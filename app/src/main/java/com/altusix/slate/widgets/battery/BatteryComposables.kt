@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -76,7 +75,7 @@ fun MinimalBatteryTile(
                         text = "BATTERY",
                         style = TextStyle(
                             color = ColorProvider(secondaryTextColor),
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )
@@ -86,7 +85,7 @@ fun MinimalBatteryTile(
                             text = "CHARGING",
                             style = TextStyle(
                                 color = ColorProvider(accentColor),
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -99,7 +98,7 @@ fun MinimalBatteryTile(
                     text = "$percentage%",
                     style = TextStyle(
                         color = ColorProvider(primaryTextColor),
-                        fontSize = 40.sp,
+                        fontSize = 44.sp,
                         fontWeight = FontWeight.Bold
                     )
                 )
@@ -108,10 +107,7 @@ fun MinimalBatteryTile(
 
                 LinearProgressIndicator(
                     progress = (percentage.coerceIn(0, 100) / 100f),
-                    modifier = GlanceModifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .cornerRadius(SlateShapes.CapsuleRadius),
+                    modifier = GlanceModifier.fillMaxWidth().height(6.dp),
                     color = ColorProvider(accentColor),
                     backgroundColor = ColorProvider(trackColor)
                 )
@@ -126,8 +122,9 @@ fun MinimalBatteryTile(
 @Composable
 fun MultiDeviceBatteryCard(
     phonePct: Int,
-    watchPct: Int = 82,
-    budsPct: Int = 94,
+    isCharging: Boolean,
+    tempText: String,
+    voltageText: String,
     config: SlateWidgetConfig
 ) {
     val isLight = config.themeMode == "LIGHT"
@@ -156,8 +153,9 @@ fun MultiDeviceBatteryCard(
                 verticalAlignment = Alignment.Vertical.CenterVertically
             ) {
                 DeviceBatteryRow(
-                    name = "PHONE",
-                    pct = phonePct,
+                    name = if (isCharging) "PHONE • CHARGING" else "PHONE LEVEL",
+                    pctText = "$phonePct%",
+                    pctRatio = phonePct / 100f,
                     accentColor = accentColor,
                     textColor = primaryTextColor,
                     subTextColor = secondaryTextColor,
@@ -167,8 +165,9 @@ fun MultiDeviceBatteryCard(
                 Spacer(modifier = GlanceModifier.height(12.dp))
 
                 DeviceBatteryRow(
-                    name = "WATCH",
-                    pct = watchPct,
+                    name = "TEMPERATURE",
+                    pctText = tempText,
+                    pctRatio = 0.45f,
                     accentColor = accentColor,
                     textColor = primaryTextColor,
                     subTextColor = secondaryTextColor,
@@ -178,8 +177,9 @@ fun MultiDeviceBatteryCard(
                 Spacer(modifier = GlanceModifier.height(12.dp))
 
                 DeviceBatteryRow(
-                    name = "BUDS",
-                    pct = budsPct,
+                    name = "VOLTAGE",
+                    pctText = voltageText,
+                    pctRatio = 0.82f,
                     accentColor = accentColor,
                     textColor = primaryTextColor,
                     subTextColor = secondaryTextColor,
@@ -193,7 +193,8 @@ fun MultiDeviceBatteryCard(
 @Composable
 private fun DeviceBatteryRow(
     name: String,
-    pct: Int,
+    pctText: String,
+    pctRatio: Float,
     accentColor: Color,
     textColor: Color,
     subTextColor: Color,
@@ -214,10 +215,10 @@ private fun DeviceBatteryRow(
                 modifier = GlanceModifier.defaultWeight()
             )
             Text(
-                text = "$pct%",
+                text = pctText,
                 style = TextStyle(
                     color = ColorProvider(textColor),
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -226,11 +227,8 @@ private fun DeviceBatteryRow(
         Spacer(modifier = GlanceModifier.height(5.dp))
 
         LinearProgressIndicator(
-            progress = (pct.coerceIn(0, 100) / 100f),
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .height(5.dp)
-                .cornerRadius(SlateShapes.CapsuleRadius),
+            progress = pctRatio.coerceIn(0f, 1f),
+            modifier = GlanceModifier.fillMaxWidth().height(5.dp),
             color = ColorProvider(accentColor),
             backgroundColor = ColorProvider(trackColor)
         )
@@ -280,7 +278,7 @@ fun HorizontalBatteryStrip(
                             text = "BATTERY",
                             style = TextStyle(
                                 color = ColorProvider(secondaryTextColor),
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -290,7 +288,7 @@ fun HorizontalBatteryStrip(
                                 text = "• CHARGING",
                                 style = TextStyle(
                                     color = ColorProvider(accentColor),
-                                    fontSize = 9.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
@@ -300,7 +298,7 @@ fun HorizontalBatteryStrip(
                             text = "$percentage%",
                             style = TextStyle(
                                 color = ColorProvider(primaryTextColor),
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -310,10 +308,7 @@ fun HorizontalBatteryStrip(
 
                     LinearProgressIndicator(
                         progress = (percentage.coerceIn(0, 100) / 100f),
-                        modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .cornerRadius(SlateShapes.CapsuleRadius),
+                        modifier = GlanceModifier.fillMaxWidth().height(5.dp),
                         color = ColorProvider(accentColor),
                         backgroundColor = ColorProvider(trackColor)
                     )
@@ -342,13 +337,11 @@ fun ArcGaugeBatteryTile(
     val accentColor = Color(config.accentColorHex)
     val trackColor = if (isLight) Color(0x1F000000) else accentColor.copy(alpha = 0.2f)
 
-    val gaugeBitmap = remember(percentage, accentColor, trackColor) {
-        generateArcGaugeBitmap(
-            percentage = percentage,
-            accentColor = accentColor,
-            trackColor = trackColor
-        )
-    }
+    val gaugeBitmap = generateArcGaugeBitmap(
+        percentage = percentage,
+        accentColor = accentColor,
+        trackColor = trackColor
+    )
 
     Box(
         modifier = GlanceModifier.fillMaxSize(),
@@ -375,7 +368,7 @@ fun ArcGaugeBatteryTile(
                         text = "BATTERY",
                         style = TextStyle(
                             color = ColorProvider(secondaryTextColor),
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )
@@ -385,7 +378,7 @@ fun ArcGaugeBatteryTile(
                             text = "CHARGING",
                             style = TextStyle(
                                 color = ColorProvider(accentColor),
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -396,7 +389,7 @@ fun ArcGaugeBatteryTile(
 
                 Image(
                     provider = ImageProvider(gaugeBitmap),
-                    contentDescription = "Battery Level Arc Gauge",
+                    contentDescription = "Battery Arc Gauge",
                     modifier = GlanceModifier
                         .width(110.dp)
                         .height(55.dp)
@@ -408,7 +401,7 @@ fun ArcGaugeBatteryTile(
                     text = "$percentage%",
                     style = TextStyle(
                         color = ColorProvider(primaryTextColor),
-                        fontSize = 36.sp,
+                        fontSize = 38.sp,
                         fontWeight = FontWeight.Bold
                     )
                 )
@@ -457,6 +450,152 @@ private fun generateArcGaugeBitmap(
 
     if (currentSweep > 0) {
         canvas.drawArc(rectF, startAngle, currentSweep, false, activePaint)
+    }
+
+    return bitmap
+}
+
+// ============================================================================
+// WIDGET #5: EDITORIAL STATS TILE (2x2)
+// ============================================================================
+@Composable
+fun EditorialStatsBatteryTile(
+    percentage: Int,
+    healthText: String,
+    secondaryStatText: String,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary else SlateColors.TextDarkPrimary
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary else SlateColors.TextDarkSecondary
+
+    val accentColor = Color(config.accentColorHex)
+    val trackColor = if (isLight) Color(0x1F000000) else Color(0x2EFFFFFF)
+
+    val barBitmap = generateSegmentedBarBitmap(
+        percentage = percentage,
+        accentColor = accentColor,
+        trackColor = trackColor
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(152.dp)
+                .height(152.dp)
+                .cornerRadius(SlateShapes.CornerLarge)
+                .background(finalBgColor)
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                verticalAlignment = Alignment.Vertical.CenterVertically
+            ) {
+                Text(
+                    text = "$percentage%",
+                    style = TextStyle(
+                        color = ColorProvider(primaryTextColor),
+                        fontSize = 46.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+
+                Spacer(modifier = GlanceModifier.height(6.dp))
+
+                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                    Text(
+                        text = "• ",
+                        style = TextStyle(
+                            color = ColorProvider(accentColor),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = healthText,
+                        style = TextStyle(
+                            color = ColorProvider(secondaryTextColor),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+
+                Spacer(modifier = GlanceModifier.height(3.dp))
+
+                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                    Text(
+                        text = "• ",
+                        style = TextStyle(
+                            color = ColorProvider(secondaryTextColor),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = secondaryStatText,
+                        style = TextStyle(
+                            color = ColorProvider(secondaryTextColor),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+
+                Spacer(modifier = GlanceModifier.defaultWeight())
+
+                Image(
+                    provider = ImageProvider(barBitmap),
+                    contentDescription = "Segmented Bar",
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun generateSegmentedBarBitmap(
+    percentage: Int,
+    accentColor: Color,
+    trackColor: Color,
+    widthPx: Int = 240,
+    heightPx: Int = 36,
+    totalSegments: Int = 20
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val activeSegments = (percentage.coerceIn(0, 100) / 100f * totalSegments).toInt()
+    val segmentWidth = widthPx.toFloat() / totalSegments
+    val barWidth = segmentWidth * 0.58f
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = accentColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val trackPaint = Paint().apply {
+        isAntiAlias = true
+        color = trackColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    for (i in 0 until totalSegments) {
+        val left = i * segmentWidth
+        val right = left + barWidth
+        val paint = if (i < activeSegments) activePaint else trackPaint
+
+        val rect = RectF(left, 0f, right, heightPx.toFloat())
+        canvas.drawRoundRect(rect, 4f, 4f, paint)
     }
 
     return bitmap

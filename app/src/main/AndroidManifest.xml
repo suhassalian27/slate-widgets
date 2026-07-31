@@ -26,7 +26,9 @@
             </intent-filter>
         </activity>
 
-        <!-- All 2x2 Widgets point to @xml/widget_info_2x2 -->
+        <!-- ================================================================= -->
+        <!-- ALL 2x2 WIDGETS (Sharing @xml/widget_info_2x2)                   -->
+        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.MinimalBatteryReceiver"
             android:exported="true"
@@ -51,7 +53,21 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- All 4x2 Widgets point to @xml/widget_info_4x2 -->
+        <receiver
+            android:name=".widgets.battery.EditorialStatsBatteryReceiver"
+            android:exported="true"
+            android:label="Slate Editorial Battery">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- ================================================================= -->
+        <!-- ALL 4x2 WIDGETS (Sharing @xml/widget_info_4x2)                   -->
+        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.MultiDeviceBatteryReceiver"
             android:exported="true"
@@ -64,7 +80,9 @@
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
 
-        <!-- All 4x1 Widgets point to @xml/widget_info_4x1 -->
+        <!-- ================================================================= -->
+        <!-- ALL 4x1 WIDGETS (Sharing @xml/widget_info_4x1)                   -->
+        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.HorizontalBatteryReceiver"
             android:exported="true"
