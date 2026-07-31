@@ -600,3 +600,346 @@ private fun generateSegmentedBarBitmap(
 
     return bitmap
 }
+
+
+
+// ============================================================================
+// WIDGET #6: DOT MATRIX BATTERY LED (4x2 Wide - 9 Rows Tight Wrap)
+// ============================================================================
+
+@Composable
+fun DotMatrixBatteryLEDCard(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val activeColor = if (isLight) SlateColors.TextLightPrimary else Color.White
+    val dimColor = if (isLight) Color(0x1F000000) else Color(0x1AFFFFFF)
+
+    val matrixBitmap = generateDotMatrixLEDBitmap(
+        text = "$percentage%",
+        activeColor = activeColor,
+        dimColor = dimColor,
+        bgColor = finalBgColor,
+        columns = 25,
+        rows = 9
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            provider = ImageProvider(matrixBitmap),
+            contentDescription = "Dot Matrix Battery LED Display",
+            modifier = GlanceModifier.fillMaxSize()
+        )
+    }
+}
+
+private fun generateDotMatrixLEDBitmap(
+    text: String,
+    activeColor: Color,
+    dimColor: Color,
+    bgColor: Color,
+    columns: Int = 25,
+    rows: Int = 9
+): Bitmap {
+    val cellSize = 20f
+    val marginX = 24f
+    val marginY = 20f
+
+    val gridW = columns * cellSize
+    val gridH = rows * cellSize
+
+    val canvasW = (gridW + marginX * 2f).toInt()
+    val canvasH = (gridH + marginY * 2f).toInt()
+
+    val bitmap = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val dotRadius = cellSize * 0.35f
+    val startX = marginX
+    val startY = marginY
+
+    // 1. Draw Tight Dark Background Card
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = bgColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    val cornerRadiusPx = 44f
+    canvas.drawRoundRect(
+        0f, 0f, canvasW.toFloat(), canvasH.toFloat(),
+        cornerRadiusPx, cornerRadiusPx, bgPaint
+    )
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = activeColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    // 2. Draw Background Dot Grid Across All 9 Rows
+    for (r in 0 until rows) {
+        for (c in 0 until columns) {
+            val cx = startX + c * cellSize + cellSize / 2f
+            val cy = startY + r * cellSize + cellSize / 2f
+            canvas.drawCircle(cx, cy, dotRadius, dimPaint)
+        }
+    }
+
+    // 3. Clean 5x7 Dot Typography Map
+    val fontMap = mapOf(
+        '0' to arrayOf(0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110),
+        '1' to arrayOf(0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110),
+        '2' to arrayOf(0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111),
+        '3' to arrayOf(0b11110, 0b00001, 0b00001, 0b00110, 0b00001, 0b00001, 0b11110),
+        '4' to arrayOf(0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010),
+        '5' to arrayOf(0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110),
+        '6' to arrayOf(0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110),
+        '7' to arrayOf(0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000),
+        '8' to arrayOf(0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110),
+        '9' to arrayOf(0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100),
+        '%' to arrayOf(0b11001, 0b11010, 0b00010, 0b00100, 0b01000, 0b01011, 0b10011)
+    )
+
+    // Center digits vertically (startRow = 1 leaves 1 row top & 1 row bottom)
+    val startRow = (rows - 7) / 2
+    val textWidthCols = text.length * 5 + (text.length - 1) * 1
+    var startCol = (columns - textWidthCols) / 2
+
+    text.forEach { char ->
+        val glyph = fontMap[char]
+        if (glyph != null && startCol + 5 <= columns) {
+            for (r in 0..6) {
+                val rowBits = glyph[r]
+                for (bit in 0..4) {
+                    if ((rowBits and (1 shl (4 - bit))) != 0) {
+                        val c = startCol + bit
+                        val targetRow = startRow + r
+                        val cx = startX + c * cellSize + cellSize / 2f
+                        val cy = startY + targetRow * cellSize + cellSize / 2f
+                        canvas.drawCircle(cx, cy, dotRadius, activePaint)
+                    }
+                }
+            }
+            startCol += 6
+        }
+    }
+
+    return bitmap
+}
+
+
+// ============================================================================
+// WIDGET #7: DOT LEVEL METER TILE
+// ============================================================================
+
+@Composable
+fun DotLevelMeterTile(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val activeColor = Color(config.accentColorHex)
+    val dimColor = if (isLight) Color(0x1F000000) else Color(0x1AFFFFFF)
+
+    val bitmap = generateDotLevelBitmap(
+        percentage = percentage,
+        activeColor = activeColor,
+        dimColor = dimColor,
+        columns = 10,
+        rows = 10,
+        aspectRatioHeight = 250
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(152.dp)
+                .height(152.dp)
+                .cornerRadius(SlateShapes.CornerLarge)
+                .background(finalBgColor)
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                provider = ImageProvider(bitmap),
+                contentDescription = "100-Dot Battery Level Tile",
+                modifier = GlanceModifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+// ============================================================================
+// WIDGET #8: DOT LEVEL METER CARD
+// ============================================================================
+
+@Composable
+fun DotLevelMeterCard(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val activeColor = Color(config.accentColorHex)
+    val dimColor = if (isLight) Color(0x1F000000) else Color(0x1AFFFFFF)
+
+    val bitmap = generateCenteredLevelBitmap(
+        percentage = percentage,
+        activeColor = activeColor,
+        dimColor = dimColor,
+        bgColor = finalBgColor,
+        columns = 20,
+        rows = 5
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            provider = ImageProvider(bitmap),
+            contentDescription = "20x5 Dot Battery Level Card",
+            modifier = GlanceModifier.fillMaxSize()
+        )
+    }
+}
+
+private fun generateCenteredLevelBitmap(
+    percentage: Int,
+    activeColor: Color,
+    dimColor: Color,
+    bgColor: Color,
+    columns: Int = 20,
+    rows: Int = 5
+): Bitmap {
+    val cellSize = 22f
+    val marginX = 24f
+    val marginY = 20f
+
+    val gridW = columns * cellSize
+    val gridH = rows * cellSize
+
+    val canvasW = (gridW + marginX * 2f).toInt()
+    val canvasH = (gridH + marginY * 2f).toInt()
+
+    val bitmap = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    // Reduced multiplier (0.28f) creates distinctly larger gaps between dots
+    val dotRadius = cellSize * 0.28f
+    val startX = marginX
+    val startY = marginY
+
+    // 1. Draw Rounded Background Card Directly on Canvas
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = bgColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    val cornerRadiusPx = 44f
+    canvas.drawRoundRect(
+        0f, 0f, canvasW.toFloat(), canvasH.toFloat(),
+        cornerRadiusPx, cornerRadiusPx, bgPaint
+    )
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = activeColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val totalDots = columns * rows // 100 dots
+    val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
+    val emptyDotsCount = totalDots - activeDotsCount // Drains top-to-bottom
+
+    for (i in 0 until totalDots) {
+        val r = i / columns
+        val c = i % columns
+
+        val cx = startX + c * cellSize + cellSize / 2f
+        val cy = startY + r * cellSize + cellSize / 2f
+
+        val paint = if (i < emptyDotsCount) dimPaint else activePaint
+        canvas.drawCircle(cx, cy, dotRadius, paint)
+    }
+
+    return bitmap
+}
+
+private fun generateDotLevelBitmap(
+    percentage: Int,
+    activeColor: Color,
+    dimColor: Color,
+    columns: Int,
+    rows: Int,
+    aspectRatioHeight: Int
+): Bitmap {
+    val widthPx = columns * 25
+    val heightPx = aspectRatioHeight
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val cellW = widthPx.toFloat() / columns
+    val cellH = heightPx.toFloat() / rows
+    val dotRadius = minOf(cellW, cellH) * 0.36f
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = activeColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val totalDots = columns * rows // 100 dots
+    val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
+    val emptyDotsCount = totalDots - activeDotsCount // Drains top-to-bottom
+
+    for (i in 0 until totalDots) {
+        val r = i / columns
+        val c = i % columns
+
+        val cx = c * cellW + cellW / 2f
+        val cy = r * cellH + cellH / 2f
+
+        val paint = if (i < emptyDotsCount) dimPaint else activePaint
+        canvas.drawCircle(cx, cy, dotRadius, paint)
+    }
+
+    return bitmap
+}
+

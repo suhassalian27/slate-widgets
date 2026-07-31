@@ -215,3 +215,69 @@ class EditorialStatsBatteryWidget : GlanceAppWidget() {
 class EditorialStatsBatteryReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = EditorialStatsBatteryWidget()
 }
+
+// 6. Dot Matrix Battery LED (4x2 Wide)
+class DotMatrixBatteryLEDWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) {
+            SlateWidgetConfig()
+        }
+
+        provideContent {
+            DotMatrixBatteryLEDCard(percentage = data.percentage, isCharging = data.isCharging, config = config)
+        }
+    }
+}
+
+class DotMatrixBatteryLEDReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = DotMatrixBatteryLEDWidget()
+}
+
+// 7. 100-Dot Level Meter Tile (2x2)
+class DotLevelMeterWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) {
+            SlateWidgetConfig()
+        }
+
+        provideContent {
+            DotLevelMeterTile(percentage = data.percentage, isCharging = data.isCharging, config = config)
+        }
+    }
+}
+
+class DotLevelMeterReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWidget()
+}
+
+// 8. 100-Dot Level Meter Card (4x2)
+class DotLevelMeterWideWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) {
+            SlateWidgetConfig()
+        }
+
+        provideContent {
+            DotLevelMeterCard(percentage = data.percentage, isCharging = data.isCharging, config = config)
+        }
+    }
+}
+
+class DotLevelMeterWideReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWideWidget()
+}

@@ -34,6 +34,9 @@ import androidx.lifecycle.lifecycleScope
 import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.battery.ArcGaugeBatteryWidget
+import com.altusix.slate.widgets.battery.DotLevelMeterWideWidget
+import com.altusix.slate.widgets.battery.DotLevelMeterWidget
+import com.altusix.slate.widgets.battery.DotMatrixBatteryLEDWidget
 import com.altusix.slate.widgets.battery.EditorialStatsBatteryWidget
 import com.altusix.slate.widgets.battery.HorizontalBatteryWidget
 import com.altusix.slate.widgets.battery.MinimalBatteryWidget
@@ -286,6 +289,9 @@ class WidgetConfigActivity : ComponentActivity() {
                     widgetClassName.contains("MultiDeviceBatteryReceiver") -> MultiDeviceBatteryWidget()
                     widgetClassName.contains("HorizontalBatteryReceiver") -> HorizontalBatteryWidget()
                     widgetClassName.contains("EditorialStatsBatteryReceiver") -> EditorialStatsBatteryWidget()
+                    widgetClassName.contains("DotMatrixBatteryLEDReceiver") -> DotMatrixBatteryLEDWidget()
+                    widgetClassName.contains("DotLevelMeterReceiver") -> DotLevelMeterWidget()
+                    widgetClassName.contains("DotLevelMeterWideReceiver") -> DotLevelMeterWideWidget()
                     else -> MinimalBatteryWidget()
                 }
 
