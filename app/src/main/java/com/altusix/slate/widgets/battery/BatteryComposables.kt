@@ -35,6 +35,7 @@ import androidx.glance.unit.ColorProvider
 import com.altusix.slate.core.theme.SlateColors
 import com.altusix.slate.data.local.SlateWidgetConfig
 import kotlin.math.roundToInt
+import kotlin.math.floor
 
 // ============================================================================
 // HELPER: Canvas Bitmap Background (Aspect-Matched to LocalSize)
@@ -1024,20 +1025,16 @@ fun DotLevelMeterCard(
     val activeColor = Color(config.accentColorHex)
     val dimColor = if (isLight) Color(0x1F000000) else Color(0x1AFFFFFF)
 
-    val canvasW = (size.width.value * 3f).toInt().coerceAtLeast(300)
-    val canvasH = (size.height.value * 3f).toInt().coerceAtLeast(200)
-    val aspect = canvasW.toFloat() / canvasH.toFloat()
-
-    val dynamicRows = if (aspect >= 1.0f) 6 else (6 / aspect).toInt().coerceIn(6, 16)
-    val dynamicCols = if (aspect >= 1.0f) (6 * aspect).toInt().coerceIn(16, 40) else 10
+    val cardHeightDp = 152.dp
+    val canvasH = 450 // High-DPI canvas height
+    val aspect = (size.width.value / cardHeightDp.value).coerceAtLeast(1.2f)
+    val canvasW = (canvasH * aspect).toInt().coerceAtLeast(540)
 
     val bitmap = generateCenteredLevelBitmap(
         percentage = percentage,
         activeColor = activeColor,
         dimColor = dimColor,
         bgColor = finalBgColor,
-        columns = dynamicCols,
-        rows = dynamicRows,
         targetWidthPx = canvasW,
         targetHeightPx = canvasH
     )
@@ -1046,11 +1043,17 @@ fun DotLevelMeterCard(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            provider = ImageProvider(bitmap),
-            contentDescription = "Dot Battery Level Card",
-            modifier = GlanceModifier.fillMaxSize()
-        )
+        Box(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(cardHeightDp)
+        ) {
+            Image(
+                provider = ImageProvider(bitmap),
+                contentDescription = "Dot Battery Level Card",
+                modifier = GlanceModifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -1059,8 +1062,6 @@ private fun generateCenteredLevelBitmap(
     activeColor: Color,
     dimColor: Color,
     bgColor: Color,
-    columns: Int,
-    rows: Int,
     targetWidthPx: Int,
     targetHeightPx: Int
 ): Bitmap {
@@ -1070,6 +1071,7 @@ private fun generateCenteredLevelBitmap(
     val w = targetWidthPx.toFloat()
     val h = targetHeightPx.toFloat()
 
+    // 1. Draw Background Card
     val bgPaint = Paint().apply {
         isAntiAlias = true
         color = bgColor.toArgb()
@@ -1078,20 +1080,24 @@ private fun generateCenteredLevelBitmap(
     val cornerRadiusPx = 54f
     canvas.drawRoundRect(0f, 0f, w, h, cornerRadiusPx, cornerRadiusPx, bgPaint)
 
-    val paddingX = 40f
-    val paddingY = 40f
-    val availW = w - (paddingX * 2f)
-    val availH = h - (paddingY * 2f)
+    // 2. Proportional Geometry Calculation
+    val rows = 5
 
-    val cellW = availW / columns
-    val cellH = availH / rows
-    val cellSize = minOf(cellW, cellH)
+    // Reserve 1.6 cell heights total for vertical padding (0.8 top + 0.8 bottom)
+    val cellSize = h / (rows + 1.6f)
+    val paddingY = cellSize * 0.8f
+    val paddingX = cellSize * 0.9f // Safe horizontal offset to clear rounded corners
+
+    val availW = w - (paddingX * 2f)
+    val columns = floor(availW / cellSize).toInt().coerceAtLeast(12)
 
     val gridW = columns * cellSize
     val gridH = rows * cellSize
+
+    // Center grid inside safe padded area
     val startX = (w - gridW) / 2f
     val startY = (h - gridH) / 2f
-    val dotRadius = cellSize * 0.35f
+    val dotRadius = cellSize * 0.32f
 
     val activePaint = Paint().apply {
         isAntiAlias = true
@@ -1105,6 +1111,7 @@ private fun generateCenteredLevelBitmap(
         style = Paint.Style.FILL
     }
 
+    // 3. Render Matrix Dots
     val totalDots = columns * rows
     val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
     val emptyDotsCount = totalDots - activeDotsCount
