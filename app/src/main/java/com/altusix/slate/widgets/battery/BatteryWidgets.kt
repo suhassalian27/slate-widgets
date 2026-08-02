@@ -15,6 +15,7 @@ import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
+import androidx.glance.appwidget.SizeMode
 
 data class DetailedBatteryData(
     val percentage: Int,
@@ -136,6 +137,9 @@ suspend fun updateAllBatteryWidgets(context: Context) {
     }
     if (manager.getGlanceIds(PixelHeartBatteryWidget::class.java).isNotEmpty()) {
         PixelHeartBatteryWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(LightningBoltBatteryWidget::class.java).isNotEmpty()) {
+        LightningBoltBatteryWidget().updateAll(context)
     }
 }
 
@@ -309,4 +313,33 @@ class PixelHeartBatteryWidget : GlanceAppWidget() {
 }
 class PixelHeartBatteryReceiver : BaseBatteryReceiver() {
     override val glanceAppWidget: GlanceAppWidget = PixelHeartBatteryWidget()
+}
+
+
+// 11. Responsive Wavy Lightning Bolt Tile (2x2 / 4x2)
+class LightningBoltBatteryWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) { SlateWidgetConfig() }
+
+        provideContent {
+            LightningBoltBatteryTile(
+                percentage = data.percentage,
+                isCharging = data.isCharging,
+                tempText = data.tempText,
+                voltageText = data.voltageText,
+                config = config
+            )
+        }
+    }
+}
+
+class LightningBoltBatteryReceiver : BaseBatteryReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = LightningBoltBatteryWidget()
 }

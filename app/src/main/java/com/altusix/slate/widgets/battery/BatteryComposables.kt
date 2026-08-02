@@ -30,6 +30,9 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.altusix.slate.core.theme.SlateColors
 import com.altusix.slate.data.local.SlateWidgetConfig
+import android.graphics.Path
+import androidx.glance.LocalSize
+import androidx.glance.layout.fillMaxHeight
 
 // ============================================================================
 // HELPER: Canvas Bitmap Background (Aspect-Matched for Sharp Corners on All ROMs)
@@ -1263,5 +1266,235 @@ private fun generatePixelHeartBitmap(
         }
     }
 
+    return bitmap
+}
+
+
+
+
+
+// ============================================================================
+// WIDGET #11: RESPONSIVE WAVY LIGHTNING BOLT (Aspect-Matched Geometry)
+// ============================================================================
+@Composable
+fun LightningBoltBatteryTile(
+    percentage: Int,
+    isCharging: Boolean,
+    tempText: String,
+    voltageText: String,
+    config: SlateWidgetConfig
+) {
+    val size = LocalSize.current
+    val isWide = size.width >= 200.dp // True for 4x2 and 6x2 wide cards
+
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val accentColor = Color(config.accentColorHex)
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary else SlateColors.TextDarkPrimary
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary else SlateColors.TextDarkSecondary
+    val dimColor = if (isLight) Color(0x2B000000) else Color(0x2BFFFFFF)
+
+    // Calculate exact canvas aspect ratio from LocalSize to prevent bitmap stretching on launcher cells
+    val heightPx = 300
+    val aspect = (size.width.value / 152f).coerceAtLeast(1.0f)
+    val canvasW = (heightPx * aspect).toInt()
+    val canvasH = heightPx
+
+    val compositeBitmap = generateWavyLightningBoltBitmap(
+        percentage = percentage,
+        accentColor = accentColor,
+        dimColor = dimColor,
+        bgColor = finalBgColor,
+        widthPx = canvasW,
+        heightPx = canvasH,
+        isWide = isWide
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isWide) {
+            // ================================================================
+            // WIDE LAYOUT (4x2 & 6x2: Locked to 152dp Height)
+            // ================================================================
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(152.dp)
+                    .background(ImageProvider(compositeBitmap))
+                    .padding(horizontal = 22.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = GlanceModifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Vertical.CenterVertically
+                ) {
+                    Column(
+                        modifier = GlanceModifier
+                            .fillMaxHeight()
+                            .defaultWeight(),
+                        verticalAlignment = Alignment.Vertical.CenterVertically
+                    ) {
+                        Text(
+                            text = "$percentage% / $tempText",
+                            style = TextStyle(
+                                color = ColorProvider(primaryTextColor),
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+
+                        Spacer(modifier = GlanceModifier.height(4.dp))
+
+                        Text(
+                            text = if (isCharging) "Charging • Connected" else "Discharging • $voltageText",
+                            style = TextStyle(
+                                color = ColorProvider(secondaryTextColor),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        Spacer(modifier = GlanceModifier.defaultWeight())
+
+                        Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                            Text(
+                                text = "⚡ ",
+                                style = TextStyle(
+                                    color = ColorProvider(accentColor),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                            Text(
+                                text = if (isCharging) "Fast Charging Active" else "Battery Normal",
+                                style = TextStyle(
+                                    color = ColorProvider(primaryTextColor),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
+
+                    // Spacer reserving right-side space for the bolt graphic
+                    Spacer(modifier = GlanceModifier.defaultWeight())
+                }
+            }
+        } else {
+            // ================================================================
+            // COMPACT 2x2 LAYOUT (Strict 152dp x 152dp Square Tile)
+            // ================================================================
+            Box(
+                modifier = GlanceModifier
+                    .width(152.dp)
+                    .height(152.dp)
+                    .background(ImageProvider(compositeBitmap))
+            ) {}
+        }
+    }
+}
+
+private fun generateWavyLightningBoltBitmap(
+    percentage: Int,
+    accentColor: Color,
+    dimColor: Color,
+    bgColor: Color,
+    widthPx: Int,
+    heightPx: Int,
+    isWide: Boolean
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val w = widthPx.toFloat()
+    val h = heightPx.toFloat()
+
+    // 1. Draw Card Background with fixed 44px rounded corners
+    val cornerRadiusPx = 44f
+    val cardRect = RectF(0f, 0f, w, h)
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = bgColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadiusPx, cornerRadiusPx, bgPaint)
+
+    // Clip Canvas to Card Bounds for clean corner masking
+    canvas.save()
+    val cardClipPath = Path().apply {
+        addRoundRect(cardRect, cornerRadiusPx, cornerRadiusPx, Path.Direction.CW)
+    }
+    canvas.clipPath(cardClipPath)
+
+    // 2. Fixed Pixel Geometry Anchored relative to height (150px = h / 2)
+    // Anchored 150px from right edge on wide cards, centered at w / 2 on 2x2 square cards
+    val centerX = if (isWide) w - 150f else w / 2f
+
+    val boltPath = Path().apply {
+        moveTo(centerX - 48f,  -36f) // Top-Left Cap
+        lineTo(centerX + 115f, -36f) // Top-Right Cap
+        lineTo(centerX - 12f,  126f) // Upper Right Slant
+        lineTo(centerX + 145f, 126f) // Middle Right Notch
+        lineTo(centerX - 125f, 336f) // Bottom Sharp Tip
+        lineTo(centerX - 42f,  162f) // Lower Left Slant
+        lineTo(centerX - 145f, 162f) // Middle Left Notch
+        close()
+    }
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = accentColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    // Draw Unfilled Track
+    canvas.drawPath(boltPath, dimPaint)
+
+    // 3. Liquid Wavy Fill Path
+    val maxFillY = -36f
+    val minFillY = 336f
+    val fillProgress = percentage.coerceIn(0, 100) / 100f
+    val fillY = minFillY - ((minFillY - maxFillY) * fillProgress)
+
+    if (fillProgress > 0f) {
+        val wavePath = Path().apply {
+            val waveAmplitude = 10f
+            val waveLength = 250f
+
+            moveTo(-100f, fillY)
+
+            var x = -100f
+            var isUp = true
+            while (x < w + 100f) {
+                val nextX = x + (waveLength / 2f)
+                val midX = x + ((nextX - x) / 2f)
+                val controlY = if (isUp) fillY - waveAmplitude else fillY + waveAmplitude
+
+                quadTo(midX, controlY, nextX, fillY)
+                x = nextX
+                isUp = !isUp
+            }
+
+            lineTo(w + 100f, h + 100f)
+            lineTo(-100f, h + 100f)
+            close()
+        }
+
+        canvas.save()
+        canvas.clipPath(wavePath)
+        canvas.drawPath(boltPath, activePaint)
+        canvas.restore()
+    }
+
+    canvas.restore()
     return bitmap
 }
