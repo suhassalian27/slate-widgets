@@ -958,3 +958,174 @@ private fun generateDotLevelBitmap(
 
     return bitmap
 }
+
+// ============================================================================
+// WIDGET #9: 5-BAR SEGMENTED PILL BATTERY TILE (2x2)
+// ============================================================================
+@Composable
+fun SegmentedPillBatteryTile(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary else SlateColors.TextDarkPrimary
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary else SlateColors.TextDarkSecondary
+    val accentColor = Color(config.accentColorHex)
+
+    val dimColor = if (isLight) Color(0x1F000000) else Color(0x26FFFFFF)
+    val containerBgColor = if (isLight) Color(0x0F000000) else Color(0x1AFFFFFF)
+
+    val gaugeBitmap = generateFivePillGaugeBitmap(
+        percentage = percentage,
+        accentColor = accentColor,
+        dimColor = dimColor,
+        containerBgColor = containerBgColor,
+        widthPx = 220,
+        heightPx = 95
+    )
+
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 300, heightPx = 300, cornerRadiusPx = 40f)
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(152.dp)
+                .height(152.dp)
+                .background(ImageProvider(bgBitmap))
+                .padding(14.dp)
+        ) {
+            Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+                verticalAlignment = Alignment.Vertical.CenterVertically
+            ) {
+                // Header: Icon + Percentage
+                Row(
+                    verticalAlignment = Alignment.Vertical.CenterVertically
+                ) {
+                    if (isCharging) {
+                        Text(
+                            text = "⚡ ",
+                            style = TextStyle(
+                                color = ColorProvider(accentColor),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
+                    Text(
+                        text = "$percentage%",
+                        style = TextStyle(
+                            color = ColorProvider(primaryTextColor),
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+
+                Spacer(modifier = GlanceModifier.defaultWeight())
+
+                // 5-Bar Pill Gauge Image
+                Image(
+                    provider = ImageProvider(gaugeBitmap),
+                    contentDescription = "5-Bar Pill Battery Gauge",
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                )
+
+                Spacer(modifier = GlanceModifier.defaultWeight())
+
+                // Bottom Subtitle (Charging status / estimate placeholder)
+                Text(
+                    text = if (isCharging) "Charging" else "~ Discharging",
+                    style = TextStyle(
+                        color = ColorProvider(secondaryTextColor),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+    }
+}
+
+private fun generateFivePillGaugeBitmap(
+    percentage: Int,
+    accentColor: Color,
+    dimColor: Color,
+    containerBgColor: Color,
+    widthPx: Int = 220,
+    heightPx: Int = 95
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    // 1. Draw Outer Rounded Pill Enclosure
+    val enclosurePaint = Paint().apply {
+        isAntiAlias = true
+        color = containerBgColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    val cornerRadius = heightPx * 0.28f
+    val enclosureRect = RectF(0f, 0f, widthPx.toFloat(), heightPx.toFloat())
+    canvas.drawRoundRect(enclosureRect, cornerRadius, cornerRadius, enclosurePaint)
+
+    // 2. Bar Layout Calculations
+    val paddingX = widthPx * 0.07f
+    val paddingY = heightPx * 0.14f
+    val innerW = widthPx - (paddingX * 2f)
+    val innerH = heightPx - (paddingY * 2f)
+
+    val totalBars = 5
+    val spacing = innerW * 0.05f
+    val barWidth = (innerW - (spacing * (totalBars - 1))) / totalBars
+    val barCornerRadius = barWidth * 0.35f
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = accentColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    for (i in 0 until totalBars) {
+        val left = paddingX + i * (barWidth + spacing)
+        val right = left + barWidth
+        val top = paddingY
+        val bottom = heightPx - paddingY
+
+        val barRect = RectF(left, top, right, bottom)
+
+        // Draw Dim Background Bar
+        canvas.drawRoundRect(barRect, barCornerRadius, barCornerRadius, dimPaint)
+
+        // 3. Sub-step calculation (5% per step = 4 steps per 20% bar)
+        val barPct = (percentage - (i * 20)).coerceIn(0, 20)
+        val subSteps = barPct / 5 // 0, 1, 2, 3, or 4
+        val fillRatio = subSteps * 0.25f
+
+        if (fillRatio > 0f) {
+            val activeHeight = innerH * fillRatio
+            val activeTop = bottom - activeHeight
+            val activeRect = RectF(left, activeTop, right, bottom)
+
+            // Draw active fill with matching rounded corners
+            canvas.drawRoundRect(activeRect, barCornerRadius, barCornerRadius, activePaint)
+        }
+    }
+
+    return bitmap
+}

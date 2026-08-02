@@ -131,6 +131,9 @@ suspend fun updateAllBatteryWidgets(context: Context) {
     if (manager.getGlanceIds(DotLevelMeterWideWidget::class.java).isNotEmpty()) {
         DotLevelMeterWideWidget().updateAll(context)
     }
+    if (manager.getGlanceIds(SegmentedPillBatteryWidget::class.java).isNotEmpty()) {
+        SegmentedPillBatteryWidget().updateAll(context)
+    }
 }
 
 abstract class BaseBatteryReceiver : GlanceAppWidgetReceiver() {
@@ -265,4 +268,23 @@ class DotLevelMeterWideWidget : GlanceAppWidget() {
 }
 class DotLevelMeterWideReceiver : BaseBatteryReceiver() {
     override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWideWidget()
+}
+
+// 9. 5-Bar Segmented Pill Tile (2x2)
+class SegmentedPillBatteryWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) { SlateWidgetConfig() }
+
+        provideContent {
+            SegmentedPillBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config)
+        }
+    }
+}
+class SegmentedPillBatteryReceiver : BaseBatteryReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = SegmentedPillBatteryWidget()
 }
