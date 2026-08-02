@@ -27,6 +27,36 @@
         </activity>
 
         <!-- ================================================================= -->
+        <!-- 1x2 WIDGETS                                                       -->
+        <!-- ================================================================= -->
+        <receiver
+            android:name=".widgets.battery.VerticalBatteryPillReceiver"
+            android:exported="true"
+            android:label="Vertical Battery Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
+
+        <!-- ================================================================= -->
+        <!-- 2x1 WIDGETS                                                       -->
+        <!-- ================================================================= -->
+        <receiver
+            android:name=".widgets.battery.HorizontalBatteryPillReceiver"
+            android:exported="true"
+            android:label="Horizontal Battery Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- ================================================================= -->
         <!-- ALL 2x2 WIDGETS                                                   -->
         <!-- ================================================================= -->
         <receiver

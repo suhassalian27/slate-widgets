@@ -120,6 +120,8 @@ suspend fun updateAllBatteryWidgets(context: Context) {
     if (manager.getGlanceIds(PixelHeartBatteryWidget::class.java).isNotEmpty()) PixelHeartBatteryWidget().updateAll(context)
     if (manager.getGlanceIds(LightningBoltBatteryWidget::class.java).isNotEmpty()) LightningBoltBatteryWidget().updateAll(context)
     if (manager.getGlanceIds(CircularRingBatteryWidget::class.java).isNotEmpty()) CircularRingBatteryWidget().updateAll(context)
+    if (manager.getGlanceIds(VerticalBatteryPillWidget::class.java).isNotEmpty()) VerticalBatteryPillWidget().updateAll(context)
+    if (manager.getGlanceIds(HorizontalBatteryPillWidget::class.java).isNotEmpty()) HorizontalBatteryPillWidget().updateAll(context)
 }
 
 abstract class BaseBatteryReceiver : GlanceAppWidgetReceiver() {
@@ -271,4 +273,56 @@ private suspend fun getWidgetConfig(context: Context, id: GlanceId): SlateWidget
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         SlateDataStore(context).getWidgetConfig(appWidgetId).catch { emit(SlateWidgetConfig()) }.first()
     } catch (e: Exception) { SlateWidgetConfig() }
+}
+
+// ============================================================================
+// WIDGET #13: VERTICAL PILL BATTERY (1x2 Fluid)
+// ============================================================================
+class VerticalBatteryPillWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) { SlateWidgetConfig() }
+
+        provideContent {
+            VerticalBatteryPillTile(
+                percentage = data.percentage,
+                isCharging = data.isCharging,
+                config = config
+            )
+        }
+    }
+}
+class VerticalBatteryPillReceiver : BaseBatteryReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = VerticalBatteryPillWidget()
+}
+
+// ============================================================================
+// WIDGET #14: HORIZONTAL PILL BATTERY (2x1 Fluid)
+// ============================================================================
+class HorizontalBatteryPillWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) { SlateWidgetConfig() }
+
+        provideContent {
+            HorizontalBatteryPillTile(
+                percentage = data.percentage,
+                isCharging = data.isCharging,
+                config = config
+            )
+        }
+    }
+}
+class HorizontalBatteryPillReceiver : BaseBatteryReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = HorizontalBatteryPillWidget()
 }

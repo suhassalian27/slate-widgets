@@ -36,6 +36,9 @@ import com.altusix.slate.core.theme.SlateColors
 import com.altusix.slate.data.local.SlateWidgetConfig
 import kotlin.math.roundToInt
 import kotlin.math.floor
+import android.graphics.LinearGradient
+import android.graphics.Shader
+
 
 // ============================================================================
 // HELPER: Canvas Bitmap Background (Aspect-Matched to LocalSize)
@@ -1880,6 +1883,357 @@ private fun generateCircularGaugeBitmap(
         }
         canvas.drawPath(boltPath, boltPaint)
     }
+
+    return bitmap
+}
+
+
+// ============================================================================
+// WIDGET #13: VERTICAL PILL BATTERY TILE (Perfect Inner Radius & Masked Bounds)
+// ============================================================================
+@Composable
+fun VerticalBatteryPillTile(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val size = LocalSize.current
+
+    val canvasW = (size.width.value * 3f).toInt().coerceAtLeast(300)
+    val canvasH = (size.height.value * 3f).toInt().coerceAtLeast(450)
+
+    val pillBitmap = generateVerticalPillBitmap(
+        percentage = percentage,
+        isCharging = isCharging,
+        config = config,
+        widthPx = canvasW,
+        heightPx = canvasH
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            provider = ImageProvider(pillBitmap),
+            contentDescription = "Vertical Hardware Battery Gauge",
+            modifier = GlanceModifier.fillMaxSize()
+        )
+    }
+}
+
+private fun generateVerticalPillBitmap(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig,
+    widthPx: Int,
+    heightPx: Int
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val w = widthPx.toFloat()
+    val h = heightPx.toFloat()
+
+    // 1. Aspect Ratio Geometry (2.2x Height to Width)
+    val padding = minOf(w, h) * 0.05f
+    val availW = w - (padding * 2f)
+    val availH = h - (padding * 2f)
+
+    val targetRatio = 2.2f
+    var bodyW = availW
+    var bodyH = bodyW * targetRatio
+
+    if (bodyH > availH * 0.90f) {
+        bodyH = availH * 0.90f
+        bodyW = bodyH / targetRatio
+    }
+
+    val capH = bodyH * 0.045f
+    val capW = bodyW * 0.40f
+    val strokeW = (bodyW * 0.045f).coerceIn(6f, 12f)
+
+    val totalH = bodyH + capH
+    val startY = (h - totalH) / 2f
+    val centerX = w / 2f
+
+    val capRect = RectF(
+        centerX - (capW / 2f),
+        startY,
+        centerX + (capW / 2f),
+        startY + capH + strokeW
+    )
+
+    val bodyRect = RectF(
+        centerX - (bodyW / 2f) + (strokeW / 2f),
+        startY + capH,
+        centerX + (bodyW / 2f) - (strokeW / 2f),
+        startY + totalH - (strokeW / 2f)
+    )
+
+    val bodyRadius = bodyW * 0.20f
+    val capRadius = 8f
+
+    // 2. Dynamic Theme Palette
+    val isLight = config.themeMode == "LIGHT"
+    val accentColor = Color(config.accentColorHex)
+    val isLowBattery = percentage <= 20 && !isCharging
+
+    val shellBgColor = if (isLight) Color(0xFFFFFFFF).toArgb() else Color(0xFF141416).toArgb()
+    val strokeColor = if (isLight) Color(0xFFD1D1D6).toArgb() else Color(0xFF2C2C2E).toArgb()
+    val activeColor = if (isLowBattery) Color(0xFFFF3B30).toArgb() else accentColor.toArgb()
+    val dimColor = if (isLight) Color(0x14000000).toArgb() else Color(0x1AFFFFFF).toArgb()
+    val capColor = if (isCharging) activeColor else strokeColor
+
+    val strokePaint = Paint().apply {
+        isAntiAlias = true
+        color = strokeColor
+        style = Paint.Style.STROKE
+        strokeWidth = strokeW
+    }
+
+    val capPaint = Paint().apply {
+        isAntiAlias = true
+        color = capColor
+        style = Paint.Style.FILL
+    }
+
+    val shellPaint = Paint().apply {
+        isAntiAlias = true
+        color = shellBgColor
+        style = Paint.Style.FILL
+    }
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = activeColor
+        style = Paint.Style.FILL
+    }
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor
+        style = Paint.Style.FILL
+    }
+
+    // Draw Casing Outer Frame & Cap
+    canvas.drawRoundRect(capRect, capRadius, capRadius, capPaint)
+    canvas.drawRoundRect(bodyRect, bodyRadius, bodyRadius, shellPaint)
+    canvas.drawRoundRect(bodyRect, bodyRadius, bodyRadius, strokePaint)
+
+    // 3. Inner Chamber Clip Path (Ensures bar corners follow the shell curve smoothly)
+    val innerMargin = strokeW + (bodyW * 0.035f)
+    val innerRect = RectF(
+        bodyRect.left + innerMargin,
+        bodyRect.top + innerMargin,
+        bodyRect.right - innerMargin,
+        bodyRect.bottom - innerMargin
+    )
+    val innerRadius = (bodyRadius - innerMargin).coerceAtLeast(8f)
+
+    val innerClipPath = Path().apply {
+        addRoundRect(innerRect, innerRadius, innerRadius, Path.Direction.CW)
+    }
+
+    canvas.save()
+    canvas.clipPath(innerClipPath)
+
+    // 4. Render 5 Segmented Bars (Proportional corner radius)
+    val totalSegments = 5
+    val gap = innerRect.height() * 0.03f
+    val segmentH = (innerRect.height() - (gap * (totalSegments - 1))) / totalSegments
+    val segmentRadius = (segmentH * 0.18f).coerceAtLeast(8f)
+
+    val activeSegmentsCount = (percentage.coerceIn(0, 100) / 100f * totalSegments).toInt()
+
+    for (i in 0 until totalSegments) {
+        val segTop = innerRect.bottom - ((i + 1) * segmentH) - (i * gap)
+        val segBottom = segTop + segmentH
+        val segLeft = innerRect.left
+        val segRight = innerRect.right
+
+        val segRect = RectF(segLeft, segTop, segRight, segBottom)
+        val paint = if (i < activeSegmentsCount) activePaint else dimPaint
+
+        canvas.drawRoundRect(segRect, segmentRadius, segmentRadius, paint)
+    }
+
+    canvas.restore()
+
+    return bitmap
+}
+
+// ============================================================================
+// WIDGET #14: HORIZONTAL PILL BATTERY TILE (Perfect Inner Radius & Masked Bounds)
+// ============================================================================
+@Composable
+fun HorizontalBatteryPillTile(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val size = LocalSize.current
+
+    val canvasW = (size.width.value * 3f).toInt().coerceAtLeast(450)
+    val canvasH = (size.height.value * 3f).toInt().coerceAtLeast(225)
+
+    val pillBitmap = generateHorizontalPillBitmap(
+        percentage = percentage,
+        isCharging = isCharging,
+        config = config,
+        widthPx = canvasW,
+        heightPx = canvasH
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            provider = ImageProvider(pillBitmap),
+            contentDescription = "Horizontal Hardware Battery Gauge",
+            modifier = GlanceModifier.fillMaxSize()
+        )
+    }
+}
+
+private fun generateHorizontalPillBitmap(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig,
+    widthPx: Int,
+    heightPx: Int
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val w = widthPx.toFloat()
+    val h = heightPx.toFloat()
+
+    // 1. Aspect Ratio Geometry (1.85x Width to Height)
+    val padding = minOf(w, h) * 0.05f
+    val availW = w - (padding * 2f)
+    val availH = h - (padding * 2f)
+
+    val targetRatio = 1.85f
+    var bodyH = availH
+    var bodyW = bodyH * targetRatio
+
+    if (bodyW > availW * 0.90f) {
+        bodyW = availW * 0.90f
+        bodyH = bodyW / targetRatio
+    }
+
+    val capW = bodyW * 0.055f
+    val capH = bodyH * 0.40f
+    val strokeW = (bodyH * 0.045f).coerceIn(6f, 12f)
+
+    val totalW = bodyW + capW
+    val startX = (w - totalW) / 2f
+    val centerY = h / 2f
+
+    val bodyRect = RectF(
+        startX + (strokeW / 2f),
+        centerY - (bodyH / 2f),
+        startX + bodyW - (strokeW / 2f),
+        centerY + (bodyH / 2f)
+    )
+
+    val capRect = RectF(
+        bodyRect.right - strokeW,
+        centerY - (capH / 2f),
+        startX + totalW,
+        centerY + (capH / 2f)
+    )
+
+    val bodyRadius = bodyH * 0.20f
+    val capRadius = 8f
+
+    // 2. Dynamic Theme Palette
+    val isLight = config.themeMode == "LIGHT"
+    val accentColor = Color(config.accentColorHex)
+    val isLowBattery = percentage <= 20 && !isCharging
+
+    val shellBgColor = if (isLight) Color(0xFFFFFFFF).toArgb() else Color(0xFF141416).toArgb()
+    val strokeColor = if (isLight) Color(0xFFD1D1D6).toArgb() else Color(0xFF2C2C2E).toArgb()
+    val activeColor = if (isLowBattery) Color(0xFFFF3B30).toArgb() else accentColor.toArgb()
+    val dimColor = if (isLight) Color(0x14000000).toArgb() else Color(0x1AFFFFFF).toArgb()
+    val capColor = if (isCharging) activeColor else strokeColor
+
+    val strokePaint = Paint().apply {
+        isAntiAlias = true
+        color = strokeColor
+        style = Paint.Style.STROKE
+        strokeWidth = strokeW
+    }
+
+    val capPaint = Paint().apply {
+        isAntiAlias = true
+        color = capColor
+        style = Paint.Style.FILL
+    }
+
+    val shellPaint = Paint().apply {
+        isAntiAlias = true
+        color = shellBgColor
+        style = Paint.Style.FILL
+    }
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = activeColor
+        style = Paint.Style.FILL
+    }
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor
+        style = Paint.Style.FILL
+    }
+
+    // Draw Casing Outer Frame & Cap
+    canvas.drawRoundRect(capRect, capRadius, capRadius, capPaint)
+    canvas.drawRoundRect(bodyRect, bodyRadius, bodyRadius, shellPaint)
+    canvas.drawRoundRect(bodyRect, bodyRadius, bodyRadius, strokePaint)
+
+    // 3. Inner Chamber Clip Path (Ensures bar corners follow the shell curve smoothly)
+    val innerMargin = strokeW + (bodyH * 0.035f)
+    val innerRect = RectF(
+        bodyRect.left + innerMargin,
+        bodyRect.top + innerMargin,
+        bodyRect.right - innerMargin,
+        bodyRect.bottom - innerMargin
+    )
+    val innerRadius = (bodyRadius - innerMargin).coerceAtLeast(8f)
+
+    val innerClipPath = Path().apply {
+        addRoundRect(innerRect, innerRadius, innerRadius, Path.Direction.CW)
+    }
+
+    canvas.save()
+    canvas.clipPath(innerClipPath)
+
+    // 4. Render 5 Segmented Bars (Proportional corner radius)
+    val totalSegments = 5
+    val gap = innerRect.width() * 0.03f
+    val segmentW = (innerRect.width() - (gap * (totalSegments - 1))) / totalSegments
+    val segmentRadius = (segmentW * 0.18f).coerceAtLeast(8f)
+
+    val activeSegmentsCount = (percentage.coerceIn(0, 100) / 100f * totalSegments).toInt()
+
+    for (i in 0 until totalSegments) {
+        val segLeft = innerRect.left + (i * segmentW) + (i * gap)
+        val segRight = segLeft + segmentW
+        val segTop = innerRect.top
+        val segBottom = innerRect.bottom
+
+        val segRect = RectF(segLeft, segTop, segRight, segBottom)
+        val paint = if (i < activeSegmentsCount) activePaint else dimPaint
+
+        canvas.drawRoundRect(segRect, segmentRadius, segmentRadius, paint)
+    }
+
+    canvas.restore()
 
     return bitmap
 }
