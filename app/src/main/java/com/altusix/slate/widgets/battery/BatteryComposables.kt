@@ -1129,3 +1129,139 @@ private fun generateFivePillGaugeBitmap(
 
     return bitmap
 }
+
+// ============================================================================
+// WIDGET #10: PIXEL ART HEART BATTERY TILE (2x2 - Minimal / No Text)
+// ============================================================================
+@Composable
+fun PixelHeartBatteryTile(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    // User-selected accent color from settings
+    val accentColor = Color(config.accentColorHex)
+
+    // Inactive pixel color adapts seamlessly to light / dark theme
+    val dimColor = if (isLight) Color(0x2B000000) else Color(0x2BFFFFFF)
+
+    val heartBitmap = generatePixelHeartBitmap(
+        percentage = percentage,
+        accentColor = accentColor,
+        dimColor = dimColor,
+        widthPx = 280,
+        heightPx = 280
+    )
+
+    val bgBitmap = createRoundedBackgroundBitmap(
+        color = finalBgColor,
+        widthPx = 300,
+        heightPx = 300,
+        cornerRadiusPx = 40f
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(152.dp)
+                .height(152.dp)
+                .background(ImageProvider(bgBitmap))
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                provider = ImageProvider(heartBitmap),
+                contentDescription = "Pixel Heart Battery Display",
+                modifier = GlanceModifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+private fun generatePixelHeartBitmap(
+    percentage: Int,
+    accentColor: Color,
+    dimColor: Color,
+    widthPx: Int = 280,
+    heightPx: Int = 280
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    // Perfectly Symmetrical Pixel Heart Grid (11 rows x 13 columns, centered on col 6)
+    val heartGrid = arrayOf(
+        intArrayOf(0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0), // Row 0 (3 left, gap 3, 3 right)
+        intArrayOf(0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0), // Row 1 (5 left, gap 1, 5 right)
+        intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), // Row 2 (Full 13)
+        intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), // Row 3 (Full 13)
+        intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), // Row 4 (Full 13)
+        intArrayOf(0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0), // Row 5 (Width 11)
+        intArrayOf(0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0), // Row 6 (Width 9)
+        intArrayOf(0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0), // Row 7 (Width 7)
+        intArrayOf(0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0), // Row 8 (Width 5)
+        intArrayOf(0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0), // Row 9 (Width 3)
+        intArrayOf(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)  // Row 10 (Centered 1-pixel tip)
+    )
+
+    val rows = heartGrid.size
+    val cols = heartGrid[0].size
+
+    // Calculate total active pixel count in the heart shape (91 total pixels)
+    var totalHeartPixels = 0
+    for (r in 0 until rows) {
+        for (c in 0 until cols) {
+            if (heartGrid[r][c] == 1) totalHeartPixels++
+        }
+    }
+
+    val activePixelsCount = ((percentage.coerceIn(0, 100) / 100f) * totalHeartPixels).toInt()
+
+    val cellSize = minOf(widthPx.toFloat() / cols, heightPx.toFloat() / rows)
+    val dotSize = cellSize * 0.84f // Clean spacing gap between pixels
+    val gap = (cellSize - dotSize) / 2f
+    val cornerRadius = dotSize * 0.28f // Slightly rounded pixel blocks
+
+    val offsetX = (widthPx - (cols * cellSize)) / 2f
+    val offsetY = (heightPx - (rows * cellSize)) / 2f
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = accentColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val dimPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    // Fills bottom-to-top starting from single dot tip at Row 10
+    var currentPixelIndex = 0
+
+    for (r in rows - 1 downTo 0) {
+        for (c in 0 until cols) {
+            if (heartGrid[r][c] == 1) {
+                val left = offsetX + c * cellSize + gap
+                val top = offsetY + r * cellSize + gap
+                val right = left + dotSize
+                val bottom = top + dotSize
+
+                val rect = RectF(left, top, right, bottom)
+                val paint = if (currentPixelIndex < activePixelsCount) activePaint else dimPaint
+
+                canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint)
+                currentPixelIndex++
+            }
+        }
+    }
+
+    return bitmap
+}

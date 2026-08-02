@@ -46,7 +46,9 @@ class MainActivity : ComponentActivity() {
             SlateWidgetInfo("Dot Matrix LED", DotMatrixBatteryLEDReceiver::class.java),
             SlateWidgetInfo("Dot Level Wide", DotLevelMeterWideReceiver::class.java),
             SlateWidgetInfo("Battery Strip", HorizontalBatteryReceiver::class.java),
-            SlateWidgetInfo("5-Pill Gauge", SegmentedPillBatteryReceiver::class.java)
+            SlateWidgetInfo("5-Pill Gauge", SegmentedPillBatteryReceiver::class.java),
+            SlateWidgetInfo("Pixel Heart", PixelHeartBatteryReceiver::class.java)
+
         )
 
         setContent {
