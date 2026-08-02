@@ -48,7 +48,8 @@ class MainActivity : ComponentActivity() {
             SlateWidgetInfo("Battery Strip", HorizontalBatteryReceiver::class.java),
             SlateWidgetInfo("5-Pill Gauge", SegmentedPillBatteryReceiver::class.java),
             SlateWidgetInfo("Pixel Heart", PixelHeartBatteryReceiver::class.java),
-            SlateWidgetInfo("Lightning Bolt", LightningBoltBatteryReceiver::class.java)
+            SlateWidgetInfo("Lightning Bolt", LightningBoltBatteryReceiver::class.java),
+            SlateWidgetInfo("Circular Dial", CircularRingBatteryReceiver::class.java)
         )
 
         setContent {

@@ -263,7 +263,7 @@ private fun DeviceBatteryRow(
 }
 
 // ============================================================================
-// WIDGET #3: HORIZONTAL STRIP (4x1)
+// WIDGET #3: HORIZONTAL STRIP (4x1 / 6x1 - Composite Full-Width Bar)
 // ============================================================================
 @Composable
 fun HorizontalBatteryStrip(
@@ -271,16 +271,31 @@ fun HorizontalBatteryStrip(
     isCharging: Boolean,
     config: SlateWidgetConfig
 ) {
+    val size = LocalSize.current
     val isLight = config.themeMode == "LIGHT"
     val rawBgColor = Color(config.backgroundColorHex)
     val finalBgColor = rawBgColor.copy(alpha = config.opacity)
 
     val primaryTextColor = if (isLight) SlateColors.TextLightPrimary else SlateColors.TextDarkPrimary
     val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary else SlateColors.TextDarkSecondary
-    val trackColor = if (isLight) Color(0x1F000000) else Color(0x1FAFAFAF)
+    val trackColor = if (isLight) Color(0x1F000000) else Color(0x2BFFFFFF)
     val accentColor = Color(config.accentColorHex)
 
-    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 600, heightPx = 120, cornerRadiusPx = 32f)
+    // Calculate dynamic canvas resolution directly from LocalSize.current
+    val cardHeightDp = 70.dp
+    val canvasH = 240
+    val aspect = (size.width.value / cardHeightDp.value).coerceAtLeast(1.0f)
+    val canvasW = (canvasH * aspect).toInt()
+
+    // Composite Bitmap: Card Background + Full-Width Progress Bar
+    val compositeBitmap = generateHorizontalStripBitmap(
+        percentage = percentage,
+        accentColor = accentColor,
+        trackColor = trackColor,
+        bgColor = finalBgColor,
+        widthPx = canvasW,
+        heightPx = canvasH
+    )
 
     Box(
         modifier = GlanceModifier.fillMaxSize(),
@@ -289,61 +304,116 @@ fun HorizontalBatteryStrip(
         Box(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .background(ImageProvider(bgBitmap))
-                .padding(horizontal = 16.dp)
+                .height(cardHeightDp)
+                .background(ImageProvider(compositeBitmap))
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
+            // Header Row: Label + Charging + Percentage (Bar is pre-rendered below)
             Row(
-                modifier = GlanceModifier.fillMaxSize(),
+                modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Vertical.CenterVertically
             ) {
-                Column(modifier = GlanceModifier.defaultWeight()) {
-                    Row(
-                        modifier = GlanceModifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Vertical.CenterVertically
-                    ) {
-                        Text(
-                            text = "BATTERY",
-                            style = TextStyle(
-                                color = ColorProvider(secondaryTextColor),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        if (isCharging) {
-                            Spacer(modifier = GlanceModifier.width(8.dp))
-                            Text(
-                                text = "• CHARGING",
-                                style = TextStyle(
-                                    color = ColorProvider(accentColor),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-                        Spacer(modifier = GlanceModifier.defaultWeight())
-                        Text(
-                            text = "$percentage%",
-                            style = TextStyle(
-                                color = ColorProvider(primaryTextColor),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                    }
+                Text(
+                    text = "BATTERY",
+                    style = TextStyle(
+                        color = ColorProvider(secondaryTextColor),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
 
-                    Spacer(modifier = GlanceModifier.height(6.dp))
-
-                    LinearProgressIndicator(
-                        progress = (percentage.coerceIn(0, 100) / 100f),
-                        modifier = GlanceModifier.fillMaxWidth().height(5.dp),
-                        color = ColorProvider(accentColor),
-                        backgroundColor = ColorProvider(trackColor)
+                if (isCharging) {
+                    Spacer(modifier = GlanceModifier.width(8.dp))
+                    Text(
+                        text = "• CHARGING",
+                        style = TextStyle(
+                            color = ColorProvider(accentColor),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
                 }
+
+                Spacer(modifier = GlanceModifier.defaultWeight())
+
+                Text(
+                    text = "$percentage%",
+                    style = TextStyle(
+                        color = ColorProvider(primaryTextColor),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
             }
         }
     }
+}
+
+private fun generateHorizontalStripBitmap(
+    percentage: Int,
+    accentColor: Color,
+    trackColor: Color,
+    bgColor: Color,
+    widthPx: Int,
+    heightPx: Int
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val w = widthPx.toFloat()
+    val h = heightPx.toFloat()
+
+    // 1. Draw Outer Background Card with Sleek Constant Corner Radius (36px)
+    val cornerRadiusPx = 36f
+    val cardRect = RectF(0f, 0f, w, h)
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = bgColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadiusPx, cornerRadiusPx, bgPaint)
+
+    // Clip Canvas to Card Bounds
+    canvas.save()
+    val cardClipPath = Path().apply {
+        addRoundRect(cardRect, cornerRadiusPx, cornerRadiusPx, Path.Direction.CW)
+    }
+    canvas.clipPath(cardClipPath)
+
+    // 2. Full-Stretch Progress Bar (Spans full width matching 18dp horizontal padding)
+    val paddingX = 58f // Aligns precisely with 18dp text padding
+    val barTop = 154f
+    val barHeight = 22f
+    val barRadius = barHeight / 2f // Rounded pill caps for progress bar
+
+    val trackRect = RectF(paddingX, barTop, w - paddingX, barTop + barHeight)
+    val trackPaint = Paint().apply {
+        isAntiAlias = true
+        color = trackColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(trackRect, barRadius, barRadius, trackPaint)
+
+    // 3. Active Fill
+    val fillProgress = percentage.coerceIn(0, 100) / 100f
+    if (fillProgress > 0f) {
+        val totalBarWidth = w - (2f * paddingX)
+        val fillWidth = totalBarWidth * fillProgress
+
+        val fillPaint = Paint().apply {
+            isAntiAlias = true
+            color = accentColor.toArgb()
+            style = Paint.Style.FILL
+        }
+
+        canvas.save()
+        canvas.clipRect(paddingX, barTop, paddingX + fillWidth, barTop + barHeight)
+        canvas.drawRoundRect(trackRect, barRadius, barRadius, fillPaint)
+        canvas.restore()
+    }
+
+    canvas.restore()
+    return bitmap
 }
 
 // ============================================================================
@@ -1270,9 +1340,6 @@ private fun generatePixelHeartBitmap(
 }
 
 
-
-
-
 // ============================================================================
 // WIDGET #11: RESPONSIVE WAVY LIGHTNING BOLT (Aspect-Matched Geometry)
 // ============================================================================
@@ -1496,5 +1563,235 @@ private fun generateWavyLightningBoltBitmap(
     }
 
     canvas.restore()
+    return bitmap
+}
+
+
+
+// ============================================================================
+// WIDGET #12: CIRCULAR DIAL BATTERY TILE (2x2 - Pure Circle / Precision Dial)
+// ============================================================================
+@Composable
+fun CircularRingBatteryTile(
+    percentage: Int,
+    isCharging: Boolean,
+    config: SlateWidgetConfig
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val rawBgColor = Color(config.backgroundColorHex)
+    val finalBgColor = rawBgColor.copy(alpha = config.opacity)
+
+    val accentColor = Color(config.accentColorHex)
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary else SlateColors.TextDarkPrimary
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary else SlateColors.TextDarkSecondary
+    val dimColor = if (isLight) Color(0x1F000000) else Color(0x2BFFFFFF)
+
+    val gaugeBitmap = generateCircularGaugeBitmap(
+        percentage = percentage,
+        isCharging = isCharging,
+        accentColor = accentColor,
+        dimColor = dimColor,
+        iconColor = primaryTextColor,
+        bgColor = finalBgColor,
+        isLight = isLight,
+        widthPx = 300,
+        heightPx = 300
+    )
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(152.dp)
+                .height(152.dp)
+                .background(ImageProvider(gaugeBitmap)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = GlanceModifier.padding(top = 18.dp), // Pulled text UP to balance with lowered icon
+                horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+                verticalAlignment = Alignment.Vertical.CenterVertically
+            ) {
+                // Main Percentage Stat
+                Text(
+                    text = "$percentage%",
+                    style = TextStyle(
+                        color = ColorProvider(primaryTextColor),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+
+                Spacer(modifier = GlanceModifier.height(1.dp))
+
+                // Subtitle Status Label
+                Text(
+                    text = if (isCharging) "CHARGING" else "DISCHARGING",
+                    style = TextStyle(
+                        color = ColorProvider(secondaryTextColor),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+    }
+}
+
+private fun generateCircularGaugeBitmap(
+    percentage: Int,
+    isCharging: Boolean,
+    accentColor: Color,
+    dimColor: Color,
+    iconColor: Color,
+    bgColor: Color,
+    isLight: Boolean,
+    widthPx: Int = 300,
+    heightPx: Int = 300
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val w = widthPx.toFloat()
+    val h = heightPx.toFloat()
+    val cx = w / 2f
+    val cy = h / 2f
+
+    // 1. Pure Circular Background
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = bgColor.toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, w / 2f, bgPaint)
+
+    // 2. Ring Geometry
+    val ringStrokeWidth = 22f
+    val margin = 20f
+    val arcRadius = (w / 2f) - margin - (ringStrokeWidth / 2f)
+    val arcRect = RectF(
+        cx - arcRadius,
+        cy - arcRadius,
+        cx + arcRadius,
+        cy + arcRadius
+    )
+
+    val trackPaint = Paint().apply {
+        isAntiAlias = true
+        color = dimColor.toArgb()
+        style = Paint.Style.STROKE
+        setStrokeWidth(ringStrokeWidth)
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val activePaint = Paint().apply {
+        isAntiAlias = true
+        color = accentColor.toArgb()
+        style = Paint.Style.STROKE
+        setStrokeWidth(ringStrokeWidth)
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    // Draw Unfilled Track Ring
+    canvas.drawArc(arcRect, 0f, 360f, false, trackPaint)
+
+    // Active Sweep Ring starting from Top (-90 deg)
+    val fillProgress = percentage.coerceIn(0, 100) / 100f
+    val sweepAngle = fillProgress * 360f
+
+    if (sweepAngle > 0f) {
+        canvas.drawArc(arcRect, -90f, sweepAngle, false, activePaint)
+    }
+
+    // 3. Subtle Precision Radial Ticks (Softened Opacity & 2px stroke)
+    val tickColor = if (isLight) Color(0x20000000).toArgb() else Color(0x28FFFFFF).toArgb()
+    val tickPaint = Paint().apply {
+        isAntiAlias = true
+        color = tickColor
+        setStrokeWidth(2f) // Thinner 2px stroke
+        style = Paint.Style.STROKE
+    }
+    val tickInnerR = arcRadius - (ringStrokeWidth / 2f) - 6f
+    val tickOuterR = tickInnerR - 10f
+
+    for (i in 0 until 60) {
+        val angleDeg = i * 6f
+        val angleRad = Math.toRadians(angleDeg.toDouble())
+        val startX = cx + (tickInnerR * Math.cos(angleRad)).toFloat()
+        val startY = cy + (tickInnerR * Math.sin(angleRad)).toFloat()
+        val endX = cx + (tickOuterR * Math.cos(angleRad)).toFloat()
+        val endY = cy + (tickOuterR * Math.sin(angleRad)).toFloat()
+        canvas.drawLine(startX, startY, endX, endY, tickPaint)
+    }
+
+    // 4. Working & Lowered Battery Vector Icon
+    val iconY = cy - 42f // Lowered position
+    val batW = 24f
+    val batH = 38f
+
+    val shellPaint = Paint().apply {
+        isAntiAlias = true
+        color = iconColor.toArgb()
+        style = Paint.Style.STROKE
+        setStrokeWidth(3f)
+    }
+
+    // Dynamic Fill Color: Red when <=20%, Accent Color otherwise
+    val fillColor = if (percentage <= 20 && !isCharging) {
+        Color(0xFFFF3B30).toArgb()
+    } else {
+        accentColor.toArgb()
+    }
+
+    val fillPaint = Paint().apply {
+        isAntiAlias = true
+        color = fillColor
+        style = Paint.Style.FILL
+    }
+
+    val bodyRect = RectF(cx - (batW / 2f), iconY - (batH / 2f) + 3f, cx + (batW / 2f), iconY + (batH / 2f))
+    val capRect = RectF(cx - 5f, iconY - (batH / 2f) - 3f, cx + 5f, iconY - (batH / 2f) + 3f)
+
+    // A. Draw Outer Battery Shell & Cap
+    canvas.drawRoundRect(capRect, 2f, 2f, fillPaint)
+    canvas.drawRoundRect(bodyRect, 6f, 6f, shellPaint)
+
+    // B. Draw Dynamic Internal Fill Level
+    val innerMargin = 3.5f
+    val maxFillH = batH - (innerMargin * 2f)
+    val currentFillH = (maxFillH * fillProgress).coerceAtLeast(2f)
+
+    val fillRect = RectF(
+        bodyRect.left + innerMargin,
+        bodyRect.bottom - innerMargin - currentFillH,
+        bodyRect.right - innerMargin,
+        bodyRect.bottom - innerMargin
+    )
+    canvas.drawRoundRect(fillRect, 3f, 3f, fillPaint)
+
+    // C. Charging Overlay: Draw active lightning bolt inside shell when plugged in
+    if (isCharging) {
+        val boltColor = if (isLight) Color(0xFF000000).toArgb() else Color(0xFFFFFFFF).toArgb()
+        val boltPaint = Paint().apply {
+            isAntiAlias = true
+            color = boltColor
+            style = Paint.Style.FILL
+        }
+
+        val boltPath = Path().apply {
+            moveTo(cx - 2f, iconY - 11f)
+            lineTo(cx + 6f, iconY - 11f)
+            lineTo(cx - 1f, iconY - 1f)
+            lineTo(cx + 5f, iconY - 1f)
+            lineTo(cx - 5f, iconY + 11f)
+            lineTo(cx - 1f, iconY + 1f)
+            lineTo(cx - 5f, iconY + 1f)
+            close()
+        }
+        canvas.drawPath(boltPath, boltPaint)
+    }
+
     return bitmap
 }

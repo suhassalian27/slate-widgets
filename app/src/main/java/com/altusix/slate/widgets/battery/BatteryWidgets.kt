@@ -141,6 +141,9 @@ suspend fun updateAllBatteryWidgets(context: Context) {
     if (manager.getGlanceIds(LightningBoltBatteryWidget::class.java).isNotEmpty()) {
         LightningBoltBatteryWidget().updateAll(context)
     }
+    if (manager.getGlanceIds(CircularRingBatteryWidget::class.java).isNotEmpty()) {
+        CircularRingBatteryWidget().updateAll(context)
+    }
 }
 
 abstract class BaseBatteryReceiver : GlanceAppWidgetReceiver() {
@@ -342,4 +345,29 @@ class LightningBoltBatteryWidget : GlanceAppWidget() {
 
 class LightningBoltBatteryReceiver : BaseBatteryReceiver() {
     override val glanceAppWidget: GlanceAppWidget = LightningBoltBatteryWidget()
+}
+
+
+// 12. Circular Dial Battery Tile (2x2)
+class CircularRingBatteryWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = readDetailedBatteryStatus(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            SlateDataStore(context).getWidgetConfig(appWidgetId)
+                .catch { emit(SlateWidgetConfig()) }.first()
+        } catch (e: Exception) { SlateWidgetConfig() }
+
+        provideContent {
+            CircularRingBatteryTile(
+                percentage = data.percentage,
+                isCharging = data.isCharging,
+                config = config
+            )
+        }
+    }
+}
+
+class CircularRingBatteryReceiver : BaseBatteryReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = CircularRingBatteryWidget()
 }
