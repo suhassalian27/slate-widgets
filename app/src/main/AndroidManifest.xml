@@ -27,7 +27,7 @@
         </activity>
 
         <!-- ================================================================= -->
-        <!-- ALL 2x2 WIDGETS (Sharing @xml/widget_info_2x2)                   -->
+        <!-- ALL 2x2 WIDGETS                                                   -->
         <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.MinimalBatteryReceiver"
@@ -40,6 +40,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+
         <receiver
             android:name=".widgets.battery.ArcGaugeBatteryReceiver"
             android:exported="true"
@@ -51,6 +52,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+
         <receiver
             android:name=".widgets.battery.EditorialStatsBatteryReceiver"
             android:exported="true"
@@ -62,7 +64,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 100-Dot Level Meter Tile (2x2) -->
+
         <receiver
             android:name=".widgets.battery.DotLevelMeterReceiver"
             android:exported="true"
@@ -75,11 +77,8 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-
-
-
         <!-- ================================================================= -->
-        <!-- ALL 4x2 WIDGETS (Sharing @xml/widget_info_4x2)                   -->
+        <!-- ALL 4x2 WIDGETS                                                   -->
         <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.MultiDeviceBatteryReceiver"
@@ -92,7 +91,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-        <!-- Dot Matrix Battery LED Card (4x2) -->
+
         <receiver
             android:name=".widgets.battery.DotMatrixBatteryLEDReceiver"
             android:exported="true"
@@ -104,7 +103,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-        <!-- 100-Dot Level Meter Card (4x2) -->
+
         <receiver
             android:name=".widgets.battery.DotLevelMeterWideReceiver"
             android:exported="true"
@@ -117,10 +116,8 @@
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
 
-
-
         <!-- ================================================================= -->
-        <!-- ALL 4x1 WIDGETS (Sharing @xml/widget_info_4x1)                   -->
+        <!-- ALL 4x1 WIDGETS                                                   -->
         <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.HorizontalBatteryReceiver"

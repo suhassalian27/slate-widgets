@@ -10,6 +10,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.updateAll
 import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
 import kotlinx.coroutines.flow.catch
@@ -24,7 +25,7 @@ data class DetailedBatteryData(
     val voltageText: String
 )
 
-private fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
+fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
     return try {
         val appCtx = context.applicationContext
         val batteryManager = appCtx.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
@@ -33,12 +34,19 @@ private fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
             batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
         } catch (e: Exception) { -1 }
 
+        val isChargingDirect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            batteryManager?.isCharging == true
+        } else {
+            val status = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS) ?: -1
+            status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        }
+
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         val intent = appCtx.registerReceiver(null, filter)
 
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: 100
-        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val statusIntent = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val tempRaw = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
         val voltageRaw = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1) ?: -1
         val healthRaw = intent?.getIntExtra(BatteryManager.EXTRA_HEALTH, BatteryManager.BATTERY_HEALTH_UNKNOWN) ?: 0
@@ -46,11 +54,12 @@ private fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
         val pct = when {
             pctRaw in 0..100 -> pctRaw
             level >= 0 && scale > 0 -> (level * 100) / scale
-            else -> 80
+            else -> 100
         }
 
-        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL
+        val isCharging = isChargingDirect ||
+                statusIntent == BatteryManager.BATTERY_STATUS_CHARGING ||
+                statusIntent == BatteryManager.BATTERY_STATUS_FULL
 
         val healthText = when (healthRaw) {
             BatteryManager.BATTERY_HEALTH_GOOD -> "Good health"
@@ -85,13 +94,54 @@ private fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
         )
     } catch (e: Exception) {
         DetailedBatteryData(
-            percentage = 80,
+            percentage = 100,
             isCharging = false,
             healthText = "Good health",
-            secondaryStatText = "31.5°C temp",
-            tempText = "31.5°C",
-            voltageText = "4.1V"
+            secondaryStatText = "Healthy",
+            tempText = "N/A",
+            voltageText = "N/A"
         )
+    }
+}
+
+suspend fun updateAllBatteryWidgets(context: Context) {
+    val manager = GlanceAppWidgetManager(context)
+
+    if (manager.getGlanceIds(MinimalBatteryWidget::class.java).isNotEmpty()) {
+        MinimalBatteryWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(MultiDeviceBatteryWidget::class.java).isNotEmpty()) {
+        MultiDeviceBatteryWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(HorizontalBatteryWidget::class.java).isNotEmpty()) {
+        HorizontalBatteryWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(ArcGaugeBatteryWidget::class.java).isNotEmpty()) {
+        ArcGaugeBatteryWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(EditorialStatsBatteryWidget::class.java).isNotEmpty()) {
+        EditorialStatsBatteryWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(DotMatrixBatteryLEDWidget::class.java).isNotEmpty()) {
+        DotMatrixBatteryLEDWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(DotLevelMeterWidget::class.java).isNotEmpty()) {
+        DotLevelMeterWidget().updateAll(context)
+    }
+    if (manager.getGlanceIds(DotLevelMeterWideWidget::class.java).isNotEmpty()) {
+        DotLevelMeterWideWidget().updateAll(context)
+    }
+}
+
+abstract class BaseBatteryReceiver : GlanceAppWidgetReceiver() {
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        BatteryUpdateWorker.schedule(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        BatteryUpdateWorker.cancel(context)
     }
 }
 
@@ -103,19 +153,12 @@ class MinimalBatteryWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            MinimalBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config)
-        }
+        provideContent { MinimalBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
     }
 }
-
-class MinimalBatteryReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = MinimalBatteryWidget()
-}
+class MinimalBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = MinimalBatteryWidget() }
 
 // 2. Multi-Device Card (4x2)
 class MultiDeviceBatteryWidget : GlanceAppWidget() {
@@ -125,25 +168,12 @@ class MultiDeviceBatteryWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            MultiDeviceBatteryCard(
-                phonePct = data.percentage,
-                isCharging = data.isCharging,
-                tempText = data.tempText,
-                voltageText = data.voltageText,
-                config = config
-            )
-        }
+        provideContent { MultiDeviceBatteryCard(phonePct = data.percentage, isCharging = data.isCharging, tempText = data.tempText, voltageText = data.voltageText, config = config) }
     }
 }
-
-class MultiDeviceBatteryReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = MultiDeviceBatteryWidget()
-}
+class MultiDeviceBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = MultiDeviceBatteryWidget() }
 
 // 3. Horizontal Strip (4x1)
 class HorizontalBatteryWidget : GlanceAppWidget() {
@@ -153,19 +183,12 @@ class HorizontalBatteryWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            HorizontalBatteryStrip(percentage = data.percentage, isCharging = data.isCharging, config = config)
-        }
+        provideContent { HorizontalBatteryStrip(percentage = data.percentage, isCharging = data.isCharging, config = config) }
     }
 }
-
-class HorizontalBatteryReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = HorizontalBatteryWidget()
-}
+class HorizontalBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = HorizontalBatteryWidget() }
 
 // 4. Arc Gauge Tile (2x2)
 class ArcGaugeBatteryWidget : GlanceAppWidget() {
@@ -175,19 +198,12 @@ class ArcGaugeBatteryWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            ArcGaugeBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config)
-        }
+        provideContent { ArcGaugeBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
     }
 }
-
-class ArcGaugeBatteryReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = ArcGaugeBatteryWidget()
-}
+class ArcGaugeBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = ArcGaugeBatteryWidget() }
 
 // 5. Editorial Stats Tile (2x2)
 class EditorialStatsBatteryWidget : GlanceAppWidget() {
@@ -197,24 +213,12 @@ class EditorialStatsBatteryWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            EditorialStatsBatteryTile(
-                percentage = data.percentage,
-                healthText = data.healthText,
-                secondaryStatText = data.secondaryStatText,
-                config = config
-            )
-        }
+        provideContent { EditorialStatsBatteryTile(percentage = data.percentage, healthText = data.healthText, secondaryStatText = data.secondaryStatText, config = config) }
     }
 }
-
-class EditorialStatsBatteryReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = EditorialStatsBatteryWidget()
-}
+class EditorialStatsBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = EditorialStatsBatteryWidget() }
 
 // 6. Dot Matrix Battery LED (4x2 Wide)
 class DotMatrixBatteryLEDWidget : GlanceAppWidget() {
@@ -224,19 +228,12 @@ class DotMatrixBatteryLEDWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            DotMatrixBatteryLEDCard(percentage = data.percentage, isCharging = data.isCharging, config = config)
-        }
+        provideContent { DotMatrixBatteryLEDCard(percentage = data.percentage, isCharging = data.isCharging, config = config) }
     }
 }
-
-class DotMatrixBatteryLEDReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = DotMatrixBatteryLEDWidget()
-}
+class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = DotMatrixBatteryLEDWidget() }
 
 // 7. 100-Dot Level Meter Tile (2x2)
 class DotLevelMeterWidget : GlanceAppWidget() {
@@ -246,19 +243,12 @@ class DotLevelMeterWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            DotLevelMeterTile(percentage = data.percentage, isCharging = data.isCharging, config = config)
-        }
+        provideContent { DotLevelMeterTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
     }
 }
-
-class DotLevelMeterReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWidget()
-}
+class DotLevelMeterReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWidget() }
 
 // 8. 100-Dot Level Meter Card (4x2)
 class DotLevelMeterWideWidget : GlanceAppWidget() {
@@ -268,16 +258,11 @@ class DotLevelMeterWideWidget : GlanceAppWidget() {
             val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
             SlateDataStore(context).getWidgetConfig(appWidgetId)
                 .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) {
-            SlateWidgetConfig()
-        }
+        } catch (e: Exception) { SlateWidgetConfig() }
 
-        provideContent {
-            DotLevelMeterCard(percentage = data.percentage, isCharging = data.isCharging, config = config)
-        }
+        provideContent { DotLevelMeterCard(percentage = data.percentage, isCharging = data.isCharging, config = config) }
     }
 }
-
-class DotLevelMeterWideReceiver : GlanceAppWidgetReceiver() {
+class DotLevelMeterWideReceiver : BaseBatteryReceiver() {
     override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWideWidget()
 }

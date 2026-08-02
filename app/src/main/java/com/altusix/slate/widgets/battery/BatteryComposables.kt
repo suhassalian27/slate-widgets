@@ -13,7 +13,6 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.appwidget.LinearProgressIndicator
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -30,8 +29,31 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.altusix.slate.core.theme.SlateColors
-import com.altusix.slate.core.theme.SlateShapes
 import com.altusix.slate.data.local.SlateWidgetConfig
+
+// ============================================================================
+// HELPER: Canvas Bitmap Background (Aspect-Matched for Sharp Corners on All ROMs)
+// ============================================================================
+private fun createRoundedBackgroundBitmap(
+    color: Color,
+    widthPx: Int = 300,
+    heightPx: Int = 300,
+    cornerRadiusPx: Float = 40f
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        this.color = color.toArgb()
+        style = Paint.Style.FILL
+    }
+
+    val rect = RectF(0f, 0f, widthPx.toFloat(), heightPx.toFloat())
+    canvas.drawRoundRect(rect, cornerRadiusPx, cornerRadiusPx, bgPaint)
+
+    return bitmap
+}
 
 // ============================================================================
 // WIDGET #1: MINIMAL 2x2 BATTERY TILE
@@ -51,6 +73,8 @@ fun MinimalBatteryTile(
     val trackColor = if (isLight) Color(0x1F000000) else Color(0x1FAFAFAF)
     val accentColor = Color(config.accentColorHex)
 
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 300, heightPx = 300, cornerRadiusPx = 40f)
+
     Box(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -59,8 +83,7 @@ fun MinimalBatteryTile(
             modifier = GlanceModifier
                 .width(152.dp)
                 .height(152.dp)
-                .cornerRadius(SlateShapes.CornerLarge)
-                .background(finalBgColor)
+                .background(ImageProvider(bgBitmap))
                 .padding(16.dp)
         ) {
             Column(
@@ -136,6 +159,8 @@ fun MultiDeviceBatteryCard(
     val trackColor = if (isLight) Color(0x1F000000) else Color(0x1FAFAFAF)
     val accentColor = Color(config.accentColorHex)
 
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 600, heightPx = 337, cornerRadiusPx = 40f)
+
     Box(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -144,8 +169,7 @@ fun MultiDeviceBatteryCard(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .height(180.dp)
-                .cornerRadius(SlateShapes.CornerLarge)
-                .background(finalBgColor)
+                .background(ImageProvider(bgBitmap))
                 .padding(16.dp)
         ) {
             Column(
@@ -253,6 +277,8 @@ fun HorizontalBatteryStrip(
     val trackColor = if (isLight) Color(0x1F000000) else Color(0x1FAFAFAF)
     val accentColor = Color(config.accentColorHex)
 
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 600, heightPx = 120, cornerRadiusPx = 32f)
+
     Box(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -261,8 +287,7 @@ fun HorizontalBatteryStrip(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .cornerRadius(SlateShapes.CornerMedium)
-                .background(finalBgColor)
+                .background(ImageProvider(bgBitmap))
                 .padding(horizontal = 16.dp)
         ) {
             Row(
@@ -343,6 +368,8 @@ fun ArcGaugeBatteryTile(
         trackColor = trackColor
     )
 
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 300, heightPx = 300, cornerRadiusPx = 40f)
+
     Box(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -351,8 +378,7 @@ fun ArcGaugeBatteryTile(
             modifier = GlanceModifier
                 .width(152.dp)
                 .height(152.dp)
-                .cornerRadius(SlateShapes.CornerLarge)
-                .background(finalBgColor)
+                .background(ImageProvider(bgBitmap))
                 .padding(14.dp)
         ) {
             Column(
@@ -481,6 +507,8 @@ fun EditorialStatsBatteryTile(
         trackColor = trackColor
     )
 
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 300, heightPx = 300, cornerRadiusPx = 40f)
+
     Box(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -489,8 +517,7 @@ fun EditorialStatsBatteryTile(
             modifier = GlanceModifier
                 .width(152.dp)
                 .height(152.dp)
-                .cornerRadius(SlateShapes.CornerLarge)
-                .background(finalBgColor)
+                .background(ImageProvider(bgBitmap))
                 .padding(16.dp)
         ) {
             Column(
@@ -601,12 +628,9 @@ private fun generateSegmentedBarBitmap(
     return bitmap
 }
 
-
-
 // ============================================================================
-// WIDGET #6: DOT MATRIX BATTERY LED (4x2 Wide - 9 Rows Tight Wrap)
+// WIDGET #6: DOT MATRIX BATTERY LED (4x2 Wide)
 // ============================================================================
-
 @Composable
 fun DotMatrixBatteryLEDCard(
     percentage: Int,
@@ -666,7 +690,6 @@ private fun generateDotMatrixLEDBitmap(
     val startX = marginX
     val startY = marginY
 
-    // 1. Draw Tight Dark Background Card
     val bgPaint = Paint().apply {
         isAntiAlias = true
         color = bgColor.toArgb()
@@ -690,7 +713,6 @@ private fun generateDotMatrixLEDBitmap(
         style = Paint.Style.FILL
     }
 
-    // 2. Draw Background Dot Grid Across All 9 Rows
     for (r in 0 until rows) {
         for (c in 0 until columns) {
             val cx = startX + c * cellSize + cellSize / 2f
@@ -699,7 +721,6 @@ private fun generateDotMatrixLEDBitmap(
         }
     }
 
-    // 3. Clean 5x7 Dot Typography Map
     val fontMap = mapOf(
         '0' to arrayOf(0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110),
         '1' to arrayOf(0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110),
@@ -714,7 +735,6 @@ private fun generateDotMatrixLEDBitmap(
         '%' to arrayOf(0b11001, 0b11010, 0b00010, 0b00100, 0b01000, 0b01011, 0b10011)
     )
 
-    // Center digits vertically (startRow = 1 leaves 1 row top & 1 row bottom)
     val startRow = (rows - 7) / 2
     val textWidthCols = text.length * 5 + (text.length - 1) * 1
     var startCol = (columns - textWidthCols) / 2
@@ -741,11 +761,9 @@ private fun generateDotMatrixLEDBitmap(
     return bitmap
 }
 
-
 // ============================================================================
-// WIDGET #7: DOT LEVEL METER TILE
+// WIDGET #7: DOT LEVEL METER TILE (2x2)
 // ============================================================================
-
 @Composable
 fun DotLevelMeterTile(
     percentage: Int,
@@ -768,6 +786,8 @@ fun DotLevelMeterTile(
         aspectRatioHeight = 250
     )
 
+    val bgBitmap = createRoundedBackgroundBitmap(color = finalBgColor, widthPx = 300, heightPx = 300, cornerRadiusPx = 40f)
+
     Box(
         modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -776,8 +796,7 @@ fun DotLevelMeterTile(
             modifier = GlanceModifier
                 .width(152.dp)
                 .height(152.dp)
-                .cornerRadius(SlateShapes.CornerLarge)
-                .background(finalBgColor)
+                .background(ImageProvider(bgBitmap))
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -791,9 +810,8 @@ fun DotLevelMeterTile(
 }
 
 // ============================================================================
-// WIDGET #8: DOT LEVEL METER CARD
+// WIDGET #8: DOT LEVEL METER CARD (4x2)
 // ============================================================================
-
 @Composable
 fun DotLevelMeterCard(
     percentage: Int,
@@ -849,12 +867,10 @@ private fun generateCenteredLevelBitmap(
     val bitmap = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    // Reduced multiplier (0.28f) creates distinctly larger gaps between dots
     val dotRadius = cellSize * 0.28f
     val startX = marginX
     val startY = marginY
 
-    // 1. Draw Rounded Background Card Directly on Canvas
     val bgPaint = Paint().apply {
         isAntiAlias = true
         color = bgColor.toArgb()
@@ -878,9 +894,9 @@ private fun generateCenteredLevelBitmap(
         style = Paint.Style.FILL
     }
 
-    val totalDots = columns * rows // 100 dots
+    val totalDots = columns * rows
     val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
-    val emptyDotsCount = totalDots - activeDotsCount // Drains top-to-bottom
+    val emptyDotsCount = totalDots - activeDotsCount
 
     for (i in 0 until totalDots) {
         val r = i / columns
@@ -925,9 +941,9 @@ private fun generateDotLevelBitmap(
         style = Paint.Style.FILL
     }
 
-    val totalDots = columns * rows // 100 dots
+    val totalDots = columns * rows
     val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
-    val emptyDotsCount = totalDots - activeDotsCount // Drains top-to-bottom
+    val emptyDotsCount = totalDots - activeDotsCount
 
     for (i in 0 until totalDots) {
         val r = i / columns
@@ -942,4 +958,3 @@ private fun generateDotLevelBitmap(
 
     return bitmap
 }
-

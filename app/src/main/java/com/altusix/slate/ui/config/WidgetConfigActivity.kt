@@ -28,19 +28,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.lifecycleScope
 import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.widgets.battery.ArcGaugeBatteryWidget
-import com.altusix.slate.widgets.battery.DotLevelMeterWideWidget
-import com.altusix.slate.widgets.battery.DotLevelMeterWidget
-import com.altusix.slate.widgets.battery.DotMatrixBatteryLEDWidget
-import com.altusix.slate.widgets.battery.EditorialStatsBatteryWidget
-import com.altusix.slate.widgets.battery.HorizontalBatteryWidget
-import com.altusix.slate.widgets.battery.MinimalBatteryWidget
-import com.altusix.slate.widgets.battery.MultiDeviceBatteryWidget
+import com.altusix.slate.widgets.battery.BatteryUpdateWorker
+import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
 import kotlinx.coroutines.launch
 
 class WidgetConfigActivity : ComponentActivity() {
@@ -65,7 +57,6 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        // Detect which receiver launched this config screen
         val widgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
         widgetClassName = widgetInfo?.provider?.className ?: ""
 
@@ -91,7 +82,6 @@ class WidgetConfigActivity : ComponentActivity() {
                         modifier = Modifier.padding(vertical = 12.dp)
                     )
 
-                    // Dynamic Live Preview Box
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -112,7 +102,6 @@ class WidgetConfigActivity : ComponentActivity() {
                                 .padding(14.dp)
                         ) {
                             if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
-                                // Arc Gauge Preview
                                 Column(
                                     modifier = Modifier.fillMaxSize(),
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -139,7 +128,6 @@ class WidgetConfigActivity : ComponentActivity() {
                                     Text(text = "85%", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = textColor)
                                 }
                             } else {
-                                // Default Standard Battery Tile Preview
                                 Column(
                                     modifier = Modifier.fillMaxSize(),
                                     verticalArrangement = Arrangement.SpaceBetween
@@ -166,7 +154,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Style Mode (Dark / Light)
                     Text(text = "Style Mode", color = Color.Gray, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
@@ -200,7 +187,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Accent Colors
                     Text(text = "Accent Color", color = Color.Gray, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -222,7 +208,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Opacity Slider
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -244,7 +229,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Apply Button
                     Button(
                         onClick = {
                             saveAndFinish(
@@ -272,34 +256,11 @@ class WidgetConfigActivity : ComponentActivity() {
             try {
                 dataStore.saveWidgetConfig(appWidgetId, config)
 
-                val glanceManager = GlanceAppWidgetManager(this@WidgetConfigActivity)
-                val glanceId = try {
-                    glanceManager.getGlanceIdBy(intent)
-                } catch (e: Exception) {
-                    try {
-                        glanceManager.getGlanceIdBy(appWidgetId)
-                    } catch (e2: Exception) {
-                        null
-                    }
-                }
 
-                // Dynamically trigger update on the exact widget type that opened config
-                val widget = when {
-                    widgetClassName.contains("ArcGaugeBatteryReceiver") -> ArcGaugeBatteryWidget()
-                    widgetClassName.contains("MultiDeviceBatteryReceiver") -> MultiDeviceBatteryWidget()
-                    widgetClassName.contains("HorizontalBatteryReceiver") -> HorizontalBatteryWidget()
-                    widgetClassName.contains("EditorialStatsBatteryReceiver") -> EditorialStatsBatteryWidget()
-                    widgetClassName.contains("DotMatrixBatteryLEDReceiver") -> DotMatrixBatteryLEDWidget()
-                    widgetClassName.contains("DotLevelMeterReceiver") -> DotLevelMeterWidget()
-                    widgetClassName.contains("DotLevelMeterWideReceiver") -> DotLevelMeterWideWidget()
-                    else -> MinimalBatteryWidget()
-                }
 
-                if (glanceId != null) {
-                    widget.update(this@WidgetConfigActivity, glanceId)
-                } else {
-                    widget.updateAll(this@WidgetConfigActivity)
-                }
+                // Force instant sync across all active widgets
+//                updateAllBatteryWidgets(this@WidgetConfigActivity)
+
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
