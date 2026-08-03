@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.altusix.slate.widgets.ai.*
 import com.altusix.slate.widgets.battery.*
 
 data class SlateWidgetInfo(
@@ -36,6 +37,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val aiWidgets = listOf(
+            SlateWidgetInfo("Gemini", GeminiTextReceiver::class.java),
+            SlateWidgetInfo("ChatGPT Text", ChatGptTextReceiver::class.java),
+            SlateWidgetInfo("ChatGPT Voice", ChatGptVoiceReceiver::class.java),
+            SlateWidgetInfo("Claude", ClaudeReceiver::class.java),
+            SlateWidgetInfo("Grok", GrokReceiver::class.java),
+            SlateWidgetInfo("Perplexity", PerplexityReceiver::class.java),
+            SlateWidgetInfo("DeepSeek", DeepSeekReceiver::class.java),
+            SlateWidgetInfo("Copilot", CopilotReceiver::class.java),
+            SlateWidgetInfo("Meta AI", MetaAiReceiver::class.java)
+        )
 
         val batteryWidgets = listOf(
             SlateWidgetInfo("Minimal Tile", MinimalBatteryReceiver::class.java),
@@ -75,7 +88,29 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(bottom = 20.dp)
                         )
 
-                        // Category Section
+                        // Battery Widgets
+                        Text(
+                            text = "AI",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        // 3-Column Grid
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(aiWidgets) { widget ->
+                                WidgetGridItem(widgetInfo = widget) {
+                                    pinWidgetToHomeScreen(this@MainActivity, widget.receiverClass)
+                                }
+                            }
+                        }
+
+                        // Battery Widgets
                         Text(
                             text = "Battery",
                             fontSize = 16.sp,
@@ -134,7 +169,7 @@ fun WidgetGridItem(widgetInfo: SlateWidgetInfo, onClick: () -> Unit) {
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF161618))
             .clickable { onClick() }
-            .padding(12.dp),
+            .padding(5.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(

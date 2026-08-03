@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <queries>
+        <package android:name="com.google.android.apps.bard" />
+        <package android:name="com.google.android.googlequicksearchbox" />
+        <package android:name="com.openai.chatgpt" />
+        <package android:name="com.anthropic.claude" />
+        <package android:name="ai.x.grok" />
+        <package android:name="ai.perplexity.app.android" />
+        <package android:name="com.deepseek.chat" />
+        <package android:name="com.microsoft.copilot" />
+        <package android:name="com.facebook.stella" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -25,6 +37,54 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+
+
+        <!-- ================================================================= -->
+        <!-- ALL ADAPTIVE ICON WIDGETS                                         -->
+        <!-- ================================================================= -->
+        <!-- AI SHORTCUT WIDGETS (2x2 default, resizable down to 1x1) -->
+        <receiver android:name=".widgets.ai.GeminiTextReceiver" android:exported="true" android:label="Gemini Text">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.GeminiVoiceReceiver" android:exported="true" android:label="Gemini Live">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.ChatGptTextReceiver" android:exported="true" android:label="ChatGPT Text">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.ChatGptVoiceReceiver" android:exported="true" android:label="ChatGPT Voice">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.ClaudeReceiver" android:exported="true" android:label="Claude AI">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.GrokReceiver" android:exported="true" android:label="Grok AI">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.PerplexityReceiver" android:exported="true" android:label="Perplexity AI">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.DeepSeekReceiver" android:exported="true" android:label="DeepSeek AI">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.CopilotReceiver" android:exported="true" android:label="Microsoft Copilot">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.ai.MetaAiReceiver" android:exported="true" android:label="Meta AI">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
 
         <!-- ================================================================= -->
         <!-- 1x2 WIDGETS                                                       -->
@@ -154,6 +214,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+
 
         <!-- ================================================================= -->
         <!-- ALL 4x2 WIDGETS                                                   -->
