@@ -41,14 +41,10 @@
 
 
         <!-- ================================================================= -->
-        <!-- ALL ADAPTIVE ICON WIDGETS                                         -->
+        <!-- AI ALL ADAPTIVE ICON WIDGETS                                         -->
         <!-- ================================================================= -->
         <!-- AI SHORTCUT WIDGETS (2x2 default, resizable down to 1x1) -->
         <receiver android:name=".widgets.ai.GeminiTextReceiver" android:exported="true" android:label="Gemini Text">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
-        </receiver>
-        <receiver android:name=".widgets.ai.GeminiVoiceReceiver" android:exported="true" android:label="Gemini Live">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
@@ -83,6 +79,63 @@
         <receiver android:name=".widgets.ai.MetaAiReceiver" android:exported="true" android:label="Meta AI">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <!-- AI BARS (4x1) -->
+        <receiver android:name=".widgets.ai.AiBarPrimaryReceiver" android:exported="true" android:label="AI Primary Bar">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiBarDock5Receiver" android:exported="true" android:label="AI Dock Bar">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiBarCapsuleReceiver" android:exported="true" android:label="AI Capsule Bar">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiBarSplitActionReceiver" android:exported="true" android:label="AI Dual Voice Bar">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- AI FOLDERS (2x2 / 4x2) -->
+        <receiver android:name=".widgets.ai.AiFolder4ClassicReceiver" android:exported="true" android:label="AI Quad Folder (4)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiFolder6BentoHeroReceiver" android:exported="true" android:label="AI Bento Folder (6)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiFolder8BentoSideReceiver" android:exported="true" android:label="AI Side Bento Folder (8)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiFolder9GridReceiver" android:exported="true" android:label="AI 3x3 Grid Folder (9)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiFolder10MegaReceiver" android:exported="true" android:label="AI Mega Folder (10)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiFolder7AsymmetricReceiver" android:exported="true" android:label="AI Asymmetric Bento (7)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver android:name=".widgets.ai.AiFolderFloatingMatrixReceiver" android:exported="true" android:label="AI Floating Matrix (6)">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
         </receiver>
 
 
@@ -269,6 +322,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x1" />
         </receiver>
+
+
+
 
     </application>
 

@@ -24,7 +24,7 @@ abstract class BaseAiWidget(private val target: AiTarget) : GlanceAppWidget() {
         } catch (e: Exception) { SlateWidgetConfig() }
 
         provideContent {
-            AiShortcutTile(target = target, config = config)
+            AiTileIcon(target = target, config = config)
         }
     }
 }

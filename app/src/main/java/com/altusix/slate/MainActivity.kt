@@ -47,7 +47,18 @@ class MainActivity : ComponentActivity() {
             SlateWidgetInfo("Perplexity", PerplexityReceiver::class.java),
             SlateWidgetInfo("DeepSeek", DeepSeekReceiver::class.java),
             SlateWidgetInfo("Copilot", CopilotReceiver::class.java),
-            SlateWidgetInfo("Meta AI", MetaAiReceiver::class.java)
+            SlateWidgetInfo("Meta AI", MetaAiReceiver::class.java),
+            SlateWidgetInfo("AI Primary Bar (4x1)", AiBarPrimaryReceiver::class.java),
+            SlateWidgetInfo("AI Dock Bar (4x1)", AiBarDock5Receiver::class.java),
+            SlateWidgetInfo("AI Capsule Bar (4x1)", AiBarCapsuleReceiver::class.java),
+            SlateWidgetInfo("AI Dual Voice Bar (4x1)", AiBarSplitActionReceiver::class.java),
+            SlateWidgetInfo("AI Quad Folder (4)", AiFolder4ClassicReceiver::class.java),
+            SlateWidgetInfo("AI Bento Folder (6)", AiFolder6BentoHeroReceiver::class.java),
+            SlateWidgetInfo("AI Side Bento Folder (8)", AiFolder8BentoSideReceiver::class.java),
+            SlateWidgetInfo("AI 3x3 Grid Folder (9)", AiFolder9GridReceiver::class.java),
+            SlateWidgetInfo("AI Mega Folder (10)", AiFolder10MegaReceiver::class.java),
+            SlateWidgetInfo("AI Asymmetric Bento (7)", AiFolder7AsymmetricReceiver::class.java),
+            SlateWidgetInfo("AI Floating Matrix (6)", AiFolderFloatingMatrixReceiver::class.java)
         )
 
         val batteryWidgets = listOf(
