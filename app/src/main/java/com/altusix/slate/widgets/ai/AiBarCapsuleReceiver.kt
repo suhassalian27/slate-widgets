@@ -35,7 +35,7 @@ abstract class BaseAiFolderWidget(
 // ============================================================================
 // BARS (4x1)
 // ============================================================================
-class AiBarPrimaryWidget : BaseAiFolderWidget({ config -> AiBarPrimaryTile(config) })
+class AiBarPrimaryWidget : BaseAiFolderWidget({ config -> AiBarHeroPrimary(config) })
 class AiBarPrimaryReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarPrimaryWidget() }
 
 class AiBarDock5Widget : BaseAiFolderWidget({ config -> AiBarDock5Tile(config) })
@@ -44,8 +44,8 @@ class AiBarDock5Receiver : GlanceAppWidgetReceiver() { override val glanceAppWid
 class AiBarCapsuleWidget : BaseAiFolderWidget({ config -> AiBarCapsuleTile(config) })
 class AiBarCapsuleReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarCapsuleWidget() }
 
-class AiBarSplitActionWidget : BaseAiFolderWidget({ config -> AiBarSplitActionTile(config) })
-class AiBarSplitActionReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarSplitActionWidget() }
+class AiBarDualFlagshipWidget : BaseAiFolderWidget({ config -> AiBarDualFlagship(config) })
+class AiBarDualFlagshipReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarDualFlagshipWidget() }
 
 // ============================================================================
 // FOLDERS (2x2 / 4x2)
@@ -76,7 +76,7 @@ suspend fun updateAllAiFolderWidgets(context: Context) {
     if (manager.getGlanceIds(AiBarPrimaryWidget::class.java).isNotEmpty()) AiBarPrimaryWidget().updateAll(context)
     if (manager.getGlanceIds(AiBarDock5Widget::class.java).isNotEmpty()) AiBarDock5Widget().updateAll(context)
     if (manager.getGlanceIds(AiBarCapsuleWidget::class.java).isNotEmpty()) AiBarCapsuleWidget().updateAll(context)
-    if (manager.getGlanceIds(AiBarSplitActionWidget::class.java).isNotEmpty()) AiBarSplitActionWidget().updateAll(context)
+    if (manager.getGlanceIds(AiBarDualFlagshipWidget::class.java).isNotEmpty()) AiBarDualFlagshipWidget().updateAll(context)
     if (manager.getGlanceIds(AiFolder4ClassicWidget::class.java).isNotEmpty()) AiFolder4ClassicWidget().updateAll(context)
     if (manager.getGlanceIds(AiFolder6BentoHeroWidget::class.java).isNotEmpty()) AiFolder6BentoHeroWidget().updateAll(context)
     if (manager.getGlanceIds(AiFolder8BentoSideWidget::class.java).isNotEmpty()) AiFolder8BentoSideWidget().updateAll(context)

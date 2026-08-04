@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
             SlateWidgetInfo("AI Primary Bar (4x1)", AiBarPrimaryReceiver::class.java),
             SlateWidgetInfo("AI Dock Bar (4x1)", AiBarDock5Receiver::class.java),
             SlateWidgetInfo("AI Capsule Bar (4x1)", AiBarCapsuleReceiver::class.java),
-            SlateWidgetInfo("AI Dual Voice Bar (4x1)", AiBarSplitActionReceiver::class.java),
+            SlateWidgetInfo("AI Dual Flagship Bar (4x1)", AiBarDualFlagshipReceiver::class.java),
             SlateWidgetInfo("AI Quad Folder (4)", AiFolder4ClassicReceiver::class.java),
             SlateWidgetInfo("AI Bento Folder (6)", AiFolder6BentoHeroReceiver::class.java),
             SlateWidgetInfo("AI Side Bento Folder (8)", AiFolder8BentoSideReceiver::class.java),

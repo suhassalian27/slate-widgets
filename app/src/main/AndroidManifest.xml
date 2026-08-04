@@ -97,7 +97,7 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
 
-        <receiver android:name=".widgets.ai.AiBarSplitActionReceiver" android:exported="true" android:label="AI Dual Voice Bar">
+        <receiver android:name=".widgets.ai.AiBarDualFlagshipReceiver" android:exported="true" android:label="AI Dual Voice Bar">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
