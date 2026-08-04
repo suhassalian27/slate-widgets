@@ -58,7 +58,6 @@ class MainActivity : ComponentActivity() {
             SlateWidgetInfo("AI 3x3 Grid Folder (9)", AiFolder9GridReceiver::class.java),
             SlateWidgetInfo("AI Mega Folder (10)", AiFolder10MegaReceiver::class.java),
             SlateWidgetInfo("AI Asymmetric Bento (7)", AiFolder7AsymmetricReceiver::class.java),
-            SlateWidgetInfo("AI Floating Matrix (6)", AiFolderFloatingMatrixReceiver::class.java)
         )
 
         val batteryWidgets = listOf(

@@ -242,6 +242,37 @@ private fun AiCardContainer(
     }
 }
 
+
+@Composable
+private fun AiFolderCardContainer(
+    config: SlateWidgetConfig,
+    content: @Composable () -> Unit
+) {
+    val isLight = config.themeMode == "LIGHT"
+    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+
+    val currentWidth = LocalSize.current.width
+    val currentHeight = LocalSize.current.height
+    // Lock outer card to a strict 1:1 square card centered in the cell
+    val squareCardSize = minOf(currentWidth, currentHeight)
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .size(squareCardSize)
+                .cornerRadius(24.dp)
+                .background(cardBg)
+                .padding(10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
+    }
+}
+
 // ============================================================================
 // BARS (4x1 / 3x1)
 // ============================================================================
@@ -696,66 +727,37 @@ fun AiBarDualFlagship(config: SlateWidgetConfig) {
 fun AiFolder4ClassicTile(config: SlateWidgetConfig) {
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
+    val squareCardSize = minOf(currentWidth, currentHeight)
 
     val outerPadding = 10.dp
     val gap = 8.dp
+    val availSize = squareCardSize - (outerPadding * 2)
 
-    val availW = currentWidth - (outerPadding * 2)
-    val availH = currentHeight - (outerPadding * 2)
+    val tileSizeDp = ((availSize - gap) / 2).value.toInt().coerceAtLeast(36)
 
-    val slotW = ((availW - gap) / 2).value.toInt().coerceAtLeast(36)
-    val slotH = ((availH - gap) / 2).value.toInt().coerceAtLeast(36)
-
-    AiCardContainer(config) {
+    AiFolderCardContainer(config) {
         Column(
-            modifier = GlanceModifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = GlanceModifier.fillMaxWidth().height(tileSizeDp.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AiTileIcon(
-                    target = AiTarget.GEMINI_TEXT,
-                    config = config,
-                    shapeStyle = AiShapeStyle.SQUIRCLE,
-                    widthDp = slotW,
-                    heightDp = slotH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                )
+                AiTileIcon(target = AiTarget.GEMINI_TEXT, config = config, shapeStyle = AiShapeStyle.SQUIRCLE, widthDp = tileSizeDp, heightDp = tileSizeDp, modifier = GlanceModifier.size(tileSizeDp.dp))
                 Spacer(GlanceModifier.width(gap))
-                AiTileIcon(
-                    target = AiTarget.CHATGPT_TEXT,
-                    config = config,
-                    shapeStyle = AiShapeStyle.SQUIRCLE,
-                    widthDp = slotW,
-                    heightDp = slotH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                )
+                AiTileIcon(target = AiTarget.CHATGPT_TEXT, config = config, shapeStyle = AiShapeStyle.SQUIRCLE, widthDp = tileSizeDp, heightDp = tileSizeDp, modifier = GlanceModifier.size(tileSizeDp.dp))
             }
             Spacer(GlanceModifier.height(gap))
             Row(
-                modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = GlanceModifier.fillMaxWidth().height(tileSizeDp.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AiTileIcon(
-                    target = AiTarget.GROK,
-                    config = config,
-                    shapeStyle = AiShapeStyle.SQUIRCLE,
-                    widthDp = slotW,
-                    heightDp = slotH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                )
+                AiTileIcon(target = AiTarget.GROK, config = config, shapeStyle = AiShapeStyle.SQUIRCLE, widthDp = tileSizeDp, heightDp = tileSizeDp, modifier = GlanceModifier.size(tileSizeDp.dp))
                 Spacer(GlanceModifier.width(gap))
-                AiTileIcon(
-                    target = AiTarget.CLAUDE,
-                    config = config,
-                    shapeStyle = AiShapeStyle.SQUIRCLE,
-                    widthDp = slotW,
-                    heightDp = slotH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                )
+                AiTileIcon(target = AiTarget.CLAUDE, config = config, shapeStyle = AiShapeStyle.SQUIRCLE, widthDp = tileSizeDp, heightDp = tileSizeDp, modifier = GlanceModifier.size(tileSizeDp.dp))
             }
         }
     }
@@ -764,67 +766,89 @@ fun AiFolder4ClassicTile(config: SlateWidgetConfig) {
 // FOLDER 2: Bento Hero (2 Top Large + 4 Bottom Small)
 @Composable
 fun AiFolder6BentoHeroTile(config: SlateWidgetConfig) {
+    val isLight = config.themeMode == "LIGHT"
+    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
 
-    val outerPadding = 10.dp
+    val outerPadding = 12.dp
     val gap = 6.dp
 
     val availW = currentWidth - (outerPadding * 2)
     val availH = currentHeight - (outerPadding * 2)
 
-    val topSlotW = ((availW - gap) / 2).value.toInt().coerceAtLeast(36)
-    val topSlotH = ((availH - gap) * 0.55f).value.toInt().coerceAtLeast(36)
+    // Constrain small tile size by BOTH width and height limits
+    val botTileFromW = (availW - (gap * 3)) / 4
+    val botTileFromH = (availH - (gap * 2)) / 3
 
-    val botSlotW = ((availW - (gap * 3)) / 4).value.toInt().coerceAtLeast(28)
-    val botSlotH = ((availH - gap) * 0.45f).value.toInt().coerceAtLeast(28)
+    val botTileSize = minOf(botTileFromW, botTileFromH).value.toInt().coerceAtLeast(20)
+    val gapPx = gap.value.toInt()
+    val topTileSize = (botTileSize * 2) + gapPx
 
-    AiCardContainer(config) {
-        Column(
-            modifier = GlanceModifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
+    // Calculate exact outer bounds that strictly fit inside cell boundaries
+    val cardW = ((botTileSize * 4) + (gapPx * 3)).dp + (outerPadding * 2)
+    val cardH = ((botTileSize * 3) + (gapPx * 2)).dp + (outerPadding * 2)
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(cardW)
+                .height(cardH)
+                .cornerRadius(24.dp)
+                .background(cardBg)
+                .padding(outerPadding),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AiTileIcon(
-                    target = AiTarget.GEMINI_TEXT,
-                    config = config,
-                    shapeStyle = AiShapeStyle.SQUIRCLE,
-                    widthDp = topSlotW,
-                    heightDp = topSlotH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                )
-                Spacer(GlanceModifier.width(gap))
-                AiTileIcon(
-                    target = AiTarget.CHATGPT_TEXT,
-                    config = config,
-                    shapeStyle = AiShapeStyle.SQUIRCLE,
-                    widthDp = topSlotW,
-                    heightDp = topSlotH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                )
-            }
-
-            Spacer(GlanceModifier.height(gap))
-
-            Row(
-                modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val bottomList = listOf(AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
-                bottomList.forEachIndexed { index, target ->
+                // Top Row: 2 Big Squares
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     AiTileIcon(
-                        target = target,
+                        target = AiTarget.GEMINI_TEXT,
                         config = config,
                         shapeStyle = AiShapeStyle.SQUIRCLE,
-                        widthDp = botSlotW,
-                        heightDp = botSlotH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
+                        widthDp = topTileSize,
+                        heightDp = topTileSize,
+                        modifier = GlanceModifier.size(topTileSize.dp)
                     )
-                    if (index < bottomList.size - 1) {
-                        Spacer(GlanceModifier.width(gap))
+                    Spacer(GlanceModifier.width(gap))
+                    AiTileIcon(
+                        target = AiTarget.CHATGPT_TEXT,
+                        config = config,
+                        shapeStyle = AiShapeStyle.SQUIRCLE,
+                        widthDp = topTileSize,
+                        heightDp = topTileSize,
+                        modifier = GlanceModifier.size(topTileSize.dp)
+                    )
+                }
+
+                Spacer(GlanceModifier.height(gap))
+
+                // Bottom Row: 4 Small Squares
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val bottomList = listOf(AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
+                    bottomList.forEachIndexed { index, target ->
+                        AiTileIcon(
+                            target = target,
+                            config = config,
+                            shapeStyle = AiShapeStyle.SQUIRCLE,
+                            widthDp = botTileSize,
+                            heightDp = botTileSize,
+                            modifier = GlanceModifier.size(botTileSize.dp)
+                        )
+                        if (index < bottomList.size - 1) Spacer(GlanceModifier.width(gap))
                     }
                 }
             }
@@ -832,64 +856,102 @@ fun AiFolder6BentoHeroTile(config: SlateWidgetConfig) {
     }
 }
 
-// FOLDER 3: Bento Side Split (2 Left Hero + 6 Right Small - 8 Apps)
+// FOLDER 3: Bento Side Split (2 Left Hero + 6 Right Small)
 @Composable
 fun AiFolder8BentoSideTile(config: SlateWidgetConfig) {
+    val isLight = config.themeMode == "LIGHT"
+    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
 
-    val outerPadding = 10.dp
-    val gap = 6.dp
+    val outerPadding = 12.dp
+    val gap = 5.dp
 
     val availW = currentWidth - (outerPadding * 2)
     val availH = currentHeight - (outerPadding * 2)
 
-    val leftW = ((availW - gap) / 2).value.toInt().coerceAtLeast(36)
-    val leftH = ((availH - gap) / 2).value.toInt().coerceAtLeast(36)
+    // Constrain right tile size by BOTH width and height limits
+    val rightTileFromW = (availW - (gap * 2.5f)) / 3.5f
+    val rightTileFromH = (availH - (gap * 2)) / 3
 
-    val rightW = ((availW - gap) / 4).value.toInt().coerceAtLeast(26)
-    val rightH = ((availH - (gap * 2)) / 3).value.toInt().coerceAtLeast(26)
+    val rightTileSize = minOf(rightTileFromW, rightTileFromH).value.toInt().coerceAtLeast(20)
+    val gapPx = gap.value.toInt()
+    val leftTileSize = (rightTileSize * 3 + gapPx) / 2
 
-    AiCardContainer(config) {
-        Row(modifier = GlanceModifier.fillMaxSize()) {
-            Column(modifier = GlanceModifier.defaultWeight().fillMaxHeight()) {
-                AiTileIcon(
-                    target = AiTarget.GEMINI_TEXT,
-                    config = config,
-                    widthDp = leftW,
-                    heightDp = leftH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth()
-                )
-                Spacer(GlanceModifier.height(gap))
-                AiTileIcon(
-                    target = AiTarget.CHATGPT_TEXT,
-                    config = config,
-                    widthDp = leftW,
-                    heightDp = leftH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth()
-                )
-            }
-            Spacer(GlanceModifier.width(gap))
-            Column(modifier = GlanceModifier.defaultWeight().fillMaxHeight()) {
-                val rightGrid = listOf(
-                    listOf(AiTarget.CLAUDE, AiTarget.GROK),
-                    listOf(AiTarget.PERPLEXITY, AiTarget.COPILOT),
-                    listOf(AiTarget.DEEPSEEK, AiTarget.META_AI)
-                )
-                rightGrid.forEachIndexed { rIdx, row ->
-                    Row(modifier = GlanceModifier.defaultWeight().fillMaxWidth()) {
-                        row.forEachIndexed { cIdx, target ->
-                            AiTileIcon(
-                                target = target,
-                                config = config,
-                                widthDp = rightW,
-                                heightDp = rightH,
-                                modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                            )
-                            if (cIdx < row.size - 1) Spacer(GlanceModifier.width(gap))
+    // Calculate exact outer bounds that strictly fit inside cell boundaries
+    val cardW = (leftTileSize + (rightTileSize * 2) + (gapPx * 2)).dp + (outerPadding * 2)
+    val cardH = ((rightTileSize * 3) + (gapPx * 2)).dp + (outerPadding * 2)
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(cardW)
+                .height(cardH)
+                .cornerRadius(24.dp)
+                .background(cardBg)
+                .padding(outerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Left Column: 2 Big Stacked Squares
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AiTileIcon(
+                        target = AiTarget.GEMINI_TEXT,
+                        config = config,
+                        shapeStyle = AiShapeStyle.SQUIRCLE,
+                        widthDp = leftTileSize,
+                        heightDp = leftTileSize,
+                        modifier = GlanceModifier.size(leftTileSize.dp)
+                    )
+                    Spacer(GlanceModifier.height(gap))
+                    AiTileIcon(
+                        target = AiTarget.CHATGPT_TEXT,
+                        config = config,
+                        shapeStyle = AiShapeStyle.SQUIRCLE,
+                        widthDp = leftTileSize,
+                        heightDp = leftTileSize,
+                        modifier = GlanceModifier.size(leftTileSize.dp)
+                    )
+                }
+
+                Spacer(GlanceModifier.width(gap))
+
+                // Right Block: 6 Small Squares (2 Columns x 3 Rows)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val rightGrid = listOf(
+                        listOf(AiTarget.CLAUDE, AiTarget.GROK),
+                        listOf(AiTarget.PERPLEXITY, AiTarget.COPILOT),
+                        listOf(AiTarget.DEEPSEEK, AiTarget.META_AI)
+                    )
+                    rightGrid.forEachIndexed { rIdx, row ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            row.forEachIndexed { cIdx, target ->
+                                AiTileIcon(
+                                    target = target,
+                                    config = config,
+                                    shapeStyle = AiShapeStyle.SQUIRCLE,
+                                    widthDp = rightTileSize,
+                                    heightDp = rightTileSize,
+                                    modifier = GlanceModifier.size(rightTileSize.dp)
+                                )
+                                if (cIdx < row.size - 1) Spacer(GlanceModifier.width(gap))
+                            }
                         }
+                        if (rIdx < rightGrid.size - 1) Spacer(GlanceModifier.height(gap))
                     }
-                    if (rIdx < rightGrid.size - 1) Spacer(GlanceModifier.height(gap))
                 }
             }
         }
@@ -901,33 +963,31 @@ fun AiFolder8BentoSideTile(config: SlateWidgetConfig) {
 fun AiFolder9GridTile(config: SlateWidgetConfig) {
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
+    val squareCardSize = minOf(currentWidth, currentHeight)
 
     val outerPadding = 10.dp
     val gap = 4.dp
+    val availSize = squareCardSize - (outerPadding * 2)
 
-    val availW = currentWidth - (outerPadding * 2)
-    val availH = currentHeight - (outerPadding * 2)
+    val tileSizeDp = ((availSize - (gap * 2)) / 3).value.toInt().coerceAtLeast(28)
 
-    val slotW = ((availW - (gap * 2)) / 3).value.toInt().coerceAtLeast(28)
-    val slotH = ((availH - (gap * 2)) / 3).value.toInt().coerceAtLeast(28)
-
-    AiCardContainer(config) {
-        val grid = listOf(
-            listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT),
-            listOf(AiTarget.GROK, AiTarget.CLAUDE, AiTarget.DEEPSEEK),
-            listOf(AiTarget.PERPLEXITY, AiTarget.META_AI, AiTarget.POE)
-        )
-        Column(modifier = GlanceModifier.fillMaxSize()) {
+    AiFolderCardContainer(config) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val grid = listOf(
+                listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT),
+                listOf(AiTarget.GROK, AiTarget.CLAUDE, AiTarget.DEEPSEEK),
+                listOf(AiTarget.PERPLEXITY, AiTarget.META_AI, AiTarget.POE)
+            )
             grid.forEachIndexed { rIdx, row ->
-                Row(modifier = GlanceModifier.defaultWeight().fillMaxWidth()) {
+                Row(
+                    modifier = GlanceModifier.height(tileSizeDp.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     row.forEachIndexed { cIdx, target ->
-                        AiTileIcon(
-                            target = target,
-                            config = config,
-                            widthDp = slotW,
-                            heightDp = slotH,
-                            modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                        )
+                        AiTileIcon(target = target, config = config, widthDp = tileSizeDp, heightDp = tileSizeDp, modifier = GlanceModifier.size(tileSizeDp.dp))
                         if (cIdx < row.size - 1) Spacer(GlanceModifier.width(gap))
                     }
                 }
@@ -940,46 +1000,83 @@ fun AiFolder9GridTile(config: SlateWidgetConfig) {
 // FOLDER 5: 5x2 Mega Folder (10 Apps - 4x2 Size)
 @Composable
 fun AiFolder10MegaTile(config: SlateWidgetConfig) {
+    val isLight = config.themeMode == "LIGHT"
+    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
 
-    val outerPadding = 10.dp
+    val outerPadding = 12.dp
     val gap = 6.dp
 
     val availW = currentWidth - (outerPadding * 2)
     val availH = currentHeight - (outerPadding * 2)
 
-    val slotW = ((availW - (gap * 4)) / 5).value.toInt().coerceAtLeast(28)
-    val slotH = ((availH - gap) / 2).value.toInt().coerceAtLeast(28)
+    // Calculate maximum possible square tile size fitting both width and height constraints
+    val tileFromW = (availW - (gap * 4)) / 5
+    val tileFromH = (availH - gap) / 2
+    val tileSize = minOf(tileFromW, tileFromH).value.toInt().coerceAtLeast(24)
 
-    AiCardContainer(config) {
-        val row1 = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK)
-        val row2 = listOf(AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI)
+    val gapPx = gap.value.toInt()
+    val cardW = ((tileSize * 5) + (gapPx * 4)).dp + (outerPadding * 2)
+    val cardH = ((tileSize * 2) + gapPx).dp + (outerPadding * 2)
 
-        Column(modifier = GlanceModifier.fillMaxSize()) {
-            Row(modifier = GlanceModifier.defaultWeight().fillMaxWidth()) {
-                row1.forEachIndexed { idx, target ->
-                    AiTileIcon(
-                        target = target,
-                        config = config,
-                        widthDp = slotW,
-                        heightDp = slotH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                    )
-                    if (idx < row1.size - 1) Spacer(GlanceModifier.width(gap))
+    val row1 = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK)
+    val row2 = listOf(AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI)
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(cardW)
+                .height(cardH)
+                .cornerRadius(24.dp)
+                .background(cardBg)
+                .padding(outerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Row 1
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    row1.forEachIndexed { idx, target ->
+                        AiTileIcon(
+                            target = target,
+                            config = config,
+                            shapeStyle = AiShapeStyle.SQUIRCLE,
+                            widthDp = tileSize,
+                            heightDp = tileSize,
+                            modifier = GlanceModifier.size(tileSize.dp)
+                        )
+                        if (idx < row1.size - 1) Spacer(GlanceModifier.width(gap))
+                    }
                 }
-            }
-            Spacer(GlanceModifier.height(gap))
-            Row(modifier = GlanceModifier.defaultWeight().fillMaxWidth()) {
-                row2.forEachIndexed { idx, target ->
-                    AiTileIcon(
-                        target = target,
-                        config = config,
-                        widthDp = slotW,
-                        heightDp = slotH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                    )
-                    if (idx < row2.size - 1) Spacer(GlanceModifier.width(gap))
+
+                Spacer(GlanceModifier.height(gap))
+
+                // Row 2
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    row2.forEachIndexed { idx, target ->
+                        AiTileIcon(
+                            target = target,
+                            config = config,
+                            shapeStyle = AiShapeStyle.SQUIRCLE,
+                            widthDp = tileSize,
+                            heightDp = tileSize,
+                            modifier = GlanceModifier.size(tileSize.dp)
+                        )
+                        if (idx < row2.size - 1) Spacer(GlanceModifier.width(gap))
+                    }
                 }
             }
         }
@@ -989,102 +1086,116 @@ fun AiFolder10MegaTile(config: SlateWidgetConfig) {
 // FOLDER 6: Asymmetric Bento (1 Large + 2 Medium + 4 Small - 7 Apps)
 @Composable
 fun AiFolder7AsymmetricTile(config: SlateWidgetConfig) {
+    val isLight = config.themeMode == "LIGHT"
+    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
 
-    val outerPadding = 10.dp
-    val gap = 6.dp
+    val outerPadding = 12.dp
+    val gap = 5.dp
+    val gapPx = gap.value.toInt()
 
     val availW = currentWidth - (outerPadding * 2)
     val availH = currentHeight - (outerPadding * 2)
 
-    val mainW = ((availW - gap) * 0.60f).value.toInt().coerceAtLeast(36)
-    val mainH = ((availH - gap) * 0.55f).value.toInt().coerceAtLeast(36)
+    // Calculate small unit size S based on 4-unit grid (4S + 3g)
+    val unitFromW = (availW - (gap * 3)) / 4
+    val unitFromH = (availH - (gap * 3)) / 4
+    val smallSize = minOf(unitFromW, unitFromH).value.toInt().coerceAtLeast(20)
 
-    val subW = ((availW - gap) * 0.30f).value.toInt().coerceAtLeast(26)
-    val subH = ((availH - gap) * 0.40f).value.toInt().coerceAtLeast(26)
+    // Big tile dimensions: 3S + 2g (1:1 Perfect Square)
+    val bigSize = (smallSize * 3) + (gapPx * 2)
 
-    val sideW = ((availW - gap) * 0.35f).value.toInt().coerceAtLeast(24)
-    val sideH = ((availH - (gap * 3)) / 4).value.toInt().coerceAtLeast(24)
+    // Medium tile dimensions (under Big tile)
+    val medW = ((bigSize - gapPx) / 2).coerceAtLeast(20)
+    val medH = smallSize
 
-    AiCardContainer(config) {
-        Row(modifier = GlanceModifier.fillMaxSize()) {
-            Column(modifier = GlanceModifier.defaultWeight().fillMaxHeight()) {
-                AiTileIcon(
-                    target = AiTarget.CHATGPT_TEXT,
-                    config = config,
-                    isPrimaryAccent = true,
-                    widthDp = mainW,
-                    heightDp = mainH,
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth()
-                )
-                Spacer(GlanceModifier.height(gap))
-                Row(modifier = GlanceModifier.defaultWeight().fillMaxWidth()) {
+    // Card dimensions: 4S + 3g (Equal bounds on all sides)
+    val cardW = ((smallSize * 4) + (gapPx * 3)).dp + (outerPadding * 2)
+    val cardH = cardW
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(cardW)
+                .height(cardH)
+                .cornerRadius(24.dp)
+                .background(cardBg)
+                .padding(outerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Left Column: 1 Big Square + 2 Medium Tiles
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 1 Big Square Tile
                     AiTileIcon(
-                        target = AiTarget.GEMINI_TEXT,
+                        target = AiTarget.CHATGPT_TEXT,
                         config = config,
-                        widthDp = subW,
-                        heightDp = subH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
+                        isPrimaryAccent = true,
+                        widthDp = bigSize,
+                        heightDp = bigSize,
+                        modifier = GlanceModifier.size(bigSize.dp)
                     )
-                    Spacer(GlanceModifier.width(gap))
-                    AiTileIcon(
-                        target = AiTarget.CLAUDE,
-                        config = config,
-                        widthDp = subW,
-                        heightDp = subH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                    )
+
+                    Spacer(GlanceModifier.height(gap))
+
+                    // Bottom Row: 2 Medium Tiles
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        AiTileIcon(
+                            target = AiTarget.GEMINI_TEXT,
+                            config = config,
+                            shapeStyle = AiShapeStyle.SQUIRCLE,
+                            widthDp = medW,
+                            heightDp = medH,
+                            modifier = GlanceModifier.size(width = medW.dp, height = medH.dp)
+                        )
+                        Spacer(GlanceModifier.width(gap))
+                        AiTileIcon(
+                            target = AiTarget.CLAUDE,
+                            config = config,
+                            shapeStyle = AiShapeStyle.SQUIRCLE,
+                            widthDp = medW,
+                            heightDp = medH,
+                            modifier = GlanceModifier.size(width = medW.dp, height = medH.dp)
+                        )
+                    }
                 }
-            }
-            Spacer(GlanceModifier.width(gap))
-            Column(modifier = GlanceModifier.width(sideW.dp + 8.dp).fillMaxHeight()) {
-                val sideList = listOf(AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.PERPLEXITY, AiTarget.META_AI)
-                sideList.forEachIndexed { idx, target ->
-                    AiTileIcon(
-                        target = target,
-                        config = config,
-                        widthDp = sideW,
-                        heightDp = sideH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxWidth()
-                    )
-                    if (idx < sideList.size - 1) Spacer(GlanceModifier.height(gap))
+
+                Spacer(GlanceModifier.width(gap))
+
+                // Right Column: 4 Small Square Tiles Stacked Vertically
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val rightList = listOf(AiTarget.GROK, AiTarget.COPILOT, AiTarget.PERPLEXITY, AiTarget.META_AI)
+                    rightList.forEachIndexed { idx, target ->
+                        AiTileIcon(
+                            target = target,
+                            config = config,
+                            shapeStyle = AiShapeStyle.SQUIRCLE,
+                            widthDp = smallSize,
+                            heightDp = smallSize,
+                            modifier = GlanceModifier.size(smallSize.dp)
+                        )
+                        if (idx < rightList.size - 1) Spacer(GlanceModifier.height(gap))
+                    }
                 }
             }
         }
     }
 }
 
-// FOLDER 7: Floating Wallpaper Matrix (Frameless 6 Apps)
-@Composable
-fun AiFolderFloatingMatrixTile(config: SlateWidgetConfig) {
-    val currentWidth = LocalSize.current.width
-    val currentHeight = LocalSize.current.height
-
-    val gap = 8.dp
-    val slotW = ((currentWidth - (gap * 2)) / 3).value.toInt().coerceAtLeast(32)
-    val slotH = ((currentHeight - gap) / 2).value.toInt().coerceAtLeast(32)
-
-    val list = listOf(
-        listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE),
-        listOf(AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.PERPLEXITY)
-    )
-    Column(modifier = GlanceModifier.fillMaxSize()) {
-        list.forEachIndexed { rIdx, row ->
-            Row(modifier = GlanceModifier.defaultWeight().fillMaxWidth()) {
-                row.forEachIndexed { cIdx, target ->
-                    AiTileIcon(
-                        target = target,
-                        config = config,
-                        shapeStyle = AiShapeStyle.SQUIRCLE,
-                        widthDp = slotW,
-                        heightDp = slotH,
-                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
-                    )
-                    if (cIdx < row.size - 1) Spacer(GlanceModifier.width(gap))
-                }
-            }
-            if (rIdx < list.size - 1) Spacer(GlanceModifier.height(gap))
-        }
-    }
-}

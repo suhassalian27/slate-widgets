@@ -68,8 +68,6 @@ class AiFolder10MegaReceiver : GlanceAppWidgetReceiver() { override val glanceAp
 class AiFolder7AsymmetricWidget : BaseAiFolderWidget({ config -> AiFolder7AsymmetricTile(config) })
 class AiFolder7AsymmetricReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder7AsymmetricWidget() }
 
-class AiFolderFloatingMatrixWidget : BaseAiFolderWidget({ config -> AiFolderFloatingMatrixTile(config) })
-class AiFolderFloatingMatrixReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolderFloatingMatrixWidget() }
 
 suspend fun updateAllAiFolderWidgets(context: Context) {
     val manager = GlanceAppWidgetManager(context)
@@ -83,5 +81,4 @@ suspend fun updateAllAiFolderWidgets(context: Context) {
     if (manager.getGlanceIds(AiFolder9GridWidget::class.java).isNotEmpty()) AiFolder9GridWidget().updateAll(context)
     if (manager.getGlanceIds(AiFolder10MegaWidget::class.java).isNotEmpty()) AiFolder10MegaWidget().updateAll(context)
     if (manager.getGlanceIds(AiFolder7AsymmetricWidget::class.java).isNotEmpty()) AiFolder7AsymmetricWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolderFloatingMatrixWidget::class.java).isNotEmpty()) AiFolderFloatingMatrixWidget().updateAll(context)
 }
