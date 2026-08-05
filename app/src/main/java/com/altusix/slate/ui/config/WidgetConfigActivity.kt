@@ -31,9 +31,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.widgets.battery.BatteryUpdateWorker
 import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.GlanceAppWidgetReceiver
 
 class WidgetConfigActivity : ComponentActivity() {
 
@@ -67,6 +69,16 @@ class WidgetConfigActivity : ComponentActivity() {
                 var selectedAccentHex by remember { mutableLongStateOf(0xFF00D166L) }
 
                 val currentBgHex = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
+
+                // Pre-populate UI with saved settings when editing an existing widget
+                LaunchedEffect(appWidgetId) {
+                    val savedConfig = dataStore.getWidgetConfig(appWidgetId).firstOrNull()
+                    if (savedConfig != null) {
+                        themeMode = savedConfig.themeMode
+                        opacity = savedConfig.opacity
+                        selectedAccentHex = savedConfig.accentColorHex
+                    }
+                }
 
                 Column(
                     modifier = Modifier
@@ -252,24 +264,68 @@ class WidgetConfigActivity : ComponentActivity() {
     }
 
     private fun saveAndFinish(config: SlateWidgetConfig) {
+        val appCtx = applicationContext
+        val targetWidgetClass = widgetClassName
+        val targetAppWidgetId = appWidgetId
+
         lifecycleScope.launch {
             try {
-                dataStore.saveWidgetConfig(appWidgetId, config)
-
-
-
-                // Force instant sync across all active widgets
-//                updateAllBatteryWidgets(this@WidgetConfigActivity)
-
+                // 1. Save config to DataStore
+                dataStore.saveWidgetConfig(targetAppWidgetId, config)
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
+                // 2. Notify launcher of successful configuration
                 val resultValue = Intent().apply {
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, targetAppWidgetId)
                 }
                 setResult(Activity.RESULT_OK, resultValue)
                 finish()
+
+                // 3. Poll for Glance launcher binding and force immediate recomposition
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    for (attempt in 1..6) {
+                        kotlinx.coroutines.delay(150L * attempt)
+                        try {
+                            if (targetWidgetClass.isNotEmpty()) {
+                                val glanceManager = GlanceAppWidgetManager(appCtx)
+                                val glanceId = glanceManager.getGlanceIdBy(targetAppWidgetId)
+
+                                val receiverClass = Class.forName(targetWidgetClass)
+                                val receiverInstance = receiverClass.getDeclaredConstructor().newInstance()
+
+                                if (receiverInstance is GlanceAppWidgetReceiver) {
+                                    receiverInstance.glanceAppWidget.update(appCtx, glanceId)
+                                    break
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Retry until launcher completes binding appWidgetId to GlanceId
+                        }
+                    }
+
+                    // Fallback sync across all Glance widget pools
+                    try {
+                        com.altusix.slate.widgets.ai.updateAllAiWidgets(appCtx)
+                        com.altusix.slate.widgets.ai.updateAllAiFolderWidgets(appCtx)
+                        updateAllBatteryWidgets(appCtx)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
             }
+        }
+    }
+
+    private fun updateStandardAppWidget() {
+        val appWidgetManager = AppWidgetManager.getInstance(this)
+        val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
+        if (widgetInfo != null) {
+            val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                component = widgetInfo.provider
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(appWidgetId))
+            }
+            sendBroadcast(intent)
         }
     }
 

@@ -12,6 +12,12 @@ import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
+import androidx.compose.ui.unit.dp
+import androidx.glance.GlanceModifier
+import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
+import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.size
 
 abstract class BaseAiWidget(private val target: AiTarget) : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
@@ -24,7 +30,23 @@ abstract class BaseAiWidget(private val target: AiTarget) : GlanceAppWidget() {
         } catch (e: Exception) { SlateWidgetConfig() }
 
         provideContent {
-            AiTileIcon(target = target, config = config)
+            val size = androidx.glance.LocalSize.current
+            val widthDp = size.width.value.toInt().coerceAtLeast(40)
+            val heightDp = size.height.value.toInt().coerceAtLeast(40)
+            val squareSize = minOf(widthDp, heightDp)
+
+            androidx.glance.layout.Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = androidx.glance.layout.Alignment.Center
+            ) {
+                AiTileIcon(
+                    target = target,
+                    config = config,
+                    widthDp = squareSize,
+                    heightDp = squareSize,
+                    modifier = GlanceModifier.size(squareSize.dp)
+                )
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.altusix.slate.ui.config.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="70dp"
     android:minHeight="140dp"
@@ -8,3 +9,4 @@
     android:targetCellWidth="1"
     android:targetCellHeight="2"
     android:updatePeriodMillis="0" />
+

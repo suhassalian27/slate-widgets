@@ -227,8 +227,7 @@ private fun AiCardContainer(
     config: SlateWidgetConfig,
     content: @Composable () -> Unit
 ) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     Box(
         modifier = GlanceModifier
@@ -248,8 +247,7 @@ private fun AiFolderCardContainer(
     config: SlateWidgetConfig,
     content: @Composable () -> Unit
 ) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
@@ -440,7 +438,7 @@ fun SplitHeroAction(
 @Composable
 fun AiBarHeroPrimary(config: SlateWidgetConfig) {
     val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
     val dividerColor = if (isLight) Color(0x33000000) else Color(0x33FFFFFF)
 
     val currentWidth = LocalSize.current.width
@@ -530,8 +528,7 @@ fun AiBarHeroPrimary(config: SlateWidgetConfig) {
 // BAR 2: Uniform 5-Icon Dock Bar
 @Composable
 fun AiBarDock5Tile(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val outerPadding = 6.dp
@@ -593,8 +590,7 @@ fun AiBarDock5Tile(config: SlateWidgetConfig) {
 // BAR 3: Multi-Modal Action Bar
 @Composable
 fun AiBarCapsuleTile(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val outerPadding = 6.dp
@@ -671,8 +667,7 @@ fun AiBarCapsuleTile(config: SlateWidgetConfig) {
 // BAR 4: Dual Flagship Dock (Each hero pill stretches 50% edge-to-edge)
 @Composable
 fun AiBarDualFlagship(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val barHeight = 72.dp
@@ -766,8 +761,7 @@ fun AiFolder4ClassicTile(config: SlateWidgetConfig) {
 // FOLDER 2: Bento Hero (2 Top Large + 4 Bottom Small)
 @Composable
 fun AiFolder6BentoHeroTile(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
@@ -859,8 +853,7 @@ fun AiFolder6BentoHeroTile(config: SlateWidgetConfig) {
 // FOLDER 3: Bento Side Split (2 Left Hero + 6 Right Small)
 @Composable
 fun AiFolder8BentoSideTile(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
@@ -1000,8 +993,7 @@ fun AiFolder9GridTile(config: SlateWidgetConfig) {
 // FOLDER 5: 5x2 Mega Folder (10 Apps - 4x2 Size)
 @Composable
 fun AiFolder10MegaTile(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
@@ -1086,8 +1078,7 @@ fun AiFolder10MegaTile(config: SlateWidgetConfig) {
 // FOLDER 6: Asymmetric Bento (1 Large + 2 Medium + 4 Small - 7 Apps)
 @Composable
 fun AiFolder7AsymmetricTile(config: SlateWidgetConfig) {
-    val isLight = config.themeMode == "LIGHT"
-    val cardBg = if (isLight) Color(0xFFE5E5EA) else Color(0xFF141416)
+    val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity)
 
     val currentWidth = LocalSize.current.width
     val currentHeight = LocalSize.current.height
