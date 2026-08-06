@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.updateAll
 
 class WidgetConfigActivity : ComponentActivity() {
 
@@ -270,12 +271,14 @@ class WidgetConfigActivity : ComponentActivity() {
         val targetWidgetClass = widgetClassName
         val targetAppWidgetId = appWidgetId
 
-        lifecycleScope.launch {
+        // 1. Launch in the IO dispatcher to handle background polling and delays
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                // 1. Await DataStore write
+                // 2. Save config to DataStore. This must complete first.
                 dataStore.saveWidgetConfig(targetAppWidgetId, config)
 
-                // 2. Broadcast system update
+                // 3. Send the broadcast. For brand new widgets, this forces Glance
+                // to wake up, intercept the ID, and write it to its internal database.
                 if (targetWidgetClass.isNotEmpty()) {
                     val updateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
                         component = ComponentName(appCtx, targetWidgetClass)
@@ -284,31 +287,46 @@ class WidgetConfigActivity : ComponentActivity() {
                     appCtx.sendBroadcast(updateIntent)
                 }
 
-                // 3. Try targeted Glance update for existing widgets
-                try {
-                    val glanceManager = GlanceAppWidgetManager(appCtx)
-                    val glanceId = glanceManager.getGlanceIdBy(targetAppWidgetId)
-                    if (targetWidgetClass.isNotEmpty()) {
-                        val receiverClass = Class.forName(targetWidgetClass)
-                        val receiverInstance = receiverClass.getDeclaredConstructor().newInstance()
-                        if (receiverInstance is GlanceAppWidgetReceiver) {
-                            receiverInstance.glanceAppWidget.update(appCtx, glanceId)
-                        }
+                // 4. Poll for the GlanceId.
+                // For existing widgets, this succeeds instantly on attempt 1.
+                // For new widgets, it gives Glance the few milliseconds it needs to process the broadcast.
+                var mappedGlanceId: androidx.glance.GlanceId? = null
+                val glanceManager = GlanceAppWidgetManager(appCtx)
+
+                for (attempt in 1..15) {
+                    try {
+                        mappedGlanceId = glanceManager.getGlanceIdBy(targetAppWidgetId)
+                        break // We successfully found the mapped ID, break out of the loop
+                    } catch (e: IllegalArgumentException) {
+                        // Not mapped yet. Wait 100ms and try again.
+                        kotlinx.coroutines.delay(100L)
                     }
-                } catch (e: Exception) {
-                    // New widgets throw here because launcher hasn't bound GlanceId yet.
-                    // That's expected; the launcher will trigger provideGlance once we set RESULT_OK.
                 }
 
-                // 4. Return RESULT_OK to launcher
-                val resultValue = Intent().apply {
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, targetAppWidgetId)
+                // 5. Force a synchronous Compose update.
+                // .update() is a suspend function. It will completely block this coroutine
+                // until Glance has fully built the UI and pushed it to the system AppWidgetManager.
+                if (mappedGlanceId != null && targetWidgetClass.isNotEmpty()) {
+                    val receiverClass = Class.forName(targetWidgetClass)
+                    val receiverInstance = receiverClass.getDeclaredConstructor().newInstance()
+                    if (receiverInstance is GlanceAppWidgetReceiver) {
+                        receiverInstance.glanceAppWidget.update(appCtx, mappedGlanceId)
+                    }
                 }
-                setResult(Activity.RESULT_OK, resultValue)
+
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                finish()
+                // 6. We ONLY finish the activity after the RemoteViews are generated.
+                // By switching to Main and finishing here, we guarantee the launcher
+                // reads the fully themed widget the exact moment it hits the homescreen.
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    val resultValue = Intent().apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, targetAppWidgetId)
+                    }
+                    setResult(Activity.RESULT_OK, resultValue)
+                    finish()
+                }
             }
         }
     }
