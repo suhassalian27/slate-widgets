@@ -2,6 +2,7 @@
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -32,6 +33,8 @@ import androidx.lifecycle.lifecycleScope
 import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
+import com.altusix.slate.widgets.ai.updateAllAiWidgets
+import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -70,7 +73,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                 val currentBgHex = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
 
-                // Pre-populate UI with saved settings when editing an existing widget
                 LaunchedEffect(appWidgetId) {
                     val savedConfig = dataStore.getWidgetConfig(appWidgetId).firstOrNull()
                     if (savedConfig != null) {
@@ -270,62 +272,44 @@ class WidgetConfigActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             try {
-                // 1. Save config to DataStore
+                // 1. Await DataStore write
                 dataStore.saveWidgetConfig(targetAppWidgetId, config)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                // 2. Notify launcher of successful configuration
+
+                // 2. Broadcast system update
+                if (targetWidgetClass.isNotEmpty()) {
+                    val updateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                        component = ComponentName(appCtx, targetWidgetClass)
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(targetAppWidgetId))
+                    }
+                    appCtx.sendBroadcast(updateIntent)
+                }
+
+                // 3. Try targeted Glance update for existing widgets
+                try {
+                    val glanceManager = GlanceAppWidgetManager(appCtx)
+                    val glanceId = glanceManager.getGlanceIdBy(targetAppWidgetId)
+                    if (targetWidgetClass.isNotEmpty()) {
+                        val receiverClass = Class.forName(targetWidgetClass)
+                        val receiverInstance = receiverClass.getDeclaredConstructor().newInstance()
+                        if (receiverInstance is GlanceAppWidgetReceiver) {
+                            receiverInstance.glanceAppWidget.update(appCtx, glanceId)
+                        }
+                    }
+                } catch (e: Exception) {
+                    // New widgets throw here because launcher hasn't bound GlanceId yet.
+                    // That's expected; the launcher will trigger provideGlance once we set RESULT_OK.
+                }
+
+                // 4. Return RESULT_OK to launcher
                 val resultValue = Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, targetAppWidgetId)
                 }
                 setResult(Activity.RESULT_OK, resultValue)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
                 finish()
-
-                // 3. Poll for Glance launcher binding and force immediate recomposition
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                    for (attempt in 1..6) {
-                        kotlinx.coroutines.delay(150L * attempt)
-                        try {
-                            if (targetWidgetClass.isNotEmpty()) {
-                                val glanceManager = GlanceAppWidgetManager(appCtx)
-                                val glanceId = glanceManager.getGlanceIdBy(targetAppWidgetId)
-
-                                val receiverClass = Class.forName(targetWidgetClass)
-                                val receiverInstance = receiverClass.getDeclaredConstructor().newInstance()
-
-                                if (receiverInstance is GlanceAppWidgetReceiver) {
-                                    receiverInstance.glanceAppWidget.update(appCtx, glanceId)
-                                    break
-                                }
-                            }
-                        } catch (e: Exception) {
-                            // Retry until launcher completes binding appWidgetId to GlanceId
-                        }
-                    }
-
-                    // Fallback sync across all Glance widget pools
-                    try {
-                        com.altusix.slate.widgets.ai.updateAllAiWidgets(appCtx)
-                        com.altusix.slate.widgets.ai.updateAllAiFolderWidgets(appCtx)
-                        updateAllBatteryWidgets(appCtx)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
             }
-        }
-    }
-
-    private fun updateStandardAppWidget() {
-        val appWidgetManager = AppWidgetManager.getInstance(this)
-        val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
-        if (widgetInfo != null) {
-            val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
-                component = widgetInfo.provider
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(appWidgetId))
-            }
-            sendBroadcast(intent)
         }
     }
 

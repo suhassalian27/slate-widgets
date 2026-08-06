@@ -1,9 +1,15 @@
 ﻿package com.altusix.slate.data.local
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.glance.GlanceId
+import androidx.glance.appwidget.AppWidgetId
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "slate_widget_prefs")
@@ -34,5 +40,32 @@ class SlateDataStore(private val context: Context) {
             prefs[PreferencesKeys.widgetOpacityKey(widgetId)] = config.opacity
             prefs[PreferencesKeys.widgetAccentColorKey(widgetId)] = config.accentColorHex
         }
+    }
+}
+
+suspend fun getWidgetConfigSafely(context: Context, id: GlanceId): SlateWidgetConfig {
+    // Direct cast bypasses GlanceAppWidgetManager internal DB lookup failure
+    val appWidgetId = if (id is AppWidgetId) {
+        id.appWidgetId
+    } else {
+        try {
+            GlanceAppWidgetManager(context).getAppWidgetId(id)
+        } catch (e: Exception) {
+            val str = id.toString()
+            val match = Regex("""\d+""").find(str)
+            match?.value?.toIntOrNull() ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        }
+    }
+
+    if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        return SlateWidgetConfig()
+    }
+
+    return try {
+        SlateDataStore(context).getWidgetConfig(appWidgetId)
+            .catch { emit(SlateWidgetConfig()) }
+            .first()
+    } catch (e: Exception) {
+        SlateWidgetConfig()
     }
 }
