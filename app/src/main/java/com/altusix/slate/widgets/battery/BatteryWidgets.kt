@@ -1,21 +1,15 @@
 ﻿package com.altusix.slate.widgets.battery
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.os.BatteryManager
 import android.os.Build
-import androidx.glance.GlanceId
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
-import com.altusix.slate.data.local.SlateDataStore
+import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
 
 data class DetailedBatteryData(
     val percentage: Int,
@@ -105,26 +99,39 @@ fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
     }
 }
 
-suspend fun updateAllBatteryWidgets(context: Context) {
-    val manager = GlanceAppWidgetManager(context)
+fun updateAllBatteryWidgets(context: Context) {
+    val receivers = listOf(
+        MinimalBatteryReceiver::class.java,
+        MultiDeviceBatteryReceiver::class.java,
+        HorizontalBatteryReceiver::class.java,
+        ArcGaugeBatteryReceiver::class.java,
+        EditorialStatsBatteryReceiver::class.java,
+        DotMatrixBatteryLEDReceiver::class.java,
+        DotLevelMeterReceiver::class.java,
+        DotLevelMeterWideReceiver::class.java,
+        SegmentedPillBatteryReceiver::class.java,
+        PixelHeartBatteryReceiver::class.java,
+        LightningBoltBatteryReceiver::class.java,
+        CircularRingBatteryReceiver::class.java,
+        VerticalBatteryPillReceiver::class.java,
+        HorizontalBatteryPillReceiver::class.java
+    )
 
-    if (manager.getGlanceIds(MinimalBatteryWidget::class.java).isNotEmpty()) MinimalBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(MultiDeviceBatteryWidget::class.java).isNotEmpty()) MultiDeviceBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(HorizontalBatteryWidget::class.java).isNotEmpty()) HorizontalBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(ArcGaugeBatteryWidget::class.java).isNotEmpty()) ArcGaugeBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(EditorialStatsBatteryWidget::class.java).isNotEmpty()) EditorialStatsBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(DotMatrixBatteryLEDWidget::class.java).isNotEmpty()) DotMatrixBatteryLEDWidget().updateAll(context)
-    if (manager.getGlanceIds(DotLevelMeterWidget::class.java).isNotEmpty()) DotLevelMeterWidget().updateAll(context)
-    if (manager.getGlanceIds(DotLevelMeterWideWidget::class.java).isNotEmpty()) DotLevelMeterWideWidget().updateAll(context)
-    if (manager.getGlanceIds(SegmentedPillBatteryWidget::class.java).isNotEmpty()) SegmentedPillBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(PixelHeartBatteryWidget::class.java).isNotEmpty()) PixelHeartBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(LightningBoltBatteryWidget::class.java).isNotEmpty()) LightningBoltBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(CircularRingBatteryWidget::class.java).isNotEmpty()) CircularRingBatteryWidget().updateAll(context)
-    if (manager.getGlanceIds(VerticalBatteryPillWidget::class.java).isNotEmpty()) VerticalBatteryPillWidget().updateAll(context)
-    if (manager.getGlanceIds(HorizontalBatteryPillWidget::class.java).isNotEmpty()) HorizontalBatteryPillWidget().updateAll(context)
+    val manager = AppWidgetManager.getInstance(context)
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
+        if (ids.isNotEmpty()) {
+            val intent = Intent(context, receiver).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            context.sendBroadcast(intent)
+        }
+    }
 }
 
-abstract class BaseBatteryReceiver : GlanceAppWidgetReceiver() {
+// Base Battery Receiver linking WorkManager scheduling and real-time charging triggers
+abstract class BaseBatteryReceiver : BaseCanvasWidgetProvider() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         BatteryUpdateWorker.schedule(context)
@@ -134,195 +141,186 @@ abstract class BaseBatteryReceiver : GlanceAppWidgetReceiver() {
         super.onDisabled(context)
         BatteryUpdateWorker.cancel(context)
     }
-}
 
-// 1. Minimal 2x2 Tile
-class MinimalBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { MinimalBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val action = intent.action
+        if (action == Intent.ACTION_POWER_CONNECTED ||
+            action == Intent.ACTION_POWER_DISCONNECTED ||
+            action == Intent.ACTION_BATTERY_LOW ||
+            action == Intent.ACTION_BATTERY_OKAY
+        ) {
+            updateAllBatteryWidgets(context)
+        }
     }
 }
-class MinimalBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = MinimalBatteryWidget() }
+
+// 1. Minimal Tile (2x2)
+class MinimalBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generateMinimalBatteryBitmap(context, data, config, wDp, hDp)
+    }
+}
 
 // 2. Multi-Device Card (4x2)
-class MultiDeviceBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+class MultiDeviceBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { MultiDeviceBatteryCard(phonePct = data.percentage, isCharging = data.isCharging, tempText = data.tempText, voltageText = data.voltageText, config = config) }
+        return generateMultiDeviceBatteryBitmap(context, data, config, wDp, hDp)
     }
 }
-class MultiDeviceBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = MultiDeviceBatteryWidget() }
 
 // 3. Horizontal Strip (4x1)
-class HorizontalBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+class HorizontalBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { HorizontalBatteryStrip(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateHorizontalStripBitmap(data.percentage, androidx.compose.ui.graphics.Color(config.accentColorHex), androidx.compose.ui.graphics.Color(0x2BFFFFFF), androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity), wPx, hPx)
     }
 }
-class HorizontalBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = HorizontalBatteryWidget() }
 
 // 4. Arc Gauge Tile (2x2)
-class ArcGaugeBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+class ArcGaugeBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { ArcGaugeBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        return generateArcGaugeTileBitmap(context, data, config, wDp, hDp)
     }
 }
-class ArcGaugeBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = ArcGaugeBatteryWidget() }
 
 // 5. Editorial Stats Tile (2x2)
-class EditorialStatsBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+class EditorialStatsBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { EditorialStatsBatteryTile(percentage = data.percentage, healthText = data.healthText, secondaryStatText = data.secondaryStatText, config = config) }
+        return generateEditorialStatsBitmap(context, data, config, wDp, hDp)
     }
 }
-class EditorialStatsBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = EditorialStatsBatteryWidget() }
 
-// 6. Dot Matrix Battery LED (4x2 Wide)
-class DotMatrixBatteryLEDWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 6. Dot Matrix LED (4x2)
+class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { DotMatrixBatteryLEDCard(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val activeColor = if (isLight) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x1AFFFFFF)
+        val bgColor = androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity)
+        return generateDotMatrixLEDBitmap("${data.percentage}%", activeColor, dimColor, bgColor, wPx, hPx)
     }
 }
-class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = DotMatrixBatteryLEDWidget() }
 
-// 7. 100-Dot Level Meter Tile (2x2)
-class DotLevelMeterWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 7. Dot Level Meter Tile (2x2)
+class DotLevelMeterReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { DotLevelMeterTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val activeColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x1AFFFFFF)
+        return generateDotLevelBitmap(data.percentage, activeColor, dimColor, 10, 10, wPx, hPx)
     }
 }
-class DotLevelMeterReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWidget() }
 
-// 8. 100-Dot Level Meter Card (4x2)
-class DotLevelMeterWideWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 8. Dot Level Meter Wide (4x2)
+class DotLevelMeterWideReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { DotLevelMeterCard(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val activeColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x1AFFFFFF)
+        val bgColor = androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity)
+        return generateCenteredLevelBitmap(data.percentage, activeColor, dimColor, bgColor, wPx, hPx)
     }
 }
-class DotLevelMeterWideReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = DotLevelMeterWideWidget() }
 
-// 9. 5-Bar Segmented Pill Tile (2x2)
-class SegmentedPillBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 9. Segmented Pill Tile (2x2)
+class SegmentedPillBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { SegmentedPillBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val accentColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x26FFFFFF)
+        val containerBgColor = if (isLight) androidx.compose.ui.graphics.Color(0x0F000000) else androidx.compose.ui.graphics.Color(0x1AFFFFFF)
+        return generateFivePillGaugeBitmap(data.percentage, accentColor, dimColor, containerBgColor, wPx, hPx)
     }
 }
-class SegmentedPillBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = SegmentedPillBatteryWidget() }
 
-// 10. Pixel Heart Battery Tile (2x2)
-class PixelHeartBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 10. Pixel Heart Tile (2x2)
+class PixelHeartBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { PixelHeartBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val accentColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x2B000000) else androidx.compose.ui.graphics.Color(0x2BFFFFFF)
+        return generatePixelHeartBitmap(data.percentage, accentColor, dimColor, wPx, hPx)
     }
 }
-class PixelHeartBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = PixelHeartBatteryWidget() }
 
-// 11. Responsive Wavy Lightning Bolt Tile (2x2 / 4x2)
-class LightningBoltBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 11. Lightning Bolt Tile (2x2 / 4x2)
+class LightningBoltBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { LightningBoltBatteryTile(percentage = data.percentage, isCharging = data.isCharging, tempText = data.tempText, voltageText = data.voltageText, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val isWide = wDp >= 200
+        val accentColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x2B000000) else androidx.compose.ui.graphics.Color(0x2BFFFFFF)
+        val bgColor = androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity)
+        return generateWavyLightningBoltBitmap(data.percentage, accentColor, dimColor, bgColor, wPx, hPx, isWide)
     }
 }
-class LightningBoltBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = LightningBoltBatteryWidget() }
 
-// 12. Circular Dial Battery Tile (2x2)
-class CircularRingBatteryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+// 12. Circular Ring Dial (2x2)
+class CircularRingBatteryReceiver : BaseBatteryReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = getWidgetConfig(context, id)
-        provideContent { CircularRingBatteryTile(percentage = data.percentage, isCharging = data.isCharging, config = config) }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        val isLight = config.themeMode == "LIGHT"
+        val accentColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
+        val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x2BFFFFFF)
+        val iconColor = if (isLight) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
+        val bgColor = androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity)
+        return generateCircularGaugeBitmap(data.percentage, data.isCharging, accentColor, dimColor, iconColor, bgColor, isLight, 1.0f, wPx, hPx)
     }
 }
-class CircularRingBatteryReceiver : BaseBatteryReceiver() { override val glanceAppWidget: GlanceAppWidget = CircularRingBatteryWidget() }
 
-private suspend fun getWidgetConfig(context: Context, id: GlanceId): SlateWidgetConfig {
-    return try {
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        SlateDataStore(context).getWidgetConfig(appWidgetId).catch { emit(SlateWidgetConfig()) }.first()
-    } catch (e: Exception) { SlateWidgetConfig() }
-}
-
-// ============================================================================
-// WIDGET #13: VERTICAL PILL BATTERY (1x2 Fluid)
-// ============================================================================
-class VerticalBatteryPillWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = readDetailedBatteryStatus(context)
-        val config = try {
-            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-            SlateDataStore(context).getWidgetConfig(appWidgetId)
-                .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) { SlateWidgetConfig() }
-
-        provideContent {
-            VerticalBatteryPillTile(
-                percentage = data.percentage,
-                isCharging = data.isCharging,
-                config = config
-            )
-        }
-    }
-}
+// 13. Vertical Pill (1x2)
 class VerticalBatteryPillReceiver : BaseBatteryReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = VerticalBatteryPillWidget()
-}
-
-// ============================================================================
-// WIDGET #14: HORIZONTAL PILL BATTERY (2x1 Fluid)
-// ============================================================================
-class HorizontalBatteryPillWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val config = try {
-            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-            SlateDataStore(context).getWidgetConfig(appWidgetId)
-                .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) { SlateWidgetConfig() }
-
-        provideContent {
-            HorizontalBatteryPillTile(
-                percentage = data.percentage,
-                isCharging = data.isCharging,
-                config = config
-            )
-        }
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateVerticalPillBitmap(data.percentage, data.isCharging, config, wPx, hPx)
     }
 }
+
+// 14. Horizontal Pill (2x1)
 class HorizontalBatteryPillReceiver : BaseBatteryReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = HorizontalBatteryPillWidget()
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateHorizontalPillBitmap(data.percentage, data.isCharging, config, wPx, hPx)
+    }
 }

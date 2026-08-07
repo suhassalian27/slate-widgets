@@ -2,7 +2,7 @@
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -29,29 +29,19 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
-import com.altusix.slate.data.local.SlateDataStore
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
-import com.altusix.slate.widgets.ai.updateAllAiWidgets
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
-import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.updateAll
+import com.altusix.slate.widgets.ai.updateAllAiWidgets
+import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
 
 class WidgetConfigActivity : ComponentActivity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
-    private lateinit var dataStore: SlateDataStore
     private var widgetClassName: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
-
-        dataStore = SlateDataStore(this)
 
         appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -70,17 +60,27 @@ class WidgetConfigActivity : ComponentActivity() {
             SlateConfigTheme {
                 var themeMode by remember { mutableStateOf("DARK") }
                 var opacity by remember { mutableFloatStateOf(1.0f) }
-                var selectedAccentHex by remember { mutableLongStateOf(0xFF00D166L) }
+                // Default accent color: White in Dark Mode
+                var selectedAccentHex by remember { mutableLongStateOf(0xFFFFFFFFL) }
 
                 val currentBgHex = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
 
+                // Load existing configuration from SharedPreferences
                 LaunchedEffect(appWidgetId) {
-                    val savedConfig = dataStore.getWidgetConfig(appWidgetId).firstOrNull()
-                    if (savedConfig != null) {
-                        themeMode = savedConfig.themeMode
-                        opacity = savedConfig.opacity
-                        selectedAccentHex = savedConfig.accentColorHex
+                    val prefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+                    if (prefs.contains("widget_${appWidgetId}_theme_mode")) {
+                        themeMode = prefs.getString("widget_${appWidgetId}_theme_mode", "DARK") ?: "DARK"
+                        opacity = prefs.getFloat("widget_${appWidgetId}_opacity", 1.0f)
+                        val defaultAccent = if (themeMode == "LIGHT") 0xFF000000L else 0xFFFFFFFFL
+                        selectedAccentHex = prefs.getLong("widget_${appWidgetId}_accent_color", defaultAccent)
                     }
+                }
+
+                // Accent Options: White included for Dark Mode, Black for Light Mode
+                val accentOptions = if (themeMode == "LIGHT") {
+                    listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                } else {
+                    listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
                 }
 
                 Column(
@@ -187,7 +187,17 @@ class WidgetConfigActivity : ComponentActivity() {
                                     .height(38.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                                    .clickable { themeMode = mode },
+                                    .clickable {
+                                        if (themeMode != mode) {
+                                            themeMode = mode
+                                            // Automatically switch default accent color when toggling mode
+                                            if (mode == "LIGHT" && selectedAccentHex == 0xFFFFFFFFL) {
+                                                selectedAccentHex = 0xFF000000L
+                                            } else if (mode == "DARK" && selectedAccentHex == 0xFF000000L) {
+                                                selectedAccentHex = 0xFFFFFFFFL
+                                            }
+                                        }
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -208,14 +218,18 @@ class WidgetConfigActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        listOf(0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL).forEach { hex ->
+                        accentOptions.forEach { hex ->
                             val isSelected = selectedAccentHex == hex
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clip(CircleShape)
                                     .background(Color(hex))
-                                    .border(if (isSelected) 2.5.dp else 0.dp, Color.White, CircleShape)
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) Color.Green else Color.White.copy(alpha = 0.3f),
+                                        shape = CircleShape
+                                    )
                                     .clickable { selectedAccentHex = hex }
                             )
                         }
@@ -267,68 +281,34 @@ class WidgetConfigActivity : ComponentActivity() {
     }
 
     private fun saveAndFinish(config: SlateWidgetConfig) {
-        val appCtx = applicationContext
-        val targetWidgetClass = widgetClassName
-        val targetAppWidgetId = appWidgetId
+        // 1. Commit settings to SharedPreferences synchronously
+        val prefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("widget_${appWidgetId}_theme_mode", config.themeMode)
+            .putLong("widget_${appWidgetId}_bg_color", config.backgroundColorHex)
+            .putFloat("widget_${appWidgetId}_opacity", config.opacity)
+            .putLong("widget_${appWidgetId}_accent_color", config.accentColorHex)
+            .commit()
 
-        // 1. Launch in the IO dispatcher to handle background polling and delays
-        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                // 2. Save config to DataStore. This must complete first.
-                dataStore.saveWidgetConfig(targetAppWidgetId, config)
+        // 2. Direct broadcast update to AppWidgetProvider
+        val manager = AppWidgetManager.getInstance(this)
+        val widgetInfo = manager.getAppWidgetInfo(appWidgetId)
 
-                // 3. Send the broadcast. For brand new widgets, this forces Glance
-                // to wake up, intercept the ID, and write it to its internal database.
-                if (targetWidgetClass.isNotEmpty()) {
-                    val updateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
-                        component = ComponentName(appCtx, targetWidgetClass)
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(targetAppWidgetId))
-                    }
-                    appCtx.sendBroadcast(updateIntent)
-                }
-
-                // 4. Poll for the GlanceId.
-                // For existing widgets, this succeeds instantly on attempt 1.
-                // For new widgets, it gives Glance the few milliseconds it needs to process the broadcast.
-                var mappedGlanceId: androidx.glance.GlanceId? = null
-                val glanceManager = GlanceAppWidgetManager(appCtx)
-
-                for (attempt in 1..15) {
-                    try {
-                        mappedGlanceId = glanceManager.getGlanceIdBy(targetAppWidgetId)
-                        break // We successfully found the mapped ID, break out of the loop
-                    } catch (e: IllegalArgumentException) {
-                        // Not mapped yet. Wait 100ms and try again.
-                        kotlinx.coroutines.delay(100L)
-                    }
-                }
-
-                // 5. Force a synchronous Compose update.
-                // .update() is a suspend function. It will completely block this coroutine
-                // until Glance has fully built the UI and pushed it to the system AppWidgetManager.
-                if (mappedGlanceId != null && targetWidgetClass.isNotEmpty()) {
-                    val receiverClass = Class.forName(targetWidgetClass)
-                    val receiverInstance = receiverClass.getDeclaredConstructor().newInstance()
-                    if (receiverInstance is GlanceAppWidgetReceiver) {
-                        receiverInstance.glanceAppWidget.update(appCtx, mappedGlanceId)
-                    }
-                }
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                // 6. We ONLY finish the activity after the RemoteViews are generated.
-                // By switching to Main and finishing here, we guarantee the launcher
-                // reads the fully themed widget the exact moment it hits the homescreen.
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    val resultValue = Intent().apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, targetAppWidgetId)
-                    }
-                    setResult(Activity.RESULT_OK, resultValue)
-                    finish()
-                }
+        if (widgetInfo?.provider != null) {
+            val updateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                component = widgetInfo.provider
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(appWidgetId))
             }
+            sendBroadcast(updateIntent)
         }
+
+        // 3. Fallback batch update for all category widgets
+        updateAllBatteryWidgets(this)
+        updateAllAiWidgets(this)
+        updateAllAiFolderWidgets(this)
+
+        setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+        finish()
     }
 
     private fun generateArcGaugeBitmapPreview(percentage: Int, accentColor: Color, trackColor: Color): Bitmap {

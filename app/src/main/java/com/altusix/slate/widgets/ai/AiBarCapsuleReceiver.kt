@@ -1,84 +1,134 @@
 package com.altusix.slate.widgets.ai
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
-import androidx.compose.runtime.Composable
-import androidx.glance.GlanceId
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
-import com.altusix.slate.data.local.SlateDataStore
+import android.content.Intent
+import android.graphics.Bitmap
+import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
-
-abstract class BaseAiFolderWidget(
-    private val contentComposers: @Composable (SlateWidgetConfig) -> Unit
-) : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val config = try {
-            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-            SlateDataStore(context).getWidgetConfig(appWidgetId)
-                .catch { emit(SlateWidgetConfig()) }.first()
-        } catch (e: Exception) { SlateWidgetConfig() }
-
-        provideContent {
-            contentComposers(config)
-        }
-    }
-}
 
 // ============================================================================
 // BARS (4x1)
 // ============================================================================
-class AiBarPrimaryWidget : BaseAiFolderWidget({ config -> AiBarHeroPrimary(config) })
-class AiBarPrimaryReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarPrimaryWidget() }
 
-class AiBarDock5Widget : BaseAiFolderWidget({ config -> AiBarDock5Tile(config) })
-class AiBarDock5Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarDock5Widget() }
+class AiBarPrimaryReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiBarHeroPrimaryBitmap(context, config, wPx, hPx)
+    }
+}
 
-class AiBarCapsuleWidget : BaseAiFolderWidget({ config -> AiBarCapsuleTile(config) })
-class AiBarCapsuleReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarCapsuleWidget() }
+class AiBarDock5Receiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiBarDock5Bitmap(context, config, wPx, hPx)
+    }
+}
 
-class AiBarDualFlagshipWidget : BaseAiFolderWidget({ config -> AiBarDualFlagship(config) })
-class AiBarDualFlagshipReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiBarDualFlagshipWidget() }
+class AiBarCapsuleReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiBarCapsuleBitmap(context, config, wPx, hPx)
+    }
+}
+
+class AiBarDualFlagshipReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiBarDualFlagshipBitmap(context, config, wPx, hPx)
+    }
+}
 
 // ============================================================================
 // FOLDERS (2x2 / 4x2)
 // ============================================================================
-class AiFolder4ClassicWidget : BaseAiFolderWidget({ config -> AiFolder4ClassicTile(config) })
-class AiFolder4ClassicReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder4ClassicWidget() }
 
-class AiFolder6BentoHeroWidget : BaseAiFolderWidget({ config -> AiFolder6BentoHeroTile(config) })
-class AiFolder6BentoHeroReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder6BentoHeroWidget() }
+class AiFolder4ClassicReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiFolder4ClassicBitmap(context, config, wPx, hPx)
+    }
+}
 
-class AiFolder8BentoSideWidget : BaseAiFolderWidget({ config -> AiFolder8BentoSideTile(config) })
-class AiFolder8BentoSideReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder8BentoSideWidget() }
+class AiFolder6BentoHeroReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiFolder6BentoHeroBitmap(context, config, wPx, hPx)
+    }
+}
 
-class AiFolder9GridWidget : BaseAiFolderWidget({ config -> AiFolder9GridTile(config) })
-class AiFolder9GridReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder9GridWidget() }
+class AiFolder8BentoSideReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiFolder8BentoSideBitmap(context, config, wPx, hPx)
+    }
+}
 
-class AiFolder10MegaWidget : BaseAiFolderWidget({ config -> AiFolder10MegaTile(config) })
-class AiFolder10MegaReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder10MegaWidget() }
+class AiFolder9GridReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiFolder9GridBitmap(context, config, wPx, hPx)
+    }
+}
 
-class AiFolder7AsymmetricWidget : BaseAiFolderWidget({ config -> AiFolder7AsymmetricTile(config) })
-class AiFolder7AsymmetricReceiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = AiFolder7AsymmetricWidget() }
+class AiFolder10MegaReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiFolder10MegaBitmap(context, config, wPx, hPx)
+    }
+}
 
+class AiFolder7AsymmetricReceiver : BaseCanvasWidgetProvider() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val wPx = (wDp * density).toInt()
+        val hPx = (hDp * density).toInt()
+        return generateAiFolder7AsymmetricBitmap(context, config, wPx, hPx)
+    }
+}
 
-suspend fun updateAllAiFolderWidgets(context: Context) {
-    val manager = GlanceAppWidgetManager(context)
-    if (manager.getGlanceIds(AiBarPrimaryWidget::class.java).isNotEmpty()) AiBarPrimaryWidget().updateAll(context)
-    if (manager.getGlanceIds(AiBarDock5Widget::class.java).isNotEmpty()) AiBarDock5Widget().updateAll(context)
-    if (manager.getGlanceIds(AiBarCapsuleWidget::class.java).isNotEmpty()) AiBarCapsuleWidget().updateAll(context)
-    if (manager.getGlanceIds(AiBarDualFlagshipWidget::class.java).isNotEmpty()) AiBarDualFlagshipWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolder4ClassicWidget::class.java).isNotEmpty()) AiFolder4ClassicWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolder6BentoHeroWidget::class.java).isNotEmpty()) AiFolder6BentoHeroWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolder8BentoSideWidget::class.java).isNotEmpty()) AiFolder8BentoSideWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolder9GridWidget::class.java).isNotEmpty()) AiFolder9GridWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolder10MegaWidget::class.java).isNotEmpty()) AiFolder10MegaWidget().updateAll(context)
-    if (manager.getGlanceIds(AiFolder7AsymmetricWidget::class.java).isNotEmpty()) AiFolder7AsymmetricWidget().updateAll(context)
+fun updateAllAiFolderWidgets(context: Context) {
+    val receivers = listOf(
+        AiBarPrimaryReceiver::class.java,
+        AiBarDock5Receiver::class.java,
+        AiBarCapsuleReceiver::class.java,
+        AiBarDualFlagshipReceiver::class.java,
+        AiFolder4ClassicReceiver::class.java,
+        AiFolder6BentoHeroReceiver::class.java,
+        AiFolder8BentoSideReceiver::class.java,
+        AiFolder9GridReceiver::class.java,
+        AiFolder10MegaReceiver::class.java,
+        AiFolder7AsymmetricReceiver::class.java
+    )
+
+    val manager = AppWidgetManager.getInstance(context)
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
+        if (ids.isNotEmpty()) {
+            val intent = Intent(context, receiver).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            context.sendBroadcast(intent)
+        }
+    }
 }

@@ -2,15 +2,15 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.altusix.slate.ui.config.WidgetConfigActivity"
     android:widgetFeatures="reconfigurable"
+    android:initialLayout="@layout/widget_canvas_container"
     android:minWidth="180dp"
     android:minHeight="110dp"
-    android:targetCellWidth="3"
-    android:targetCellHeight="2"
     android:minResizeWidth="180dp"
     android:minResizeHeight="110dp"
     android:maxResizeWidth="500dp"
     android:maxResizeHeight="500dp"
     android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
     android:updatePeriodMillis="0"
-    android:widgetCategory="home_screen">
-</appwidget-provider>
+    android:widgetCategory="home_screen" />

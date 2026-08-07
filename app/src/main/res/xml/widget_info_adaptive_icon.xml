@@ -2,7 +2,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.altusix.slate.ui.config.WidgetConfigActivity"
     android:widgetFeatures="reconfigurable"
-    android:initialLayout="@layout/glance_default_loading_layout"
+    android:initialLayout="@layout/widget_canvas_container"
     android:minWidth="40dp"
     android:minHeight="40dp"
     android:minResizeWidth="40dp"
@@ -10,4 +10,5 @@
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="2"
     android:targetCellHeight="2"
-    android:updatePeriodMillis="0" />
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />
