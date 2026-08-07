@@ -560,6 +560,7 @@ fun generateAiBarDualFlagshipBitmap(
 // AI FOLDERS (CANVAS COMPOSITES)
 // ============================================================================
 
+// 1. AI Quad Folder
 fun generateAiFolder4ClassicBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -572,27 +573,44 @@ fun generateAiFolder4ClassicBitmap(
     val w = widthPx.toFloat()
     val h = heightPx.toFloat()
 
+    // 1. Lock outer card to a 1:1 square centered in widget bounds
+    val cardSize = minOf(w, h)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+
     val isLight = config.themeMode == "LIGHT"
     val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity).toArgb()
     val accentColor = Color(config.accentColorHex)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
-    canvas.drawRoundRect(RectF(0f, 0f, w, h), 48f, 48f, bgPaint)
+    val cardCornerRadius = cardSize * 0.20f
+    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = w * 0.08f
-    val gap = w * 0.05f
-    val tileSize = ((w - (pad * 2f) - gap) / 2f).toInt()
+    // 2. Inner 2x2 Grid Layout
+    val pad = cardSize * 0.08f
+    val gap = cardSize * 0.05f
+    val tileSize = ((cardSize - (pad * 2f) - gap) / 2f).toInt()
+    val tileBgColor = if (isLight) Color(0x0A000000) else Color(0x14FFFFFF)
 
     val grid = listOf(
         listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT),
-        listOf(AiTarget.GROK, AiTarget.CLAUDE)
+        listOf(AiTarget.PERPLEXITY, AiTarget.CLAUDE)
     )
 
     grid.forEachIndexed { r, row ->
         row.forEachIndexed { c, target ->
-            val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = tileSize, heightPx = tileSize)
-            val xPos = pad + c * (tileSize + gap)
-            val yPos = pad + r * (tileSize + gap)
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColor = tileBgColor,
+                accentColor = accentColor,
+                isLight = isLight,
+                shapeStyle = AiShapeStyle.SQUIRCLE,
+                widthPx = tileSize,
+                heightPx = tileSize
+            )
+            val xPos = leftX + pad + c * (tileSize + gap)
+            val yPos = topY + pad + r * (tileSize + gap)
             canvas.drawBitmap(tile, xPos, yPos, null)
         }
     }
@@ -600,6 +618,7 @@ fun generateAiFolder4ClassicBitmap(
     return bitmap
 }
 
+// 2. AI Bento Folder
 fun generateAiFolder6BentoHeroBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -616,32 +635,83 @@ fun generateAiFolder6BentoHeroBitmap(
     val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity).toArgb()
     val accentColor = Color(config.accentColorHex)
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
-    canvas.drawRoundRect(RectF(0f, 0f, w, h), 48f, 48f, bgPaint)
+    val pad = minOf(w, h) * 0.04f
+    val gap = minOf(w, h) * 0.025f
 
-    val pad = w * 0.06f
-    val gap = w * 0.03f
-
-    val botTileSize = ((w - (pad * 2f) - (gap * 3f)) / 4f).toInt()
+    // Constrain tile size to fit within both width AND height bounds
+    val maxBotW = (w - (pad * 2f) - (gap * 3f)) / 4f
+    val maxBotH = (h - (pad * 2f) - (gap * 2f)) / 3f
+    val botTileSize = minOf(maxBotW, maxBotH).toInt().coerceAtLeast(1)
     val topTileSize = (botTileSize * 2) + gap.toInt()
 
-    val top1 = generateTileBitmap(context, AiTarget.GEMINI_TEXT, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = topTileSize, heightPx = topTileSize)
-    canvas.drawBitmap(top1, pad, pad, null)
+    val cardW = (topTileSize * 2) + gap + (pad * 2f)
+    val cardH = topTileSize + botTileSize + gap + (pad * 2f)
 
-    val top2 = generateTileBitmap(context, AiTarget.CHATGPT_TEXT, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = topTileSize, heightPx = topTileSize)
-    canvas.drawBitmap(top2, pad + topTileSize + gap, pad, null)
+    // Center layout inside widget container
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
 
-    val bottomList = listOf(AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
-    val botY = pad + topTileSize + gap
-    bottomList.forEachIndexed { i, target ->
-        val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = botTileSize, heightPx = botTileSize)
-        val botX = pad + i * (botTileSize + gap)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
+    val cardCornerRadius = minOf(cardW, cardH) * 0.16f
+    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val tileBgColor = if (isLight) Color(0x0A000000) else Color(0x14FFFFFF)
+    val startX = leftX + pad
+    val startY = topY + pad
+
+    // Row 1: Top Hero Tiles
+    val top1 = generateTileBitmap(
+        context = context,
+        target = AiTarget.GEMINI_TEXT,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.CAPSULE_LEFT,
+        widthPx = topTileSize,
+        heightPx = topTileSize
+    )
+    canvas.drawBitmap(top1, startX, startY, null)
+
+    val top2 = generateTileBitmap(
+        context = context,
+        target = AiTarget.CHATGPT_TEXT,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.CAPSULE_RIGHT,
+        widthPx = topTileSize,
+        heightPx = topTileSize
+    )
+    canvas.drawBitmap(top2, startX + topTileSize + gap, startY, null)
+
+    // Row 2: Bottom 4 Tiles
+    val bottomItems = listOf(
+        Pair(AiTarget.CLAUDE, AiShapeStyle.CAPSULE_LEFT),
+        Pair(AiTarget.GROK, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.META_AI, AiShapeStyle.CAPSULE_RIGHT)
+    )
+    val botY = startY + topTileSize + gap
+
+    bottomItems.forEachIndexed { i, (target, shape) ->
+        val tile = generateTileBitmap(
+            context = context,
+            target = target,
+            bgColor = tileBgColor,
+            accentColor = accentColor,
+            isLight = isLight,
+            shapeStyle = shape,
+            widthPx = botTileSize,
+            heightPx = botTileSize
+        )
+        val botX = startX + i * (botTileSize + gap)
         canvas.drawBitmap(tile, botX, botY, null)
     }
 
     return bitmap
 }
 
+// 3. AI Side Bento Folder
 fun generateAiFolder8BentoSideBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -658,33 +728,80 @@ fun generateAiFolder8BentoSideBitmap(
     val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity).toArgb()
     val accentColor = Color(config.accentColorHex)
 
+    val pad = minOf(w, h) * 0.04f
+    val gap = minOf(w, h) * 0.025f
+
+    // Constrain grid sizes to fit within both width and height bounds simultaneously
+    val maxRightH = (h - (pad * 2f) - (gap * 2f)) / 3f
+    val maxRightW = (w - (pad * 2f) - (gap * 2f)) / 3.5f
+    val rightTileSize = minOf(maxRightW, maxRightH).toInt().coerceAtLeast(1)
+
+    // Mathematically match two left hero tiles to the three right small tiles
+    val leftTileSize = ((rightTileSize * 3 + gap) / 2f).toInt()
+
+    val cardW = leftTileSize + (rightTileSize * 2) + (gap * 2f) + (pad * 2f)
+    val cardH = (rightTileSize * 3) + (gap * 2f) + (pad * 2f)
+
+    // Center card layout inside widget container
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
-    canvas.drawRoundRect(RectF(0f, 0f, w, h), 48f, 48f, bgPaint)
+    val cardCornerRadius = minOf(cardW, cardH) * 0.16f
+    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = w * 0.05f
-    val gap = w * 0.025f
+    val tileBgColor = if (isLight) Color(0x0A000000) else Color(0x14FFFFFF)
+    val startX = leftX + pad
+    val startY = topY + pad
 
-    val rightTileSize = ((h - (pad * 2f) - (gap * 2f)) / 3f).toInt()
-    val leftTileSize = (rightTileSize * 1.5f + gap / 2f).toInt()
+    // Left Hero Column (Outer edges hug left container curves)
+    val left1 = generateTileBitmap(
+        context = context,
+        target = AiTarget.GEMINI_TEXT,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.CAPSULE_LEFT,
+        widthPx = leftTileSize,
+        heightPx = leftTileSize
+    )
+    canvas.drawBitmap(left1, startX, startY, null)
 
-    val left1 = generateTileBitmap(context, AiTarget.GEMINI_TEXT, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = leftTileSize, heightPx = leftTileSize)
-    canvas.drawBitmap(left1, pad, pad, null)
+    val left2Y = startY + leftTileSize + gap
+    val left2 = generateTileBitmap(
+        context = context,
+        target = AiTarget.CHATGPT_TEXT,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.CAPSULE_LEFT,
+        widthPx = leftTileSize,
+        heightPx = leftTileSize
+    )
+    canvas.drawBitmap(left2, startX, left2Y, null)
 
-    val left2 = generateTileBitmap(context, AiTarget.CHATGPT_TEXT, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = leftTileSize, heightPx = leftTileSize)
-    canvas.drawBitmap(left2, pad, pad + leftTileSize + gap, null)
-
+    // Right Grid (3 rows x 2 columns with top-right & bottom-right outer corner hugging)
     val rightGrid = listOf(
-        listOf(AiTarget.CLAUDE, AiTarget.GROK),
-        listOf(AiTarget.PERPLEXITY, AiTarget.COPILOT),
-        listOf(AiTarget.DEEPSEEK, AiTarget.META_AI)
+        listOf(Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE), Pair(AiTarget.GROK, AiShapeStyle.CAPSULE_RIGHT)),
+        listOf(Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE), Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE)),
+        listOf(Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE), Pair(AiTarget.META_AI, AiShapeStyle.CAPSULE_RIGHT))
     )
 
-    val rightStartX = pad + leftTileSize + gap
+    val rightStartX = startX + leftTileSize + gap
     rightGrid.forEachIndexed { r, row ->
-        row.forEachIndexed { c, target ->
-            val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = rightTileSize, heightPx = rightTileSize)
+        row.forEachIndexed { c, (target, shape) ->
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColor = tileBgColor,
+                accentColor = accentColor,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = rightTileSize,
+                heightPx = rightTileSize
+            )
             val rx = rightStartX + c * (rightTileSize + gap)
-            val ry = pad + r * (rightTileSize + gap)
+            val ry = startY + r * (rightTileSize + gap)
             canvas.drawBitmap(tile, rx, ry, null)
         }
     }
@@ -692,6 +809,7 @@ fun generateAiFolder8BentoSideBitmap(
     return bitmap
 }
 
+// 4. AI 3x3 Grid Folder
 fun generateAiFolder9GridBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -704,16 +822,24 @@ fun generateAiFolder9GridBitmap(
     val w = widthPx.toFloat()
     val h = heightPx.toFloat()
 
+    // 1. Lock outer card to a 1:1 square centered in widget bounds
+    val cardSize = minOf(w, h)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+
     val isLight = config.themeMode == "LIGHT"
     val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity).toArgb()
     val accentColor = Color(config.accentColorHex)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
-    canvas.drawRoundRect(RectF(0f, 0f, w, h), 48f, 48f, bgPaint)
+    val cardCornerRadius = cardSize * 0.20f
+    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = w * 0.06f
-    val gap = w * 0.03f
-    val tileSize = ((w - (pad * 2f) - (gap * 2f)) / 3f).toInt()
+    // 2. Inner 3x3 Grid Layout
+    val pad = cardSize * 0.07f
+    val gap = cardSize * 0.035f
+    val tileSize = ((cardSize - (pad * 2f) - (gap * 2f)) / 3f).toInt()
+    val tileBgColor = if (isLight) Color(0x0A000000) else Color(0x14FFFFFF)
 
     val grid = listOf(
         listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT),
@@ -723,9 +849,18 @@ fun generateAiFolder9GridBitmap(
 
     grid.forEachIndexed { r, row ->
         row.forEachIndexed { c, target ->
-            val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = tileSize, heightPx = tileSize)
-            val xPos = pad + c * (tileSize + gap)
-            val yPos = pad + r * (tileSize + gap)
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColor = tileBgColor,
+                accentColor = accentColor,
+                isLight = isLight,
+                shapeStyle = AiShapeStyle.SQUIRCLE,
+                widthPx = tileSize,
+                heightPx = tileSize
+            )
+            val xPos = leftX + pad + c * (tileSize + gap)
+            val yPos = topY + pad + r * (tileSize + gap)
             canvas.drawBitmap(tile, xPos, yPos, null)
         }
     }
@@ -733,6 +868,7 @@ fun generateAiFolder9GridBitmap(
     return bitmap
 }
 
+// 4. AI Mega Folder
 fun generateAiFolder10MegaBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -749,32 +885,80 @@ fun generateAiFolder10MegaBitmap(
     val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity).toArgb()
     val accentColor = Color(config.accentColorHex)
 
+    val pad = minOf(w, h) * 0.04f
+    val gap = minOf(w, h) * 0.02f
+
+    // Constrain tile size against both width and height bounds
+    val maxTileW = (w - (pad * 2f) - (gap * 4f)) / 5f
+    val maxTileH = (h - (pad * 2f) - gap) / 2f
+    val tileSize = minOf(maxTileW, maxTileH).toInt().coerceAtLeast(1)
+
+    val cardW = (tileSize * 5) + (gap * 4f) + (pad * 2f)
+    val cardH = (tileSize * 2) + gap + (pad * 2f)
+
+    // Center container card inside widget bounds
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
-    canvas.drawRoundRect(RectF(0f, 0f, w, h), 48f, 48f, bgPaint)
+    val cardCornerRadius = minOf(cardW, cardH) * 0.18f
+    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = w * 0.04f
-    val gap = w * 0.02f
-    val tileSize = ((w - (pad * 2f) - (gap * 4f)) / 5f).toInt()
+    val tileBgColor = if (isLight) Color(0x0A000000) else Color(0x14FFFFFF)
+    val startX = leftX + pad
+    val startY = topY + pad
 
-    val row1 = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK)
-    val row2 = listOf(AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI)
+    val row1 = listOf(
+        Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CAPSULE_LEFT),
+        Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.GROK, AiShapeStyle.CAPSULE_RIGHT)
+    )
 
-    row1.forEachIndexed { i, target ->
-        val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = tileSize, heightPx = tileSize)
-        val x = pad + i * (tileSize + gap)
-        canvas.drawBitmap(tile, x, pad, null)
+    val row2 = listOf(
+        Pair(AiTarget.PERPLEXITY, AiShapeStyle.CAPSULE_LEFT),
+        Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.META_AI, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.POE, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.PI, AiShapeStyle.CAPSULE_RIGHT)
+    )
+
+    row1.forEachIndexed { i, (target, shape) ->
+        val tile = generateTileBitmap(
+            context = context,
+            target = target,
+            bgColor = tileBgColor,
+            accentColor = accentColor,
+            isLight = isLight,
+            shapeStyle = shape,
+            widthPx = tileSize,
+            heightPx = tileSize
+        )
+        val x = startX + i * (tileSize + gap)
+        canvas.drawBitmap(tile, x, startY, null)
     }
 
-    val row2Y = pad + tileSize + gap
-    row2.forEachIndexed { i, target ->
-        val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = tileSize, heightPx = tileSize)
-        val x = pad + i * (tileSize + gap)
+    val row2Y = startY + tileSize + gap
+    row2.forEachIndexed { i, (target, shape) ->
+        val tile = generateTileBitmap(
+            context = context,
+            target = target,
+            bgColor = tileBgColor,
+            accentColor = accentColor,
+            isLight = isLight,
+            shapeStyle = shape,
+            widthPx = tileSize,
+            heightPx = tileSize
+        )
+        val x = startX + i * (tileSize + gap)
         canvas.drawBitmap(tile, x, row2Y, null)
     }
 
     return bitmap
 }
 
+// 4. AI Asymmetric Bento
 fun generateAiFolder7AsymmetricBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -791,31 +975,97 @@ fun generateAiFolder7AsymmetricBitmap(
     val cardBg = Color(config.backgroundColorHex).copy(alpha = config.opacity).toArgb()
     val accentColor = Color(config.accentColorHex)
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
-    canvas.drawRoundRect(RectF(0f, 0f, w, h), 48f, 48f, bgPaint)
+    val pad = minOf(w, h) * 0.04f
+    val gap = minOf(w, h) * 0.025f
 
-    val pad = w * 0.05f
-    val gap = w * 0.025f
+    val availW = w - 2 * pad
+    val availH = h - 2 * pad
 
-    val smallSize = ((w - (pad * 2f) - (gap * 3f)) / 4f).toInt()
+    val maxSmallW = (availW - 3 * gap) / 4f
+    val maxSmallH = (availH - 3 * gap) / 4f
+
+    val smallSize = minOf(maxSmallW, maxSmallH).toInt().coerceAtLeast(1)
     val bigSize = (smallSize * 3) + gap.toInt() * 2
     val medW = ((bigSize - gap.toInt()) / 2)
 
-    val bigTile = generateTileBitmap(context, AiTarget.CHATGPT_TEXT, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, isPrimaryAccent = true, widthPx = bigSize, heightPx = bigSize)
-    canvas.drawBitmap(bigTile, pad, pad, null)
+    val cardW = bigSize + gap + smallSize + (pad * 2f)
+    val cardH = (smallSize * 4) + (gap * 3f) + (pad * 2f)
 
-    val medY = pad + bigSize + gap
-    val med1 = generateTileBitmap(context, AiTarget.GEMINI_TEXT, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = medW, heightPx = smallSize)
-    canvas.drawBitmap(med1, pad, medY, null)
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
 
-    val med2 = generateTileBitmap(context, AiTarget.CLAUDE, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = medW, heightPx = smallSize)
-    canvas.drawBitmap(med2, pad + medW + gap, medY, null)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg }
+    val cardCornerRadius = minOf(cardW, cardH) * 0.16f
+    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val rightX = pad + bigSize + gap
-    val rightList = listOf(AiTarget.GROK, AiTarget.COPILOT, AiTarget.PERPLEXITY, AiTarget.META_AI)
-    rightList.forEachIndexed { i, target ->
-        val tile = generateTileBitmap(context, target, Color(config.backgroundColorHex).copy(alpha = config.opacity), accentColor, isLight, AiShapeStyle.SQUIRCLE, widthPx = smallSize, heightPx = smallSize)
-        val ry = pad + i * (smallSize + gap)
+    val tileBgColor = if (isLight) Color(0x0A000000) else Color(0x14FFFFFF)
+    val startX = leftX + pad
+    val startY = topY + pad
+
+    // 1. Big Tile (ChatGPT, top-left primary)
+    val bigTile = generateTileBitmap(
+        context = context,
+        target = AiTarget.CHATGPT_TEXT,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.SQUIRCLE,
+        isPrimaryAccent = true,
+        widthPx = bigSize,
+        heightPx = bigSize
+    )
+    canvas.drawBitmap(bigTile, startX, startY, null)
+
+    // 2. Medium Row (below big tile)
+    val medY = startY + bigSize + gap
+
+    // Gemini (bottom-left) - CAPSULE_LEFT hugs outer bottom-left corner
+    val med1 = generateTileBitmap(
+        context = context,
+        target = AiTarget.GEMINI_TEXT,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.CAPSULE_LEFT,
+        widthPx = medW,
+        heightPx = smallSize
+    )
+    canvas.drawBitmap(med1, startX, medY, null)
+
+    // Claude (bottom-center) - SQUIRCLE
+    val med2 = generateTileBitmap(
+        context = context,
+        target = AiTarget.CLAUDE,
+        bgColor = tileBgColor,
+        accentColor = accentColor,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.SQUIRCLE,
+        widthPx = medW,
+        heightPx = smallSize
+    )
+    canvas.drawBitmap(med2, startX + medW + gap, medY, null)
+
+    // 3. Right Small Stack (4 rows)
+    val rightX = startX + bigSize + gap
+    val rightItems = listOf(
+        Pair(AiTarget.GROK, AiShapeStyle.CAPSULE_RIGHT),   // Grok (top-right) - CAPSULE_RIGHT hugs outer curve
+        Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE),
+        Pair(AiTarget.META_AI, AiShapeStyle.CAPSULE_RIGHT)  // Meta AI (bottom-right) - CAPSULE_RIGHT hugs outer curve
+    )
+
+    rightItems.forEachIndexed { i, (target, shape) ->
+        val tile = generateTileBitmap(
+            context = context,
+            target = target,
+            bgColor = tileBgColor,
+            accentColor = accentColor,
+            isLight = isLight,
+            shapeStyle = shape,
+            widthPx = smallSize,
+            heightPx = smallSize
+        )
+        val ry = startY + i * (smallSize + gap)
         canvas.drawBitmap(tile, rightX, ry, null)
     }
 
