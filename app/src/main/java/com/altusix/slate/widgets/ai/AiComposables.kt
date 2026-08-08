@@ -81,8 +81,8 @@ fun generateTileBitmap(
 
         when (shapeStyle) {
             AiShapeStyle.SQUIRCLE -> {
-                canvas.drawRoundRect(fullRect, squircleRadius, squircleRadius, bgPaint)
-                if (!isPrimaryAccent) canvas.drawRoundRect(fullRect, squircleRadius, squircleRadius, strokePaint)
+                canvas.drawRoundRect(squareRect, squircleRadius, squircleRadius, bgPaint)
+                if (!isPrimaryAccent) canvas.drawRoundRect(squareRect, squircleRadius, squircleRadius, strokePaint)
             }
             AiShapeStyle.CIRCLE -> {
                 val radius = (minDim / 2f) - margin

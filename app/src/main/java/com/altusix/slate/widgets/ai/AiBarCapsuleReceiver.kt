@@ -1,5 +1,6 @@
 package com.altusix.slate.widgets.ai
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -7,6 +8,22 @@ import android.content.Intent
 import android.graphics.Bitmap
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
+
+// ============================================================================
+// HELPER: AI App Launch Pending Intent
+// ============================================================================
+
+fun getAiAppLaunchPendingIntent(context: Context, packageName: String, requestCode: Int): PendingIntent? {
+    val pm = context.packageManager
+    val launchIntent = pm.getLaunchIntentForPackage(packageName) ?: return null
+    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    return PendingIntent.getActivity(
+        context,
+        requestCode,
+        launchIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+}
 
 // ============================================================================
 // BARS (4x1)
@@ -19,6 +36,11 @@ class AiBarPrimaryReceiver : BaseCanvasWidgetProvider() {
         val hPx = (hDp * density).toInt()
         return generateAiBarHeroPrimaryBitmap(context, config, wPx, hPx)
     }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+            ?: getAiAppLaunchPendingIntent(context, "com.google.android.googlequicksearchbox", appWidgetId)
+    }
 }
 
 class AiBarDock5Receiver : BaseCanvasWidgetProvider() {
@@ -27,6 +49,10 @@ class AiBarDock5Receiver : BaseCanvasWidgetProvider() {
         val wPx = (wDp * density).toInt()
         val hPx = (hDp * density).toInt()
         return generateAiBarDock5Bitmap(context, config, wPx, hPx)
+    }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
     }
 }
 
@@ -37,6 +63,10 @@ class AiBarCapsuleReceiver : BaseCanvasWidgetProvider() {
         val hPx = (hDp * density).toInt()
         return generateAiBarCapsuleBitmap(context, config, wPx, hPx)
     }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", appWidgetId)
+    }
 }
 
 class AiBarDualFlagshipReceiver : BaseCanvasWidgetProvider() {
@@ -45,6 +75,10 @@ class AiBarDualFlagshipReceiver : BaseCanvasWidgetProvider() {
         val wPx = (wDp * density).toInt()
         val hPx = (hDp * density).toInt()
         return generateAiBarDualFlagshipBitmap(context, config, wPx, hPx)
+    }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", appWidgetId)
     }
 }
 
@@ -59,6 +93,10 @@ class AiFolder4ClassicReceiver : BaseCanvasWidgetProvider() {
         val hPx = (hDp * density).toInt()
         return generateAiFolder4ClassicBitmap(context, config, wPx, hPx)
     }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    }
 }
 
 class AiFolder6BentoHeroReceiver : BaseCanvasWidgetProvider() {
@@ -67,6 +105,10 @@ class AiFolder6BentoHeroReceiver : BaseCanvasWidgetProvider() {
         val wPx = (wDp * density).toInt()
         val hPx = (hDp * density).toInt()
         return generateAiFolder6BentoHeroBitmap(context, config, wPx, hPx)
+    }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
     }
 }
 
@@ -77,6 +119,10 @@ class AiFolder8BentoSideReceiver : BaseCanvasWidgetProvider() {
         val hPx = (hDp * density).toInt()
         return generateAiFolder8BentoSideBitmap(context, config, wPx, hPx)
     }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    }
 }
 
 class AiFolder9GridReceiver : BaseCanvasWidgetProvider() {
@@ -85,6 +131,10 @@ class AiFolder9GridReceiver : BaseCanvasWidgetProvider() {
         val wPx = (wDp * density).toInt()
         val hPx = (hDp * density).toInt()
         return generateAiFolder9GridBitmap(context, config, wPx, hPx)
+    }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
     }
 }
 
@@ -95,6 +145,10 @@ class AiFolder10MegaReceiver : BaseCanvasWidgetProvider() {
         val hPx = (hDp * density).toInt()
         return generateAiFolder10MegaBitmap(context, config, wPx, hPx)
     }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    }
 }
 
 class AiFolder7AsymmetricReceiver : BaseCanvasWidgetProvider() {
@@ -103,6 +157,10 @@ class AiFolder7AsymmetricReceiver : BaseCanvasWidgetProvider() {
         val wPx = (wDp * density).toInt()
         val hPx = (hDp * density).toInt()
         return generateAiFolder7AsymmetricBitmap(context, config, wPx, hPx)
+    }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", appWidgetId)
     }
 }
 

@@ -10,6 +10,7 @@ import android.os.BatteryManager
 import android.os.Build
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
+import android.app.PendingIntent
 
 data class DetailedBatteryData(
     val percentage: Int,
@@ -133,6 +134,8 @@ fun updateAllBatteryWidgets(context: Context) {
 }
 
 // Base Battery Receiver linking WorkManager scheduling and real-time charging triggers
+// In BatteryWidgets.kt
+
 abstract class BaseBatteryReceiver : BaseCanvasWidgetProvider() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
@@ -155,6 +158,8 @@ abstract class BaseBatteryReceiver : BaseCanvasWidgetProvider() {
             updateAllBatteryWidgets(context)
         }
     }
+
+    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? = null
 }
 
 // Minimal Linear Tile (2x2)
