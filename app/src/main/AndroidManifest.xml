@@ -170,9 +170,21 @@
         <!-- ALL 2x2 WIDGETS                                                   -->
         <!-- ================================================================= -->
         <receiver
-            android:name=".widgets.battery.MinimalBatteryReceiver"
+            android:name=".widgets.battery.MinimalLinearBatteryReceiver"
             android:exported="true"
-            android:label="Slate Battery Tile">
+            android:label="Minimal Linear Battery">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.battery.MinimalRingBatteryReceiver"
+            android:exported="true"
+            android:label="Minimal Ring Battery">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -206,9 +218,21 @@
         </receiver>
 
         <receiver
-            android:name=".widgets.battery.DotLevelMeterReceiver"
+            android:name=".widgets.battery.DotLevelHeaderBatteryReceiver"
             android:exported="true"
-            android:label="Slate Dot Level Tile">
+            android:label="Dot Level Header">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.battery.DotLevelPureBatteryReceiver"
+            android:exported="true"
+            android:label="Dot Level Pure">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

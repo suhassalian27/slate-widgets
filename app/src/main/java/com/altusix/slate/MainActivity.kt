@@ -71,10 +71,12 @@ class MainActivity : ComponentActivity() {
         )
 
         val batteryWidgets = listOf(
-            SlateWidgetInfo("Minimal Tile", "2x2", "Battery", MinimalBatteryReceiver::class.java),
+            SlateWidgetInfo("Dot Level Header", "2x2", "Battery", DotLevelHeaderBatteryReceiver::class.java),
+            SlateWidgetInfo("Dot Level Pure", "2x2", "Battery", DotLevelPureBatteryReceiver::class.java),
+            SlateWidgetInfo("Minimal Linear", "2x2", "Battery", MinimalLinearBatteryReceiver::class.java),
+            SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java),
             SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java),
             SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java),
-            SlateWidgetInfo("Dot Level Tile", "2x2", "Battery", DotLevelMeterReceiver::class.java),
             SlateWidgetInfo("Multi-Device", "4x2", "Battery", MultiDeviceBatteryReceiver::class.java),
             SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java),
             SlateWidgetInfo("Dot Level Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java),
