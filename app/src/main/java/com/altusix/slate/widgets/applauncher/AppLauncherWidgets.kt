@@ -43,7 +43,7 @@ abstract class BaseAppLauncherReceiver : BaseCanvasWidgetProvider() {
 fun getAppLauncherWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("App Launcher Adaptive", "1x1", "App Launcher", AdaptiveAppLauncherReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("App Launcher + Custom Text", "2x1", "App Launcher", CustomTextAppLauncherReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("App Launcher Rectangle", "2x1", "App Launcher", CustomTextAppLauncherReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("App Launcher - Squircle", "1x1", "App Launcher", SquircleLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Pentagon", "1x1", "App Launcher", PentagonLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Flower", "1x1", "App Launcher", FlowerLauncherReceiver::class.java, hasModeOption = false),
@@ -66,11 +66,11 @@ class AdaptiveAppLauncherReceiver : BaseAppLauncherReceiver() {
     }
 }
 
-// 2. Custom Text Launcher (Supports Responsive vs Fixed)
+// 2. Rectangle Launcher Receiver
 class CustomTextAppLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
-        return generateTextLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        return generateRectangleLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 

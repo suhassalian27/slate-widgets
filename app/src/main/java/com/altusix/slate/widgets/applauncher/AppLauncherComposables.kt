@@ -134,8 +134,8 @@ fun generateAdaptiveLauncherBitmap(
     return bitmap
 }
 
-// 2. Custom Text / Badge App Launcher (2x1 or 1x1)
-fun generateTextLauncherBitmap(
+// 2. Rectangle App Launcher (2x1)
+fun generateRectangleLauncherBitmap(
     context: Context,
     slateConfig: SlateWidgetConfig,
     launcherConfig: AppLauncherWidgetConfig,
@@ -158,10 +158,17 @@ fun generateTextLauncherBitmap(
     val rect = if (launcherConfig.isResponsive) {
         RectF(0f, 0f, w.toFloat(), h.toFloat())
     } else {
-        val minDim = minOf(w, h).toFloat()
-        val leftX = (w - minDim) / 2f
-        val topY = (h - minDim) / 2f
-        RectF(leftX, topY, leftX + minDim, topY + minDim)
+        // Fixed Mode: 2:1 aspect ratio centered inside the grid cell
+        val targetRatio = 2.0f
+        var cardW = w.toFloat()
+        var cardH = cardW / targetRatio
+        if (cardH > h) {
+            cardH = h.toFloat()
+            cardW = cardH * targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -170,16 +177,8 @@ fun generateTextLauncherBitmap(
     }
     canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = rect.height() * 0.35f
-        typeface = Typeface.DEFAULT_BOLD
-        textAlign = Paint.Align.CENTER
-    }
-
-    val fontMetrics = textPaint.fontMetrics
-    val textY = rect.centerY() - (fontMetrics.ascent + fontMetrics.descent) / 2f
-    canvas.drawText(launcherConfig.customText.ifEmpty { "APP" }.uppercase(), rect.centerX(), textY, textPaint)
+    // Render App Icon / Emoji / Vector / Custom Text / EDIT placeholder
+    renderLauncherContent(context, canvas, rect, launcherConfig, accentColor, density)
 
     return bitmap
 }

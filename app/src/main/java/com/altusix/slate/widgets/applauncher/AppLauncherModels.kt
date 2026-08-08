@@ -38,7 +38,17 @@ data class AppLauncherWidgetConfig(
         fun load(context: Context, widgetId: Int): AppLauncherWidgetConfig {
             val prefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
             val prefix = "launcher_${widgetId}_"
+
+            // 1. Read global default set during pinning in MainActivity
             val defaultResponsive = prefs.getBoolean("default_is_responsive", true)
+
+            // 2. Lock and persist preference to this specific widget ID if it hasn't been saved yet
+            val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
+                prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
+            } else {
+                prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+                defaultResponsive
+            }
 
             return AppLauncherWidgetConfig(
                 packageName = prefs.getString("${prefix}package", "") ?: "",
@@ -47,7 +57,7 @@ data class AppLauncherWidgetConfig(
                 customText = prefs.getString("${prefix}custom_text", "APP") ?: "APP",
                 selectedEmoji = prefs.getString("${prefix}selected_emoji", "🚀") ?: "🚀",
                 selectedVectorResName = prefs.getString("${prefix}vector_res", "ic_sparkle") ?: "ic_sparkle",
-                isResponsive = prefs.getBoolean("${prefix}is_responsive", defaultResponsive),
+                isResponsive = isResponsive,
                 useSystemAccent = prefs.getBoolean("${prefix}use_system_accent", false),
                 accentColorHex = prefs.getLong("${prefix}accent_color", 0xFF00D166L),
                 themeMode = prefs.getString("${prefix}theme_mode", "DARK") ?: "DARK",

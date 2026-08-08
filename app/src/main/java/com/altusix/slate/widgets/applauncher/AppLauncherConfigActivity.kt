@@ -2,7 +2,11 @@ package com.altusix.slate.widgets.applauncher
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,29 +20,50 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.config.SlateConfigTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class AppLauncherConfigActivity : ComponentActivity() {
 
-    private data class InstalledAppItem(
+    data class InstalledAppItem(
         val label: String,
-        val packageName: String
+        val packageName: String,
+        val icon: Drawable? = null
     )
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var widgetClassName: String = ""
+
+    // Helper function to return directly to Home Screen
+    private fun navigateToHomeScreenAndFinish() {
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(homeIntent)
+        finish()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,20 +86,37 @@ class AppLauncherConfigActivity : ComponentActivity() {
             SlateConfigTheme {
                 var config by remember { mutableStateOf(AppLauncherWidgetConfig.load(this, appWidgetId)) }
                 var installedApps by remember { mutableStateOf<List<InstalledAppItem>>(emptyList()) }
-                var searchQuery by remember { mutableStateOf("") }
+                var showAppPickerSheet by remember { mutableStateOf(false) }
                 var selectedIconTab by remember { mutableIntStateOf(0) }
 
-                LaunchedEffect(Unit) {
-                    val pm = packageManager
-                    val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
-                    val resolvedActivities = pm.queryIntentActivities(mainIntent, 0)
-                    installedApps = resolvedActivities.map {
-                        InstalledAppItem(
-                            label = it.loadLabel(pm).toString(),
-                            packageName = it.activityInfo.packageName
-                        )
-                    }.sortedBy { it.label }
+                // Lock initial responsive mode to this specific widget ID
+                LaunchedEffect(appWidgetId) {
+                    val prefs = getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+                    val prefix = "launcher_${appWidgetId}_"
+                    if (!prefs.contains("${prefix}is_responsive")) {
+                        val defaultResponsive = prefs.getBoolean("default_is_responsive", true)
+                        config = config.copy(isResponsive = defaultResponsive)
+                        prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+                    }
+
+                    withContext(Dispatchers.IO) {
+                        val pm = packageManager
+                        val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+                        val resolved = pm.queryIntentActivities(mainIntent, 0)
+                        val apps = resolved.map {
+                            InstalledAppItem(
+                                label = it.loadLabel(pm).toString(),
+                                packageName = it.activityInfo.packageName,
+                                icon = try { it.loadIcon(pm) } catch (e: Exception) { null }
+                            )
+                        }.sortedBy { it.label }
+                        withContext(Dispatchers.Main) {
+                            installedApps = apps
+                        }
+                    }
                 }
+
+                val selectedApp = installedApps.find { it.packageName == config.packageName }
 
                 val emojis = listOf(
                     "😂", "❤️", "😍", "🤣", "😊",
@@ -107,7 +149,7 @@ class AppLauncherConfigActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(160.dp)
+                            .height(180.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(Color(0xFF161618)),
                         contentAlignment = Alignment.Center
@@ -119,8 +161,8 @@ class AppLauncherConfigActivity : ComponentActivity() {
                                 opacity = config.opacity,
                                 accentColorHex = config.accentColorHex
                             )
-                            if (widgetClassName.contains("CustomText", ignoreCase = true)) {
-                                generateTextLauncherBitmap(
+                            if (widgetClassName.contains("CustomText", ignoreCase = true) || widgetClassName.contains("Rectangle", ignoreCase = true)) {
+                                generateRectangleLauncherBitmap(
                                     context = this@AppLauncherConfigActivity,
                                     slateConfig = slateConfig,
                                     launcherConfig = config,
@@ -140,55 +182,89 @@ class AppLauncherConfigActivity : ComponentActivity() {
                         Image(
                             bitmap = previewBitmap.asImageBitmap(),
                             contentDescription = "Preview",
-                            modifier = Modifier.size(110.dp)
+                            modifier = Modifier.size(120.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // APP SELECTOR SEARCH
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Select App...", color = Color.Gray, fontSize = 13.sp) },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = Color(0xFF2C2C30),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        )
-                    )
+                    // APP SELECTOR CARD
+                    Text(text = "Target Application", color = Color.Gray, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    val filteredApps = installedApps.filter { it.label.contains(searchQuery, ignoreCase = true) }
-                    if (searchQuery.isNotEmpty()) {
-                        LazyColumn(modifier = Modifier.height(100.dp).fillMaxWidth().padding(top = 4.dp)) {
-                            items(filteredApps) { app ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            config = config.copy(packageName = app.packageName, customText = app.label.take(4))
-                                            searchQuery = ""
-                                        }
-                                        .padding(vertical = 6.dp, horizontal = 10.dp)
-                                ) {
-                                    Text(text = app.label, color = Color.White, fontSize = 13.sp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF161618))
+                            .border(1.dp, Color(0xFF242428), RoundedCornerShape(16.dp))
+                            .clickable { showAppPickerSheet = true }
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (selectedApp?.icon != null) {
+                                    Image(
+                                        bitmap = selectedApp.icon.toImageBitmap(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF2C2C30)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = null,
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
                                 }
+
+                                Text(
+                                    text = selectedApp?.label ?: "Select Application...",
+                                    color = if (selectedApp != null) Color.White else Color.Gray,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
+
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Color.Gray
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     // ICON TYPE TABS
+                    Text(text = "Icon Style", color = Color.Gray, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(38.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF161618)),
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF161618))
+                            .padding(3.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         listOf("App Icon", "Emoji", "Icons", "Text").forEachIndexed { index, label ->
@@ -197,8 +273,7 @@ class AppLauncherConfigActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
-                                    .padding(3.dp)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(11.dp))
                                     .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
                                     .clickable {
                                         selectedIconTab = index
@@ -211,34 +286,43 @@ class AppLauncherConfigActivity : ComponentActivity() {
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = label, color = if (isSelected) Color.White else Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // DYNAMIC PICKER AREA
-                    Box(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
                         when (selectedIconTab) {
                             1 -> {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(5),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     items(emojis) { emoji ->
                                         val isSelected = config.selectedEmoji == emoji
                                         Box(
                                             modifier = Modifier
                                                 .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(10.dp))
+                                                .clip(RoundedCornerShape(14.dp))
                                                 .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF161618))
-                                                .border(1.dp, if (isSelected) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
+                                                .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
                                                 .clickable { config = config.copy(selectedEmoji = emoji) },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = emoji, fontSize = 20.sp)
+                                            Text(text = emoji, fontSize = 22.sp)
                                         }
                                     }
                                 }
@@ -246,21 +330,21 @@ class AppLauncherConfigActivity : ComponentActivity() {
                             2 -> {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(5),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     items(customIconNames) { iconName ->
                                         val isSelected = config.selectedVectorResName == iconName
                                         Box(
                                             modifier = Modifier
                                                 .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(10.dp))
+                                                .clip(RoundedCornerShape(14.dp))
                                                 .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF161618))
-                                                .border(1.dp, if (isSelected) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
+                                                .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
                                                 .clickable { config = config.copy(selectedVectorResName = iconName) },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "★", color = Color.White, fontSize = 18.sp)
+                                            Text(text = "★", color = Color.White, fontSize = 20.sp)
                                         }
                                     }
                                 }
@@ -269,49 +353,208 @@ class AppLauncherConfigActivity : ComponentActivity() {
                                 OutlinedTextField(
                                     value = config.customText,
                                     onValueChange = { config = config.copy(customText = it) },
-                                    label = { Text("Badge Text", color = Color.Gray) },
+                                    placeholder = { Text("Badge Text (Max 4 chars)", color = Color.Gray) },
                                     modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = Color.White,
-                                        unfocusedBorderColor = Color(0xFF2C2C30),
+                                        unfocusedBorderColor = Color(0xFF242428),
+                                        focusedContainerColor = Color(0xFF161618),
+                                        unfocusedContainerColor = Color(0xFF161618),
                                         focusedTextColor = Color.White,
                                         unfocusedTextColor = Color.White
                                     )
                                 )
                             }
                             else -> {
-                                Text(text = "Using default icon of the selected app.", color = Color.Gray, fontSize = 12.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Displays the standard icon of the target application.",
+                                        color = Color.Gray,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Button(
-                            onClick = { finish() },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
+                            onClick = {
+                                navigateToHomeScreenAndFinish()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(26.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161618))
                         ) {
-                            Text(text = "Cancel", color = Color.White)
+                            Text(text = "Cancel", color = Color.White, fontWeight = FontWeight.SemiBold)
                         }
+
                         Spacer(modifier = Modifier.width(12.dp))
+
                         Button(
                             onClick = {
                                 AppLauncherWidgetConfig.save(this@AppLauncherConfigActivity, appWidgetId, config)
                                 updateAllAppLauncherWidgets(this@AppLauncherConfigActivity)
                                 setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
-                                finish()
+                                navigateToHomeScreenAndFinish()
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFCC00))
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(26.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
                         ) {
-                            Text(text = "Save", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text(text = "Save Widget", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (showAppPickerSheet) {
+                    AppPickerBottomSheet(
+                        installedApps = installedApps,
+                        selectedPackageName = config.packageName,
+                        onDismiss = { showAppPickerSheet = false },
+                        onAppSelected = { app ->
+                            config = config.copy(
+                                packageName = app.packageName,
+                                customText = app.label.take(4)
+                            )
+                            showAppPickerSheet = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun Drawable.toImageBitmap(): ImageBitmap {
+    val width = intrinsicWidth.coerceAtLeast(1)
+    val height = intrinsicHeight.coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    setBounds(0, 0, canvas.width, canvas.height)
+    draw(canvas)
+    return bitmap.asImageBitmap()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppPickerBottomSheet(
+    installedApps: List<AppLauncherConfigActivity.InstalledAppItem>,
+    selectedPackageName: String,
+    onDismiss: () -> Unit,
+    onAppSelected: (AppLauncherConfigActivity.InstalledAppItem) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredApps = remember(searchQuery, installedApps) {
+        if (searchQuery.isBlank()) installedApps
+        else installedApps.filter { it.label.contains(searchQuery, ignoreCase = true) }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF161618),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(horizontal = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Select Application", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search apps...", color = Color.Gray, fontSize = 13.sp) },
+                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.White,
+                    unfocusedBorderColor = Color(0xFF242428),
+                    focusedContainerColor = Color(0xFF0D0D0E),
+                    unfocusedContainerColor = Color(0xFF0D0D0E),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(filteredApps) { app ->
+                    val isSelected = app.packageName == selectedPackageName
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                            .clickable { onAppSelected(app) }
+                            .padding(vertical = 10.dp, horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (app.icon != null) {
+                            Image(
+                                bitmap = app.icon.toImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2C2C30))
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Text(
+                            text = app.label,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = Color.Green,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
