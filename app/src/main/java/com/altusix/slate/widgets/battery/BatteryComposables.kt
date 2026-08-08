@@ -658,6 +658,7 @@ fun generateMultiDeviceBatteryBitmap(
 
 // 8. Dot Matrix LED (4x2)
 fun generateDotMatrixLEDBitmap(
+    context: Context,
     text: String,
     activeColor: Color,
     dimColor: Color,
@@ -665,6 +666,7 @@ fun generateDotMatrixLEDBitmap(
     targetWidthPx: Int,
     targetHeightPx: Int
 ): Bitmap {
+    val density = context.resources.displayMetrics.density
     val bitmap = Bitmap.createBitmap(targetWidthPx.coerceAtLeast(1), targetHeightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -682,8 +684,7 @@ fun generateDotMatrixLEDBitmap(
         color = bgColor.toArgb()
         style = Paint.Style.FILL
     }
-    // Estimated density scale for 22dp corner radius
-    val cardCornerRadius = 22f * (cardH / 150f).coerceAtLeast(1.0f)
+    val cardCornerRadius = getStandardCornerRadius(density)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val rows = 9
@@ -772,6 +773,7 @@ fun generateDotMatrixLEDBitmap(
 
 // 9. Dot Level Wide (4x2)
 fun generateCenteredLevelBitmap(
+    context: Context,
     percentage: Int,
     activeColor: Color,
     dimColor: Color,
@@ -779,6 +781,7 @@ fun generateCenteredLevelBitmap(
     targetWidthPx: Int,
     targetHeightPx: Int
 ): Bitmap {
+    val density = context.resources.displayMetrics.density
     val bitmap = Bitmap.createBitmap(targetWidthPx.coerceAtLeast(1), targetHeightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -808,7 +811,7 @@ fun generateCenteredLevelBitmap(
         color = bgColor.toArgb()
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = 22f * (cardH / 100f).coerceAtLeast(1.0f)
+    val cardCornerRadius = getStandardCornerRadius(density)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val startX = leftX + padX
@@ -962,7 +965,7 @@ fun generateSegmentedPillTileBitmap(
 
     // Outer Background Card (Standard 22dp Radius)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
-    val cardCornerRadius = 22f * density
+    val cardCornerRadius = getStandardCornerRadius(density)
     canvas.drawRoundRect(
         RectF(leftX, topY, leftX + cardSize, topY + cardSize),
         cardCornerRadius,
@@ -1078,7 +1081,7 @@ fun generatePixelHeartBitmap(
 
     // 2. Outer Background Card (Standard 22dp Radius)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
-    val cardCornerRadius = 22f * density
+    val cardCornerRadius = getStandardCornerRadius(density)
     canvas.drawRoundRect(
         RectF(leftX, topY, leftX + cardSize, topY + cardSize),
         cardCornerRadius,
@@ -1196,7 +1199,7 @@ fun generateWavyLightningBoltBitmap(
     val topY = (h - cardH) / 2f
 
     // Outer Background Card (Standard 22dp Radius)
-    val cardCornerRadius = 22f * density
+    val cardCornerRadius = getStandardCornerRadius(density)
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)

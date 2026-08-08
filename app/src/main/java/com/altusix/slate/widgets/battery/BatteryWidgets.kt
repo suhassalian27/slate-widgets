@@ -221,7 +221,7 @@ class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver() {
         val activeColor = if (isLight) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
         val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x1AFFFFFF)
         val bgColor = androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity)
-        return generateDotMatrixLEDBitmap("${data.percentage}%", activeColor, dimColor, bgColor, wPx, hPx)
+        return generateDotMatrixLEDBitmap(context, "${data.percentage}%", activeColor, dimColor, bgColor, wPx, hPx)
     }
 }
 
@@ -252,7 +252,7 @@ class DotLevelMeterWideReceiver : BaseBatteryReceiver() {
         val activeColor = androidx.compose.ui.graphics.Color(config.accentColorHex)
         val dimColor = if (isLight) androidx.compose.ui.graphics.Color(0x1F000000) else androidx.compose.ui.graphics.Color(0x1AFFFFFF)
         val bgColor = androidx.compose.ui.graphics.Color(config.backgroundColorHex).copy(alpha = config.opacity)
-        return generateCenteredLevelBitmap(data.percentage, activeColor, dimColor, bgColor, wPx, hPx)
+        return generateCenteredLevelBitmap(context, data.percentage, activeColor, dimColor, bgColor, wPx, hPx)
     }
 }
 
