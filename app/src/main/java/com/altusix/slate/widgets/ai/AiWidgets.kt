@@ -9,6 +9,31 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.core.model.SlateWidgetInfo
+
+fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
+    return listOf(
+        SlateWidgetInfo("Gemini", "2x2", "AI", GeminiTextReceiver::class.java),
+        SlateWidgetInfo("ChatGPT Text", "2x2", "AI", ChatGptTextReceiver::class.java),
+        SlateWidgetInfo("ChatGPT Voice", "2x2", "AI", ChatGptVoiceReceiver::class.java),
+        SlateWidgetInfo("Claude", "2x2", "AI", ClaudeReceiver::class.java),
+        SlateWidgetInfo("Grok", "2x2", "AI", GrokReceiver::class.java),
+        SlateWidgetInfo("Perplexity", "2x2", "AI", PerplexityReceiver::class.java),
+        SlateWidgetInfo("DeepSeek", "2x2", "AI", DeepSeekReceiver::class.java),
+        SlateWidgetInfo("Copilot", "2x2", "AI", CopilotReceiver::class.java),
+        SlateWidgetInfo("Meta AI", "2x2", "AI", MetaAiReceiver::class.java),
+        SlateWidgetInfo("AI Primary Bar", "4x1", "AI", AiBarPrimaryReceiver::class.java),
+        SlateWidgetInfo("AI Dock Bar", "4x1", "AI", AiBarDock5Receiver::class.java),
+        SlateWidgetInfo("AI Capsule Bar", "4x1", "AI", AiBarCapsuleReceiver::class.java),
+        SlateWidgetInfo("AI Dual Flagship Bar", "4x1", "AI", AiBarDualFlagshipReceiver::class.java),
+        SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java),
+        SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java),
+        SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java),
+        SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java),
+        SlateWidgetInfo("AI Mega Folder", "4x2", "AI", AiFolder10MegaReceiver::class.java),
+        SlateWidgetInfo("AI Asymmetric Bento", "3x2", "AI", AiFolder7AsymmetricReceiver::class.java)
+    )
+}
 
 abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseCanvasWidgetProvider() {
 

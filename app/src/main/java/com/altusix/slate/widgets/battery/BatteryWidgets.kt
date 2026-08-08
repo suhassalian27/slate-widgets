@@ -11,6 +11,28 @@ import android.os.Build
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
 import android.app.PendingIntent
+import com.altusix.slate.core.model.SlateWidgetInfo
+
+fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
+    return listOf(
+        SlateWidgetInfo("Dot Level Header", "2x2", "Battery", DotLevelHeaderBatteryReceiver::class.java),
+        SlateWidgetInfo("Dot Level Pure", "2x2", "Battery", DotLevelPureBatteryReceiver::class.java),
+        SlateWidgetInfo("Minimal Linear", "2x2", "Battery", MinimalLinearBatteryReceiver::class.java),
+        SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java),
+        SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java),
+        SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java),
+        SlateWidgetInfo("Multi-Device", "4x2", "Battery", MultiDeviceBatteryReceiver::class.java),
+        SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java),
+        SlateWidgetInfo("Dot Level Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java),
+        SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java),
+        SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java),
+        SlateWidgetInfo("Pixel Heart", "2x2", "Battery", PixelHeartBatteryReceiver::class.java),
+        SlateWidgetInfo("Lightning Bolt", "2x2", "Battery", LightningBoltBatteryReceiver::class.java),
+        SlateWidgetInfo("Circular Dial", "2x2", "Battery", CircularRingBatteryReceiver::class.java),
+        SlateWidgetInfo("Vertical Pill", "1x2", "Battery", VerticalBatteryPillReceiver::class.java),
+        SlateWidgetInfo("Horizontal Pill", "2x1", "Battery", HorizontalBatteryPillReceiver::class.java)
+    )
+}
 
 data class DetailedBatteryData(
     val percentage: Int,

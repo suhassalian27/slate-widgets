@@ -33,63 +33,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.altusix.slate.widgets.ai.*
-import com.altusix.slate.widgets.battery.*
-
-data class SlateWidgetInfo(
-    val name: String,
-    val sizeText: String,
-    val category: String,
-    val receiverClass: Class<*>
-)
+import com.altusix.slate.core.model.SlateWidgetInfo
+import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
+import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
+import com.altusix.slate.widgets.battery.getBatteryWidgetsCatalog
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val aiWidgets = listOf(
-            SlateWidgetInfo("Gemini", "2x2", "AI", GeminiTextReceiver::class.java),
-            SlateWidgetInfo("ChatGPT Text", "2x2", "AI", ChatGptTextReceiver::class.java),
-            SlateWidgetInfo("ChatGPT Voice", "2x2", "AI", ChatGptVoiceReceiver::class.java),
-            SlateWidgetInfo("Claude", "2x2", "AI", ClaudeReceiver::class.java),
-            SlateWidgetInfo("Grok", "2x2", "AI", GrokReceiver::class.java),
-            SlateWidgetInfo("Perplexity", "2x2", "AI", PerplexityReceiver::class.java),
-            SlateWidgetInfo("DeepSeek", "2x2", "AI", DeepSeekReceiver::class.java),
-            SlateWidgetInfo("Copilot", "2x2", "AI", CopilotReceiver::class.java),
-            SlateWidgetInfo("Meta AI", "2x2", "AI", MetaAiReceiver::class.java),
-            SlateWidgetInfo("AI Primary Bar", "4x1", "AI", AiBarPrimaryReceiver::class.java),
-            SlateWidgetInfo("AI Dock Bar", "4x1", "AI", AiBarDock5Receiver::class.java),
-            SlateWidgetInfo("AI Capsule Bar", "4x1", "AI", AiBarCapsuleReceiver::class.java),
-            SlateWidgetInfo("AI Dual Flagship Bar", "4x1", "AI", AiBarDualFlagshipReceiver::class.java),
-            SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java),
-            SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java),
-            SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java),
-            SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java),
-            SlateWidgetInfo("AI Mega Folder", "4x2", "AI", AiFolder10MegaReceiver::class.java),
-            SlateWidgetInfo("AI Asymmetric Bento", "3x2", "AI", AiFolder7AsymmetricReceiver::class.java)
-        )
-
-        val batteryWidgets = listOf(
-            SlateWidgetInfo("Dot Level Header", "2x2", "Battery", DotLevelHeaderBatteryReceiver::class.java),
-            SlateWidgetInfo("Dot Level Pure", "2x2", "Battery", DotLevelPureBatteryReceiver::class.java),
-            SlateWidgetInfo("Minimal Linear", "2x2", "Battery", MinimalLinearBatteryReceiver::class.java),
-            SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java),
-            SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java),
-            SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java),
-            SlateWidgetInfo("Multi-Device", "4x2", "Battery", MultiDeviceBatteryReceiver::class.java),
-            SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java),
-            SlateWidgetInfo("Dot Level Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java),
-            SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java),
-            SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java),
-            SlateWidgetInfo("Pixel Heart", "2x2", "Battery", PixelHeartBatteryReceiver::class.java),
-            SlateWidgetInfo("Lightning Bolt", "2x2", "Battery", LightningBoltBatteryReceiver::class.java),
-            SlateWidgetInfo("Circular Dial", "2x2", "Battery", CircularRingBatteryReceiver::class.java),
-            SlateWidgetInfo("Vertical Pill", "1x2", "Battery", VerticalBatteryPillReceiver::class.java),
-            SlateWidgetInfo("Horizontal Pill", "2x1", "Battery", HorizontalBatteryPillReceiver::class.java)
-        )
-
-        val categories = listOf("All", "AI", "Battery")
+        val aiWidgets = getAiWidgetsCatalog()
+        val batteryWidgets = getBatteryWidgetsCatalog()
+        val appLauncherWidgets = getAppLauncherWidgetsCatalog()
+        val categories = listOf("All", "AI", "Battery", "App Launcher")
 
         setContent {
             MaterialTheme(
@@ -99,11 +56,13 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 var selectedCategoryIndex by remember { mutableIntStateOf(0) }
+                var pendingWidgetInfo by remember { mutableStateOf<SlateWidgetInfo?>(null) }
 
                 val displayedWidgets = when (selectedCategoryIndex) {
                     1 -> aiWidgets
                     2 -> batteryWidgets
-                    else -> aiWidgets + batteryWidgets
+                    3 -> appLauncherWidgets
+                    else -> aiWidgets + batteryWidgets + appLauncherWidgets
                 }
 
                 Column(
@@ -111,7 +70,6 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(Color(0xFF000000))
                 ) {
-                    // Title Header
                     Text(
                         text = "Widgets",
                         fontSize = 32.sp,
@@ -120,7 +78,6 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 14.dp)
                     )
 
-                    // Filter Pills
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(horizontal = 20.dp),
@@ -147,7 +104,6 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Borderless Surface Grid
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -163,10 +119,32 @@ class MainActivity : ComponentActivity() {
                             }
                         ) { widget ->
                             SleekWidgetCard(widgetInfo = widget) {
-                                pinWidgetToHomeScreen(this@MainActivity, widget.receiverClass)
+                                if (widget.hasModeOption) {
+                                    pendingWidgetInfo = widget
+                                } else {
+                                    pinWidgetToHomeScreen(this@MainActivity, widget.receiverClass)
+                                }
                             }
                         }
                     }
+                }
+
+                // WIDGET MODE BOTTOM SHEET (Displays BEFORE system pinning dialog)
+                if (pendingWidgetInfo != null) {
+                    WidgetModeBottomSheet(
+                        widgetInfo = pendingWidgetInfo!!,
+                        onDismiss = { pendingWidgetInfo = null },
+                        onModeSelected = { isResponsive ->
+                            val widget = pendingWidgetInfo!!
+                            pendingWidgetInfo = null
+
+                            // Save default responsive preference so the new widget instance reads it
+                            val prefs = getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+                            prefs.edit().putBoolean("default_is_responsive", isResponsive).apply()
+
+                            pinWidgetToHomeScreen(this@MainActivity, widget.receiverClass)
+                        }
+                    )
                 }
             }
         }
@@ -174,36 +152,65 @@ class MainActivity : ComponentActivity() {
 
     private fun pinWidgetToHomeScreen(context: Context, receiverClass: Class<*>) {
         val appWidgetManager = AppWidgetManager.getInstance(context)
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (appWidgetManager.isRequestPinAppWidgetSupported) {
                 val myProvider = ComponentName(context, receiverClass)
                 val success = appWidgetManager.requestPinAppWidget(myProvider, null, null)
-
                 if (!success) {
-                    Toast.makeText(
-                        context,
-                        "Pinning blocked. Please allow 'Add Home screen shortcuts' in app settings.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(context, "Pinning blocked by launcher.", Toast.LENGTH_SHORT).show()
                 }
-            } else {
-                Toast.makeText(context, "Launcher does not support direct widget pinning.", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(context, "Requires Android 8.0+", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WidgetModeBottomSheet(
+    widgetInfo: SlateWidgetInfo,
+    onDismiss: () -> Unit,
+    onModeSelected: (Boolean) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF161618),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = "Choose Widget Mode", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(text = "Pick whichever works best on your HomeScreen.", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(
+                    modifier = Modifier.weight(1f).height(110.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF242428)).clickable { onModeSelected(true) }.padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "Responsive", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(text = "Adapts to cell size", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+                Box(
+                    modifier = Modifier.weight(1f).height(110.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF242428)).clickable { onModeSelected(false) }.padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "Fixed", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(text = "Native 1:1 ratio", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
 fun SleekWidgetCard(widgetInfo: SlateWidgetInfo, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
-        // Hero Surface Card - Direct 1-layer geometry
+    Column(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         val previewModifier = when (widgetInfo.sizeText) {
             "4x1" -> Modifier.fillMaxWidth().height(68.dp)
             "4x2" -> Modifier.fillMaxWidth().height(136.dp)
@@ -212,78 +219,20 @@ fun SleekWidgetCard(widgetInfo: SlateWidgetInfo, onClick: () -> Unit) {
             "2x1" -> Modifier.fillMaxWidth().aspectRatio(2.0f)
             else -> Modifier.fillMaxWidth().aspectRatio(1.0f)
         }
-
         Box(
-            modifier = previewModifier
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color(0xFF141416))
-                .border(1.dp, Color(0xFF242428), RoundedCornerShape(22.dp)),
+            modifier = previewModifier.clip(RoundedCornerShape(22.dp)).background(Color(0xFF141416)).border(1.dp, Color(0xFF242428), RoundedCornerShape(22.dp)),
             contentAlignment = Alignment.Center
         ) {
-            // Size Badge Overlay
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(10.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF222226))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = widgetInfo.sizeText,
-                    color = Color(0xFF8E8E93),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            Box(modifier = Modifier.align(Alignment.TopStart).padding(10.dp).clip(CircleShape).background(Color(0xFF222226)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                Text(text = widgetInfo.sizeText, color = Color(0xFF8E8E93), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
-
-            // Quick Pin Action Overlay
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF222226))
-                    .border(0.5.dp, Color(0xFF323238), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Widget",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp).clip(CircleShape).background(Color(0xFF222226)).border(0.5.dp, Color(0xFF323238), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
             }
-
-            // Preview Text
-            Text(
-                text = widgetInfo.name,
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(16.dp)
-            )
+            Text(text = widgetInfo.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.padding(16.dp))
         }
-
         Spacer(modifier = Modifier.height(6.dp))
-
-        // Clean External Metadata Labels
-        Text(
-            text = widgetInfo.name,
-            color = Color.White,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 2.dp)
-        )
-        Text(
-            text = widgetInfo.category,
-            color = Color(0xFF636366),
-            fontSize = 11.sp,
-            modifier = Modifier.padding(start = 2.dp)
-        )
+        Text(text = widgetInfo.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp))
+        Text(text = widgetInfo.category, color = Color(0xFF636366), fontSize = 11.sp, modifier = Modifier.padding(start = 2.dp))
     }
 }

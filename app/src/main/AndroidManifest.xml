@@ -38,7 +38,13 @@
             </intent-filter>
         </activity>
 
-
+        <activity
+            android:name=".widgets.applauncher.AppLauncherConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
         <!-- ================================================================= -->
         <!-- AI ALL ADAPTIVE ICON WIDGETS                                         -->
@@ -131,6 +137,81 @@
         <receiver android:name=".widgets.ai.AiFolder7AsymmetricReceiver" android:exported="true" android:label="AI Asymmetric Bento (7)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x2" />
+        </receiver>
+
+
+
+
+        <!-- App Launcher Receivers -->
+        <receiver
+            android:name=".widgets.applauncher.AdaptiveAppLauncherReceiver"
+            android:exported="true"
+            android:label="App Launcher Adaptive">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+        <receiver android:name=".widgets.applauncher.SquircleLauncherReceiver" android:exported="true" android:label="App Launcher Squircle">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.PentagonLauncherReceiver" android:exported="true" android:label="App Launcher M3 Pentagon">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.FlowerLauncherReceiver" android:exported="true" android:label="App Launcher M3 Flower">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.CloverLauncherReceiver" android:exported="true" android:label="App Launcher M3 Clover">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.DiamondLauncherReceiver" android:exported="true" android:label="App Launcher M3 Diamond">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.OctagonLauncherReceiver" android:exported="true" android:label="App Launcher M3 Octagon">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.CircleLauncherReceiver" android:exported="true" android:label="App Launcher Circle">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.BlobLauncherReceiver" android:exported="true" android:label="App Launcher Blob">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.PixelStarLauncherReceiver" android:exported="true" android:label="App Launcher Pixel Star">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.CustomTextAppLauncherReceiver" android:exported="true" android:label="App Launcher + Custom Text">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.GlitchTextLauncherReceiver" android:exported="true" android:label="Slate Cyber Glitch Launcher">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.NeonRingLauncherReceiver" android:exported="true" android:label="Slate Neon Halo Launcher">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
 
 
