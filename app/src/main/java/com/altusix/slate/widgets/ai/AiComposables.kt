@@ -14,6 +14,8 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 import kotlin.math.cos
 import kotlin.math.sin
 
+private fun getStandardCornerRadius(density: Float): Float = 22f * density
+
 enum class AiShapeStyle {
     SQUIRCLE,
     CIRCLE,
@@ -37,9 +39,11 @@ fun generateTileBitmap(
     showTextLabel: Boolean = false,
     customText: String? = null,
     isPrimaryAccent: Boolean = false,
+    forceSquare: Boolean = false, // Added parameter
     widthPx: Int,
     heightPx: Int
 ): Bitmap {
+    val density = context.resources.displayMetrics.density
     val wPx = widthPx.coerceAtLeast(1)
     val hPx = heightPx.coerceAtLeast(1)
     val bitmap = Bitmap.createBitmap(wPx, hPx, Bitmap.Config.ARGB_8888)
@@ -73,21 +77,29 @@ fun generateTileBitmap(
         val cx = w / 2f
         val cy = h / 2f
         val halfTile = (minDim / 2f) - margin
-        val squircleRadius = minDim * 0.28f
+        val squircleRadius = getStandardCornerRadius(density)
         val fullCapRadius = (h - (margin * 2f)) / 2f
 
         val squareRect = RectF(cx - halfTile, cy - halfTile, cx + halfTile, cy + halfTile)
         val fullRect = RectF(margin, margin, w - margin, h - margin)
 
+        // Select target bounds based on forceSquare flag
+        val targetRect = if (forceSquare) squareRect else fullRect
+
         when (shapeStyle) {
             AiShapeStyle.SQUIRCLE -> {
-                canvas.drawRoundRect(squareRect, squircleRadius, squircleRadius, bgPaint)
-                if (!isPrimaryAccent) canvas.drawRoundRect(squareRect, squircleRadius, squircleRadius, strokePaint)
+                canvas.drawRoundRect(targetRect, squircleRadius, squircleRadius, bgPaint)
+                if (!isPrimaryAccent) canvas.drawRoundRect(targetRect, squircleRadius, squircleRadius, strokePaint)
             }
             AiShapeStyle.CIRCLE -> {
-                val radius = (minDim / 2f) - margin
-                canvas.drawCircle(cx, cy, radius, bgPaint)
-                if (!isPrimaryAccent) canvas.drawCircle(cx, cy, radius, strokePaint)
+                if (forceSquare) {
+                    val radius = (minDim / 2f) - margin
+                    canvas.drawCircle(cx, cy, radius, bgPaint)
+                    if (!isPrimaryAccent) canvas.drawCircle(cx, cy, radius, strokePaint)
+                } else {
+                    canvas.drawRoundRect(fullRect, fullCapRadius, fullCapRadius, bgPaint)
+                    if (!isPrimaryAccent) canvas.drawRoundRect(fullRect, fullCapRadius, fullCapRadius, strokePaint)
+                }
             }
             AiShapeStyle.HEXAGON -> {
                 val hexPath = Path()

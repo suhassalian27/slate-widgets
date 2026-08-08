@@ -33,6 +33,7 @@ abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseCanvasWi
             accentColor = accentColor,
             isLight = isLight,
             shapeStyle = AiShapeStyle.SQUIRCLE,
+            forceSquare = true, // Guarantees 1:1 square ratio for single 1x1 widgets
             widthPx = wPx,
             heightPx = hPx
         )
