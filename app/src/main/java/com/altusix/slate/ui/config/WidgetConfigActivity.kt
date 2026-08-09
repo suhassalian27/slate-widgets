@@ -11,6 +11,9 @@ import android.graphics.RectF
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,11 +26,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -40,7 +46,13 @@ import androidx.compose.ui.window.Dialog
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
 import com.altusix.slate.widgets.ai.updateAllAiWidgets
+import com.altusix.slate.widgets.applauncher.updateAllAppLauncherWidgets
 import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
+import com.altusix.slate.widgets.bluetooth.updateAllBluetoothWidgets
+
+enum class ColorPickerTarget {
+    BACKGROUND, ACCENT
+}
 
 class WidgetConfigActivity : ComponentActivity() {
 
@@ -66,64 +78,76 @@ class WidgetConfigActivity : ComponentActivity() {
 
         setContent {
             SlateConfigTheme {
-                var themeMode by remember { mutableStateOf("DARK") }
-                var opacity by remember { mutableFloatStateOf(1.0f) }
+                var selectedBgHex by remember { mutableLongStateOf(0xFF161618L) }
                 var selectedAccentHex by remember { mutableLongStateOf(0xFFFFFFFFL) }
-                var showColorPickerDialog by remember { mutableStateOf(false) }
-
-                val currentBgHex = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
+                var opacity by remember { mutableFloatStateOf(1.0f) }
+                var activePickerTarget by remember { mutableStateOf<ColorPickerTarget?>(null) }
 
                 // Load existing configuration from SharedPreferences
                 LaunchedEffect(appWidgetId) {
                     val prefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-                    if (prefs.contains("widget_${appWidgetId}_theme_mode")) {
-                        themeMode = prefs.getString("widget_${appWidgetId}_theme_mode", "DARK") ?: "DARK"
+                    if (prefs.contains("widget_${appWidgetId}_bg_color")) {
+                        selectedBgHex = prefs.getLong("widget_${appWidgetId}_bg_color", 0xFF161618L)
                         opacity = prefs.getFloat("widget_${appWidgetId}_opacity", 1.0f)
-                        val defaultAccent = if (themeMode == "LIGHT") 0xFF000000L else 0xFFFFFFFFL
-                        selectedAccentHex = prefs.getLong("widget_${appWidgetId}_accent_color", defaultAccent)
+                        selectedAccentHex = prefs.getLong("widget_${appWidgetId}_accent_color", 0xFFFFFFFFL)
                     }
                 }
 
-                val accentOptions = if (themeMode == "LIGHT") {
+                // Determine contrast mode dynamically based on background luminance
+                val isLightBg = remember(selectedBgHex) { calculateLuminance(selectedBgHex) > 0.5f }
+                val textColor = if (isLightBg) Color.Black else Color.White
+
+                // Background Presets
+                val bgPresets = listOf(
+                    0xFF161618L to "Dark",
+                    0xFF000000L to "AMOLED",
+                    0xFFFFFFFFL to "Light"
+                )
+
+                // Accent Presets
+                val accentPresets = if (isLightBg) {
                     listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
                 } else {
                     listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
                 }
 
-                val isCustomColorSelected = !accentOptions.contains(selectedAccentHex)
-
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF0D0D0E))
-                        .padding(20.dp)
+                        .background(Color(0xFF09090A))
+                        .padding(horizontal = 22.dp, vertical = 16.dp)
                 ) {
                     Text(
                         text = "Customize Widget",
-                        fontSize = 22.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        modifier = Modifier.padding(vertical = 12.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                     )
 
+                    // 1. STUDIO LIVE PREVIEW CARD
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Color(0xFF161618)),
+                            .height(210.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF1B1B1E), Color(0xFF121214))
+                                )
+                            )
+                            .border(1.dp, Color(0xFF28282C), RoundedCornerShape(28.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        val previewBg = Color(currentBgHex).copy(alpha = opacity)
-                        val textColor = if (themeMode == "LIGHT") Color.Black else Color.White
+                        val previewBg = Color(selectedBgHex).copy(alpha = opacity)
 
                         Box(
                             modifier = Modifier
-                                .size(140.dp)
-                                .clip(RoundedCornerShape(22.dp))
+                                .size(148.dp)
+                                .clip(RoundedCornerShape(24.dp))
                                 .background(previewBg)
-                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(22.dp))
-                                .padding(14.dp)
+                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
+                                .padding(16.dp)
                         ) {
                             if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
                                 Column(
@@ -135,11 +159,11 @@ class WidgetConfigActivity : ComponentActivity() {
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = "BATTERY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.6f))
-                                        Text(text = "CHARGING", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                        Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                        Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
                                     }
 
-                                    val arcBitmap = remember(selectedAccentHex, themeMode) {
+                                    val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
                                         generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
                                     }
 
@@ -149,7 +173,7 @@ class WidgetConfigActivity : ComponentActivity() {
                                         modifier = Modifier.size(100.dp, 50.dp)
                                     )
 
-                                    Text(text = "85%", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                    Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
                                 }
                             } else {
                                 Column(
@@ -161,13 +185,13 @@ class WidgetConfigActivity : ComponentActivity() {
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = "BATTERY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.6f))
-                                        Text(text = "CHARGING", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                        Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                        Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
                                     }
-                                    Text(text = "85%", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                    Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
                                     LinearProgressIndicator(
                                         progress = { 0.85f },
-                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
                                         color = Color(selectedAccentHex),
                                         trackColor = textColor.copy(alpha = 0.15f)
                                     )
@@ -176,114 +200,91 @@ class WidgetConfigActivity : ComponentActivity() {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    Text(text = "Style Mode", color = Color.Gray, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // 2. BACKGROUND COLOR SECTION
+                    SectionTitle(title = "Background", subtitle = "Presets & custom tint")
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF161618))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        listOf("DARK" to "Dark", "LIGHT" to "Light").forEach { (mode, label) ->
-                            val isSelected = themeMode == mode
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                                    .clickable {
-                                        if (themeMode != mode) {
-                                            themeMode = mode
-                                            if (mode == "LIGHT" && selectedAccentHex == 0xFFFFFFFFL) {
-                                                selectedAccentHex = 0xFF000000L
-                                            } else if (mode == "DARK" && selectedAccentHex == 0xFF000000L) {
-                                                selectedAccentHex = 0xFFFFFFFFL
-                                            }
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
+                        bgPresets.forEach { (hex, label) ->
+                            val isSelected = selectedBgHex == hex
+                            SelectableChip(
+                                label = label,
+                                isSelected = isSelected,
+                                colorPreview = Color(hex),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) Color.White else Color.Gray,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                selectedBgHex = hex
+                                if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) {
+                                    selectedAccentHex = 0xFF000000L
+                                } else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) {
+                                    selectedAccentHex = 0xFFFFFFFFL
+                                }
                             }
+                        }
+
+                        // Custom BG Rainbow Chip
+                        val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+                        RainbowPickerChip(
+                            isSelected = isCustomBg,
+                            activeColor = if (isCustomBg) Color(selectedBgHex) else null,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            activePickerTarget = ColorPickerTarget.BACKGROUND
                         }
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    Text(text = "Accent Color", color = Color.Gray, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    // 3. ACCENT COLOR SECTION
+                    SectionTitle(title = "Accent Color", subtitle = "Primary highlight & controls")
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        accentOptions.forEach { hex ->
+                        accentPresets.forEach { hex ->
                             val isSelected = selectedAccentHex == hex
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(hex))
-                                    .border(
-                                        width = if (isSelected) 2.5.dp else 1.dp,
-                                        color = if (isSelected) Color.Green else Color.White.copy(alpha = 0.3f),
-                                        shape = CircleShape
-                                    )
-                                    .clickable { selectedAccentHex = hex }
+                            ProfessionalSwatchCircle(
+                                color = Color(hex),
+                                isSelected = isSelected,
+                                onClick = { selectedAccentHex = hex }
                             )
                         }
 
-                        // Rainbow Custom Color Button
-                        val rainbowBrush = Brush.sweepGradient(
-                            listOf(
-                                Color.Red, Color.Yellow, Color.Green,
-                                Color.Cyan, Color.Blue, Color.Magenta, Color.Red
-                            )
+                        // Custom Accent Rainbow Button
+                        val isCustomAccent = accentPresets.none { it == selectedAccentHex }
+                        RainbowCustomCircle(
+                            isSelected = isCustomAccent,
+                            activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
+                            onClick = { activePickerTarget = ColorPickerTarget.ACCENT }
                         )
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(rainbowBrush)
-                                .border(
-                                    width = if (isCustomColorSelected) 2.5.dp else 1.dp,
-                                    color = if (isCustomColorSelected) Color.Green else Color.White.copy(alpha = 0.3f),
-                                    shape = CircleShape
-                                )
-                                .clickable { showColorPickerDialog = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isCustomColorSelected) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(selectedAccentHex))
-                                )
-                            }
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
+                    // 4. OPACITY SLIDER SECTION
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Opacity", color = Color.Gray, fontSize = 13.sp)
-                        Text(text = "${(opacity * 100).toInt()}%", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        SectionTitle(title = "Opacity", subtitle = "Surface transparency")
+                        Text(
+                            text = "${(opacity * 100).toInt()}%",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Slider(
                         value = opacity,
@@ -292,43 +293,59 @@ class WidgetConfigActivity : ComponentActivity() {
                         colors = SliderDefaults.colors(
                             thumbColor = Color.White,
                             activeTrackColor = Color.White,
-                            inactiveTrackColor = Color(0xFF2C2C30)
+                            inactiveTrackColor = Color(0xFF242428)
                         )
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
 
+                    // 5. CTA APPLY BUTTON
                     Button(
                         onClick = {
                             saveAndFinish(
                                 SlateWidgetConfig(
-                                    themeMode = themeMode,
-                                    backgroundColorHex = currentBgHex,
+                                    themeMode = if (isLightBg) "LIGHT" else "DARK",
+                                    backgroundColorHex = selectedBgHex,
                                     opacity = opacity,
                                     accentColorHex = selectedAccentHex
                                 )
                             )
                         },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(27.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White)
                     ) {
-                        Text(text = "Apply Widget", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text(text = "Apply Widget", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                if (showColorPickerDialog) {
+                // Custom Color Picker Dialog for both Background and Accent
+                activePickerTarget?.let { target ->
+                    val initialColor = if (target == ColorPickerTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
                     CustomColorPickerDialog(
-                        initialColor = Color(selectedAccentHex),
-                        onDismiss = { showColorPickerDialog = false },
+                        initialColor = initialColor,
+                        title = if (target == ColorPickerTarget.BACKGROUND) "Custom Background" else "Custom Accent",
+                        onDismiss = { activePickerTarget = null },
                         onColorSelected = { color ->
-                            selectedAccentHex = (color.toArgb().toLong() and 0xFFFFFFFFL)
-                            showColorPickerDialog = false
+                            val hex = (color.toArgb().toLong() and 0xFFFFFFFFL)
+                            if (target == ColorPickerTarget.BACKGROUND) {
+                                selectedBgHex = hex
+                            } else {
+                                selectedAccentHex = hex
+                            }
+                            activePickerTarget = null
                         }
                     )
                 }
             }
         }
+    }
+
+    private fun calculateLuminance(hex: Long): Float {
+        val r = ((hex shr 16) and 0xFFL) / 255f
+        val g = ((hex shr 8) and 0xFFL) / 255f
+        val b = (hex and 0xFFL) / 255f
+        return 0.2126f * r + 0.7152f * g + 0.0722f * b
     }
 
     private fun saveAndFinish(config: SlateWidgetConfig) {
@@ -354,6 +371,8 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllBatteryWidgets(this)
         updateAllAiWidgets(this)
         updateAllAiFolderWidgets(this)
+        updateAllBluetoothWidgets(this)
+        updateAllAppLauncherWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
@@ -386,19 +405,206 @@ class WidgetConfigActivity : ComponentActivity() {
 }
 
 // ============================================================================
+// SLEEK RE-IMAGINED UI COMPONENTS
+// ============================================================================
+
+@Composable
+private fun SectionTitle(title: String, subtitle: String) {
+    Column {
+        Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(text = subtitle, color = Color.Gray, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun SelectableChip(
+    label: String,
+    isSelected: Boolean,
+    colorPreview: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val animatedBg by animateColorAsState(if (isSelected) Color(0xFF28282C) else Color(0xFF141416), label = "chipBg")
+    val animatedBorder by animateColorAsState(if (isSelected) Color.White.copy(alpha = 0.6f) else Color(0xFF222226), label = "chipBorder")
+
+    Row(
+        modifier = modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(animatedBg)
+            .border(1.dp, animatedBorder, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(colorPreview)
+                .border(0.5.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = if (isSelected) Color.White else Color.Gray,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun RainbowPickerChip(
+    isSelected: Boolean,
+    activeColor: Color?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val rainbowBrush = Brush.sweepGradient(
+        listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+    )
+    val animatedBorder by animateColorAsState(if (isSelected) Color.White else Color(0xFF222226), label = "rainbowBorder")
+
+    val chipModifier = modifier
+        .height(40.dp)
+        .clip(RoundedCornerShape(12.dp))
+        .background(Color(0xFF141416))
+        .border(1.dp, animatedBorder, RoundedCornerShape(12.dp))
+        .clickable { onClick() }
+        .padding(horizontal = 10.dp)
+
+    Row(
+        modifier = chipModifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        val dotModifier = Modifier
+            .size(12.dp)
+            .clip(CircleShape)
+            .border(0.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+
+        if (activeColor != null) {
+            Box(modifier = dotModifier.background(activeColor))
+        } else {
+            Box(modifier = dotModifier.background(rainbowBrush))
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "Custom",
+            color = if (isSelected) Color.White else Color.Gray,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun ProfessionalSwatchCircle(
+    color: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(if (isSelected) 1.12f else 1.0f, label = "circleScale")
+    val isLightColor = remember(color) {
+        val argb = color.toArgb()
+        val r = ((argb shr 16) and 0xFF) / 255f
+        val g = ((argb shr 8) and 0xFF) / 255f
+        val b = (argb and 0xFF) / 255f
+        (0.2126f * r + 0.7152f * g + 0.0722f * b) > 0.6f
+    }
+
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .scale(scale)
+            .clip(CircleShape)
+            .background(color)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.15f),
+                shape = CircleShape
+            )
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = if (isLightColor) Color.Black else Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RainbowCustomCircle(
+    isSelected: Boolean,
+    activeColor: Color?,
+    onClick: () -> Unit
+) {
+    val rainbowBrush = Brush.sweepGradient(
+        listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+    )
+    val scale by animateFloatAsState(if (isSelected) 1.12f else 1.0f, label = "customCircleScale")
+
+    val circleModifier = Modifier
+        .size(38.dp)
+        .scale(scale)
+        .clip(CircleShape)
+        .border(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.2f),
+            shape = CircleShape
+        )
+        .clickable { onClick() }
+
+    val baseModifier = if (activeColor != null) {
+        circleModifier.background(activeColor)
+    } else {
+        circleModifier.background(rainbowBrush)
+    }
+
+    Box(
+        modifier = baseModifier,
+        contentAlignment = Alignment.Center
+    ) {
+        if (isSelected && activeColor != null) {
+            val isLightColor = remember(activeColor) {
+                val argb = activeColor.toArgb()
+                val r = ((argb shr 16) and 0xFF) / 255f
+                val g = ((argb shr 8) and 0xFF) / 255f
+                val b = (argb and 0xFF) / 255f
+                (0.2126f * r + 0.7152f * g + 0.0722f * b) > 0.6f
+            }
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = if (isLightColor) Color.Black else Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+// ============================================================================
 // CUSTOM COLOR PICKER DIALOG (SWATCHES & SPECTRUM TABS)
 // ============================================================================
 
 @Composable
 fun CustomColorPickerDialog(
     initialColor: Color,
+    title: String,
     onDismiss: () -> Unit,
     onColorSelected: (Color) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Swatches, 1: Spectrum
     var currentColor by remember { mutableStateOf(initialColor) }
 
-    // HSV values for Spectrum mode
     val initialHsv = FloatArray(3)
     android.graphics.Color.colorToHSV(initialColor.toArgb(), initialHsv)
     var hue by remember { mutableFloatStateOf(initialHsv[0]) }
@@ -412,8 +618,8 @@ fun CustomColorPickerDialog(
             0xFFBDBDBDL, 0xFFE57373L, 0xFFFFB74DL, 0xFFFFD54FL, 0xFF81C784L, 0xFF4DD0E1L, 0xFF64B5F6L, 0xFFBA68C8L,
             0xFF757575L, 0xFFEF5350L, 0xFFFFA726L, 0xFFFFCA28L, 0xFF66BB6AL, 0xFF26C6DAL, 0xFF42A5F5L, 0xFFAB47BCL,
             0xFF424242L, 0xFFF44336L, 0xFFFF9800L, 0xFFFFC107L, 0xFF4CAF50L, 0xFF00BCD4L, 0xFF2196F3L, 0xFF9C27B0L,
-            0xFF212121L, 0xFFD32F2FL, 0xFFF57C00L, 0xFFFFB300L, 0xFF388E3CL, 0xFF0097A7L, 0xFF1976D2L, 0xFF7B1FA2L,
-            0xFF000000L, 0xFFB71C1CL, 0xFFE65100L, 0xFFFF8F00L, 0xFF1B5E20L, 0xFF006064L, 0xFF0D47A1L, 0xFF4A148CL
+            0xFF212121L, 0xFFD32F2FL, 0xFFF57C00L, 0xFFFFB300L, 0xFF388E3CL, 0xFF0097A7L, 0xFF1976D2L, 0xFF4A148CL,
+            0xFF161618L, 0xFF121214L, 0xFF000000L, 0xFF1B5E20L, 0xFF006064L, 0xFF0D47A1L, 0xFF311B92L, 0xFF1A237EL
         )
     }
 
@@ -423,19 +629,28 @@ fun CustomColorPickerDialog(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF242426))
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E22))
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Tab Header: Swatches | Spectrum
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(42.dp)
                         .clip(RoundedCornerShape(21.dp))
-                        .background(Color(0xFF19191B)),
+                        .background(Color(0xFF121214)),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     listOf("Swatches", "Spectrum").forEachIndexed { index, label ->
@@ -446,7 +661,7 @@ fun CustomColorPickerDialog(
                                 .fillMaxHeight()
                                 .padding(3.dp)
                                 .clip(RoundedCornerShape(18.dp))
-                                .background(if (isSelected) Color(0xFF323236) else Color.Transparent)
+                                .background(if (isSelected) Color(0xFF2E2E34) else Color.Transparent)
                                 .clickable { selectedTab = index },
                             contentAlignment = Alignment.Center
                         ) {
@@ -463,7 +678,6 @@ fun CustomColorPickerDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (selectedTab == 0) {
-                    // Swatches View
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(8),
                         modifier = Modifier
@@ -477,12 +691,12 @@ fun CustomColorPickerDialog(
                             Box(
                                 modifier = Modifier
                                     .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .clip(RoundedCornerShape(6.dp))
                                     .background(color)
                                     .border(
                                         width = if (currentColor == color) 2.dp else 0.dp,
                                         color = if (currentColor == color) Color.White else Color.Transparent,
-                                        shape = RoundedCornerShape(4.dp)
+                                        shape = RoundedCornerShape(6.dp)
                                     )
                                     .clickable {
                                         currentColor = color
@@ -495,17 +709,15 @@ fun CustomColorPickerDialog(
                         }
                     }
                 } else {
-                    // Spectrum View (2D Saturation/Hue Box + Value/Brightness Slider)
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 2D Gradient Box (Hue & Saturation)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(160.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .pointerInput(Unit) {
                                     detectTapGestures { offset ->
                                         hue = (offset.x / size.width.toFloat()) * 360f
@@ -523,12 +735,9 @@ fun CustomColorPickerDialog(
                                     }
                                 }
                         ) {
-                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
                                 val rainbowBrush = Brush.horizontalGradient(
-                                    listOf(
-                                        Color.Red, Color.Yellow, Color.Green,
-                                        Color.Cyan, Color.Blue, Color.Magenta, Color.Red
-                                    )
+                                    listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
                                 )
                                 drawRect(brush = rainbowBrush)
                                 val saturationBrush = Brush.verticalGradient(
@@ -537,7 +746,6 @@ fun CustomColorPickerDialog(
                                 drawRect(brush = saturationBrush)
                             }
 
-                            // Pointer Indicator
                             val indicatorX = (hue / 360f)
                             val indicatorY = 1f - saturation
                             Box(
@@ -560,7 +768,6 @@ fun CustomColorPickerDialog(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Brightness Slider
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -577,7 +784,7 @@ fun CustomColorPickerDialog(
                                 colors = SliderDefaults.colors(
                                     thumbColor = Color.White,
                                     activeTrackColor = currentColor,
-                                    inactiveTrackColor = Color(0xFF19191B)
+                                    inactiveTrackColor = Color(0xFF121214)
                                 )
                             )
                             Text(
@@ -592,11 +799,10 @@ fun CustomColorPickerDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Color Preview & RGB / Hex Readout
                 val argb = currentColor.toArgb()
                 val hexStr = String.format("#%06X", 0xFFFFFF and argb)
-                val red = (argb shrinkRight 16) and 0xFF
-                val green = (argb shrinkRight 8) and 0xFF
+                val red = (argb shr 16) and 0xFF
+                val green = (argb shr 8) and 0xFF
                 val blue = argb and 0xFF
 
                 Row(
@@ -635,7 +841,6 @@ fun CustomColorPickerDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Cancel / Done Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -653,12 +858,10 @@ fun CustomColorPickerDialog(
     }
 }
 
-private infix fun Int.shrinkRight(bitCount: Int): Int = this shr bitCount
-
 @Composable
 fun SlateConfigTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = darkColorScheme(background = Color(0xFF0D0D0E), surface = Color(0xFF161618)),
+        colorScheme = darkColorScheme(background = Color(0xFF09090A), surface = Color(0xFF141416)),
         content = content
     )
 }

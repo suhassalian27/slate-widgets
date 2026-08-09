@@ -17,6 +17,9 @@
         <package android:name="com.facebook.stella" />
     </queries>
 
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -52,8 +55,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".widgets.bluetooth.BluetoothPermissionActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- ================================================================= -->
-        <!-- AI ALL ADAPTIVE ICON WIDGETS                                         -->
+        <!-- AI WIDGETS                                                        -->
         <!-- ================================================================= -->
         <!-- AI SHORTCUT WIDGETS (2x2 default, resizable down to 1x1) -->
         <receiver android:name=".widgets.ai.GeminiTextReceiver" android:exported="true" android:label="Gemini Text">
@@ -92,54 +100,44 @@
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <!-- AI BARS (4x1) -->
         <receiver android:name=".widgets.ai.AiBarPrimaryReceiver" android:exported="true" android:label="AI Primary Bar">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiBarDock5Receiver" android:exported="true" android:label="AI Dock Bar">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiBarCapsuleReceiver" android:exported="true" android:label="AI Capsule Bar">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiBarDualFlagshipReceiver" android:exported="true" android:label="AI Dual Voice Bar">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
-
         <!-- AI FOLDERS (2x2 / 4x2) -->
         <receiver android:name=".widgets.ai.AiFolder4ClassicReceiver" android:exported="true" android:label="AI Quad Folder (4)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiFolder6BentoHeroReceiver" android:exported="true" android:label="AI Bento Folder (6)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiFolder8BentoSideReceiver" android:exported="true" android:label="AI Side Bento Folder (8)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiFolder9GridReceiver" android:exported="true" android:label="AI 3x3 Grid Folder (9)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiFolder10MegaReceiver" android:exported="true" android:label="AI Mega Folder (10)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <receiver android:name=".widgets.ai.AiFolder7AsymmetricReceiver" android:exported="true" android:label="AI Asymmetric Bento (7)">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x2" />
@@ -153,99 +151,81 @@
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.CustomTextAppLauncherReceiver" android:exported="true" android:label="App Launcher Rectangle">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.SquircleLauncherReceiver" android:exported="true" android:label="App Launcher Squircle">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.HeartLauncherReceiver" android:exported="true" android:label="App Launcher Heart">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.TriangleLauncherReceiver" android:exported="true" android:label="App Launcher Triangle">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.Star5LauncherReceiver" android:exported="true" android:label="App Launcher Soft Star">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.PentagonLauncherReceiver" android:exported="true" android:label="App Launcher M3 Pentagon">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.FlowerLauncherReceiver" android:exported="true" android:label="App Launcher M3 Flower">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.CloverLauncherReceiver" android:exported="true" android:label="App Launcher M3 Clover">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.DiamondLauncherReceiver" android:exported="true" android:label="App Launcher M3 Diamond">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.OctagonLauncherReceiver" android:exported="true" android:label="App Launcher M3 Octagon">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.CircleLauncherReceiver" android:exported="true" android:label="App Launcher Circle">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.BlobBottomRightLauncherReceiver" android:exported="true" android:label="App Launcher Blob BR">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.BlobBottomLeftLauncherReceiver" android:exported="true" android:label="App Launcher Blob BL">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.BlobTopRightLauncherReceiver" android:exported="true" android:label="App Launcher Blob TR">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.BlobTopLeftLauncherReceiver" android:exported="true" android:label="App Launcher Blob TL">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.PixelStarLauncherReceiver" android:exported="true" android:label="App Launcher Pixel Star">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.GlitchTextLauncherReceiver" android:exported="true" android:label="Slate Cyber Glitch Launcher">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
-
         <receiver android:name=".widgets.applauncher.NeonRingLauncherReceiver" android:exported="true" android:label="Slate Neon Halo Launcher">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
 
         <!-- ================================================================= -->
-        <!-- 1x2 WIDGETS                                                       -->
+        <!-- BATTERY WIDGETS                                                   -->
         <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.VerticalBatteryPillReceiver"
@@ -258,10 +238,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_1x2" />
         </receiver>
-
-        <!-- ================================================================= -->
-        <!-- 2x1 WIDGETS                                                       -->
-        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.HorizontalBatteryPillReceiver"
             android:exported="true"
@@ -273,10 +249,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x1" />
         </receiver>
-
-        <!-- ================================================================= -->
-        <!-- ALL 2x2 WIDGETS                                                   -->
-        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.MinimalLinearBatteryReceiver"
             android:exported="true"
@@ -288,7 +260,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.MinimalRingBatteryReceiver"
             android:exported="true"
@@ -300,7 +271,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.ArcGaugeBatteryReceiver"
             android:exported="true"
@@ -312,7 +282,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.EditorialStatsBatteryReceiver"
             android:exported="true"
@@ -324,7 +293,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.DotLevelHeaderBatteryReceiver"
             android:exported="true"
@@ -336,7 +304,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.DotLevelPureBatteryReceiver"
             android:exported="true"
@@ -348,7 +315,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.SegmentedPillBatteryReceiver"
             android:exported="true"
@@ -360,7 +326,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.PixelHeartBatteryReceiver"
             android:exported="true"
@@ -372,7 +337,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.LightningBoltBatteryReceiver"
             android:exported="true"
@@ -384,7 +348,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.CircularRingBatteryReceiver"
             android:exported="true"
@@ -396,11 +359,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
-
-        <!-- ================================================================= -->
-        <!-- ALL 4x2 WIDGETS                                                   -->
-        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.MultiDeviceBatteryReceiver"
             android:exported="true"
@@ -412,7 +370,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.DotMatrixBatteryLEDReceiver"
             android:exported="true"
@@ -424,7 +381,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.battery.DotLevelMeterWideReceiver"
             android:exported="true"
@@ -436,10 +392,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
-        <!-- ================================================================= -->
-        <!-- ALL 4x1 WIDGETS                                                   -->
-        <!-- ================================================================= -->
         <receiver
             android:name=".widgets.battery.HorizontalBatteryReceiver"
             android:exported="true"
@@ -451,5 +403,22 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x1" />
         </receiver>
+
+        <!-- ================================================================= -->
+        <!-- BLUETOOTH WIDGETS                                                 -->
+        <!-- ================================================================= -->
+        <receiver
+            android:name=".widgets.bluetooth.EarbudsSquareReceiver"
+            android:exported="true"
+            android:label="Slate Bluetooth Earbuds">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+
     </application>
 </manifest>
