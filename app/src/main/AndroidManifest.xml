@@ -453,6 +453,29 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <receiver
+            android:name=".widgets.bluetooth.EarbudsTriDockReceiver"
+            android:exported="true"
+            android:label="Slate Bluetooth Tri-Battery Dock">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.bluetooth.EarbudsTriCircleReceiver"
+            android:exported="true"
+            android:label="Slate Bluetooth Tri-Battery Circle">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

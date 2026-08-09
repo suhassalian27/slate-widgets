@@ -23,7 +23,9 @@ fun getBluetoothWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Bluetooth Earbuds", "2x2", "Bluetooth", EarbudsSquareReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Bluetooth Circular Dial", "2x2", "Bluetooth", EarbudsCircularReceiver::class.java),
         SlateWidgetInfo("Bluetooth Ring Widget", "2x2", "Bluetooth", EarbudsRingReceiver::class.java),
-        SlateWidgetInfo("Bluetooth Volume Control", "2x2", "Bluetooth", EarbudsVolumeReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Bluetooth Volume Control", "2x2", "Bluetooth", EarbudsVolumeReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Bluetooth Tri-Battery Dock", "2x2", "Bluetooth", EarbudsTriDockReceiver::class.java),
+        SlateWidgetInfo("Bluetooth Tri-Battery Circle", "2x2", "Bluetooth", EarbudsTriCircleReceiver::class.java)
     )
 }
 
@@ -288,6 +290,62 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
     }
 }
 
+/**
+ * 5. Bluetooth Tri-Battery Dock Receiver (Structured Pod Layout)
+ */
+class EarbudsTriDockReceiver : BaseBluetoothReceiver() {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val prefs = context.getSharedPreferences("slate_bluetooth_prefs", Context.MODE_PRIVATE)
+        val prefix = "bluetooth_${appWidgetId}_"
+        val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+            .getBoolean("default_is_responsive", true)
+
+        val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
+            prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
+        } else {
+            prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+            defaultResponsive
+        }
+
+        val deviceData = BluetoothDataReader.readCurrentDeviceStatus(context)
+        return generateBluetoothTriBatteryDockBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+    }
+}
+
+/**
+ * 6. Bluetooth Tri-Battery Circle Receiver (Curved Arc Stage Layout)
+ */
+class EarbudsTriCircleReceiver : BaseBluetoothReceiver() {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val prefs = context.getSharedPreferences("slate_bluetooth_prefs", Context.MODE_PRIVATE)
+        val prefix = "bluetooth_${appWidgetId}_"
+        val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+            .getBoolean("default_is_responsive", true)
+
+        val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
+            prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
+        } else {
+            prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+            defaultResponsive
+        }
+
+        val deviceData = BluetoothDataReader.readCurrentDeviceStatus(context)
+        return generateBluetoothTriBatteryCircleBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+    }
+}
+
 // =========================================================================
 // GLOBAL UPDATE BROADCAST
 // =========================================================================
@@ -297,7 +355,9 @@ fun updateAllBluetoothWidgets(context: Context) {
         EarbudsSquareReceiver::class.java,
         EarbudsCircularReceiver::class.java,
         EarbudsRingReceiver::class.java,
-        EarbudsVolumeReceiver::class.java
+        EarbudsVolumeReceiver::class.java,
+        EarbudsTriDockReceiver::class.java,
+        EarbudsTriCircleReceiver::class.java
     )
 
     val manager = AppWidgetManager.getInstance(context)
