@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 
@@ -16,12 +17,13 @@ import androidx.core.content.ContextCompat
 // =========================================================================
 
 /**
- * Holds real-time connection state, device name, and battery metrics.
+ * Holds real-time connection state, device name, battery metrics, and media volume level.
  */
 data class BluetoothDeviceData(
     val isConnected: Boolean,
     val deviceName: String,
     val batteryLevel: Int = -1,
+    val volumeLevel: Int = 50, // 0-100 media volume percentage
     val needsPermission: Boolean = false
 )
 
@@ -31,9 +33,6 @@ data class BluetoothDeviceData(
 
 object BluetoothDataReader {
 
-    /**
-     * Checks runtime Bluetooth permissions based on Android API level.
-     */
     fun hasBluetoothPermission(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ContextCompat.checkSelfPermission(
@@ -49,15 +48,33 @@ object BluetoothDataReader {
     }
 
     /**
-     * Reads active Bluetooth audio connection status and battery percentage.
+     * Reads current media stream volume (0-100%).
      */
+    fun getCurrentMediaVolume(context: Context): Int {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null) {
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                ((currentVol.toFloat() / maxVol.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else {
+                50
+            }
+        } catch (e: Exception) {
+            50
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun readCurrentDeviceStatus(context: Context): BluetoothDeviceData {
+        val currentVolume = getCurrentMediaVolume(context)
+
         if (!hasBluetoothPermission(context)) {
             return BluetoothDeviceData(
                 isConnected = false,
                 deviceName = "Grant Permission",
                 batteryLevel = 0,
+                volumeLevel = currentVolume,
                 needsPermission = true
             )
         }
@@ -69,7 +86,6 @@ object BluetoothDataReader {
             if (adapter != null && adapter.isEnabled) {
                 val bondedDevices = adapter.bondedDevices ?: emptySet()
 
-                // 1. Query connected devices via reflection
                 var connectedDevice: BluetoothDevice? = null
                 for (device in bondedDevices) {
                     val isConnected = try {
@@ -84,7 +100,6 @@ object BluetoothDataReader {
                     }
                 }
 
-                // 2. Fallback check for A2DP / Headset audio profiles
                 if (connectedDevice == null) {
                     val a2dpState = adapter.getProfileConnectionState(BluetoothProfile.A2DP)
                     val headsetState = adapter.getProfileConnectionState(BluetoothProfile.HEADSET)
@@ -100,6 +115,7 @@ object BluetoothDataReader {
                         isConnected = true,
                         deviceName = name,
                         batteryLevel = if (battery in 0..100) battery else 85,
+                        volumeLevel = currentVolume,
                         needsPermission = false
                     )
                 }
@@ -109,6 +125,7 @@ object BluetoothDataReader {
                 isConnected = false,
                 deviceName = "no device connected",
                 batteryLevel = 0,
+                volumeLevel = currentVolume,
                 needsPermission = false
             )
         } catch (e: Exception) {
@@ -116,6 +133,7 @@ object BluetoothDataReader {
                 isConnected = false,
                 deviceName = "no device connected",
                 batteryLevel = 0,
+                volumeLevel = currentVolume,
                 needsPermission = false
             )
         }
