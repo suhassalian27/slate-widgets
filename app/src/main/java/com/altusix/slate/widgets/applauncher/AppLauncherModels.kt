@@ -10,8 +10,14 @@ enum class LauncherShape {
     M3_DIAMOND,
     M3_OCTAGON,
     CIRCLE,
-    BLOB,
-    PIXEL_STAR
+    BLOB_BOTTOM_RIGHT,
+    BLOB_BOTTOM_LEFT,
+    BLOB_TOP_RIGHT,
+    BLOB_TOP_LEFT,
+    PIXEL_STAR,
+    STAR_5,
+    HEART,
+    TRIANGLE
 }
 
 enum class LauncherIconType {
@@ -39,10 +45,7 @@ data class AppLauncherWidgetConfig(
             val prefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
             val prefix = "launcher_${widgetId}_"
 
-            // 1. Read global default set during pinning in MainActivity
             val defaultResponsive = prefs.getBoolean("default_is_responsive", true)
-
-            // 2. Lock and persist preference to this specific widget ID if it hasn't been saved yet
             val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
                 prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
             } else {
@@ -50,9 +53,16 @@ data class AppLauncherWidgetConfig(
                 defaultResponsive
             }
 
+            val savedShapeName = prefs.getString("${prefix}shape", LauncherShape.SQUIRCLE.name) ?: LauncherShape.SQUIRCLE.name
+            val shape = try {
+                LauncherShape.valueOf(savedShapeName)
+            } catch (e: Exception) {
+                LauncherShape.SQUIRCLE
+            }
+
             return AppLauncherWidgetConfig(
                 packageName = prefs.getString("${prefix}package", "") ?: "",
-                shape = LauncherShape.valueOf(prefs.getString("${prefix}shape", LauncherShape.SQUIRCLE.name) ?: LauncherShape.SQUIRCLE.name),
+                shape = shape,
                 iconType = LauncherIconType.valueOf(prefs.getString("${prefix}icon_type", LauncherIconType.APP_ICON.name) ?: LauncherIconType.APP_ICON.name),
                 customText = prefs.getString("${prefix}custom_text", "APP") ?: "APP",
                 selectedEmoji = prefs.getString("${prefix}selected_emoji", "🚀") ?: "🚀",

@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.google.android.apps.bard" />
         <package android:name="com.google.android.googlequicksearchbox" />
         <package android:name="com.openai.chatgpt" />
@@ -142,21 +146,35 @@
         </receiver>
 
 
-
-
-        <!-- App Launcher Receivers -->
-        <receiver
-            android:name=".widgets.applauncher.AdaptiveAppLauncherReceiver"
-            android:exported="true"
-            android:label="App Launcher Adaptive">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_adaptive_icon" />
+        <!-- ================================================================= -->
+        <!-- APP LAUNCHER RECEIVERS                                            -->
+        <!-- ================================================================= -->
+        <receiver android:name=".widgets.applauncher.AdaptiveAppLauncherReceiver" android:exported="true" android:label="App Launcher Adaptive">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
+
+        <receiver android:name=".widgets.applauncher.CustomTextAppLauncherReceiver" android:exported="true" android:label="App Launcher Rectangle">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
         <receiver android:name=".widgets.applauncher.SquircleLauncherReceiver" android:exported="true" android:label="App Launcher Squircle">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.HeartLauncherReceiver" android:exported="true" android:label="App Launcher Heart">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.TriangleLauncherReceiver" android:exported="true" android:label="App Launcher Triangle">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.Star5LauncherReceiver" android:exported="true" android:label="App Launcher Soft Star">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
@@ -191,7 +209,22 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
 
-        <receiver android:name=".widgets.applauncher.BlobLauncherReceiver" android:exported="true" android:label="App Launcher Blob">
+        <receiver android:name=".widgets.applauncher.BlobBottomRightLauncherReceiver" android:exported="true" android:label="App Launcher Blob BR">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.BlobBottomLeftLauncherReceiver" android:exported="true" android:label="App Launcher Blob BL">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.BlobTopRightLauncherReceiver" android:exported="true" android:label="App Launcher Blob TR">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
+        </receiver>
+
+        <receiver android:name=".widgets.applauncher.BlobTopLeftLauncherReceiver" android:exported="true" android:label="App Launcher Blob TL">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
@@ -199,11 +232,6 @@
         <receiver android:name=".widgets.applauncher.PixelStarLauncherReceiver" android:exported="true" android:label="App Launcher Pixel Star">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
-        </receiver>
-
-        <receiver android:name=".widgets.applauncher.CustomTextAppLauncherReceiver" android:exported="true" android:label="App Launcher + Custom Text">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
 
         <receiver android:name=".widgets.applauncher.GlitchTextLauncherReceiver" android:exported="true" android:label="Slate Cyber Glitch Launcher">
@@ -215,9 +243,6 @@
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_adaptive_icon" />
         </receiver>
-
-
-
 
         <!-- ================================================================= -->
         <!-- 1x2 WIDGETS                                                       -->

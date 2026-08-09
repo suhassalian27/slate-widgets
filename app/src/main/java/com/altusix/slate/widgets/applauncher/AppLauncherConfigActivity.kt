@@ -4,12 +4,16 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,11 +38,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.PathParser
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.config.SlateConfigTheme
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +61,6 @@ class AppLauncherConfigActivity : ComponentActivity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var widgetClassName: String = ""
 
-    // Helper function to return directly to Home Screen
     private fun navigateToHomeScreenAndFinish() {
         val homeIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
@@ -89,7 +94,6 @@ class AppLauncherConfigActivity : ComponentActivity() {
                 var showAppPickerSheet by remember { mutableStateOf(false) }
                 var selectedIconTab by remember { mutableIntStateOf(0) }
 
-                // Lock initial responsive mode to this specific widget ID
                 LaunchedEffect(appWidgetId) {
                     val prefs = getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
                     val prefix = "launcher_${appWidgetId}_"
@@ -102,7 +106,14 @@ class AppLauncherConfigActivity : ComponentActivity() {
                     withContext(Dispatchers.IO) {
                         val pm = packageManager
                         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
-                        val resolved = pm.queryIntentActivities(mainIntent, 0)
+
+                        val resolved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            pm.queryIntentActivities(mainIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong()))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
+                        }
+
                         val apps = resolved.map {
                             InstalledAppItem(
                                 label = it.loadLabel(pm).toString(),
@@ -110,6 +121,7 @@ class AppLauncherConfigActivity : ComponentActivity() {
                                 icon = try { it.loadIcon(pm) } catch (e: Exception) { null }
                             )
                         }.sortedBy { it.label }
+
                         withContext(Dispatchers.Main) {
                             installedApps = apps
                         }
@@ -126,10 +138,7 @@ class AppLauncherConfigActivity : ComponentActivity() {
                     "✨", "🚀", "🎧", "🎮", "⚡"
                 )
 
-                val customIconNames = listOf(
-                    "ic_sparkle", "ic_rocket", "ic_heart", "ic_star", "ic_flame",
-                    "ic_chat", "ic_camera", "ic_music", "ic_setting", "ic_folder"
-                )
+                val vectorIcons = AppLauncherVectorIcons.icons
 
                 Column(
                     modifier = Modifier
@@ -333,18 +342,24 @@ class AppLauncherConfigActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    items(customIconNames) { iconName ->
-                                        val isSelected = config.selectedVectorResName == iconName
+                                    items(vectorIcons) { iconItem ->
+                                        val isSelected = config.selectedVectorResName.equals(iconItem.name, ignoreCase = true)
+
                                         Box(
                                             modifier = Modifier
                                                 .aspectRatio(1f)
                                                 .clip(RoundedCornerShape(14.dp))
                                                 .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF161618))
                                                 .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
-                                                .clickable { config = config.copy(selectedVectorResName = iconName) },
+                                                .clickable { config = config.copy(selectedVectorResName = iconItem.name) },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "★", color = Color.White, fontSize = 20.sp)
+                                            Icon(
+                                                imageVector = iconItem.imageVector,
+                                                contentDescription = iconItem.name,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(22.dp)
+                                            )
                                         }
                                     }
                                 }

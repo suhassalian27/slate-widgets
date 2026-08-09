@@ -45,28 +45,32 @@ fun getAppLauncherWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("App Launcher Adaptive", "1x1", "App Launcher", AdaptiveAppLauncherReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("App Launcher Rectangle", "2x1", "App Launcher", CustomTextAppLauncherReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("App Launcher - Squircle", "1x1", "App Launcher", SquircleLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Heart", "1x1", "App Launcher", HeartLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Triangle", "1x1", "App Launcher", TriangleLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Soft Star", "1x1", "App Launcher", Star5LauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Pentagon", "1x1", "App Launcher", PentagonLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Flower", "1x1", "App Launcher", FlowerLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Clover", "1x1", "App Launcher", CloverLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Diamond", "1x1", "App Launcher", DiamondLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - M3 Octagon", "1x1", "App Launcher", OctagonLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("App Launcher - Circle", "1x1", "App Launcher", CircleLauncherReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("App Launcher - Blob", "1x1", "App Launcher", BlobLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Blob Bottom Right", "1x1", "App Launcher", BlobBottomRightLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Blob Bottom Left", "1x1", "App Launcher", BlobBottomLeftLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Blob Top Right", "1x1", "App Launcher", BlobTopRightLauncherReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("App Launcher - Blob Top Left", "1x1", "App Launcher", BlobTopLeftLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("AppLauncher - Pixel Star", "1x1", "App Launcher", PixelStarLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Cyber Glitch Launcher", "2x1", "App Launcher", GlitchTextLauncherReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Neon Halo Launcher", "1x1", "App Launcher", NeonRingLauncherReceiver::class.java, hasModeOption = false)
     )
 }
 
-// 1. Adaptive Launcher (Supports Responsive vs Fixed)
 class AdaptiveAppLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.SQUIRCLE)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
         return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
-// 2. Rectangle Launcher Receiver
 class CustomTextAppLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
@@ -74,67 +78,108 @@ class CustomTextAppLauncherReceiver : BaseAppLauncherReceiver() {
     }
 }
 
-// GEOMETRIC SHAPE LAUNCHERS (Always locked to isResponsive = false)
 class SquircleLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.SQUIRCLE, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateSquircleLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+    }
+}
+
+class HeartLauncherReceiver : BaseAppLauncherReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateHeartLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+    }
+}
+
+class TriangleLauncherReceiver : BaseAppLauncherReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateTriangleLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+    }
+}
+
+class Star5LauncherReceiver : BaseAppLauncherReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateStar5LauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class PentagonLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.M3_PENTAGON, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generatePentagonLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class FlowerLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.M3_FLOWER, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateFlowerLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class CloverLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.M3_CLOVER, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateCloverLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class DiamondLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.M3_DIAMOND, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateDiamondLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class OctagonLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.M3_OCTAGON, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateOctagonLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class CircleLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.CIRCLE, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateCircleLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
-class BlobLauncherReceiver : BaseAppLauncherReceiver() {
+class BlobBottomRightLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.BLOB, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateBlobBottomRightLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+    }
+}
+
+class BlobBottomLeftLauncherReceiver : BaseAppLauncherReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateBlobBottomLeftLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+    }
+}
+
+class BlobTopRightLauncherReceiver : BaseAppLauncherReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateBlobTopRightLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+    }
+}
+
+class BlobTopLeftLauncherReceiver : BaseAppLauncherReceiver() {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generateBlobTopLeftLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
 class PixelStarLauncherReceiver : BaseAppLauncherReceiver() {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId).copy(shape = LauncherShape.PIXEL_STAR, isResponsive = false)
-        return generateAdaptiveLauncherBitmap(context, config, launcherConfig, wDp, hDp)
+        val launcherConfig = AppLauncherWidgetConfig.load(context, appWidgetId)
+        return generatePixelStarLauncherBitmap(context, config, launcherConfig, wDp, hDp)
     }
 }
 
@@ -157,13 +202,19 @@ fun updateAllAppLauncherWidgets(context: Context) {
         AdaptiveAppLauncherReceiver::class.java,
         CustomTextAppLauncherReceiver::class.java,
         SquircleLauncherReceiver::class.java,
+        HeartLauncherReceiver::class.java,
+        TriangleLauncherReceiver::class.java,
+        Star5LauncherReceiver::class.java,
         PentagonLauncherReceiver::class.java,
         FlowerLauncherReceiver::class.java,
         CloverLauncherReceiver::class.java,
         DiamondLauncherReceiver::class.java,
         OctagonLauncherReceiver::class.java,
         CircleLauncherReceiver::class.java,
-        BlobLauncherReceiver::class.java,
+        BlobBottomRightLauncherReceiver::class.java,
+        BlobBottomLeftLauncherReceiver::class.java,
+        BlobTopRightLauncherReceiver::class.java,
+        BlobTopLeftLauncherReceiver::class.java,
         PixelStarLauncherReceiver::class.java,
         GlitchTextLauncherReceiver::class.java,
         NeonRingLauncherReceiver::class.java
