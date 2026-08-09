@@ -16,7 +16,9 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getBluetoothWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Bluetooth Earbuds", "2x2", "Bluetooth", EarbudsSquareReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Bluetooth Earbuds", "2x2", "Bluetooth", EarbudsSquareReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Bluetooth Circular Dial", "2x2", "Bluetooth", EarbudsCircularReceiver::class.java),
+        SlateWidgetInfo("Bluetooth Ring Widget", "2x2", "Bluetooth", EarbudsRingReceiver::class.java)
     )
 }
 
@@ -78,13 +80,71 @@ class EarbudsSquareReceiver : BaseBluetoothReceiver() {
     }
 }
 
+/**
+ * 2. Bluetooth Circular Dial Receiver (2x2 Circle / Dial)
+ */
+class EarbudsCircularReceiver : BaseBluetoothReceiver() {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val prefs = context.getSharedPreferences("slate_bluetooth_prefs", Context.MODE_PRIVATE)
+        val prefix = "bluetooth_${appWidgetId}_"
+        val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+            .getBoolean("default_is_responsive", true)
+
+        val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
+            prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
+        } else {
+            prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+            defaultResponsive
+        }
+
+        val deviceData = BluetoothDataReader.readCurrentDeviceStatus(context)
+        return generateBluetoothCircularDialBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+    }
+}
+
+/**
+ * 3. Bluetooth Ring Widget Receiver (2x2 Thick Ring)
+ */
+class EarbudsRingReceiver : BaseBluetoothReceiver() {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val prefs = context.getSharedPreferences("slate_bluetooth_prefs", Context.MODE_PRIVATE)
+        val prefix = "bluetooth_${appWidgetId}_"
+        val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+            .getBoolean("default_is_responsive", true)
+
+        val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
+            prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
+        } else {
+            prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+            defaultResponsive
+        }
+
+        val deviceData = BluetoothDataReader.readCurrentDeviceStatus(context)
+        return generateBluetoothRingBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+    }
+}
+
+
 // =========================================================================
 // GLOBAL UPDATE BROADCAST
 // =========================================================================
-
 fun updateAllBluetoothWidgets(context: Context) {
     val receivers = listOf(
-        EarbudsSquareReceiver::class.java
+        EarbudsSquareReceiver::class.java,
+        EarbudsCircularReceiver::class.java,
+        EarbudsRingReceiver::class.java
     )
 
     val manager = AppWidgetManager.getInstance(context)

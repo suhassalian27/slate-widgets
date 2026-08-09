@@ -147,6 +147,360 @@ fun generateEarbudsSquareBitmap(
     return bitmap
 }
 
+/**
+ * 2. Bluetooth Circular Dial Widget (2x2 Square / Responsive)
+ * Features a unique audio-segmented 36-dash radial gauge, inner precision halo,
+ * centered TWS earbud graphics, percentage readout, and multi-line status text.
+ */
+fun generateBluetoothCircularDialBitmap(
+    context: Context,
+    deviceData: BluetoothDeviceData,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = slateConfig.themeMode == "LIGHT"
+    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val dimColor = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x1CFFFFFF).toArgb()
+
+    // 1. Calculate Bounds (Responsive vs Fixed Aspect Ratio)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardSize = minOf(rect.width(), rect.height())
+    val cx = rect.centerX()
+    val cy = rect.centerY()
+
+    // 2. Background Circle
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, cardSize / 2f, bgPaint)
+
+    val dynamicScale = (cardSize / 300f).coerceAtLeast(0.5f)
+    val margin = cardSize * 0.055f
+    val outerRadius = (cardSize / 2f) - margin
+
+    // 3. Segmented Radial Audio Gauge (36 Rounded LED Pill Dashes)
+    val totalDashes = 36
+    val activeDashes = if (deviceData.isConnected) {
+        ((deviceData.batteryLevel.coerceIn(0, 100) / 100f) * totalDashes).toInt()
+    } else {
+        0
+    }
+
+    val dashLength = 11f * dynamicScale
+    val dashStrokeWidth = 3.6f * dynamicScale
+    val dashOuterR = outerRadius - (dashStrokeWidth / 2f)
+    val dashInnerR = dashOuterR - dashLength
+
+    val activeDashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        strokeWidth = dashStrokeWidth
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val inactiveDashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dimColor
+        strokeWidth = dashStrokeWidth
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    for (i in 0 until totalDashes) {
+        // Clockwise sweep starting from 12 o'clock (-90 degrees)
+        val angleDeg = -90f + (i * (360f / totalDashes))
+        val angleRad = Math.toRadians(angleDeg.toDouble())
+
+        val startX = cx + (dashInnerR * Math.cos(angleRad)).toFloat()
+        val startY = cy + (dashInnerR * Math.sin(angleRad)).toFloat()
+        val endX = cx + (dashOuterR * Math.cos(angleRad)).toFloat()
+        val endY = cy + (dashOuterR * Math.sin(angleRad)).toFloat()
+
+        val paint = if (i < activeDashes) activeDashPaint else inactiveDashPaint
+        canvas.drawLine(startX, startY, endX, endY, paint)
+    }
+
+    // 4. Inner Precision Halo Ring & Cardinal Dots
+    val haloRadius = dashInnerR - (8f * dynamicScale)
+    val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0x18000000).toArgb() else Color(0x22FFFFFF).toArgb()
+        strokeWidth = 1.4f * dynamicScale
+        style = Paint.Style.STROKE
+    }
+    canvas.drawCircle(cx, cy, haloRadius, haloPaint)
+
+    val notchDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (deviceData.isConnected) accentColor else (if (isLight) Color(0x30000000).toArgb() else Color(0x40FFFFFF).toArgb())
+        style = Paint.Style.FILL
+    }
+    val dotRadius = 2.2f * dynamicScale
+    for (angle in listOf(-90f, 0f, 90f, 180f)) {
+        val rad = Math.toRadians(angle.toDouble())
+        val notchX = cx + (haloRadius * Math.cos(rad)).toFloat()
+        val notchY = cy + (haloRadius * Math.sin(rad)).toFloat()
+        canvas.drawCircle(notchX, notchY, dotRadius, notchDotPaint)
+    }
+
+    // 5. TWS Earbuds Graphic (Positions & scale preserved)
+    val earbudCy = cy - (cardSize * 0.15f)
+    val earbudSpacing = cardSize * 0.11f
+    val earbudScale = (cardSize / (165f * density)).coerceAtLeast(0.42f)
+
+    drawScaledEarbudGraphic(
+        canvas = canvas,
+        cx = cx - earbudSpacing,
+        cy = earbudCy,
+        angleDeg = -20f,
+        scale = earbudScale,
+        accentColor = accentColor,
+        isLightMode = isLight,
+        density = density
+    )
+    drawScaledEarbudGraphic(
+        canvas = canvas,
+        cx = cx + earbudSpacing,
+        cy = earbudCy,
+        angleDeg = 20f,
+        scale = earbudScale,
+        accentColor = accentColor,
+        isLightMode = isLight,
+        density = density
+    )
+
+    // 6. Percentage Text (Positions & scale preserved)
+    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
+    val secondaryTextColor = if (isLight) Color(0x99000000).toArgb() else Color(0x99FFFFFF).toArgb()
+
+    val pctText = when {
+        deviceData.needsPermission -> "GRANT"
+        deviceData.isConnected -> "${deviceData.batteryLevel}%"
+        else -> "--%"
+    }
+
+    val pctTextSize = cardSize * 0.11f
+    val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = pctTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+    val pctY = cy + (cardSize * 0.11f)
+    canvas.drawText(pctText, cx, pctY, pctPaint)
+
+    // 7. Multi-Line Device Name Label (Positions & scale preserved)
+    val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = cardSize * 0.042f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.05f
+    }
+
+    val (line1, line2) = when {
+        deviceData.needsPermission -> Pair("PERMISSION", "REQUIRED")
+        deviceData.isConnected -> splitToTwoLines(deviceData.deviceName.uppercase(), maxCharsPerLine = 15)
+        else -> Pair("NO DEVICE", "CONNECTED")
+    }
+
+    val line1Y = pctY + (cardSize * 0.075f)
+    canvas.drawText(line1, cx, line1Y, statusPaint)
+
+    if (!line2.isNullOrEmpty()) {
+        val line2Y = line1Y + (cardSize * 0.052f)
+        canvas.drawText(line2, cx, line2Y, statusPaint)
+    }
+
+    return bitmap
+}
+private fun splitToTwoLines(text: String, maxCharsPerLine: Int): Pair<String, String?> {
+    val words = text.trim().split("\\s+".toRegex())
+    if (words.size <= 1 || text.length <= maxCharsPerLine) {
+        return Pair(text.take(maxCharsPerLine), null)
+    }
+
+    var line1 = ""
+    var line2 = ""
+    for (word in words) {
+        if ((line1 + " " + word).trim().length <= maxCharsPerLine) {
+            line1 = (line1 + " " + word).trim()
+        } else {
+            line2 = (line2 + " " + word).trim()
+        }
+    }
+
+    return Pair(line1, if (line2.isNotEmpty()) line2.take(maxCharsPerLine) else null)
+}
+
+/**
+ * 3. Bluetooth Ring Widget (2x2 Square / Responsive)
+ * Features a thick outer battery progress ring, inner background circle,
+ * TWS earbud graphics, status/percentage readout, and multi-line device label.
+ */
+fun generateBluetoothRingBitmap(
+    context: Context,
+    deviceData: BluetoothDeviceData,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = slateConfig.themeMode == "LIGHT"
+    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val dimColor = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x22FFFFFF).toArgb()
+
+    // 1. Calculate Bounds (Responsive vs Fixed Aspect Ratio)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardSize = minOf(rect.width(), rect.height())
+    val cx = rect.centerX()
+    val cy = rect.centerY()
+
+    // 2. Thick Outer Ring Geometry
+    val ringStrokeWidth = cardSize * 0.13f
+    val ringRadius = (cardSize / 2f) - (ringStrokeWidth / 2f) - (2f * density)
+
+    val ringRect = RectF(
+        cx - ringRadius,
+        cy - ringRadius,
+        cx + ringRadius,
+        cy + ringRadius
+    )
+
+    // 3. Draw Thick Outer Track & Progress Arc
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dimColor
+        style = Paint.Style.STROKE
+        strokeWidth = ringStrokeWidth
+    }
+    canvas.drawArc(ringRect, 0f, 360f, false, trackPaint)
+
+    if (deviceData.isConnected) {
+        val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.STROKE
+            strokeWidth = ringStrokeWidth
+            strokeCap = Paint.Cap.ROUND
+        }
+        val fillProgress = deviceData.batteryLevel.coerceIn(0, 100) / 100f
+        val sweepAngle = fillProgress * 360f
+        if (sweepAngle > 0f) {
+            canvas.drawArc(ringRect, -90f, sweepAngle, false, activePaint)
+        }
+    }
+
+    // 4. Inner Background Circle
+    val innerRadius = ringRadius - (ringStrokeWidth / 2f)
+    val innerBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, innerRadius, innerBgPaint)
+
+    // 5. TWS Earbuds Graphic
+    val earbudCy = cy - (innerRadius * 0.30f)
+    val earbudSpacing = innerRadius * 0.22f
+    val earbudScale = (innerRadius / (75f * density)).coerceAtLeast(0.38f)
+
+    drawScaledEarbudGraphic(
+        canvas = canvas,
+        cx = cx - earbudSpacing,
+        cy = earbudCy,
+        angleDeg = -20f,
+        scale = earbudScale,
+        accentColor = accentColor,
+        isLightMode = isLight,
+        density = density
+    )
+    drawScaledEarbudGraphic(
+        canvas = canvas,
+        cx = cx + earbudSpacing,
+        cy = earbudCy,
+        angleDeg = 20f,
+        scale = earbudScale,
+        accentColor = accentColor,
+        isLightMode = isLight,
+        density = density
+    )
+
+    // 6. Status / Percentage Text
+    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
+    val secondaryTextColor = if (isLight) Color(0x99000000).toArgb() else Color(0x99FFFFFF).toArgb()
+
+    val statusText = when {
+        deviceData.needsPermission -> "GRANT"
+        deviceData.isConnected -> "${deviceData.batteryLevel}%"
+        else -> "OFF"
+    }
+
+    val statusTextSize = innerRadius * 0.26f
+    val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = statusTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+    val statusY = cy + (innerRadius * 0.18f)
+    canvas.drawText(statusText, cx, statusY, statusPaint)
+
+    // 7. Multi-Line Device Name Label
+    val nameTextSize = innerRadius * 0.11f
+    val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = nameTextSize
+        typeface = Typeface.DEFAULT
+        textAlign = Paint.Align.CENTER
+    }
+
+    val (line1, line2) = when {
+        deviceData.needsPermission -> Pair("tap to allow access", null)
+        deviceData.isConnected -> splitToTwoLines(deviceData.deviceName.lowercase(), maxCharsPerLine = 16)
+        else -> Pair("no device connected", null)
+    }
+
+    val line1Y = statusY + (innerRadius * 0.18f)
+    canvas.drawText(line1, cx, line1Y, namePaint)
+
+    if (!line2.isNullOrEmpty()) {
+        val line2Y = line1Y + (innerRadius * 0.14f)
+        canvas.drawText(line2, cx, line2Y, namePaint)
+    }
+
+    return bitmap
+}
+
 // =========================================================================
 // PRIVATE GRAPHIC DRAWING HELPERS
 // =========================================================================
