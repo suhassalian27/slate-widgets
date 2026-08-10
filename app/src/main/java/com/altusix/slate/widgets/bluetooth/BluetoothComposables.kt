@@ -953,8 +953,6 @@ fun generateBluetoothTriBatteryDockBitmap(
 
 /**
  * 6. Bluetooth Tri-Battery Circular Stage Widget (2x2 / Responsive)
- * Features a pure circle layout, angled earbud graphics, top-right arc status text,
- * and bottom-left curved battery readouts (L / R / C).
  */
 fun generateBluetoothTriBatteryCircleBitmap(
     context: Context,
@@ -995,29 +993,38 @@ fun generateBluetoothTriBatteryCircleBitmap(
 
     val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
 
-    val earbudScale = (radius / (62f * density)).coerceAtLeast(0.45f)
+
+    val earbudScale = (radius / (50f * density)).coerceAtLeast(0.40f)
+
+
+    val earbudSpread = radius * 0.2f
 
     drawScaledEarbudGraphic(
         canvas = canvas,
-        cx = cx - (radius * 0.22f),
-        cy = cy - (radius * 0.12f),
-        angleDeg = -38f,
+        cx = cx - (radius * 0.28f),
+        cy = cy - (radius * 0.14f),
+        angleDeg = -30f,
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density
+        density = density,
+        flipTip = false
     )
 
     drawScaledEarbudGraphic(
         canvas = canvas,
-        cx = cx + (radius * 0.12f),
-        cy = cy + (radius * 0.18f),
-        angleDeg = 52f,
+        cx = cx - (radius * -0.28f),
+        cy = cy - (radius * -0.14f),
+        angleDeg = 30f,
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density
+        density = density,
+        flipTip = true
     )
+
+    val topMargin = radius * 0.05f
+    val bottomMargin = radius * 0.0f
 
     val statusText = when {
         deviceData.needsPermission -> "PERMISSION"
@@ -1025,44 +1032,128 @@ fun generateBluetoothTriBatteryCircleBitmap(
         else -> "DISCONNECTED"
     }
 
-    val topArcRadius = radius - (16f * density)
-    val topArcRect = RectF(cx - topArcRadius, cy - topArcRadius, cx + topArcRadius, cy + topArcRadius)
-
-    val topPath = Path().apply {
-        addArc(topArcRect, -85f, 95f)
-    }
-
+    val statusTextSize = (radius * 0.15f).coerceIn(8f * density, 16f * density)
     val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (deviceData.isConnected) accentColor else Color(0xFFFF3B30).toArgb()
-        textSize = (radius * 0.11f).coerceIn(10f * density, 18f * density)
+        textSize = statusTextSize
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
         letterSpacing = 0.08f
     }
+
+    val topArcRadius = radius - topMargin - statusTextSize
+    val topArcRect = RectF(cx - topArcRadius, cy - topArcRadius, cx + topArcRadius, cy + topArcRadius)
+
+    val topPath = Path().apply {
+        addArc(topArcRect, -82f, 92f)
+    }
     canvas.drawTextOnPath(statusText, topPath, 0f, 0f, statusPaint)
+
 
     val lVal = if (deviceData.isConnected) "${deviceData.leftBattery}%" else "--"
     val rVal = if (deviceData.isConnected) "${deviceData.rightBattery}%" else "--"
     val cVal = if (deviceData.isConnected) "${deviceData.caseBattery}%" else "--"
     val batteryText = "L $lVal  /  R $rVal  /  C $cVal"
 
-    val bottomArcRadius = radius - (16f * density)
+    val batteryTextSize = (radius * 0.12f).coerceIn(8f * density, 15f * density)
+    val batteryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (deviceData.isConnected) accentColor else Color(0xFFFF3B30).toArgb()
+        textSize = batteryTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.05f
+    }
+
+    val bottomArcRadius = radius - bottomMargin - batteryTextSize
     val bottomArcRect = RectF(cx - bottomArcRadius, cy - bottomArcRadius, cx + bottomArcRadius, cy + bottomArcRadius)
 
     val bottomPath = Path().apply {
         addArc(bottomArcRect, 205f, -110f)
     }
-
-    val batteryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = (radius * 0.095f).coerceIn(9f * density, 16f * density)
-        typeface = Typeface.DEFAULT_BOLD
-        textAlign = Paint.Align.CENTER
-        letterSpacing = 0.05f
-    }
     canvas.drawTextOnPath(batteryText, bottomPath, 0f, 0f, batteryPaint)
 
     return bitmap
+}
+
+// =========================================================================
+// PRIVATE GRAPHIC DRAWING HELPER
+// =========================================================================
+
+private fun drawScaledEarbudGraphic(
+    canvas: Canvas,
+    cx: Float,
+    cy: Float,
+    angleDeg: Float,
+    scale: Float,
+    accentColor: Int,
+    isLightMode: Boolean,
+    density: Float,
+    flipTip: Boolean = false
+) {
+    canvas.save()
+    canvas.rotate(angleDeg, cx, cy)
+
+    val sideDirection = if (flipTip) 1f else (if (angleDeg <= 0f) -1f else 1f)
+
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+
+    val bodyColor = if (isLightMode) Color(0xFF2C2C30).toArgb() else Color(0xFF38383E).toArgb()
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bodyColor
+        style = Paint.Style.FILL
+    }
+
+    // 1. Silicone Ear Tip
+    val tipRadius = 9.5f * density * scale
+    val tipCx = cx + (sideDirection * -9.5f * density * scale)
+    val tipCy = cy - 8f * density * scale
+    canvas.drawCircle(tipCx, tipCy, tipRadius, accentPaint)
+
+    // 2. Main Earbud Head
+    val headRadius = 12.5f * density * scale
+    val headCy = cy - 8f * density * scale
+    canvas.drawCircle(cx, headCy, headRadius, bodyPaint)
+
+    // 3. Earbud Stem
+    val stemW = 4.8f * density * scale
+    val stemH = 25f * density * scale
+    val stemRect = RectF(
+        cx - stemW,
+        cy - 4f * density * scale,
+        cx + stemW,
+        cy + stemH
+    )
+    canvas.drawRoundRect(stemRect, stemW, stemW, bodyPaint)
+
+    // 4. Acoustic Sensor / Cutout Detail
+    val sensorW = 2.2f * density * scale
+    val sensorH = 3.8f * density * scale
+    val sensorCx = cx + (sideDirection * 5.5f * density * scale)
+    val sensorCy = cy - 13.5f * density * scale
+    val sensorRect = RectF(
+        sensorCx - sensorW,
+        sensorCy - sensorH,
+        sensorCx + sensorW,
+        sensorCy + sensorH
+    )
+    canvas.drawRoundRect(sensorRect, sensorW, sensorW, accentPaint)
+
+    // 5. Bottom Stem Accent / Charging Contact Bar
+    val stripW = 1.6f * density * scale
+    val stripH = 5.5f * density * scale
+    val stripCy = cy + stemH - (5.5f * density * scale)
+    val stripRect = RectF(
+        cx - stripW,
+        stripCy - (stripH / 2f),
+        cx + stripW,
+        stripCy + (stripH / 2f)
+    )
+    canvas.drawRoundRect(stripRect, stripW, stripW, accentPaint)
+
+    canvas.restore()
 }
 
 // =========================================================================
