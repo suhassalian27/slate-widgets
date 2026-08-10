@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Canvas Surface -->
+    <ImageView
+        android:id="@+id/widget_canvas_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:contentDescription="Circle Calc Surface" />
+
+    <!-- Full-bleed Touch Target Overlay Grid (26% Display / 74% Keypad) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Top Display Touch Region (26% Height Weight) -->
+        <FrameLayout
+            android:id="@+id/btn_calc_display"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.26"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Keypad Touch Grid (74% Height Weight) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.74"
+            android:orientation="vertical">
+
+            <!-- Row 1: AC, DEL, %, ÷ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+                <FrameLayout android:id="@+id/btn_calc_ac" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_del" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_percent" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_div" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+            </LinearLayout>
+
+            <!-- Row 2: 7, 8, 9, × -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+                <FrameLayout android:id="@+id/btn_calc_7" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_8" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_9" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_mul" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+            </LinearLayout>
+
+            <!-- Row 3: 4, 5, 6, - -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+                <FrameLayout android:id="@+id/btn_calc_4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_sub" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+            </LinearLayout>
+
+            <!-- Row 4: 1, 2, 3, + -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+                <FrameLayout android:id="@+id/btn_calc_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_add" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+            </LinearLayout>
+
+            <!-- Row 5: 0 (Left Half), . (Right Half) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+                <FrameLayout android:id="@+id/btn_calc_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+                <FrameLayout android:id="@+id/btn_calc_dot" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

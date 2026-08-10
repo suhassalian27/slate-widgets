@@ -38,6 +38,7 @@ import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
 import com.altusix.slate.widgets.battery.getBatteryWidgetsCatalog
 import com.altusix.slate.widgets.bluetooth.getBluetoothWidgetsCatalog
+import com.altusix.slate.widgets.calculator.getCalculatorWidgetsCatalog
 
 class MainActivity : ComponentActivity() {
 
@@ -48,8 +49,10 @@ class MainActivity : ComponentActivity() {
         val batteryWidgets = getBatteryWidgetsCatalog()
         val appLauncherWidgets = getAppLauncherWidgetsCatalog()
         val bluetoothWidgets = getBluetoothWidgetsCatalog()
+        val calculatorWidgets = getCalculatorWidgetsCatalog()
 
-        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth")
+
+        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator")
 
         setContent {
             MaterialTheme(
@@ -66,7 +69,8 @@ class MainActivity : ComponentActivity() {
                     2 -> batteryWidgets
                     3 -> appLauncherWidgets
                     4 -> bluetoothWidgets
-                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets
+                    5 -> calculatorWidgets
+                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets
                 }
 
                 Column(

@@ -464,11 +464,59 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <receiver
             android:name=".widgets.bluetooth.EarbudsTriCircleReceiver"
             android:exported="true"
             android:label="Slate Bluetooth Tri-Battery Circle">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+
+        <!-- ================================================================= -->
+        <!-- CALCULATOR WIDGETS                                                -->
+        <!-- ================================================================= -->
+        <receiver
+            android:name=".widgets.calculator.StandardCalc2x2Receiver"
+            android:exported="true"
+            android:label="Slate Standard Calculator">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <receiver
+            android:name=".widgets.calculator.SplitCalc2x2Receiver"
+            android:exported="true"
+            android:label="Slate Split Capsule Calc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <receiver
+            android:name=".widgets.calculator.RibbonCalc4x1Receiver"
+            android:exported="true"
+            android:label="Slate Ribbon Express Calc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+        <receiver
+            android:name=".widgets.calculator.CircleCalc2x2Receiver"
+            android:exported="true"
+            android:label="Slate Circular Stage Calc">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
