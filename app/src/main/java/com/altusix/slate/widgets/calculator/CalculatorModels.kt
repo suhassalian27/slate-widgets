@@ -33,6 +33,7 @@ object CalculatorEngine {
 
         return when (key) {
             "AC" -> CalculatorState("", "0", false)
+
             "DEL" -> {
                 if (isEval) {
                     CalculatorState("", "0", false)
@@ -44,34 +45,82 @@ object CalculatorEngine {
                     currentState
                 }
             }
+
             "=" -> {
                 if (expr.isNotEmpty()) {
                     val finalResult = evaluateExpression(expr)
                     CalculatorState(expr, finalResult, true)
-                } else currentState
-            }
-            else -> {
-                if (isEval) {
-                    expr = if (isOperator(key)) currentState.resultText + key else key
-                    isEval = false
                 } else {
-                    expr += key
+                    currentState
                 }
+            }
+
+            else -> {
+                if (isOperator(key)) {
+                    if (isEval) {
+                        expr = currentState.resultText + key
+                        isEval = false
+                    } else if (expr.isEmpty()) {
+                        // Prepend "0" if starting with an operator (+, ×, ÷, %) or "-" for negative numbers
+                        expr = if (key == "-") "-" else "0$key"
+                    } else if (isOperator(expr.last().toString())) {
+                        // REPLACEMENT LOGIC: Replace the existing trailing operator with the newly pressed operator
+                        expr = expr.substring(0, expr.length - 1) + key
+                    } else {
+                        expr += key
+                    }
+                } else if (key == ".") {
+                    if (isEval) {
+                        expr = "0."
+                        isEval = false
+                    } else {
+                        // Prevent multiple decimals in the current active number
+                        val lastOpIndex = expr.indexOfLast { isOperator(it.toString()) }
+                        val currentNumSegment = if (lastOpIndex != -1) expr.substring(lastOpIndex + 1) else expr
+
+                        if (!currentNumSegment.contains(".")) {
+                            expr = if (currentNumSegment.isEmpty()) "${expr}0." else "$expr."
+                        }
+                    }
+                } else { // Digit keys 0-9
+                    if (isEval) {
+                        expr = key
+                        isEval = false
+                    } else {
+                        // Replace isolated leading "0" in the active number (e.g. prevent "05")
+                        val lastOpIndex = expr.indexOfLast { isOperator(it.toString()) }
+                        val currentNumSegment = if (lastOpIndex != -1) expr.substring(lastOpIndex + 1) else expr
+
+                        expr = if (currentNumSegment == "0") {
+                            expr.substring(0, expr.length - 1) + key
+                        } else {
+                            expr + key
+                        }
+                    }
+                }
+
                 val newRes = evaluateExpression(expr)
-                CalculatorState(expr, newRes, false)
+                CalculatorState(expr, if (expr.isEmpty()) "0" else newRes, isEval)
             }
         }
     }
 
-    private fun isOperator(key: String): Boolean = key in listOf("+", "-", "×", "÷", "%")
+    private fun isOperator(key: String): Boolean = key in listOf("+", "-", "×", "÷", "%", "*", "/")
 
-    private fun evaluateExpression(expr: String): String {
+    private fun evaluateExpression(rawExpr: String): String {
         return try {
-            if (expr.isEmpty()) return "0"
-            val cleanExpr = expr.replace("×", "*").replace("÷", "/")
+            if (rawExpr.isEmpty()) return "0"
+            var cleanExpr = rawExpr.replace("×", "*").replace("÷", "/")
 
-            // Basic sequential evaluator
-            val result = simpleEvaluate(cleanExpr)
+            // Trim trailing uncommitted operators before evaluating
+            while (cleanExpr.isNotEmpty() && isOperator(cleanExpr.last().toString())) {
+                cleanExpr = cleanExpr.substring(0, cleanExpr.length - 1)
+            }
+            if (cleanExpr.isEmpty()) return "0"
+
+            val result = parseAndEvaluate(cleanExpr)
+            if (result.isNaN() || result.isInfinite()) return "Error"
+
             if (result % 1.0 == 0.0) {
                 result.toLong().toString()
             } else {
@@ -82,22 +131,23 @@ object CalculatorEngine {
         }
     }
 
-    private fun simpleEvaluate(expression: String): Double {
-        var expr = expression
-        if (expr.endsWith("+") || expr.endsWith("-") || expr.endsWith("*") || expr.endsWith("/")) {
-            expr = expr.substring(0, expr.length - 1)
-        }
-        if (expr.isEmpty()) return 0.0
-
+    private fun parseAndEvaluate(expression: String): Double {
         val tokens = mutableListOf<String>()
         var numberBuffer = ""
-        for (ch in expr) {
-            if (ch in listOf('+', '-', '*', '/')) {
-                if (numberBuffer.isNotEmpty()) {
-                    tokens.add(numberBuffer)
-                    numberBuffer = ""
+
+        for (i in expression.indices) {
+            val ch = expression[i]
+            if (ch in listOf('+', '-', '*', '/', '%')) {
+                // Handle negative numbers at start or following an operator
+                if (ch == '-' && (numberBuffer.isEmpty() && (tokens.isEmpty() || isOperator(tokens.last())))) {
+                    numberBuffer += ch
+                } else {
+                    if (numberBuffer.isNotEmpty()) {
+                        tokens.add(numberBuffer)
+                        numberBuffer = ""
+                    }
+                    tokens.add(ch.toString())
                 }
-                tokens.add(ch.toString())
             } else {
                 numberBuffer += ch
             }
@@ -106,16 +156,34 @@ object CalculatorEngine {
 
         if (tokens.isEmpty()) return 0.0
 
-        var currentVal = tokens[0].toDoubleOrNull() ?: 0.0
+        // Handle percentage operations first
+        val processedTokens = mutableListOf<String>()
+        var idx = 0
+        while (idx < tokens.size) {
+            val token = tokens[idx]
+            if (token == "%") {
+                if (processedTokens.isNotEmpty()) {
+                    val prevVal = processedTokens.removeAt(processedTokens.size - 1).toDoubleOrNull() ?: 0.0
+                    processedTokens.add((prevVal / 100.0).toString())
+                }
+            } else {
+                processedTokens.add(token)
+            }
+            idx++
+        }
+
+        if (processedTokens.isEmpty()) return 0.0
+
+        var currentVal = processedTokens[0].toDoubleOrNull() ?: 0.0
         var i = 1
-        while (i < tokens.size - 1) {
-            val op = tokens[i]
-            val nextVal = tokens[i + 1].toDoubleOrNull() ?: 0.0
+        while (i < processedTokens.size - 1) {
+            val op = processedTokens[i]
+            val nextVal = processedTokens[i + 1].toDoubleOrNull() ?: 0.0
             when (op) {
                 "+" -> currentVal += nextVal
                 "-" -> currentVal -= nextVal
                 "*" -> currentVal *= nextVal
-                "/" -> if (nextVal != 0.0) currentVal /= nextVal
+                "/" -> if (nextVal != 0.0) currentVal /= nextVal else return Double.NaN
             }
             i += 2
         }

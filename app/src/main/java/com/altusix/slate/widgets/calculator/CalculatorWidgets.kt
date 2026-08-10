@@ -14,7 +14,7 @@ fun getCalculatorWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Standard Calculator", "2x2", "Calculator", StandardCalc2x2Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Split Capsule Calc", "2x2", "Calculator", SplitCalc2x2Receiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Ribbon Express Calc", "4x1", "Calculator", RibbonCalc4x1Receiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Studio Express Calc", "4x2", "Calculator", StudioCalc4x2Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Circular Stage Calc", "2x2", "Calculator", CircleCalc2x2Receiver::class.java, hasModeOption = false)
     )
 }
@@ -122,12 +122,16 @@ class SplitCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_split_layout)
     )
 }
 
-class RibbonCalc4x1Receiver : BaseCalcReceiver(R.layout.widget_calc_ribbon_layout) {
+class StudioCalc4x2Receiver : BaseCalcReceiver(R.layout.widget_calc_4x2_layout) {
     override fun renderBitmap(context: Context, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int) =
-        generateRibbonCalculatorBitmap(context, state, config, wDp, hDp)
+        generateStudioCalculator4x2Bitmap(context, state, config, wDp, hDp)
 
     override fun getKeyMap() = mapOf(
-        R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL", R.id.btn_calc_add to "+", R.id.btn_calc_sub to "-", R.id.btn_calc_eq to "="
+        R.id.btn_calc_7 to "7", R.id.btn_calc_8 to "8", R.id.btn_calc_9 to "9", R.id.btn_calc_div to "÷",
+        R.id.btn_calc_4 to "4", R.id.btn_calc_5 to "5", R.id.btn_calc_6 to "6", R.id.btn_calc_mul to "×",
+        R.id.btn_calc_1 to "1", R.id.btn_calc_2 to "2", R.id.btn_calc_3 to "3", R.id.btn_calc_sub to "-",
+        R.id.btn_calc_0 to "0", R.id.btn_calc_dot to ".", R.id.btn_calc_percent to "%", R.id.btn_calc_add to "+",
+        R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL"
     )
 }
 

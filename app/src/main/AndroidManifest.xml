@@ -503,15 +503,15 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
         <receiver
-            android:name=".widgets.calculator.RibbonCalc4x1Receiver"
+            android:name=".widgets.calculator.StudioCalc4x2Receiver"
             android:exported="true"
-            android:label="Slate Ribbon Express Calc">
+            android:label="Slate Studio Express Calc">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x1" />
+                android:resource="@xml/widget_info_4x2" />
         </receiver>
         <receiver
             android:name=".widgets.calculator.CircleCalc2x2Receiver"
