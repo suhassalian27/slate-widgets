@@ -49,6 +49,7 @@ import com.altusix.slate.widgets.ai.updateAllAiWidgets
 import com.altusix.slate.widgets.applauncher.updateAllAppLauncherWidgets
 import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
 import com.altusix.slate.widgets.bluetooth.updateAllBluetoothWidgets
+import com.altusix.slate.widgets.calendar.updateAllCalendarWidgets
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
@@ -373,6 +374,7 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllAiFolderWidgets(this)
         updateAllBluetoothWidgets(this)
         updateAllAppLauncherWidgets(this)
+        updateAllCalendarWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
