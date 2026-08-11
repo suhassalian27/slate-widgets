@@ -20,7 +20,9 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Big Date", "2x2", "Calendar", CalendarDate2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Overlay Calendar", "4x2", "Calendar", CalendarWatermarkReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Calendar Page", "2x2", "Calendar", CalendarPage2x2Receiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Inline Header Date", "2x2", "Calendar", CalendarInlineHeaderReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Inline Header Date", "2x2", "Calendar", CalendarInlineHeaderReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Flip Calendar", "2x2", "Calendar", CalendarSplitFlapReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Stacked Header Date", "2x2", "Calendar", CalendarStackedHeaderReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -32,7 +34,9 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarDate2x2Receiver::class.java,
         CalendarWatermarkReceiver::class.java,
         CalendarPage2x2Receiver::class.java,
-        CalendarInlineHeaderReceiver::class.java
+        CalendarInlineHeaderReceiver::class.java,
+        CalendarSplitFlapReceiver::class.java,
+        CalendarStackedHeaderReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -175,4 +179,16 @@ class CalendarPage2x2Receiver : BaseCalendarReceiver() {
 class CalendarInlineHeaderReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateInlineHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 7. FLIP CALENDAR (2x2 Square / Responsive Single Card)
+class CalendarSplitFlapReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateSplitFlapCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 8. STACKED HEADER DATE (2x2 Square / Responsive Single Card)
+class CalendarStackedHeaderReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateStackedHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
