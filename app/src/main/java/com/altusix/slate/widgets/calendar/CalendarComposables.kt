@@ -1112,3 +1112,258 @@ fun generateStackedHeaderDateBitmap(
 
     return bitmap
 }
+
+// 9. SIDEBAR MONTH DATE (2x2 Square / Responsive Single Card)
+fun generateSideBarDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+
+    // Draw Main Card Body Background
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bodyPaint)
+
+    // 2. Left Side Accent Strip (~30% of Card Width)
+    val stripW = rect.width() * 0.30f
+    val stripRect = RectF(rect.left, rect.top, rect.left + stripW, rect.bottom)
+
+    val stripPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    // Clip left corners of strip to match card bounds
+    canvas.save()
+    val clipPath = Path().apply {
+        addRoundRect(rect, cardRadius, cardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(clipPath)
+    canvas.drawRect(stripRect, stripPaint)
+    canvas.restore()
+
+    // 3. Vertical Month Text inside Left Strip
+    val fullMonthName = when (state.monthShort.uppercase()) {
+        "JAN" -> "JANUARY"
+        "FEB" -> "FEBRUARY"
+        "MAR" -> "MARCH"
+        "APR" -> "APRIL"
+        "MAY" -> "MAY"
+        "JUN" -> "JUNE"
+        "JUL" -> "JULY"
+        "AUG" -> "AUGUST"
+        "SEP" -> "SEPTEMBER"
+        "OCT" -> "OCTOBER"
+        "NOV" -> "NOVEMBER"
+        "DEC" -> "DECEMBER"
+        else -> state.monthShort.uppercase()
+    }
+
+    // Auto-calculate high-contrast text color against the accent background
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val stripTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    var baseMonthTextSize = stripW * 0.42f
+    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = stripTextColor
+        textSize = baseMonthTextSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.08f
+    }
+
+    val maxMonthHeight = stripRect.height() * 0.82f
+    if (monthPaint.measureText(fullMonthName) > maxMonthHeight) {
+        baseMonthTextSize *= (maxMonthHeight / monthPaint.measureText(fullMonthName))
+        monthPaint.textSize = baseMonthTextSize
+    }
+
+    // Rotate text -90 degrees to render vertically reading bottom-to-top
+    canvas.save()
+    val stripCx = stripRect.centerX()
+    val stripCy = stripRect.centerY()
+    canvas.rotate(-90f, stripCx, stripCy)
+
+    val monthBounds = Rect()
+    monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
+    val monthTextY = stripCy + (monthBounds.height() / 2f) - monthBounds.bottom
+
+    canvas.drawText(fullMonthName, stripCx, monthTextY, monthPaint)
+    canvas.restore()
+
+    // 4. Giant Date Number in Right Body Area
+    val rightAreaRect = RectF(stripRect.right, rect.top, rect.right, rect.bottom)
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    val dateText = state.dayOfMonth
+    var baseDateSize = rightAreaRect.width() * 0.55f
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseDateSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val maxDateW = rightAreaRect.width() * 0.85f
+    if (datePaint.measureText(dateText) > maxDateW) {
+        baseDateSize *= (maxDateW / datePaint.measureText(dateText))
+        datePaint.textSize = baseDateSize
+    }
+
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+    val dateY = rightAreaRect.centerY() + (dateBounds.height() / 2f) - dateBounds.bottom
+
+    canvas.drawText(dateText, rightAreaRect.centerX(), dateY, datePaint)
+
+    return bitmap
+}
+
+// 10. QUADRANT GRID DATE (2x2 Square / Responsive Single Card)
+fun generateGridQuadrantCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Draw Subtle Crosshair Grid Dividers
+    val dividerColor = if (isLight) Color.parseColor("#18000000") else Color.parseColor("#1FFFFFFF")
+    val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dividerColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * density
+    }
+
+    val cx = rect.centerX()
+    val cy = rect.centerY()
+
+    // Vertical & Horizontal Grid Lines
+    canvas.drawLine(cx, rect.top, cx, rect.bottom, dividerPaint)
+    canvas.drawLine(rect.left, cy, rect.right, cy, dividerPaint)
+
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // 3. Top-Left Cell: Giant Date Number
+    val topLeftRect = RectF(rect.left, rect.top, cx, cy)
+    val dateText = state.dayOfMonth
+
+    var baseDateSize = topLeftRect.height() * 0.58f
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseDateSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val maxCellW = topLeftRect.width() * 0.80f
+    if (datePaint.measureText(dateText) > maxCellW) {
+        baseDateSize *= (maxCellW / datePaint.measureText(dateText))
+        datePaint.textSize = baseDateSize
+    }
+
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+    val dateY = topLeftRect.centerY() + (dateBounds.height() / 2f) - dateBounds.bottom
+
+    canvas.drawText(dateText, topLeftRect.centerX(), dateY, datePaint)
+
+    // 4. Bottom-Right Cell: Stacked Weekday & Month Text
+    val bottomRightRect = RectF(cx, cy, rect.right, rect.bottom)
+    val dayText = state.dayOfWeekShort.uppercase()
+    val monthText = state.monthShort.uppercase()
+
+    var baseTextSize = bottomRightRect.height() * 0.28f
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseTextSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.05f
+    }
+
+    val longestWordW = maxOf(textPaint.measureText(dayText), textPaint.measureText(monthText))
+    if (longestWordW > maxCellW) {
+        baseTextSize *= (maxCellW / longestWordW)
+        textPaint.textSize = baseTextSize
+    }
+
+    val dayBounds = Rect()
+    textPaint.getTextBounds(dayText, 0, dayText.length, dayBounds)
+    val monthBounds = Rect()
+    textPaint.getTextBounds(monthText, 0, monthText.length, monthBounds)
+
+    val stackGap = bottomRightRect.height() * 0.05f
+    val totalStackH = dayBounds.height() + stackGap + monthBounds.height()
+
+    val stackTop = bottomRightRect.centerY() - (totalStackH / 2f)
+
+    val dayY = stackTop + dayBounds.height() - dayBounds.bottom
+    val monthY = stackTop + dayBounds.height() + stackGap + monthBounds.height() - monthBounds.bottom
+
+    canvas.drawText(dayText, bottomRightRect.centerX(), dayY, textPaint)
+    canvas.drawText(monthText, bottomRightRect.centerX(), monthY, textPaint)
+
+    return bitmap
+}
+

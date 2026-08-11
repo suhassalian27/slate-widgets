@@ -22,7 +22,9 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Calendar Page", "2x2", "Calendar", CalendarPage2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Inline Header Date", "2x2", "Calendar", CalendarInlineHeaderReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Flip Calendar", "2x2", "Calendar", CalendarSplitFlapReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Stacked Header Date", "2x2", "Calendar", CalendarStackedHeaderReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Stacked Header Date", "2x2", "Calendar", CalendarStackedHeaderReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Sidebar Month Date", "2x2", "Calendar", CalendarSideBarReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Quadrant Grid Date", "2x2", "Calendar", CalendarGridQuadrantReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -36,7 +38,9 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarPage2x2Receiver::class.java,
         CalendarInlineHeaderReceiver::class.java,
         CalendarSplitFlapReceiver::class.java,
-        CalendarStackedHeaderReceiver::class.java
+        CalendarStackedHeaderReceiver::class.java,
+        CalendarSideBarReceiver::class.java,
+        CalendarGridQuadrantReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -191,4 +195,16 @@ class CalendarSplitFlapReceiver : BaseCalendarReceiver() {
 class CalendarStackedHeaderReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateStackedHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 9. SIDEBAR MONTH DATE (2x2 Square / Responsive Single Card)
+class CalendarSideBarReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateSideBarDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 10. QUADRANT GRID DATE (2x2 Square / Responsive Single Card)
+class CalendarGridQuadrantReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateGridQuadrantCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
