@@ -679,3 +679,131 @@ fun generateCalendarPageBitmap(
 
     return bitmap
 }
+
+// 6. INLINE HEADER DATE (2x2 Square / Responsive Single Card)
+fun generateInlineHeaderDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Colors & Reference Scaling
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
+    val sundayAccent = Color.parseColor("#E53935")
+
+    val cardSizeRef = minOf(rect.width(), rect.height())
+    val padX = rect.width() * 0.12f
+
+    // Format Day & Month Text (Title Case: "Tue", "Aug")
+    val dayText = state.dayOfWeekShort.lowercase().replaceFirstChar { it.uppercase() }
+    val monthText = state.monthShort.lowercase().replaceFirstChar { it.uppercase() }
+
+    val isSunday = state.dayOfWeekShort.uppercase() == "SUN"
+    val dayColor = if (isSunday) sundayAccent else accentColorInt
+
+    // 3. Header Paints & Width Measurement
+    var baseHeaderSize = cardSizeRef * 0.16f
+
+    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dayColor
+        textSize = baseHeaderSize
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = baseHeaderSize
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    val maxHeaderWidth = rect.width() - (padX * 2f)
+    val headerGapX = cardSizeRef * 0.04f
+
+    fun totalHeaderWidth() = dayPaint.measureText(dayText) + headerGapX + monthPaint.measureText(monthText)
+
+    if (totalHeaderWidth() > maxHeaderWidth) {
+        val scale = maxHeaderWidth / totalHeaderWidth()
+        baseHeaderSize *= scale
+        dayPaint.textSize = baseHeaderSize
+        monthPaint.textSize = baseHeaderSize
+    }
+
+    val dayW = dayPaint.measureText(dayText)
+    val monthW = monthPaint.measureText(monthText)
+    val combinedHeaderW = dayW + headerGapX + monthW
+    val headerX = rect.centerX() - (combinedHeaderW / 2f)
+
+    val headerBounds = Rect()
+    dayPaint.getTextBounds(dayText, 0, dayText.length, headerBounds)
+    val headerHeight = headerBounds.height().toFloat()
+
+    // 4. Giant Date Number Measurement
+    val dateText = state.dayOfMonth
+    var baseDateTextSize = cardSizeRef * 0.58f
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseDateTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
+    val maxDateWidth = rect.width() - (padX * 2f)
+    if (datePaint.measureText(dateText) > maxDateWidth) {
+        baseDateTextSize *= (maxDateWidth / datePaint.measureText(dateText))
+        datePaint.textSize = baseDateTextSize
+    }
+
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+    val dateHeight = dateBounds.height().toFloat()
+
+    // 5. Center Both as a Single Compact Stack
+    val verticalGap = cardSizeRef * 0.08f // Tight gap between header and date
+    val totalBlockHeight = headerHeight + verticalGap + dateHeight
+
+    val blockTop = rect.centerY() - (totalBlockHeight / 2f)
+
+    val headerY = blockTop + headerHeight - headerBounds.bottom
+    val dateY = blockTop + headerHeight + verticalGap + dateHeight - dateBounds.bottom
+
+    // Draw Header Line
+    canvas.drawText(dayText, headerX, headerY, dayPaint)
+    canvas.drawText(monthText, headerX + dayW + headerGapX, headerY, monthPaint)
+
+    // Draw Date Text
+    canvas.drawText(dateText, rect.centerX(), dateY, datePaint)
+
+    return bitmap
+}

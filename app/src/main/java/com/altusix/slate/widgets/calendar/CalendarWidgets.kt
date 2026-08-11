@@ -19,7 +19,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Basic Calendar", "4x2", "Calendar", CalendarBasicReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Big Date", "2x2", "Calendar", CalendarDate2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Overlay Calendar", "4x2", "Calendar", CalendarWatermarkReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Calendar Page", "2x2", "Calendar", CalendarPage2x2Receiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Calendar Page", "2x2", "Calendar", CalendarPage2x2Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Inline Header Date", "2x2", "Calendar", CalendarInlineHeaderReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -30,7 +31,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarBasicReceiver::class.java,
         CalendarDate2x2Receiver::class.java,
         CalendarWatermarkReceiver::class.java,
-        CalendarPage2x2Receiver::class.java
+        CalendarPage2x2Receiver::class.java,
+        CalendarInlineHeaderReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -167,4 +169,10 @@ class CalendarWatermarkReceiver : BaseCalendarReceiver() {
 class CalendarPage2x2Receiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateCalendarPageBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 6. INLINE HEADER DATE (2x2 Square / Responsive Single Card)
+class CalendarInlineHeaderReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateInlineHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
