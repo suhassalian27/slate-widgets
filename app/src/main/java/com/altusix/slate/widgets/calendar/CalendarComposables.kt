@@ -15,13 +15,7 @@ private fun getSafeBgColor(config: SlateWidgetConfig): Int {
 }
 
 // 1. CAPSULE PILL (2x1) - Fixed Height & Auto-Fitting Text
-fun generatePillCalendarBitmap(
-    context: Context,
-    state: CalendarPillState,
-    config: SlateWidgetConfig,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
+fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState,    config: SlateWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
     val density = context.resources.displayMetrics.density
     val widthPx = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
     val heightPx = (hDp * density).toInt().coerceAtLeast((50 * density).toInt())
@@ -159,124 +153,529 @@ fun generatePillCalendarBitmap(
     return bitmap
 }
 
-// 2. BIG DATE (2x2)
-fun generateDate2x2Bitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 2. BASIC CALENDAR (4x2 Min / Dynamic Grid Height)
+fun generateBasicCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
     val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((140 * density).toInt())
+    val w = (wDp * density).toInt().coerceAtLeast((110 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
 
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val isLight = config.themeMode == "LIGHT"
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = getSafeBgColor(config) }
-    val cardRadius = 22f * density
-    canvas.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), cardRadius, cardRadius, bgPaint)
-
+    // Colors & Paints
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
-    val pad = 16f * density
+    val sundayAccent = Color.parseColor("#E53935")
 
-    // Top Header (AUG 2026)
+    // Background Card
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = getSafeBgColor(config) }
+    val cardRadius = 24f * density
+    canvas.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), cardRadius, cardRadius, bgPaint)
+
+    // Calculate month days and starting day offset (0 for Mon, 6 for Sun)
+    val cal = java.util.Calendar.getInstance().apply {
+        val yearInt = state.year.toString().toIntOrNull() ?: get(java.util.Calendar.YEAR)
+        try {
+            val date = java.text.SimpleDateFormat("MMM", java.util.Locale.ENGLISH).parse(state.monthShort)
+            if (date != null) {
+                val tempCal = java.util.Calendar.getInstance().apply { time = date }
+                set(java.util.Calendar.MONTH, tempCal.get(java.util.Calendar.MONTH))
+            }
+        } catch (_: Exception) {}
+        set(java.util.Calendar.YEAR, yearInt)
+        set(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
+
+    val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val startOffset = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 // Mon = 0 ... Sun = 6
+    val currentDayNum = state.dayOfMonth.toIntOrNull() ?: -1
+
+    // Dynamic Row Calculation (4, 5, or 6 date rows)
+    val totalCells = startOffset + daysInMonth
+    val dateRowsNeeded = kotlin.math.ceil(totalCells / 7.0).toInt()
+
+    // Layout Padding & Dimensions
+    val topPadding = 16f * density
+    val bottomPadding = 16f * density
+    val sidePadding = 20f * density
+    val usableWidth = w - (sidePadding * 2)
+
+    // 1. Month Header (Center Aligned)
     val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = 14f * density
+        textSize = 15f * density
         typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
     }
-    canvas.drawText("${state.monthShort} ${state.year}", pad, pad + (12f * density), headerPaint)
+    val headerY = topPadding + headerPaint.textSize
+    canvas.drawText(state.monthShort.uppercase(), w / 2f, headerY, headerPaint)
 
-    // Giant Date
-    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Grid Setup (Day-of-week header row + dynamic date rows)
+    val gridTopY = headerY + (14f * density)
+    val availableGridHeight = h - gridTopY - bottomPadding
+    val totalGridRows = dateRowsNeeded + 1 // +1 for M T W T F S S row
+    val rowHeight = availableGridHeight / totalGridRows
+    val colWidth = usableWidth / 7f
+
+    // 2. Day-of-Week Headers (Row 0)
+    val dayHeaderLabels = arrayOf("M", "T", "W", "T", "F", "S", "S")
+    val dayHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 13f * density
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
+    val dayHeaderY = gridTopY + (rowHeight * 0.35f)
+    for (col in 0..6) {
+        val cx = sidePadding + (col * colWidth) + (colWidth / 2f)
+        dayHeaderPaint.color = if (col == 6) sundayAccent else primaryText
+        canvas.drawText(dayHeaderLabels[col], cx, dayHeaderY, dayHeaderPaint)
+    }
+
+    // 3. Days Grid (Rows 1..dateRowsNeeded)
+    val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 13f * density
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
+    val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = 64f * density
-        typeface = Typeface.DEFAULT_BOLD
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
     }
-    val dateY = h / 2f + (20f * density)
-    canvas.drawText(state.dayOfMonth, pad, dateY, datePaint)
 
-    // Day of Week
-    val dateWidth = datePaint.measureText(state.dayOfMonth)
-    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = 16f * density
-        typeface = Typeface.DEFAULT_BOLD
+    var currentCol = startOffset
+    var currentRow = 1
+
+    for (day in 1..daysInMonth) {
+        val cx = sidePadding + (currentCol * colWidth) + (colWidth / 2f)
+        val cy = gridTopY + (currentRow * rowHeight) + (rowHeight * 0.35f)
+
+        // Highlight Current Day Box
+        if (day == currentDayNum) {
+            val boxSize = (rowHeight * 0.85f).coerceAtMost(colWidth * 0.85f)
+            val rect = RectF(
+                cx - (boxSize / 2f),
+                cy - (boxSize / 2f) - (2f * density),
+                cx + (boxSize / 2f),
+                cy + (boxSize / 2f) - (2f * density)
+            )
+            canvas.drawRoundRect(rect, 8f * density, 8f * density, outlinePaint)
+        }
+
+        // Draw Date Text
+        dateTextPaint.color = when {
+            currentCol == 6 -> sundayAccent
+            else -> primaryText
+        }
+
+        val textY = cy + (dateTextPaint.textSize / 3f) - (2f * density)
+        canvas.drawText(day.toString(), cx, textY, dateTextPaint)
+
+        currentCol++
+        if (currentCol > 6) {
+            currentCol = 0
+            currentRow++
+        }
     }
-    canvas.drawText(state.dayOfWeekShort, pad + dateWidth + (8f * density), dateY - (10f * density), dayPaint)
 
     return bitmap
 }
 
-// 3. MONTH GRID (2x2)
-fun generateMonthGrid2x2Bitmap(context: Context, state: CalendarMonthState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+
+// 3. BIG DATE (2x2 Square / Responsive)
+fun generateBigDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
     val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((140 * density).toInt())
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val cardCornerRadius = 22f * density
+
+    // Responsive fills cell bounds; Fixed centers a 1:1 square
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
+
+    val cardSizeRef = minOf(rect.width(), rect.height())
+    val pad = cardSizeRef * 0.12f
+
+    // 1. Top Header (AUG 2026)
+    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = cardSizeRef * 0.10f
+        typeface = Typeface.DEFAULT_BOLD
+    }
+    val headerY = rect.top + pad + headerPaint.textSize
+    canvas.drawText("${state.monthShort.uppercase()} ${state.year}", rect.left + pad, headerY, headerPaint)
+
+    // 2. Giant Date Number (11)
+    val dateText = state.dayOfMonth
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = cardSizeRef * 0.42f
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+    val remainingHeight = rect.bottom - headerY
+    val dateY = headerY + (remainingHeight / 2f) + (dateBounds.height() / 2f) - (4f * density)
+    canvas.drawText(dateText, rect.left + pad, dateY, datePaint)
+
+    // 3. Day of Week (TUE)
+    val dateWidth = datePaint.measureText(dateText)
+    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = cardSizeRef * 0.12f
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    val dayX = rect.left + pad + dateWidth + (cardSizeRef * 0.05f)
+    canvas.drawText(state.dayOfWeekShort.uppercase(), dayX, dateY - (dateBounds.height() * 0.10f), dayPaint)
+
+    return bitmap
+}
+
+// 4. MONTH OVERLAY CALENDAR (4x2 Min / Giant Background Month Watermark)
+fun generateWatermarkCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((110 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
 
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val isLight = config.themeMode == "LIGHT"
 
+    // Colors & Paints
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
+    val sundayAccent = Color.parseColor("#E53935")
+    val watermarkColor = if (isLight) Color.parseColor("#12000000") else Color.parseColor("#1AFFFFFF")
+
+    // Background Card
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = getSafeBgColor(config) }
-    val cardRadius = 22f * density
+    val cardRadius = 24f * density
     canvas.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), cardRadius, cardRadius, bgPaint)
 
-    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
-    val sundayRed = Color.parseColor("#FF3B30")
-    val pad = 12f * density
-    val contentW = w - (pad * 2f)
+    // Calculate month days and starting day offset (0 for Mon, 6 for Sun)
+    val cal = java.util.Calendar.getInstance().apply {
+        val yearInt = state.year.toString().toIntOrNull() ?: get(java.util.Calendar.YEAR)
+        try {
+            val date = java.text.SimpleDateFormat("MMM", java.util.Locale.ENGLISH).parse(state.monthShort)
+            if (date != null) {
+                val tempCal = java.util.Calendar.getInstance().apply { time = date }
+                set(java.util.Calendar.MONTH, tempCal.get(java.util.Calendar.MONTH))
+            }
+        } catch (_: Exception) {}
+        set(java.util.Calendar.YEAR, yearInt)
+        set(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
 
-    // Header
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = 14f * density
+    val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val startOffset = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 // Mon = 0 ... Sun = 6
+    val currentDayNum = state.dayOfMonth.toIntOrNull() ?: -1
+
+    // Dynamic Row Calculation (4, 5, or 6 date rows)
+    val totalCells = startOffset + daysInMonth
+    val dateRowsNeeded = kotlin.math.ceil(totalCells / 7.0).toInt()
+
+    // 1. GIANT BACKGROUND MONTH WATERMARK ("AUG")
+    val watermarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = watermarkColor
+        textSize = minOf(w * 0.38f, h * 0.72f)
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(state.monthShort, w / 2f, pad + (10f * density), headerPaint)
+    val watermarkBounds = Rect()
+    val watermarkText = state.monthShort.uppercase()
+    watermarkPaint.getTextBounds(watermarkText, 0, watermarkText.length, watermarkBounds)
+    val watermarkY = (h / 2f) + (watermarkBounds.height() / 2f) - watermarkBounds.bottom + (4f * density)
+    canvas.drawText(watermarkText, w / 2f, watermarkY, watermarkPaint)
 
-    // Weekdays
-    val headerY = pad + (28f * density)
-    val headers = listOf("M", "T", "W", "T", "F", "S", "S")
-    val colW = contentW / 7f
-    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 11f * density
+    // Layout Padding & Dimensions
+    val topPadding = 18f * density
+    val bottomPadding = 16f * density
+    val sidePadding = 20f * density
+    val usableWidth = w - (sidePadding * 2)
+
+    // Grid Setup
+    val gridTopY = topPadding
+    val availableGridHeight = h - gridTopY - bottomPadding
+    val totalGridRows = dateRowsNeeded + 1
+    val rowHeight = availableGridHeight / totalGridRows
+    val colWidth = usableWidth / 7f
+
+    // 2. Day-of-Week Headers
+    val dayHeaderLabels = arrayOf("M", "T", "W", "T", "F", "S", "S")
+    val dayHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 13f * density
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
     }
 
-    headers.forEachIndexed { i, title ->
-        dayPaint.color = if (i == 6) sundayRed else primaryText
-        canvas.drawText(title, pad + (i * colW) + (colW / 2f), headerY, dayPaint)
+    val dayHeaderY = gridTopY + (rowHeight * 0.35f)
+    for (col in 0..6) {
+        val cx = sidePadding + (col * colWidth) + (colWidth / 2f)
+        dayHeaderPaint.color = if (col == 6) sundayAccent else primaryText
+        canvas.drawText(dayHeaderLabels[col], cx, dayHeaderY, dayHeaderPaint)
     }
 
-    // Grid
-    val gridY = headerY + (12f * density)
-    val rowH = (h - gridY - pad) / 6f
-    val todayBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // 3. Days Grid
+    val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 13f * density
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
+    val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f * density
+        strokeWidth = 2f * density
     }
 
-    state.daysGrid.forEachIndexed { index, day ->
-        val r = index / 7
-        val c = index % 7
-        if (r >= 6) return@forEachIndexed
+    var currentCol = startOffset
+    var currentRow = 1
 
-        val cx = pad + (c * colW) + (colW / 2f)
-        val cy = gridY + (r * rowH) + (rowH / 2f)
+    for (day in 1..daysInMonth) {
+        val cx = sidePadding + (currentCol * colWidth) + (colWidth / 2f)
+        val cy = gridTopY + (currentRow * rowHeight) + (rowHeight * 0.35f)
 
-        if (day.isToday) {
-            val badgeR = minOf(colW, rowH) * 0.42f
-            canvas.drawRoundRect(RectF(cx - badgeR, cy - badgeR, cx + badgeR, cy + badgeR), 6f * density, 6f * density, todayBadgePaint)
+        // Highlight Current Day Box
+        if (day == currentDayNum) {
+            val boxSize = (rowHeight * 0.85f).coerceAtMost(colWidth * 0.85f)
+            val rect = RectF(
+                cx - (boxSize / 2f),
+                cy - (boxSize / 2f) - (2f * density),
+                cx + (boxSize / 2f),
+                cy + (boxSize / 2f) - (2f * density)
+            )
+            canvas.drawRoundRect(rect, 8f * density, 8f * density, outlinePaint)
         }
 
-        if (day.isCurrentMonth) {
-            dayPaint.color = if (day.isSunday) sundayRed else primaryText
-            val fm = dayPaint.fontMetrics
-            canvas.drawText(day.dayNumber.toString(), cx, cy - ((fm.descent + fm.ascent) / 2f), dayPaint)
+        // Draw Date Text
+        dateTextPaint.color = when {
+            currentCol == 6 -> sundayAccent
+            else -> primaryText
+        }
+
+        val textY = cy + (dateTextPaint.textSize / 3f) - (2f * density)
+        canvas.drawText(day.toString(), cx, textY, dateTextPaint)
+
+        currentCol++
+        if (currentCol > 6) {
+            currentCol = 0
+            currentRow++
         }
     }
+
+    return bitmap
+}
+
+// 5. CALENDAR PAGE (2x2 Square / Responsive Single Card)
+fun generateCalendarPageBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bodyBgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+
+    // Draw Card Body Background
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bodyBgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bodyPaint)
+
+    // 2. Top Accent Banner
+    val bannerH = rect.height() * 0.28f
+    val bannerRect = RectF(rect.left, rect.top, rect.right, rect.top + bannerH)
+
+    val bannerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    // Clip top corners of banner to card bounds
+    canvas.save()
+    val clipPath = Path().apply {
+        addRoundRect(rect, cardRadius, cardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(clipPath)
+    canvas.drawRect(bannerRect, bannerPaint)
+    canvas.restore()
+
+    // 3. Top Banner Text: Weekday Name
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val bannerTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val fullDayName = when (state.dayOfWeekShort.uppercase()) {
+        "MON" -> "MONDAY"
+        "TUE" -> "TUESDAY"
+        "WED" -> "WEDNESDAY"
+        "THU" -> "THURSDAY"
+        "FRI" -> "FRIDAY"
+        "SAT" -> "SATURDAY"
+        "SUN" -> "SUNDAY"
+        else -> state.dayOfWeekShort.uppercase()
+    }
+
+    val baseBannerTextSize = bannerH * 0.48f
+    val bannerTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bannerTextColor
+        textSize = baseBannerTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
+    // AUTO-SCALE DOWN BANNER TEXT ONLY WHEN CROPPED
+    val maxBannerWidth = bannerRect.width() * 0.86f // Leave 7% padding on each side
+    val measuredBannerWidth = bannerTextPaint.measureText(fullDayName)
+    if (measuredBannerWidth > maxBannerWidth) {
+        bannerTextPaint.textSize = baseBannerTextSize * (maxBannerWidth / measuredBannerWidth)
+    }
+
+    val bannerTextY = bannerRect.centerY() + (bannerTextPaint.textSize / 3f) - (1f * density)
+    canvas.drawText(fullDayName, bannerRect.centerX(), bannerTextY, bannerTextPaint)
+
+    // 4. Lower Body Content (Giant Date & Full Month Name - Vertically Centered)
+    val bodyAreaRect = RectF(rect.left, bannerRect.bottom, rect.right, rect.bottom)
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#636366") else Color.parseColor("#B3FFFFFF")
+
+    val fullMonthName = when (state.monthShort.uppercase()) {
+        "JAN" -> "JANUARY"
+        "FEB" -> "FEBRUARY"
+        "MAR" -> "MARCH"
+        "APR" -> "APRIL"
+        "MAY" -> "MAY"
+        "JUN" -> "JUNE"
+        "JUL" -> "JULY"
+        "AUG" -> "AUGUST"
+        "SEP" -> "SEPTEMBER"
+        "OCT" -> "OCTOBER"
+        "NOV" -> "NOVEMBER"
+        "DEC" -> "DECEMBER"
+        else -> state.monthShort.uppercase()
+    }
+
+    val dateText = state.dayOfMonth
+
+    val baseDateTextSize = bodyAreaRect.height() * 0.64f
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseDateTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
+    val baseMonthTextSize = bodyAreaRect.height() * 0.14f
+    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = baseMonthTextSize
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.08f
+    }
+
+    // AUTO-SCALE DOWN DATE & MONTH ONLY WHEN CROPPED
+    val maxBodyWidth = bodyAreaRect.width() * 0.88f
+
+    val measuredDateWidth = datePaint.measureText(dateText)
+    if (measuredDateWidth > maxBodyWidth) {
+        datePaint.textSize = baseDateTextSize * (maxBodyWidth / measuredDateWidth)
+    }
+
+    val measuredMonthWidth = monthPaint.measureText(fullMonthName)
+    if (measuredMonthWidth > maxBodyWidth) {
+        monthPaint.textSize = baseMonthTextSize * (maxBodyWidth / measuredMonthWidth)
+    }
+
+    // Measure exact bounds to center both lines as a single block
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+    val monthBounds = Rect()
+    monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
+
+    val gap = bodyAreaRect.height() * 0.08f
+    val totalBlockHeight = dateBounds.height() + gap + monthBounds.height()
+
+    val verticalOffset = -5f * density
+    val blockTop = (bodyAreaRect.centerY() - (totalBlockHeight / 2f)) + verticalOffset
+
+    val dateY = blockTop + dateBounds.height() - dateBounds.bottom
+    val monthY = blockTop + dateBounds.height() + gap + monthBounds.height() - monthBounds.bottom
+
+    canvas.drawText(dateText, bodyAreaRect.centerX(), dateY, datePaint)
+    canvas.drawText(fullMonthName, bodyAreaRect.centerX(), monthY, monthPaint)
 
     return bitmap
 }

@@ -539,7 +539,7 @@
                 android:resource="@xml/widget_info_2x1" />
         </receiver>
         <receiver
-            android:name=".widgets.calendar.CalendarMonth2x2Receiver"
+            android:name=".widgets.calendar.CalendarBasicReceiver"
             android:exported="true"
             android:label="Slate Month Grid Calendar">
             <intent-filter>
@@ -547,7 +547,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x2" />
+                android:resource="@xml/widget_info_4x2_min" />
         </receiver>
         <receiver
             android:name=".widgets.calendar.CalendarDate2x2Receiver"
@@ -560,7 +560,28 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
+        <receiver
+            android:name=".widgets.calendar.CalendarWatermarkReceiver"
+            android:exported="true"
+            android:label="Slate Month Overlay Calendar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <receiver
+            android:name=".widgets.calendar.CalendarPage2x2Receiver"
+            android:exported="true"
+            android:label="Slate Calendar Tear-Off Page">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>
