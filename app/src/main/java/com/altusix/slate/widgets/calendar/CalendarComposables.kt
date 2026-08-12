@@ -2944,3 +2944,171 @@ fun generateOverviewCalendarBitmap(
 
     return bitmap
 }
+
+// 18. MINIMAL WEEK STRIP CALENDAR (4x2 / Date & Underlined Day Strip)
+fun generateMinimalWeekStripCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Card Bounds (Responsive fills bounds; Fixed centers 2:1 container)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // Colors
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#8A8A8E")
+
+    val padX = cardRect.width() * 0.08f
+
+    // Dates & Calendar Data
+    val cal = java.util.Calendar.getInstance()
+    val dayOfWeekSun1 = cal.get(java.util.Calendar.DAY_OF_WEEK) // 1 = Sun ... 7 = Sat
+    val currentDayIndex = dayOfWeekSun1 - 1 // 0 = Sun ... 6 = Sat
+    val weekOfYear = cal.get(java.util.Calendar.WEEK_OF_YEAR)
+
+    val fullWeekdayName = when (state.dayOfWeekShort.uppercase()) {
+        "MON" -> "Monday"
+        "TUE" -> "Tuesday"
+        "WED" -> "Wednesday"
+        "THU" -> "Thursday"
+        "FRI" -> "Friday"
+        "SAT" -> "Saturday"
+        "SUN" -> "Sunday"
+        else -> state.dayOfWeekShort
+    }
+    val detailText = "$fullWeekdayName  ·  Week $weekOfYear"
+    val dateText = state.dayOfMonth
+
+    // Giant Date Sizing (Compact, Proportional)
+    var dateFontSize = (cardRect.height() * 0.38f).coerceIn(28f * density, 46f * density)
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = dateFontSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+    }
+
+    // Tight gap following giant date number directly
+    val gapBetweenDateAndStrip = 14f * density
+    val dateW = datePaint.measureText(dateText)
+
+    val startX = cardRect.left + padX
+    val rightStripLeft = startX + dateW + gapBetweenDateAndStrip
+
+    // Strip Width & Spacing
+    val availableStripW = cardRect.right - padX - rightStripLeft
+
+    var headerFontSize = (cardRect.height() * 0.16f).coerceIn(11f * density, 16f * density)
+    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = headerFontSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val dayHeaders = arrayOf("S", "M", "T", "W", "T", "F", "S")
+    val letterWidth = headerPaint.measureText("W")
+    val letterGap = ((availableStripW - (letterWidth * 7f)) / 6f).coerceIn(6f * density, 18f * density)
+
+    var detailFontSize = (cardRect.height() * 0.11f).coerceIn(9f * density, 13f * density)
+    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = detailFontSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+    }
+
+    if (detailPaint.measureText(detailText) > availableStripW) {
+        detailFontSize *= (availableStripW / detailPaint.measureText(detailText))
+        detailPaint.textSize = detailFontSize
+    }
+
+    // Font Metrics for Centering
+    val fmD = datePaint.fontMetrics
+    val fmH = headerPaint.fontMetrics
+    val fmDet = detailPaint.fontMetrics
+
+    val underlineH = 2.5f * density
+    val underlinePadding = 3f * density
+    val gapBetweenRows = 8f * density
+
+    val line1H = -fmH.ascent + fmH.descent
+    val line2H = -fmDet.ascent + fmDet.descent
+    val totalRightH = line1H + underlinePadding + underlineH + gapBetweenRows + line2H
+
+    val centerY = cardRect.centerY()
+    val rightBlockTop = centerY - (totalRightH / 2f)
+
+    val headerY = rightBlockTop - fmH.ascent
+    val underlineTop = headerY + fmH.descent + underlinePadding
+    val detailY = underlineTop + underlineH + gapBetweenRows - fmDet.ascent
+
+    val dateY = centerY - ((fmD.descent + fmD.ascent) / 2f)
+
+    // 1. Draw Giant Date Number
+    canvas.drawText(dateText, startX, dateY, datePaint)
+
+    // 2. Draw "S M T W T F S" Day Strip
+    val activeColor = if (isLight) accentColorInt else Color.WHITE
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeColor
+        style = Paint.Style.FILL
+    }
+
+    for (i in 0..6) {
+        val cx = rightStripLeft + (i * (letterWidth + letterGap)) + (letterWidth / 2f)
+
+        if (i == currentDayIndex) {
+            headerPaint.color = activeColor
+            canvas.drawText(dayHeaders[i], cx, headerY, headerPaint)
+
+            val underlineW = letterWidth * 0.90f
+            val uLeft = cx - (underlineW / 2f)
+            val uRect = RectF(uLeft, underlineTop, uLeft + underlineW, underlineTop + underlineH)
+            canvas.drawRoundRect(uRect, underlineH / 2f, underlineH / 2f, accentPaint)
+        } else {
+            headerPaint.color = primaryText
+            canvas.drawText(dayHeaders[i], cx, headerY, headerPaint)
+        }
+    }
+
+    // 3. Draw Subtext ("Wednesday · Week 33")
+    canvas.drawText(detailText, rightStripLeft, detailY, detailPaint)
+
+    return bitmap
+}

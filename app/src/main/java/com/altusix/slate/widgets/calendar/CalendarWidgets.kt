@@ -31,7 +31,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Analog Timeline Hybrid", "4x2", "Calendar", CalendarAnalogTimelineReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Week Progress Calendar", "4x2", "Calendar", CalendarWeekProgressReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Modular Matrix Calendar", "4x2", "Calendar", CalendarModularMatrixReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Overview Calendar", "4x2", "Calendar", CalendarOverviewReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Overview Calendar", "4x2", "Calendar", CalendarOverviewReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Minimal Week Strip Calendar", "4x2", "Calendar", CalendarMinimalWeekStripReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -54,7 +55,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarAnalogTimelineReceiver::class.java,
         CalendarWeekProgressReceiver::class.java,
         CalendarModularMatrixReceiver::class.java,
-        CalendarOverviewReceiver::class.java
+        CalendarOverviewReceiver::class.java,
+        CalendarMinimalWeekStripReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -280,4 +282,10 @@ class CalendarModularMatrixReceiver : BaseCalendarReceiver() {
 class CalendarOverviewReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateOverviewCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 18. MINIMAL WEEK STRIP CALENDAR (4x2 / Date & Underlined Day Strip)
+class CalendarMinimalWeekStripReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateMinimalWeekStripCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
