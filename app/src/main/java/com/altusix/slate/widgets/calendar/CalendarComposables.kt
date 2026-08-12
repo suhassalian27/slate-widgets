@@ -3112,3 +3112,181 @@ fun generateMinimalWeekStripCalendarBitmap(
 
     return bitmap
 }
+
+// 19. VERTICAL TIME PILL WIDGET (4x2 / Rotated Clock & Dual Capsule Stack)
+fun generateVerticalTimePillCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Bounds (Responsive fills bounds; Fixed centers 2:1 ratio container)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // Colors
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val pillBgColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+
+    // Dynamic contrast check for top accent pill
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val activeTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val padX = cardRect.width() * 0.08f
+    val padY = cardRect.height() * 0.12f
+
+    val usableW = cardRect.width() - (padX * 2f)
+    val usableH = cardRect.height() - (padY * 2f)
+
+    val leftW = usableW * 0.22f
+    val gapX = usableW * 0.06f
+    val rightSectionLeft = cardRect.left + padX + leftW + gapX
+    val rightSectionW = cardRect.right - padX - rightSectionLeft
+
+    // =========================================================================
+    // 2. RIGHT SIDE: DUAL STACKED CAPSULE PILLS (Fixed Corner Radius)
+    // =========================================================================
+    val pillGap = usableH * 0.10f
+    val pillH = (usableH - pillGap) / 2f
+
+    // FIXED CONSISTENT CORNER RADIUS: Capped at 16dp so corners don't balloon when shrunk
+    val pillRadius = (16f * density).coerceAtMost(pillH / 2f)
+
+    val topPillTop = cardRect.top + padY
+    val topPillRect = RectF(rightSectionLeft, topPillTop, rightSectionLeft + rightSectionW, topPillTop + pillH)
+
+    val bottomPillTop = topPillRect.bottom + pillGap
+    val bottomPillRect = RectF(rightSectionLeft, bottomPillTop, rightSectionLeft + rightSectionW, bottomPillTop + pillH)
+
+    // Total vertical span of the 2 bars combined
+    val totalBarsSpanH = bottomPillRect.bottom - topPillRect.top
+
+    // =========================================================================
+    // 1. LEFT SIDE: VERTICALLY ROTATED TIME (Matches Height of 2 Bars)
+    // =========================================================================
+    val timeFormatter = java.text.SimpleDateFormat("HHmm", java.util.Locale.getDefault())
+    val timeStr = timeFormatter.format(java.util.Date())
+
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        letterSpacing = 0.06f
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Scale time text size so rotated text length exactly matches the 2-bar vertical span
+    var calculatedTimeSize = 20f * density
+    timePaint.textSize = calculatedTimeSize
+    val measuredTimeLength = timePaint.measureText(timeStr)
+
+    if (measuredTimeLength > 0f) {
+        calculatedTimeSize *= (totalBarsSpanH / measuredTimeLength)
+        timePaint.textSize = calculatedTimeSize
+    }
+
+    // Ensure rotated text thickness does not overflow left column width
+    val fmCheck = timePaint.fontMetrics
+    val textThickness = -fmCheck.ascent + fmCheck.descent
+    if (textThickness > leftW) {
+        calculatedTimeSize *= (leftW / textThickness)
+        timePaint.textSize = calculatedTimeSize
+    }
+
+    val textCenterX = cardRect.left + padX + (leftW / 2f)
+    val textCenterY = (topPillRect.top + bottomPillRect.bottom) / 2f // Center vertically with the 2 bars
+    val fmTime = timePaint.fontMetrics
+    val timeY = textCenterY - ((fmTime.descent + fmTime.ascent) / 2f)
+
+    canvas.save()
+    canvas.rotate(-90f, textCenterX, textCenterY)
+    canvas.drawText(timeStr, textCenterX, timeY, timePaint)
+    canvas.restore()
+
+    // --- RENDER TOP ACCENT PILL (Date: "06" / "12") ---
+    val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    pillPaint.color = accentColorInt
+    canvas.drawRoundRect(topPillRect, pillRadius, pillRadius, pillPaint)
+
+    val rawDayInt = state.dayOfMonth.toIntOrNull() ?: 1
+    val dateNumStr = String.format(java.util.Locale.getDefault(), "%02d", rawDayInt)
+
+    var dateTextSize = (pillH * 0.48f).coerceIn(12f * density, 22f * density)
+    val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeTextColor
+        textSize = dateTextSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    if (dateTextPaint.measureText(dateNumStr) > topPillRect.width() * 0.80f) {
+        dateTextSize *= ((topPillRect.width() * 0.80f) / dateTextPaint.measureText(dateNumStr))
+        dateTextPaint.textSize = dateTextSize
+    }
+
+    val fmDate = dateTextPaint.fontMetrics
+    val topTextY = topPillRect.centerY() - ((fmDate.descent + fmDate.ascent) / 2f)
+    canvas.drawText(dateNumStr, topPillRect.centerX(), topTextY, dateTextPaint)
+
+    // --- RENDER BOTTOM NEUTRAL PILL (Day of Week: "FRI" / "WED") ---
+    pillPaint.color = pillBgColor
+    canvas.drawRoundRect(bottomPillRect, pillRadius, pillRadius, pillPaint)
+
+    val dayStr = state.dayOfWeekShort.uppercase()
+
+    var dayTextSize = (pillH * 0.44f).coerceIn(11f * density, 20f * density)
+    val dayTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = dayTextSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        letterSpacing = 0.05f
+        textAlign = Paint.Align.CENTER
+    }
+
+    if (dayTextPaint.measureText(dayStr) > bottomPillRect.width() * 0.80f) {
+        dayTextSize *= ((bottomPillRect.width() * 0.80f) / dayTextPaint.measureText(dayStr))
+        dayTextPaint.textSize = dayTextSize
+    }
+
+    val fmDay = dayTextPaint.fontMetrics
+    val bottomTextY = bottomPillRect.centerY() - ((fmDay.descent + fmDay.ascent) / 2f)
+    canvas.drawText(dayStr, bottomPillRect.centerX(), bottomTextY, dayTextPaint)
+
+    return bitmap
+}
