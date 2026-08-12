@@ -26,7 +26,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Sidebar Month Date", "2x2", "Calendar", CalendarSideBarReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Quadrant Grid Date", "2x2", "Calendar", CalendarGridQuadrantReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Diagonal Split Date", "2x2", "Calendar", CalendarDiagonalSplitReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Dashboard Calendar", "4x2", "Calendar", CalendarDashboardReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Dashboard Calendar", "4x2", "Calendar", CalendarDashboardReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Focus Timeline Calendar", "4x2", "Calendar", CalendarFocusTimelineReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -44,7 +45,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarSideBarReceiver::class.java,
         CalendarGridQuadrantReceiver::class.java,
         CalendarDiagonalSplitReceiver::class.java,
-        CalendarDashboardReceiver::class.java
+        CalendarDashboardReceiver::class.java,
+        CalendarFocusTimelineReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -214,8 +216,6 @@ class CalendarGridQuadrantReceiver : BaseCalendarReceiver() {
 }
 
 // 11. DIAGONAL SPLIT DATE (2x2 Square / Responsive Single Card)
-
-
 class CalendarDiagonalSplitReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateDiagonalSplitDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
@@ -225,4 +225,10 @@ class CalendarDiagonalSplitReceiver : BaseCalendarReceiver() {
 class CalendarDashboardReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateSplitDashboardCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 13. FOCUS TIMELINE CALENDAR (4x2 / Split Dual-Block Timeline)
+class CalendarFocusTimelineReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateFocusTimelineCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }

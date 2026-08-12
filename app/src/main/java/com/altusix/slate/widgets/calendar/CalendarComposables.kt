@@ -18,6 +18,8 @@ private fun getSafeBgColor(config: SlateWidgetConfig): Int {
     return Color.argb(alphaInt, r, g, b)
 }
 
+private fun getStandardCornerRadius(density: Float): Float = 22f * density
+
 // 1. CAPSULE PILL (2x1) - Fixed Height & Auto-Fitting Text
 fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState,    config: SlateWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
     val density = context.resources.displayMetrics.density
@@ -1490,7 +1492,7 @@ fun generateDiagonalSplitDateBitmap(
     return bitmap
 }
 
-// 12. SPLIT DASHBOARD CALENDAR (4x2 / Perfectly Centered Active Badge)
+// 12. SPLIT DASHBOARD CALENDAR (4x2)
 fun generateSplitDashboardCalendarBitmap(
     context: Context,
     state: CalendarDateState,
@@ -1528,7 +1530,7 @@ fun generateSplitDashboardCalendarBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardRadius = 24f * density
+    val cardRadius = getStandardCornerRadius(density)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
@@ -1559,12 +1561,11 @@ fun generateSplitDashboardCalendarBitmap(
     val gridH = cardRect.height() - (padY * 2f)
 
     val colW = gridW / 7f
-    val totalGridRows = 6f // Row 0 (Headers) + Rows 1..5 (Dates)
+    val totalGridRows = 6f
     val rowH = gridH / totalGridRows
 
     val fontScale = minOf(colW * 0.45f, rowH * 0.48f).coerceAtLeast(8f * density)
 
-    // Unified baseline calculation for row alignment
     fun getRowBaseline(row: Int): Float = gridTop + (row * rowH) + (rowH * 0.62f)
 
     // =========================================================================
@@ -1648,7 +1649,6 @@ fun generateSplitDashboardCalendarBitmap(
             dateNumPaint.color = activeTextColor
             dateNumPaint.typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
 
-            // Exact vertical centering inside the badge box
             val fm = dateNumPaint.fontMetrics
             badgeCenterY - ((fm.descent + fm.ascent) / 2f)
         } else {
@@ -1708,7 +1708,7 @@ fun generateSplitDashboardCalendarBitmap(
     val leftX = cardRect.left + padX
     val maxLeftTextW = leftW - padX
 
-    // 1. MONTH NAME: Baseline aligns with Row 0 (S M T W T F S)
+    // 1. MONTH NAME
     val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = (fontScale * 0.95f).coerceAtMost(cardRect.height() * 0.10f)
@@ -1722,7 +1722,7 @@ fun generateSplitDashboardCalendarBitmap(
     val monthY = getRowBaseline(0)
     canvas.drawText(fullMonthName, leftX, monthY, monthPaint)
 
-    // 2. WEEKDAY: Positioned tightly underneath Month
+    // 2. WEEKDAY
     val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         textSize = (fontScale * 1.30f).coerceAtMost(cardRect.height() * 0.14f)
@@ -1735,7 +1735,7 @@ fun generateSplitDashboardCalendarBitmap(
     val weekdayY = monthY + (weekdayPaint.textSize * 1.08f)
     canvas.drawText(weekdayTitle, leftX, weekdayY, weekdayPaint)
 
-    // 3. GIANT DATE: Baseline aligns flush with Row 5 (Bottom Date Row)
+    // 3. GIANT DATE
     val targetGiantBaseline = getRowBaseline(5)
     val topOfGiantArea = weekdayY + (6f * density)
     val availableGiantH = (targetGiantBaseline - topOfGiantArea).coerceAtLeast(10f)
@@ -1751,6 +1751,223 @@ fun generateSplitDashboardCalendarBitmap(
     }
 
     canvas.drawText(state.dayOfMonth, leftX, targetGiantBaseline, datePaint)
+
+    return bitmap
+}
+
+// 13. FOCUS TIMELINE CALENDAR (4x2)
+fun generateFocusTimelineCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+
+    // Draw Left Container Background
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Right Accent Block (~36% Width)
+    val rightBlockW = cardRect.width() * 0.36f
+    val rightBlockRect = RectF(
+        cardRect.right - rightBlockW,
+        cardRect.top,
+        cardRect.right,
+        cardRect.bottom
+    )
+
+    val rightBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    // Clip right accent block to outer card rounded corners
+    canvas.save()
+    val clipPath = Path().apply {
+        addRoundRect(cardRect, cardRadius, cardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(clipPath)
+    canvas.drawRect(rightBlockRect, rightBgPaint)
+    canvas.restore()
+
+    // Dynamic contrast for giant date text
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val giantDateTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    // 3. Colors for Left Section
+    val primaryLeftText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryLeftText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val dividerColor = if (isLight) Color.parseColor("#1F000000") else Color.parseColor("#26FFFFFF")
+
+    // 4. Day Name Calculations
+    val cal = java.util.Calendar.getInstance()
+    val dayFormat = java.text.SimpleDateFormat("EEE", java.util.Locale.ENGLISH)
+
+    val todayName = dayFormat.format(cal.time)
+
+    cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+    val prevDayName = dayFormat.format(cal.time)
+
+    cal.add(java.util.Calendar.DAY_OF_YEAR, 2)
+    val nextDayName = dayFormat.format(cal.time)
+
+    // 5. Left Timeline Section
+    val leftAreaRect = RectF(
+        cardRect.left,
+        cardRect.top,
+        rightBlockRect.left,
+        cardRect.bottom
+    )
+
+    val padX = leftAreaRect.width() * 0.10f
+    val padY = leftAreaRect.height() * 0.16f
+    val timelineH = leftAreaRect.height() - (padY * 2f)
+    val rowH = timelineH / 3f
+
+    val row1CenterY = leftAreaRect.top + padY + (rowH * 0.5f)
+    val row2CenterY = leftAreaRect.top + padY + (rowH * 1.5f)
+    val row3CenterY = leftAreaRect.top + padY + (rowH * 2.5f)
+
+    val divider1Y = leftAreaRect.top + padY + rowH
+    val divider2Y = leftAreaRect.top + padY + (rowH * 2f)
+
+    val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dividerColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * density
+    }
+
+    val lineLeftX = leftAreaRect.left + padX
+    val lineRightX = leftAreaRect.right - (padX * 0.8f)
+
+    canvas.drawLine(lineLeftX, divider1Y, lineRightX, divider1Y, dividerPaint)
+    canvas.drawLine(lineLeftX, divider2Y, lineRightX, divider2Y, dividerPaint)
+
+    var baseFontSize = (rowH * 0.38f).coerceAtLeast(10f * density)
+
+    val inactiveTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryLeftText
+        textSize = baseFontSize
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val activeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryLeftText
+        textSize = baseFontSize * 1.1f
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val todayLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryLeftText
+        textSize = baseFontSize
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val accentBarW = 3.5f * density
+    val activeTextStartX = lineLeftX + accentBarW + (8f * density)
+    val maxAllowedLeftW = lineRightX - activeTextStartX
+
+    val totalActiveWidth = activeTextPaint.measureText(todayName) + todayLabelPaint.measureText(" — today")
+    if (totalActiveWidth > maxAllowedLeftW) {
+        val scaleRatio = maxAllowedLeftW / totalActiveWidth
+        baseFontSize *= scaleRatio
+        inactiveTextPaint.textSize = baseFontSize
+        activeTextPaint.textSize = baseFontSize * 1.1f
+        todayLabelPaint.textSize = baseFontSize
+    }
+
+    // Row 1: Yesterday
+    val fmInactive = inactiveTextPaint.fontMetrics
+    val textY1 = row1CenterY - ((fmInactive.descent + fmInactive.ascent) / 2f)
+    canvas.drawText(prevDayName, lineLeftX, textY1, inactiveTextPaint)
+
+    // Row 2: Today
+    val accentBarH = rowH * 0.52f
+    val accentBarRect = RectF(
+        lineLeftX,
+        row2CenterY - (accentBarH / 2f),
+        lineLeftX + accentBarW,
+        row2CenterY + (accentBarH / 2f)
+    )
+
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(accentBarRect, accentBarW / 2f, accentBarW / 2f, accentPaint)
+
+    val fmActive = activeTextPaint.fontMetrics
+    val textY2 = row2CenterY - ((fmActive.descent + fmActive.ascent) / 2f)
+
+    canvas.drawText(todayName, activeTextStartX, textY2, activeTextPaint)
+
+    val dayNameWidth = activeTextPaint.measureText(todayName)
+    canvas.drawText(" — today", activeTextStartX + dayNameWidth, textY2, todayLabelPaint)
+
+    // Row 3: Tomorrow
+    val textY3 = row3CenterY - ((fmInactive.descent + fmInactive.ascent) / 2f)
+    canvas.drawText(nextDayName, lineLeftX, textY3, inactiveTextPaint)
+
+    // 6. Right Side Block: Giant Date Number
+    val maxGiantTextW = rightBlockRect.width() * 0.80f
+    val maxGiantTextH = rightBlockRect.height() * 0.65f
+
+    val giantDatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = giantDateTextColor
+        textSize = maxGiantTextH
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val measuredGiantW = giantDatePaint.measureText(state.dayOfMonth)
+    if (measuredGiantW > maxGiantTextW) {
+        giantDatePaint.textSize = maxGiantTextH * (maxGiantTextW / measuredGiantW)
+    }
+
+    val fmGiant = giantDatePaint.fontMetrics
+    val giantDateY = rightBlockRect.centerY() - ((fmGiant.descent + fmGiant.ascent) / 2f)
+    canvas.drawText(state.dayOfMonth, rightBlockRect.centerX(), giantDateY, giantDatePaint)
 
     return bitmap
 }
