@@ -30,7 +30,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Focus Timeline Calendar", "4x2", "Calendar", CalendarFocusTimelineReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Analog Timeline Hybrid", "4x2", "Calendar", CalendarAnalogTimelineReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Week Progress Calendar", "4x2", "Calendar", CalendarWeekProgressReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Modular Matrix Calendar", "4x2", "Calendar", CalendarModularMatrixReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Modular Matrix Calendar", "4x2", "Calendar", CalendarModularMatrixReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Overview Calendar", "4x2", "Calendar", CalendarOverviewReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -52,7 +53,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarFocusTimelineReceiver::class.java,
         CalendarAnalogTimelineReceiver::class.java,
         CalendarWeekProgressReceiver::class.java,
-        CalendarModularMatrixReceiver::class.java
+        CalendarModularMatrixReceiver::class.java,
+        CalendarOverviewReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -272,4 +274,10 @@ class CalendarWeekProgressReceiver : BaseCalendarReceiver() {
 class CalendarModularMatrixReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateModularMatrixCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 17. ELEGANT OVERVIEW CALENDAR (4x2 / Giant Date & Month Grid)
+class CalendarOverviewReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateOverviewCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
