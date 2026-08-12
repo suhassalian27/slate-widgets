@@ -25,7 +25,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Stacked Header Date", "2x2", "Calendar", CalendarStackedHeaderReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Sidebar Month Date", "2x2", "Calendar", CalendarSideBarReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Quadrant Grid Date", "2x2", "Calendar", CalendarGridQuadrantReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Diagonal Split Date", "2x2", "Calendar", CalendarDiagonalSplitReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Diagonal Split Date", "2x2", "Calendar", CalendarDiagonalSplitReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Dashboard Calendar", "4x2", "Calendar", CalendarDashboardReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -42,7 +43,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarStackedHeaderReceiver::class.java,
         CalendarSideBarReceiver::class.java,
         CalendarGridQuadrantReceiver::class.java,
-        CalendarDiagonalSplitReceiver::class.java
+        CalendarDiagonalSplitReceiver::class.java,
+        CalendarDashboardReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -212,7 +214,15 @@ class CalendarGridQuadrantReceiver : BaseCalendarReceiver() {
 }
 
 // 11. DIAGONAL SPLIT DATE (2x2 Square / Responsive Single Card)
+
+
 class CalendarDiagonalSplitReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateDiagonalSplitDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 12. SPLIT DASHBOARD CALENDAR (4x2 / Split Date & Month Grid)
+class CalendarDashboardReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateSplitDashboardCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
