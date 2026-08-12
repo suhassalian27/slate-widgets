@@ -3290,3 +3290,192 @@ fun generateVerticalTimePillCalendarBitmap(
 
     return bitmap
 }
+
+// 20. TIMELINE PROGRESS CALENDAR (4x2 / Minimal Horizontal Axis)
+fun generateTimelineProgressCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Card Bounds (Responsive fills bounds; Fixed centers 2:1 ratio container)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // Theme Colors
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+
+    val padX = cardRect.width() * 0.08f
+    val padY = cardRect.height() * 0.12f
+    val usableW = cardRect.width() - (padX * 2f)
+
+    // Date & Calendar Metrics
+    val cal = java.util.Calendar.getInstance().apply {
+        val yearInt = state.year.toIntOrNull() ?: get(java.util.Calendar.YEAR)
+        try {
+            val parsedDate = java.text.SimpleDateFormat("MMM", java.util.Locale.ENGLISH).parse(state.monthShort)
+            if (parsedDate != null) {
+                val tempCal = java.util.Calendar.getInstance().apply { time = parsedDate }
+                set(java.util.Calendar.MONTH, tempCal.get(java.util.Calendar.MONTH))
+            }
+        } catch (_: Exception) {}
+        set(java.util.Calendar.YEAR, yearInt)
+    }
+
+    val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val currentDayNum = state.dayOfMonth.toIntOrNull()?.coerceIn(1, daysInMonth) ?: cal.get(java.util.Calendar.DAY_OF_MONTH)
+
+    // =========================================================================
+    // 1. HEADER MONTH NAME (e.g. "SEPTEMBER")
+    // =========================================================================
+    val fullMonthTitle = when (state.monthShort.uppercase()) {
+        "JAN" -> "SEPTEMBER" // Fallback example format matching upper standard
+        "FEB" -> "FEBRUARY"
+        "MAR" -> "MARCH"
+        "APR" -> "APRIL"
+        "MAY" -> "MAY"
+        "JUN" -> "JUNE"
+        "JUL" -> "JULY"
+        "AUG" -> "AUGUST"
+        "SEP" -> "SEPTEMBER"
+        "OCT" -> "OCTOBER"
+        "NOV" -> "NOVEMBER"
+        "DEC" -> "DECEMBER"
+        else -> state.monthShort.uppercase()
+    }
+
+    var monthTitleSize = (cardRect.height() * 0.15f).coerceIn(11f * density, 18f * density)
+    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = monthTitleSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        letterSpacing = 0.06f
+        textAlign = Paint.Align.LEFT
+    }
+
+    if (monthPaint.measureText(fullMonthTitle) > usableW) {
+        monthTitleSize *= (usableW / monthPaint.measureText(fullMonthTitle))
+        monthPaint.textSize = monthTitleSize
+    }
+
+    val monthY = cardRect.top + padY - monthPaint.fontMetrics.ascent
+    val startX = cardRect.left + padX
+    val endX = cardRect.right - padX
+
+    canvas.drawText(fullMonthTitle, startX, monthY, monthPaint)
+
+    // =========================================================================
+    // 2. TIMELINE AXIS & ACCENT MARKER
+    // =========================================================================
+    val timelineY = cardRect.centerY() + (cardRect.height() * 0.06f)
+    val axisStrokeW = 1.8f * density
+
+    val axisPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = axisStrokeW
+    }
+
+    // Main Horizontal Baseline
+    canvas.drawLine(startX, timelineY, endX, timelineY, axisPaint)
+
+    // Standard Interval Ticks (6 segments across month span)
+    val standardTickH = 6f * density
+    val tickCount = 6
+    for (i in 0 until tickCount) {
+        val fraction = i / (tickCount - 1).toFloat()
+        val tickX = startX + (fraction * usableW)
+        canvas.drawLine(tickX, timelineY - standardTickH, tickX, timelineY, axisPaint)
+    }
+
+    // Accent Progress Indicator (Current Day Position)
+    val dayProgressRatio = if (daysInMonth > 1) (currentDayNum - 1) / (daysInMonth - 1).toFloat() else 0f
+    val currentDayX = startX + (dayProgressRatio * usableW)
+
+    val accentTickH = 14f * density
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = 2.4f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    // Draw Accent Vertical Marker
+    canvas.drawLine(currentDayX, timelineY - accentTickH, currentDayX, timelineY, accentPaint)
+
+    // Current Day Number Text Above Marker
+    val currentDayStr = currentDayNum.toString()
+    var dateNumSize = (cardRect.height() * 0.16f).coerceIn(11f * density, 18f * density)
+
+    val dateNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = dateNumSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val halfNumW = dateNumPaint.measureText(currentDayStr) / 2f
+    val clampedDayX = currentDayX.coerceIn(startX + halfNumW, endX - halfNumW)
+    val dateNumY = timelineY - accentTickH - (3f * density)
+
+    canvas.drawText(currentDayStr, clampedDayX, dateNumY, dateNumPaint)
+
+    // =========================================================================
+    // 3. START & END BOUNDARY LABELS ("1" & "30" / "31")
+    // =========================================================================
+    var footerLabelSize = (cardRect.height() * 0.12f).coerceIn(9f * density, 14f * density)
+    val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = footerLabelSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+    }
+
+    val fmFooter = footerPaint.fontMetrics
+    val footerY = timelineY + (10f * density) - fmFooter.ascent
+
+    // Left Bound "1"
+    footerPaint.textAlign = Paint.Align.LEFT
+    canvas.drawText("1", startX, footerY, footerPaint)
+
+    // Right Bound (Total Days in Month)
+    val endLabelStr = daysInMonth.toString()
+    footerPaint.textAlign = Paint.Align.RIGHT
+    canvas.drawText(endLabelStr, endX, footerY, footerPaint)
+
+    return bitmap
+}

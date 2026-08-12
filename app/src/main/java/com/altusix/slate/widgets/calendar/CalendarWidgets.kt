@@ -33,7 +33,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Modular Matrix Calendar", "4x2", "Calendar", CalendarModularMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Overview Calendar", "4x2", "Calendar", CalendarOverviewReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Minimal Week Strip Calendar", "4x2", "Calendar", CalendarMinimalWeekStripReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Vertical Time Pill Calendar", "4x2", "Calendar", CalendarVerticalTimePillReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Vertical Time Pill Calendar", "4x2", "Calendar", CalendarVerticalTimePillReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Timeline Progress Calendar", "4x2", "Calendar", CalendarTimelineProgressReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -58,7 +59,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarModularMatrixReceiver::class.java,
         CalendarOverviewReceiver::class.java,
         CalendarMinimalWeekStripReceiver::class.java,
-        CalendarVerticalTimePillReceiver::class.java
+        CalendarVerticalTimePillReceiver::class.java,
+        CalendarTimelineProgressReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -296,4 +298,10 @@ class CalendarMinimalWeekStripReceiver : BaseCalendarReceiver() {
 class CalendarVerticalTimePillReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateVerticalTimePillCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 20. TIMELINE PROGRESS CALENDAR (4x2 / Minimal Horizontal Axis)
+class CalendarTimelineProgressReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTimelineProgressCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
