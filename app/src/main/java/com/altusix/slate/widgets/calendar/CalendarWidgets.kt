@@ -27,7 +27,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Quadrant Grid Date", "2x2", "Calendar", CalendarGridQuadrantReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Diagonal Split Date", "2x2", "Calendar", CalendarDiagonalSplitReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Dashboard Calendar", "4x2", "Calendar", CalendarDashboardReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Focus Timeline Calendar", "4x2", "Calendar", CalendarFocusTimelineReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Focus Timeline Calendar", "4x2", "Calendar", CalendarFocusTimelineReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Analog Timeline Hybrid", "4x2", "Calendar", CalendarAnalogTimelineReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -46,7 +47,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarGridQuadrantReceiver::class.java,
         CalendarDiagonalSplitReceiver::class.java,
         CalendarDashboardReceiver::class.java,
-        CalendarFocusTimelineReceiver::class.java
+        CalendarFocusTimelineReceiver::class.java,
+        CalendarAnalogTimelineReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -231,4 +233,27 @@ class CalendarDashboardReceiver : BaseCalendarReceiver() {
 class CalendarFocusTimelineReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateFocusTimelineCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 14. ANALOG TIMELINE HYBRID (4x2 / Clock & Date Pill Strip)
+class CalendarAnalogTimelineReceiver : BaseCalendarReceiver() {
+
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateAnalogTimelineCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // Ensure ticker service is alive when widgets update
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
 }

@@ -60,6 +60,11 @@
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <service
+            android:name=".widgets.calendar.SlateClockTickerService"
+            android:enabled="true"
+            android:exported="false" />
+
         <!-- ================================================================= -->
         <!-- AI WIDGETS                                                        -->
         <!-- ================================================================= -->
@@ -663,6 +668,17 @@
             android:name=".widgets.calendar.CalendarFocusTimelineReceiver"
             android:exported="true"
             android:label="Slate Focus Timeline Calendar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <receiver
+            android:name=".widgets.calendar.CalendarAnalogTimelineReceiver"
+            android:exported="true"
+            android:label="Slate Analog Timeline Hybrid">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
