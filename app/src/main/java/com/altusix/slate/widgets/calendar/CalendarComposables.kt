@@ -2290,3 +2290,368 @@ fun generateWeekProgressCalendarBitmap(
 
     return bitmap
 }
+
+// 16. MODULAR MATRIX CALENDAR (4x2 / Row-Aligned Year & Bento Grid)
+fun generateModularMatrixCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Bounds (Responsive fills bounds; Fixed centers 2:1 ratio container)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // Theme Colors
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val tileBgColor = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#18181A")
+    val tileStrokeColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#2C2C2E")
+
+    // Dynamic contrast check for active day badge
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val activeTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val padX = cardRect.width() * 0.06f
+    val padY = cardRect.height() * 0.08f
+    val usableW = cardRect.width() - (padX * 2f)
+
+    // =========================================================================
+    // TOP HEADER STATUS LINE
+    // =========================================================================
+    val cal = java.util.Calendar.getInstance()
+    val weekOfYear = cal.get(java.util.Calendar.WEEK_OF_YEAR)
+    val headerText = "WEEK $weekOfYear OF 52  •  MAKE IT COUNT"
+
+    var headerTextSize = (cardRect.height() * 0.08f).coerceAtLeast(8f * density)
+    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = headerTextSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        letterSpacing = 0.08f
+        textAlign = Paint.Align.LEFT
+    }
+
+    // Auto-fit Header Text
+    if (headerPaint.measureText(headerText) > usableW) {
+        headerTextSize *= (usableW / headerPaint.measureText(headerText))
+        headerPaint.textSize = headerTextSize
+    }
+
+    val headerY = cardRect.top + padY + headerPaint.textSize
+    canvas.drawText(headerText, cardRect.left + padX, headerY, headerPaint)
+
+    // =========================================================================
+    // GRID GEOMETRY: LEFT YEAR COLUMN + RIGHT 2-ROW BENTO TILES
+    // =========================================================================
+    val gridTop = headerY + (cardRect.height() * 0.06f)
+    val gridH = cardRect.bottom - padY - gridTop
+
+    val yearColW = usableW * 0.18f
+    val colGap = usableW * 0.025f
+    val rightGridLeft = cardRect.left + padX + yearColW + colGap
+    val rightGridW = cardRect.right - padX - rightGridLeft
+
+    val gapX = rightGridW * 0.022f
+    val gapY = gridH * 0.06f
+    val unitW = (rightGridW - (gapX * 4f)) / 5f
+    val tileH = (gridH - gapY) / 2f
+    val tileRadius = (tileH * 0.22f).coerceIn(6f * density, 12f * density)
+
+    val row1Y = gridTop
+    val row2Y = gridTop + tileH + gapY
+
+    val row1CenterY = row1Y + (tileH / 2f)
+    val row2CenterY = row2Y + (tileH / 2f)
+
+    // =========================================================================
+    // 1. LEFT STACKED YEAR ("20" aligned with Row 1, "26" aligned with Row 2)
+    // =========================================================================
+    val yearStr = state.year
+    val yearTop = if (yearStr.length >= 2) yearStr.substring(0, 2) else "20"
+    val yearBottom = if (yearStr.length >= 4) yearStr.substring(2, 4) else "26"
+
+    var yearTextSize = tileH * 0.88f
+    val yearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = yearTextSize
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Auto-fit Year Text to Column Width
+    val maxYearW = yearColW * 0.92f
+    val maxMeasuredYearW = maxOf(yearPaint.measureText(yearTop), yearPaint.measureText(yearBottom))
+    if (maxMeasuredYearW > maxYearW) {
+        yearTextSize *= (maxYearW / maxMeasuredYearW)
+        yearPaint.textSize = yearTextSize
+    }
+
+    val yearCenterX = cardRect.left + padX + (yearColW / 2f)
+    val fmYear = yearPaint.fontMetrics
+
+    val year1Y = row1CenterY - ((fmYear.descent + fmYear.ascent) / 2f)
+    val year2Y = row2CenterY - ((fmYear.descent + fmYear.ascent) / 2f)
+
+    canvas.drawText(yearTop, yearCenterX, year1Y, yearPaint)
+    canvas.drawText(yearBottom, yearCenterX, year2Y, yearPaint)
+
+    // =========================================================================
+    // 2. RIGHT BENTO MATRIX TILES
+    // =========================================================================
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val tileStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileStrokeColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * density
+    }
+
+    // Days Calculation (Monday to Sunday)
+    val weekCal = (cal.clone() as java.util.Calendar).apply {
+        firstDayOfWeek = java.util.Calendar.MONDAY
+        set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
+    }
+
+    val todayNum = cal.get(java.util.Calendar.DAY_OF_MONTH)
+    val todayMonth = cal.get(java.util.Calendar.MONTH)
+    val dayNames = arrayOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+
+    // RENDER ROW 1: 3 Day Tiles + 1 Wide Month Tile
+    for (i in 0..2) {
+        val tLeft = rightGridLeft + (i * (unitW + gapX))
+        val tRect = RectF(tLeft, row1Y, tLeft + unitW, row1Y + tileH)
+
+        val tileDate = weekCal.get(java.util.Calendar.DAY_OF_MONTH)
+        val tileMonth = weekCal.get(java.util.Calendar.MONTH)
+        val isToday = (tileDate == todayNum && tileMonth == todayMonth)
+
+        drawBentoDayTile(
+            canvas = canvas,
+            rect = tRect,
+            radius = tileRadius,
+            dayName = dayNames[i],
+            dateNum = tileDate.toString(),
+            isToday = isToday,
+            accentColor = accentColorInt,
+            activeTextColor = activeTextColor,
+            tileBgColor = tileBgColor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            bgPaint = tileBgPaint,
+            strokePaint = tileStrokePaint,
+            density = density
+        )
+        weekCal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
+
+    // Row 1 Tile 4: Wide Month Tile (Spans 2 units)
+    val monthTileLeft = rightGridLeft + (3 * (unitW + gapX))
+    val monthTileW = (unitW * 2f) + gapX
+    val monthTileRect = RectF(monthTileLeft, row1Y, monthTileLeft + monthTileW, row1Y + tileH)
+
+    tileBgPaint.color = tileBgColor
+    canvas.drawRoundRect(monthTileRect, tileRadius, tileRadius, tileBgPaint)
+    canvas.drawRoundRect(monthTileRect, tileRadius, tileRadius, tileStrokePaint)
+
+    val fullMonthTitle = state.monthShort.uppercase()
+    var monthTextSize = (tileH * 0.36f).coerceAtLeast(10f * density)
+    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = monthTextSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        letterSpacing = 0.10f
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Auto-fit Month Tile Text
+    val maxMonthW = monthTileRect.width() * 0.85f
+    if (monthPaint.measureText(fullMonthTitle) > maxMonthW) {
+        monthTextSize *= (maxMonthW / monthPaint.measureText(fullMonthTitle))
+        monthPaint.textSize = monthTextSize
+    }
+
+    val fmM = monthPaint.fontMetrics
+    val monthY = monthTileRect.centerY() - ((fmM.descent + fmM.ascent) / 2f)
+    canvas.drawText(fullMonthTitle, monthTileRect.centerX(), monthY, monthPaint)
+
+    // RENDER ROW 2: 4 Day Tiles + 1 Dot Icon Badge Tile
+    for (i in 3..6) {
+        val colIdx = i - 3
+        val tLeft = rightGridLeft + (colIdx * (unitW + gapX))
+        val tRect = RectF(tLeft, row2Y, tLeft + unitW, row2Y + tileH)
+
+        val tileDate = weekCal.get(java.util.Calendar.DAY_OF_MONTH)
+        val tileMonth = weekCal.get(java.util.Calendar.MONTH)
+        val isToday = (tileDate == todayNum && tileMonth == todayMonth)
+
+        drawBentoDayTile(
+            canvas = canvas,
+            rect = tRect,
+            radius = tileRadius,
+            dayName = dayNames[i],
+            dateNum = tileDate.toString(),
+            isToday = isToday,
+            accentColor = accentColorInt,
+            activeTextColor = activeTextColor,
+            tileBgColor = tileBgColor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            bgPaint = tileBgPaint,
+            strokePaint = tileStrokePaint,
+            density = density
+        )
+        weekCal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
+
+    // Row 2 Tile 5: Minimal Accent Icon Tile
+    val iconTileLeft = rightGridLeft + (4 * (unitW + gapX))
+    val iconTileRect = RectF(iconTileLeft, row2Y, iconTileLeft + unitW, row2Y + tileH)
+
+    tileBgPaint.color = tileBgColor
+    canvas.drawRoundRect(iconTileRect, tileRadius, tileRadius, tileBgPaint)
+    canvas.drawRoundRect(iconTileRect, tileRadius, tileRadius, tileStrokePaint)
+
+    // Draw Minimal 4-Dot Grid Symbol
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val dotR = (minOf(unitW, tileH) * 0.08f).coerceIn(1.5f * density, 4f * density)
+    val dotOffset = dotR * 2.2f
+    val icCx = iconTileRect.centerX()
+    val icCy = iconTileRect.centerY()
+
+    canvas.drawCircle(icCx - dotOffset, icCy - dotOffset, dotR, dotPaint)
+    canvas.drawCircle(icCx + dotOffset, icCy - dotOffset, dotR, dotPaint)
+    canvas.drawCircle(icCx - dotOffset, icCy + dotOffset, dotR, dotPaint)
+    canvas.drawCircle(icCx + dotOffset, icCy + dotOffset, dotR, dotPaint)
+
+    return bitmap
+}
+
+// Helper Renderer for Bento Matrix Day Tiles with Refined Typography & Tighter Spacing
+private fun drawBentoDayTile(
+    canvas: Canvas,
+    rect: RectF,
+    radius: Float,
+    dayName: String,
+    dateNum: String,
+    isToday: Boolean,
+    accentColor: Int,
+    activeTextColor: Int,
+    tileBgColor: Int,
+    primaryText: Int,
+    secondaryText: Int,
+    bgPaint: Paint,
+    strokePaint: Paint,
+    density: Float
+) {
+    if (isToday) {
+        bgPaint.color = accentColor
+        canvas.drawRoundRect(rect, radius, radius, bgPaint)
+    } else {
+        bgPaint.color = tileBgColor
+        canvas.drawRoundRect(rect, radius, radius, bgPaint)
+        canvas.drawRoundRect(rect, radius, radius, strokePaint)
+    }
+
+    val labelColor = if (isToday) activeTextColor else secondaryText
+    val numColor = if (isToday) activeTextColor else primaryText
+    val maxTileTextW = rect.width() * 0.85f
+    val cx = rect.centerX()
+
+    if (isToday) {
+        // Active Day: Reduced weekday text size & weight + Tight Gap between Day and Number
+        var labelSize = (rect.height() * 0.22f).coerceAtLeast(7f * density)
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = labelColor
+            textSize = labelSize
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            letterSpacing = 0.04f
+            textAlign = Paint.Align.CENTER
+        }
+        if (labelPaint.measureText(dayName) > maxTileTextW) {
+            labelPaint.textSize = labelSize * (maxTileTextW / labelPaint.measureText(dayName))
+        }
+
+        var numSize = (rect.height() * 0.44f).coerceAtLeast(9f * density)
+        val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = numColor
+            textSize = numSize
+            typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        if (numPaint.measureText(dateNum) > maxTileTextW) {
+            numPaint.textSize = numSize * (maxTileTextW / numPaint.measureText(dateNum))
+        }
+
+        val fmL = labelPaint.fontMetrics
+        val fmN = numPaint.fontMetrics
+
+        val gap = -2.5f * density
+        val labelH = -fmL.ascent + fmL.descent
+        val numH = -fmN.ascent + fmN.descent
+        val totalBlockH = labelH + gap + numH
+
+        val blockTop = rect.centerY() - (totalBlockH / 2f)
+        val labelY = blockTop - fmL.ascent
+        val numY = labelY + fmL.descent + gap - fmN.ascent
+
+        canvas.drawText(dayName, cx, labelY, labelPaint)
+        canvas.drawText(dateNum, cx, numY, numPaint)
+    } else {
+        // Inactive Day: Reduced font size & lighter weight for weekdays
+        var labelSize = (rect.height() * 0.22f).coerceAtLeast(7f * density)
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = labelColor
+            textSize = labelSize
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            letterSpacing = 0.04f
+            textAlign = Paint.Align.CENTER
+        }
+        if (labelPaint.measureText(dayName) > maxTileTextW) {
+            labelPaint.textSize = labelSize * (maxTileTextW / labelPaint.measureText(dayName))
+        }
+
+        val fmL = labelPaint.fontMetrics
+        val labelY = rect.centerY() - ((fmL.descent + fmL.ascent) / 2f)
+        canvas.drawText(dayName, cx, labelY, labelPaint)
+    }
+}

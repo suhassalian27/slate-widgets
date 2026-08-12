@@ -29,7 +29,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Dashboard Calendar", "4x2", "Calendar", CalendarDashboardReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Focus Timeline Calendar", "4x2", "Calendar", CalendarFocusTimelineReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Analog Timeline Hybrid", "4x2", "Calendar", CalendarAnalogTimelineReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Week Progress Calendar", "4x2", "Calendar", CalendarWeekProgressReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Week Progress Calendar", "4x2", "Calendar", CalendarWeekProgressReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Modular Matrix Calendar", "4x2", "Calendar", CalendarModularMatrixReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -50,7 +51,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarDashboardReceiver::class.java,
         CalendarFocusTimelineReceiver::class.java,
         CalendarAnalogTimelineReceiver::class.java,
-        CalendarWeekProgressReceiver::class.java
+        CalendarWeekProgressReceiver::class.java,
+        CalendarModularMatrixReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -264,4 +266,10 @@ class CalendarAnalogTimelineReceiver : BaseCalendarReceiver() {
 class CalendarWeekProgressReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateWeekProgressCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 16. MODULAR MATRIX CALENDAR (4x2 / Bento Day Grid)
+class CalendarModularMatrixReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateModularMatrixCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
