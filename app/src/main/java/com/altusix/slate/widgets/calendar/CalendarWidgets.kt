@@ -24,7 +24,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Flip Calendar", "2x2", "Calendar", CalendarSplitFlapReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Stacked Header Date", "2x2", "Calendar", CalendarStackedHeaderReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Sidebar Month Date", "2x2", "Calendar", CalendarSideBarReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Quadrant Grid Date", "2x2", "Calendar", CalendarGridQuadrantReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Quadrant Grid Date", "2x2", "Calendar", CalendarGridQuadrantReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Diagonal Split Date", "2x2", "Calendar", CalendarDiagonalSplitReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -40,7 +41,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarSplitFlapReceiver::class.java,
         CalendarStackedHeaderReceiver::class.java,
         CalendarSideBarReceiver::class.java,
-        CalendarGridQuadrantReceiver::class.java
+        CalendarGridQuadrantReceiver::class.java,
+        CalendarDiagonalSplitReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -207,4 +209,10 @@ class CalendarSideBarReceiver : BaseCalendarReceiver() {
 class CalendarGridQuadrantReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateGridQuadrantCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 11. DIAGONAL SPLIT DATE (2x2 Square / Responsive Single Card)
+class CalendarDiagonalSplitReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateDiagonalSplitDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }

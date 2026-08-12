@@ -1367,3 +1367,125 @@ fun generateGridQuadrantCalendarBitmap(
     return bitmap
 }
 
+// 11. DIAGONAL SPLIT DATE (2x2 Square / Responsive Single Card)
+fun generateDiagonalSplitDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+
+    // 2. Base Background (Top-Left Main BG)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    // 3. Diagonal Split Accent Polygon (Bottom-Right Half)
+    val diagonalPath = Path().apply {
+        moveTo(rect.left, rect.bottom)
+        lineTo(rect.right, rect.top)
+        lineTo(rect.right, rect.bottom)
+        close()
+    }
+
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    // Clip accent triangle to match outer card corners
+    canvas.save()
+    val cardClipPath = Path().apply {
+        addRoundRect(rect, cardRadius, cardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(cardClipPath)
+    canvas.drawPath(diagonalPath, accentPaint)
+    canvas.restore()
+
+    // 4. Contrast Calculations & Color Setup
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val accentTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val cardSizeRef = minOf(rect.width(), rect.height())
+    val pad = cardSizeRef * 0.12f
+
+    // 5. Top-Left Content: Weekday Short ("WED")
+    val weekdayText = state.dayOfWeekShort.uppercase()
+    var baseWeekdaySize = cardSizeRef * 0.15f
+
+    val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseWeekdaySize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.06f
+    }
+
+    val maxTopLeftW = (rect.width() / 2f) - pad
+    if (weekdayPaint.measureText(weekdayText) > maxTopLeftW) {
+        baseWeekdaySize *= (maxTopLeftW / weekdayPaint.measureText(weekdayText))
+        weekdayPaint.textSize = baseWeekdaySize
+    }
+
+    val weekdayX = rect.left + pad
+    val weekdayY = rect.top + pad + weekdayPaint.textSize
+    canvas.drawText(weekdayText, weekdayX, weekdayY, weekdayPaint)
+
+    // 6. Bottom-Right Content: Giant Date Number ("14")
+    val dateText = state.dayOfMonth
+    var baseDateSize = cardSizeRef * 0.46f
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentTextColor
+        textSize = baseDateSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val maxDateW = (rect.width() / 2f) - pad
+    if (datePaint.measureText(dateText) > maxDateW) {
+        baseDateSize *= (maxDateW / datePaint.measureText(dateText))
+        datePaint.textSize = baseDateSize
+    }
+
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+    val dateX = rect.right - pad
+    val dateY = rect.bottom - pad - dateBounds.bottom
+
+    canvas.drawText(dateText, dateX, dateY, datePaint)
+
+    return bitmap
+}
