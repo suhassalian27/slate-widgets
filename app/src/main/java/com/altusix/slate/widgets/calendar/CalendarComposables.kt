@@ -8,20 +8,27 @@ import kotlin.text.compareTo
 import kotlin.text.toFloat
 import kotlin.times
 
+
 // --- Helper for safe background color ---
 private fun getSafeBgColor(config: SlateWidgetConfig): Int {
-    val alphaInt = ((if (config.opacity < 0.15f) 1.0f else config.opacity) * 255).toInt()
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val rawHex = config.backgroundColorHex.toInt()
-    val r = ((rawHex shr 16) and 0xFF)
-    val g = ((rawHex shr 8) and 0xFF)
-    val b = (rawHex and 0xFF)
+    val r = (rawHex shr 16) and 0xFF
+    val g = (rawHex shr 8) and 0xFF
+    val b = rawHex and 0xFF
     return Color.argb(alphaInt, r, g, b)
 }
 
 private fun getStandardCornerRadius(density: Float): Float = 22f * density
 
 // 1. CAPSULE PILL (2x1) - Fixed Height & Auto-Fitting Text
-fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState,    config: SlateWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
+fun generatePillCalendarBitmap(
+    context: Context,
+    state: CalendarPillState,
+    config: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
     val density = context.resources.displayMetrics.density
     val widthPx = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
     val heightPx = (hDp * density).toInt().coerceAtLeast((50 * density).toInt())
@@ -32,15 +39,13 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
     val w = widthPx.toFloat()
     val h = heightPx.toFloat()
 
-    // 1. EXACT BOUNDS & FIXED HEIGHT CALCULATIONS
     val padding = 6f * density
     val availW = w - (padding * 2f)
     val availH = h - (padding * 2f)
 
-    // Lock height to 62dp max so resizing on home screen expands width only
     val targetHDp = 65f
     val bodyH = (targetHDp * density).coerceAtMost(availH)
-    val bodyW = availW // Stretch horizontally across 2x1 cell space
+    val bodyW = availW
 
     val startX = (w - bodyW) / 2f
     val startY = (h - bodyH) / 2f
@@ -54,12 +59,11 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
     )
     val cardRadius = bodyH * 0.28f
 
-    // Colors
     val isLight = config.themeMode == "LIGHT"
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    val shellBgColor = if (isLight) Color.parseColor("#FFFFFF") else Color.parseColor("#141416")
-    val strokeColor = if (isLight) Color.parseColor("#FFFFFF") else Color.parseColor("#141416")
+    val shellBgColor = getSafeBgColor(config)
+    val strokeColor = if (isLight) Color.parseColor("#D1D1D6") else Color.parseColor("#2C2C2E")
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
@@ -74,11 +78,9 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
         strokeWidth = strokeW
     }
 
-    // 2. DRAW SLATE CARD CONTAINER
     canvas.drawRoundRect(cardRect, cardRadius, cardRadius, shellPaint)
     canvas.drawRoundRect(cardRect, cardRadius, cardRadius, strokePaint)
 
-    // 3. LEFT FAR-EDGE ACCENT BAR
     val accentBarW = (bodyH * 0.05f).coerceAtLeast(3f * density)
     val accentBarMargin = bodyH * 0.18f
     val accentBarRect = RectF(
@@ -93,7 +95,6 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
     }
     canvas.drawRoundRect(accentBarRect, accentBarW / 2f, accentBarW / 2f, accentPaint)
 
-    // 4. DATE NUMBER
     val dateStartX = accentBarRect.right + (bodyH * 0.14f)
     val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -106,7 +107,6 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
     val dateY = centerY - ((fmDate.descent + fmDate.ascent) / 2f)
     canvas.drawText(state.dayOfMonth, dateStartX, dateY, dateTextPaint)
 
-    // 5. VERTICAL DIVIDER LINE
     val dateW = dateTextPaint.measureText(state.dayOfMonth)
     val dividerX = dateStartX + dateW + (bodyH * 0.14f)
     val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -122,11 +122,9 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
         dividerPaint
     )
 
-    // 6. RIGHT SIDE DETAILS (Month & Full Day with Dynamic Bounds Fitting)
     val textStartX = dividerX + (bodyH * 0.14f)
     val maxAllowedTextW = (cardRect.right - textStartX - (bodyH * 0.14f)).coerceAtLeast(10f)
 
-    // Month (AUG)
     var monthTextSize = bodyH * 0.28f
     val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -141,7 +139,6 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
     }
     canvas.drawText(state.monthShort, textStartX, cardRect.top + (bodyH * 0.42f), monthPaint)
 
-    // Full Weekday Name (Auto-scales down if long, e.g. "Wednesday")
     var dayTextSize = bodyH * 0.22f
     val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
@@ -159,7 +156,7 @@ fun generatePillCalendarBitmap(    context: Context,    state: CalendarPillState
     return bitmap
 }
 
-// 2. BASIC CALENDAR (4x2 Min / Dynamic Grid Height)
+// 2. BASIC CALENDAR (4x2 Min)
 fun generateBasicCalendarBitmap(
     context: Context,
     state: CalendarDateState,
@@ -175,17 +172,13 @@ fun generateBasicCalendarBitmap(
     val canvas = Canvas(bitmap)
     val isLight = config.themeMode == "LIGHT"
 
-    // Colors & Paints
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
-    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
     val sundayAccent = Color.parseColor("#E53935")
 
-    // Background Card
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = getSafeBgColor(config) }
-    val cardRadius = 24f * density
+    val cardRadius = getStandardCornerRadius(density)
     canvas.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), cardRadius, cardRadius, bgPaint)
 
-    // Calculate month days and starting day offset (0 for Mon, 6 for Sun)
     val cal = java.util.Calendar.getInstance().apply {
         val yearInt = state.year.toString().toIntOrNull() ?: get(java.util.Calendar.YEAR)
         try {
@@ -200,20 +193,17 @@ fun generateBasicCalendarBitmap(
     }
 
     val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-    val startOffset = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 // Mon = 0 ... Sun = 6
+    val startOffset = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
     val currentDayNum = state.dayOfMonth.toIntOrNull() ?: -1
 
-    // Dynamic Row Calculation (4, 5, or 6 date rows)
     val totalCells = startOffset + daysInMonth
     val dateRowsNeeded = kotlin.math.ceil(totalCells / 7.0).toInt()
 
-    // Layout Padding & Dimensions
     val topPadding = 16f * density
     val bottomPadding = 16f * density
     val sidePadding = 20f * density
     val usableWidth = w - (sidePadding * 2)
 
-    // 1. Month Header (Center Aligned)
     val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = 15f * density
@@ -223,14 +213,12 @@ fun generateBasicCalendarBitmap(
     val headerY = topPadding + headerPaint.textSize
     canvas.drawText(state.monthShort.uppercase(), w / 2f, headerY, headerPaint)
 
-    // Grid Setup (Day-of-week header row + dynamic date rows)
     val gridTopY = headerY + (14f * density)
     val availableGridHeight = h - gridTopY - bottomPadding
-    val totalGridRows = dateRowsNeeded + 1 // +1 for M T W T F S S row
+    val totalGridRows = dateRowsNeeded + 1
     val rowHeight = availableGridHeight / totalGridRows
     val colWidth = usableWidth / 7f
 
-    // 2. Day-of-Week Headers (Row 0)
     val dayHeaderLabels = arrayOf("M", "T", "W", "T", "F", "S", "S")
     val dayHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 13f * density
@@ -245,7 +233,6 @@ fun generateBasicCalendarBitmap(
         canvas.drawText(dayHeaderLabels[col], cx, dayHeaderY, dayHeaderPaint)
     }
 
-    // 3. Days Grid (Rows 1..dateRowsNeeded)
     val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 13f * density
         typeface = Typeface.DEFAULT_BOLD
@@ -265,7 +252,6 @@ fun generateBasicCalendarBitmap(
         val cx = sidePadding + (currentCol * colWidth) + (colWidth / 2f)
         val cy = gridTopY + (currentRow * rowHeight) + (rowHeight * 0.35f)
 
-        // Highlight Current Day Box
         if (day == currentDayNum) {
             val boxSize = (rowHeight * 0.85f).coerceAtMost(colWidth * 0.85f)
             val rect = RectF(
@@ -277,7 +263,6 @@ fun generateBasicCalendarBitmap(
             canvas.drawRoundRect(rect, 8f * density, 8f * density, outlinePaint)
         }
 
-        // Draw Date Text
         dateTextPaint.color = when {
             currentCol == 6 -> sundayAccent
             else -> primaryText
@@ -296,8 +281,7 @@ fun generateBasicCalendarBitmap(
     return bitmap
 }
 
-
-// 3. BIG DATE (2x2 Square / Responsive)
+// 3. BIG DATE (2x2 Square)
 fun generateBigDateBitmap(
     context: Context,
     state: CalendarDateState,
@@ -315,9 +299,8 @@ fun generateBigDateBitmap(
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
-    val cardCornerRadius = 22f * density
+    val cardCornerRadius = getStandardCornerRadius(density)
 
-    // Responsive fills cell bounds; Fixed centers a 1:1 square
     val rect = if (isResponsive) {
         RectF(0f, 0f, w.toFloat(), h.toFloat())
     } else {
@@ -339,7 +322,6 @@ fun generateBigDateBitmap(
     val cardSizeRef = minOf(rect.width(), rect.height())
     val pad = cardSizeRef * 0.12f
 
-    // 1. Top Header (AUG 2026)
     val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = cardSizeRef * 0.10f
@@ -348,7 +330,6 @@ fun generateBigDateBitmap(
     val headerY = rect.top + pad + headerPaint.textSize
     canvas.drawText("${state.monthShort.uppercase()} ${state.year}", rect.left + pad, headerY, headerPaint)
 
-    // 2. Giant Date Number (11)
     val dateText = state.dayOfMonth
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -363,7 +344,6 @@ fun generateBigDateBitmap(
     val dateY = headerY + (remainingHeight / 2f) + (dateBounds.height() / 2f) - (4f * density)
     canvas.drawText(dateText, rect.left + pad, dateY, datePaint)
 
-    // 3. Day of Week (TUE)
     val dateWidth = datePaint.measureText(dateText)
     val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
@@ -377,7 +357,7 @@ fun generateBigDateBitmap(
     return bitmap
 }
 
-// 4. MONTH OVERLAY CALENDAR (4x2 Min / Giant Background Month Watermark)
+// 4. MONTH OVERLAY CALENDAR (4x2 Min)
 fun generateWatermarkCalendarBitmap(
     context: Context,
     state: CalendarDateState,
@@ -393,18 +373,14 @@ fun generateWatermarkCalendarBitmap(
     val canvas = Canvas(bitmap)
     val isLight = config.themeMode == "LIGHT"
 
-    // Colors & Paints
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
-    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
     val sundayAccent = Color.parseColor("#E53935")
     val watermarkColor = if (isLight) Color.parseColor("#12000000") else Color.parseColor("#1AFFFFFF")
 
-    // Background Card
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = getSafeBgColor(config) }
-    val cardRadius = 24f * density
+    val cardRadius = getStandardCornerRadius(density)
     canvas.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), cardRadius, cardRadius, bgPaint)
 
-    // Calculate month days and starting day offset (0 for Mon, 6 for Sun)
     val cal = java.util.Calendar.getInstance().apply {
         val yearInt = state.year.toString().toIntOrNull() ?: get(java.util.Calendar.YEAR)
         try {
@@ -419,14 +395,12 @@ fun generateWatermarkCalendarBitmap(
     }
 
     val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-    val startOffset = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 // Mon = 0 ... Sun = 6
+    val startOffset = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
     val currentDayNum = state.dayOfMonth.toIntOrNull() ?: -1
 
-    // Dynamic Row Calculation (4, 5, or 6 date rows)
     val totalCells = startOffset + daysInMonth
     val dateRowsNeeded = kotlin.math.ceil(totalCells / 7.0).toInt()
 
-    // 1. GIANT BACKGROUND MONTH WATERMARK ("AUG")
     val watermarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = watermarkColor
         textSize = minOf(w * 0.38f, h * 0.72f)
@@ -439,20 +413,17 @@ fun generateWatermarkCalendarBitmap(
     val watermarkY = (h / 2f) + (watermarkBounds.height() / 2f) - watermarkBounds.bottom + (4f * density)
     canvas.drawText(watermarkText, w / 2f, watermarkY, watermarkPaint)
 
-    // Layout Padding & Dimensions
     val topPadding = 18f * density
     val bottomPadding = 16f * density
     val sidePadding = 20f * density
     val usableWidth = w - (sidePadding * 2)
 
-    // Grid Setup
     val gridTopY = topPadding
     val availableGridHeight = h - gridTopY - bottomPadding
     val totalGridRows = dateRowsNeeded + 1
     val rowHeight = availableGridHeight / totalGridRows
     val colWidth = usableWidth / 7f
 
-    // 2. Day-of-Week Headers
     val dayHeaderLabels = arrayOf("M", "T", "W", "T", "F", "S", "S")
     val dayHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 13f * density
@@ -467,7 +438,6 @@ fun generateWatermarkCalendarBitmap(
         canvas.drawText(dayHeaderLabels[col], cx, dayHeaderY, dayHeaderPaint)
     }
 
-    // 3. Days Grid
     val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 13f * density
         typeface = Typeface.DEFAULT_BOLD
@@ -487,7 +457,6 @@ fun generateWatermarkCalendarBitmap(
         val cx = sidePadding + (currentCol * colWidth) + (colWidth / 2f)
         val cy = gridTopY + (currentRow * rowHeight) + (rowHeight * 0.35f)
 
-        // Highlight Current Day Box
         if (day == currentDayNum) {
             val boxSize = (rowHeight * 0.85f).coerceAtMost(colWidth * 0.85f)
             val rect = RectF(
@@ -499,7 +468,6 @@ fun generateWatermarkCalendarBitmap(
             canvas.drawRoundRect(rect, 8f * density, 8f * density, outlinePaint)
         }
 
-        // Draw Date Text
         dateTextPaint.color = when {
             currentCol == 6 -> sundayAccent
             else -> primaryText
@@ -1512,7 +1480,6 @@ fun generateSplitDashboardCalendarBitmap(
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val bgColor = getSafeBgColor(config)
 
-    // 1. Calculate Card Bounds (Responsive fills canvas; Fixed centers 2:1 aspect ratio box)
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w.toFloat(), h.toFloat())
     } else {
@@ -1537,24 +1504,20 @@ fun generateSplitDashboardCalendarBitmap(
     }
     canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
 
-    // Theme Colors
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
     val dimText = if (isLight) Color.parseColor("#C7C7CC") else Color.parseColor("#48484A")
 
-    // Dynamic contrast for active date badge
     val r = ((accentColorInt shr 16) and 0xFF) / 255f
     val g = ((accentColorInt shr 8) and 0xFF) / 255f
     val b = (accentColorInt and 0xFF) / 255f
     val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
     val activeTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
-    // Proportional Layout Calculations
     val padX = cardRect.width() * 0.06f
     val padY = cardRect.height() * 0.08f
     val leftW = cardRect.width() * 0.36f
 
-    // Grid Geometry
     val gridLeft = cardRect.left + leftW + (cardRect.width() * 0.02f)
     val gridW = cardRect.right - gridLeft - padX
     val gridTop = cardRect.top + padY
@@ -1568,9 +1531,6 @@ fun generateSplitDashboardCalendarBitmap(
 
     fun getRowBaseline(row: Int): Float = gridTop + (row * rowH) + (rowH * 0.62f)
 
-    // =========================================================================
-    // RIGHT SIDE: MONTH GRID VIEW
-    // =========================================================================
     val cal = java.util.Calendar.getInstance().apply {
         val yearInt = state.year.toIntOrNull() ?: get(java.util.Calendar.YEAR)
         try {
@@ -1588,7 +1548,6 @@ fun generateSplitDashboardCalendarBitmap(
     val firstDaySunIndex = cal.get(java.util.Calendar.DAY_OF_WEEK) - 1
     val currentDayNum = state.dayOfMonth.toIntOrNull() ?: -1
 
-    // Row 0: Headers (S M T W T F S)
     val headers = arrayOf("S", "M", "T", "W", "T", "F", "S")
     val todayColIndex = (firstDaySunIndex + currentDayNum - 1) % 7
 
@@ -1605,7 +1564,6 @@ fun generateSplitDashboardCalendarBitmap(
         canvas.drawText(headers[c], cx, row0Baseline, headerPaint)
     }
 
-    // Rows 1..5: Dates Grid
     val dateNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = fontScale
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -1675,9 +1633,6 @@ fun generateSplitDashboardCalendarBitmap(
         cellIndex++
     }
 
-    // =========================================================================
-    // LEFT SIDE: TIGHT HEADER + GRID-ALIGNED GIANT DATE
-    // =========================================================================
     val fullMonthName = when (state.monthShort.uppercase()) {
         "JAN" -> "JANUARY"
         "FEB" -> "FEBRUARY"
@@ -1708,7 +1663,6 @@ fun generateSplitDashboardCalendarBitmap(
     val leftX = cardRect.left + padX
     val maxLeftTextW = leftW - padX
 
-    // 1. MONTH NAME
     val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = (fontScale * 0.95f).coerceAtMost(cardRect.height() * 0.10f)
@@ -1722,7 +1676,6 @@ fun generateSplitDashboardCalendarBitmap(
     val monthY = getRowBaseline(0)
     canvas.drawText(fullMonthName, leftX, monthY, monthPaint)
 
-    // 2. WEEKDAY
     val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         textSize = (fontScale * 1.30f).coerceAtMost(cardRect.height() * 0.14f)
@@ -1735,7 +1688,6 @@ fun generateSplitDashboardCalendarBitmap(
     val weekdayY = monthY + (weekdayPaint.textSize * 1.08f)
     canvas.drawText(weekdayTitle, leftX, weekdayY, weekdayPaint)
 
-    // 3. GIANT DATE
     val targetGiantBaseline = getRowBaseline(5)
     val topOfGiantArea = weekdayY + (6f * density)
     val availableGiantH = (targetGiantBaseline - topOfGiantArea).coerceAtLeast(10f)
@@ -1775,7 +1727,6 @@ fun generateFocusTimelineCalendarBitmap(
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val bgColor = getSafeBgColor(config)
 
-    // 1. Calculate Card Bounds
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w.toFloat(), h.toFloat())
     } else {
@@ -1795,14 +1746,12 @@ fun generateFocusTimelineCalendarBitmap(
 
     val cardRadius = getStandardCornerRadius(density)
 
-    // Draw Left Container Background
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
 
-    // 2. Right Accent Block (~36% Width)
     val rightBlockW = cardRect.width() * 0.36f
     val rightBlockRect = RectF(
         cardRect.right - rightBlockW,
@@ -1816,7 +1765,6 @@ fun generateFocusTimelineCalendarBitmap(
         style = Paint.Style.FILL
     }
 
-    // Clip right accent block to outer card rounded corners
     canvas.save()
     val clipPath = Path().apply {
         addRoundRect(cardRect, cardRadius, cardRadius, Path.Direction.CW)
@@ -1825,19 +1773,16 @@ fun generateFocusTimelineCalendarBitmap(
     canvas.drawRect(rightBlockRect, rightBgPaint)
     canvas.restore()
 
-    // Dynamic contrast for giant date text
     val r = ((accentColorInt shr 16) and 0xFF) / 255f
     val g = ((accentColorInt shr 8) and 0xFF) / 255f
     val b = (accentColorInt and 0xFF) / 255f
     val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
     val giantDateTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
-    // 3. Colors for Left Section
     val primaryLeftText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryLeftText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
     val dividerColor = if (isLight) Color.parseColor("#1F000000") else Color.parseColor("#26FFFFFF")
 
-    // 4. Day Name Calculations
     val cal = java.util.Calendar.getInstance()
     val dayFormat = java.text.SimpleDateFormat("EEE", java.util.Locale.ENGLISH)
 
@@ -1849,7 +1794,6 @@ fun generateFocusTimelineCalendarBitmap(
     cal.add(java.util.Calendar.DAY_OF_YEAR, 2)
     val nextDayName = dayFormat.format(cal.time)
 
-    // 5. Left Timeline Section
     val leftAreaRect = RectF(
         cardRect.left,
         cardRect.top,
@@ -1917,12 +1861,10 @@ fun generateFocusTimelineCalendarBitmap(
         todayLabelPaint.textSize = baseFontSize
     }
 
-    // Row 1: Yesterday
     val fmInactive = inactiveTextPaint.fontMetrics
     val textY1 = row1CenterY - ((fmInactive.descent + fmInactive.ascent) / 2f)
     canvas.drawText(prevDayName, lineLeftX, textY1, inactiveTextPaint)
 
-    // Row 2: Today
     val accentBarH = rowH * 0.52f
     val accentBarRect = RectF(
         lineLeftX,
@@ -1945,11 +1887,9 @@ fun generateFocusTimelineCalendarBitmap(
     val dayNameWidth = activeTextPaint.measureText(todayName)
     canvas.drawText(" — today", activeTextStartX + dayNameWidth, textY2, todayLabelPaint)
 
-    // Row 3: Tomorrow
     val textY3 = row3CenterY - ((fmInactive.descent + fmInactive.ascent) / 2f)
     canvas.drawText(nextDayName, lineLeftX, textY3, inactiveTextPaint)
 
-    // 6. Right Side Block: Giant Date Number
     val maxGiantTextW = rightBlockRect.width() * 0.80f
     val maxGiantTextH = rightBlockRect.height() * 0.65f
 
@@ -1992,7 +1932,212 @@ fun generateAnalogTimelineCalendarBitmap(
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val bgColor = getSafeBgColor(config)
 
-    // 1. Calculate Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+
+    val r = ((accentColorInt shr 16) and 0xFF) / 255f
+    val g = ((accentColorInt shr 8) and 0xFF) / 255f
+    val b = (accentColorInt and 0xFF) / 255f
+    val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val activeTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val padX = cardRect.width() * 0.07f
+    val padY = cardRect.height() * 0.10f
+
+    val clockDiameter = (cardRect.height() - (padY * 2f)).coerceAtMost(cardRect.width() * 0.32f)
+    val clockCx = cardRect.left + padX + (clockDiameter / 2f)
+    val clockCy = cardRect.centerY()
+    val clockRadius = clockDiameter / 2f
+
+    val clockRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = (clockDiameter * 0.035f).coerceAtLeast(1.5f * density)
+    }
+    canvas.drawCircle(clockCx, clockCy, clockRadius - (clockRingPaint.strokeWidth / 2f), clockRingPaint)
+
+    val timeCal = java.util.Calendar.getInstance()
+    val hours = timeCal.get(java.util.Calendar.HOUR)
+    val minutes = timeCal.get(java.util.Calendar.MINUTE)
+    val seconds = timeCal.get(java.util.Calendar.SECOND)
+    val millis = timeCal.get(java.util.Calendar.MILLISECOND)
+
+    val secondsWithMillis = seconds + (millis / 1000f)
+    val minutesWithSeconds = minutes + (secondsWithMillis / 60f)
+    val hoursWithMinutes = (hours % 12) + (minutesWithSeconds / 60f)
+
+    val hourAngle = Math.toRadians((hoursWithMinutes * 30f - 90f).toDouble())
+    val minuteAngle = Math.toRadians((minutesWithSeconds * 6f - 90f).toDouble())
+    val secondAngle = Math.toRadians((secondsWithMillis * 6f - 90f).toDouble())
+
+    val hourHandLength = clockRadius * 0.48f
+    val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = (clockDiameter * 0.05f).coerceAtLeast(2.5f * density)
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        clockCx, clockCy,
+        (clockCx + hourHandLength * Math.cos(hourAngle)).toFloat(),
+        (clockCy + hourHandLength * Math.sin(hourAngle)).toFloat(),
+        hourHandPaint
+    )
+
+    val minHandLength = clockRadius * 0.72f
+    val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = (clockDiameter * 0.035f).coerceAtLeast(1.8f * density)
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        clockCx, clockCy,
+        (clockCx + minHandLength * Math.cos(minuteAngle)).toFloat(),
+        (clockCy + minHandLength * Math.sin(minuteAngle)).toFloat(),
+        minHandPaint
+    )
+
+    val secHandLength = clockRadius * 0.82f
+    val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = (clockDiameter * 0.025f).coerceAtLeast(1.2f * density)
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        clockCx, clockCy,
+        (clockCx + secHandLength * Math.cos(secondAngle)).toFloat(),
+        (clockCy + secHandLength * Math.sin(secondAngle)).toFloat(),
+        secHandPaint
+    )
+
+    val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, clockDiameter * 0.04f, capPaint)
+
+    val timelineLeft = clockCx + clockRadius + (cardRect.width() * 0.06f)
+    val timelineRight = cardRect.right - padX
+    val timelineW = timelineRight - timelineLeft
+    val timelineTop = cardRect.top + padY
+    val timelineH = cardRect.height() - (padY * 2f)
+    val rowH = timelineH / 3f
+
+    val cal = java.util.Calendar.getInstance()
+    val dayFormat = java.text.SimpleDateFormat("EEE", java.util.Locale.ENGLISH)
+
+    val todayDay = dayFormat.format(cal.time).uppercase()
+    val todayNum = cal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+
+    cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+    val prevDay = dayFormat.format(cal.time).uppercase()
+    val prevNum = cal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+
+    cal.add(java.util.Calendar.DAY_OF_YEAR, 2)
+    val nextDay = dayFormat.format(cal.time).uppercase()
+    val nextNum = cal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+
+    val pillCenterY = timelineTop + (rowH * 1.5f)
+    val pillHeight = rowH * 0.82f
+    val pillRect = RectF(
+        timelineLeft,
+        pillCenterY - (pillHeight / 2f),
+        timelineRight,
+        pillCenterY + (pillHeight / 2f)
+    )
+    val pillRadius = pillHeight * 0.28f
+    val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, pillPaint)
+
+    val fontScale = (rowH * 0.42f).coerceAtLeast(10f * density)
+    val sidePad = timelineW * 0.06f
+
+    val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = fontScale
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+    }
+
+    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeTextColor
+        textSize = fontScale * 1.1f
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+    }
+
+    fun drawTimelineRow(row: Int, dayText: String, dateText: String, isToday: Boolean) {
+        val centerY = timelineTop + (row * rowH) + (rowH / 2f)
+        val paint = if (isToday) activePaint else inactivePaint
+
+        val fm = paint.fontMetrics
+        val textY = centerY - ((fm.descent + fm.ascent) / 2f)
+
+        val leftX = timelineLeft + sidePad
+        val rightX = timelineRight - sidePad
+
+        paint.textAlign = Paint.Align.LEFT
+        canvas.drawText(dayText, leftX, textY, paint)
+
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(dateText, rightX, textY, paint)
+    }
+
+    drawTimelineRow(0, prevDay, prevNum, isToday = false)
+    drawTimelineRow(1, todayDay, todayNum, isToday = true)
+    drawTimelineRow(2, nextDay, nextNum, isToday = false)
+
+    return bitmap
+}
+
+// 15. WEEK PROGRESS CALENDAR (4x2 / Capsule Progress Tracker)
+fun generateWeekProgressCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+
+    // 1. Calculate Card Bounds (Responsive fills canvas; Fixed centers 2:1 ratio box)
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w.toFloat(), h.toFloat())
     } else {
@@ -2020,181 +2165,128 @@ fun generateAnalogTimelineCalendarBitmap(
     // Theme Colors
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val futureStrokeColor = if (isLight) Color.parseColor("#C7C7CC") else Color.parseColor("#48484A")
 
-    // Dynamic contrast for text inside active pill
-    val r = ((accentColorInt shr 16) and 0xFF) / 255f
-    val g = ((accentColorInt shr 8) and 0xFF) / 255f
-    val b = (accentColorInt and 0xFF) / 255f
-    val accentLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
-    val activeTextColor = if (accentLuminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+    val padX = cardRect.width() * 0.08f
+    val padY = cardRect.height() * 0.12f
+    val availW = cardRect.width() - (padX * 2f)
 
-    val padX = cardRect.width() * 0.07f
-    val padY = cardRect.height() * 0.10f
-
-    // =========================================================================
-    // LEFT SIDE: MINIMAL ANALOG CLOCK
-    // =========================================================================
-    val clockDiameter = (cardRect.height() - (padY * 2f)).coerceAtMost(cardRect.width() * 0.32f)
-    val clockCx = cardRect.left + padX + (clockDiameter / 2f)
-    val clockCy = cardRect.centerY()
-    val clockRadius = clockDiameter / 2f
-
-    // Clock Dial Ring
-    val clockRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        style = Paint.Style.STROKE
-        strokeWidth = (clockDiameter * 0.035f).coerceAtLeast(1.5f * density)
-    }
-    canvas.drawCircle(clockCx, clockCy, clockRadius - (clockRingPaint.strokeWidth / 2f), clockRingPaint)
-
-    // Get current time including milliseconds for smooth sweeping hands
-    val timeCal = java.util.Calendar.getInstance()
-    val hours = timeCal.get(java.util.Calendar.HOUR)
-    val minutes = timeCal.get(java.util.Calendar.MINUTE)
-    val seconds = timeCal.get(java.util.Calendar.SECOND)
-    val millis = timeCal.get(java.util.Calendar.MILLISECOND)
-
-    val secondsWithMillis = seconds + (millis / 1000f)
-    val minutesWithSeconds = minutes + (secondsWithMillis / 60f)
-    val hoursWithMinutes = (hours % 12) + (minutesWithSeconds / 60f)
-
-    val hourAngle = Math.toRadians((hoursWithMinutes * 30f - 90f).toDouble())
-    val minuteAngle = Math.toRadians((minutesWithSeconds * 6f - 90f).toDouble())
-    val secondAngle = Math.toRadians((secondsWithMillis * 6f - 90f).toDouble())
-
-    // Hour Hand
-    val hourHandLength = clockRadius * 0.48f
-    val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        style = Paint.Style.STROKE
-        strokeWidth = (clockDiameter * 0.05f).coerceAtLeast(2.5f * density)
-        strokeCap = Paint.Cap.ROUND
-    }
-    canvas.drawLine(
-        clockCx, clockCy,
-        (clockCx + hourHandLength * Math.cos(hourAngle)).toFloat(),
-        (clockCy + hourHandLength * Math.sin(hourAngle)).toFloat(),
-        hourHandPaint
-    )
-
-    // Minute Hand
-    val minHandLength = clockRadius * 0.72f
-    val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        style = Paint.Style.STROKE
-        strokeWidth = (clockDiameter * 0.035f).coerceAtLeast(1.8f * density)
-        strokeCap = Paint.Cap.ROUND
-    }
-    canvas.drawLine(
-        clockCx, clockCy,
-        (clockCx + minHandLength * Math.cos(minuteAngle)).toFloat(),
-        (clockCy + minHandLength * Math.sin(minuteAngle)).toFloat(),
-        minHandPaint
-    )
-
-    // Second Hand (Accent Colored)
-    val secHandLength = clockRadius * 0.82f
-    val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColorInt
-        style = Paint.Style.STROKE
-        strokeWidth = (clockDiameter * 0.025f).coerceAtLeast(1.2f * density)
-        strokeCap = Paint.Cap.ROUND
-    }
-    canvas.drawLine(
-        clockCx, clockCy,
-        (clockCx + secHandLength * Math.cos(secondAngle)).toFloat(),
-        (clockCy + secHandLength * Math.sin(secondAngle)).toFloat(),
-        secHandPaint
-    )
-
-    // Center Cap Dot
-    val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(clockCx, clockCy, clockDiameter * 0.04f, capPaint)
-
-    // =========================================================================
-    // RIGHT SIDE: 3-ROW TIMELINE STRIP
-    // =========================================================================
-    val timelineLeft = clockCx + clockRadius + (cardRect.width() * 0.06f)
-    val timelineRight = cardRect.right - padX
-    val timelineW = timelineRight - timelineLeft
-    val timelineTop = cardRect.top + padY
-    val timelineH = cardRect.height() - (padY * 2f)
-    val rowH = timelineH / 3f
-
-    // Dates & Day Names (Yesterday, Today, Tomorrow)
+    // Day of Week Index (Mon = 1 ... Sun = 7)
     val cal = java.util.Calendar.getInstance()
-    val dayFormat = java.text.SimpleDateFormat("EEE", java.util.Locale.ENGLISH)
+    val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
+    val currentDayIndex = if (dayOfWeek == java.util.Calendar.SUNDAY) 7 else dayOfWeek - 1
 
-    val todayDay = dayFormat.format(cal.time).uppercase()
-    val todayNum = cal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+    // Vertical Anchors
+    val headerY = cardRect.top + padY + (cardRect.height() * 0.18f)
+    val capsulesY = cardRect.top + padY + (cardRect.height() * 0.38f)
+    val footerY = cardRect.bottom - padY - (cardRect.height() * 0.02f)
 
-    cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
-    val prevDay = dayFormat.format(cal.time).uppercase()
-    val prevNum = cal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+    // =========================================================================
+    // ROW 1: REFINED TYPOGRAPHY PAIRING (e.g. "WED 12")
+    // =========================================================================
+    val dayText = state.dayOfWeekShort.uppercase()
+    val dateText = state.dayOfMonth
 
-    cal.add(java.util.Calendar.DAY_OF_YEAR, 2)
-    val nextDay = dayFormat.format(cal.time).uppercase()
-    val nextNum = cal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+    var baseHeaderSize = (cardRect.height() * 0.15f).coerceAtLeast(12f * density)
 
-    // Row 2 Active Pill Background (Today)
-    val pillCenterY = timelineTop + (rowH * 1.5f)
-    val pillHeight = rowH * 0.82f
-    val pillRect = RectF(
-        timelineLeft,
-        pillCenterY - (pillHeight / 2f),
-        timelineRight,
-        pillCenterY + (pillHeight / 2f)
-    )
-    val pillRadius = pillHeight * 0.28f
-    val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColorInt
+    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseHeaderSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        letterSpacing = 0.05f
+    }
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseHeaderSize
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    }
+
+    val spaceW = baseHeaderSize * 0.35f
+    val totalHeaderW = dayPaint.measureText(dayText) + spaceW + datePaint.measureText(dateText)
+
+    if (totalHeaderW > availW) {
+        val scale = availW / totalHeaderW
+        baseHeaderSize *= scale
+        dayPaint.textSize = baseHeaderSize
+        datePaint.textSize = baseHeaderSize
+    }
+
+    val startX = cardRect.left + padX
+    canvas.drawText(dayText, startX, headerY, dayPaint)
+    val dayW = dayPaint.measureText(dayText)
+    canvas.drawText(dateText, startX + dayW + spaceW, headerY, datePaint)
+
+    // =========================================================================
+    // ROW 2: 7 SLEEK CAPSULES TRACKER
+    // =========================================================================
+    val gap = (availW * 0.022f).coerceAtLeast(4f * density)
+    val capsuleW = (availW - (gap * 6f)) / 7f
+    val capsuleH = (cardRect.height() * 0.07f).coerceIn(5f * density, 12f * density)
+    val capsuleRadius = capsuleH / 2f
+
+    val filledPillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, pillPaint)
 
-    // Text Formatting & Measurement
-    val fontScale = (rowH * 0.42f).coerceAtLeast(10f * density)
-    val sidePad = timelineW * 0.06f
+    val strokePillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = futureStrokeColor
+        style = Paint.Style.STROKE
+        strokeWidth = (1.2f * density)
+    }
 
-    val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val cTop = capsulesY - (capsuleH / 2f)
+    val cBottom = cTop + capsuleH
+
+    for (i in 1..7) {
+        val cLeft = startX + (i - 1) * (capsuleW + gap)
+        val cRight = cLeft + capsuleW
+        val capsuleRect = RectF(cLeft, cTop, cRight, cBottom)
+
+        when {
+            i < currentDayIndex -> {
+                // Past days: Solid Primary Color
+                filledPillPaint.color = primaryText
+                canvas.drawRoundRect(capsuleRect, capsuleRadius, capsuleRadius, filledPillPaint)
+            }
+            i == currentDayIndex -> {
+                // Today: Solid Accent Color
+                filledPillPaint.color = accentColorInt
+                canvas.drawRoundRect(capsuleRect, capsuleRadius, capsuleRadius, filledPillPaint)
+            }
+            else -> {
+                // Future days: Subtle Outlined Stroke
+                val inset = strokePillPaint.strokeWidth / 2f
+                val insetRect = RectF(
+                    cLeft + inset,
+                    cTop + inset,
+                    cRight - inset,
+                    cBottom - inset
+                )
+                canvas.drawRoundRect(insetRect, capsuleRadius, capsuleRadius, strokePillPaint)
+            }
+        }
+    }
+
+    // =========================================================================
+    // ROW 3: FOOTER SUBTLE PROGRESS TEXT (e.g. "3 of 7 days this week gone")
+    // =========================================================================
+    val footerText = "$currentDayIndex of 7 days this week gone"
+    var baseFooterSize = (cardRect.height() * 0.10f).coerceAtLeast(10f * density)
+
+    val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = fontScale
-        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        textSize = baseFooterSize
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
     }
 
-    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = activeTextColor
-        textSize = fontScale * 1.1f
-        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+    if (footerPaint.measureText(footerText) > availW) {
+        baseFooterSize *= (availW / footerPaint.measureText(footerText))
+        footerPaint.textSize = baseFooterSize
     }
 
-    // Helper to render day name (Left) & date number (Right)
-    fun drawTimelineRow(row: Int, dayText: String, dateText: String, isToday: Boolean) {
-        val centerY = timelineTop + (row * rowH) + (rowH / 2f)
-        val paint = if (isToday) activePaint else inactivePaint
-
-        val fm = paint.fontMetrics
-        val textY = centerY - ((fm.descent + fm.ascent) / 2f)
-
-        val leftX = timelineLeft + sidePad
-        val rightX = timelineRight - sidePad
-
-        // Draw Day Name (Left Aligned)
-        paint.textAlign = Paint.Align.LEFT
-        canvas.drawText(dayText, leftX, textY, paint)
-
-        // Draw Date Number (Right Aligned)
-        paint.textAlign = Paint.Align.RIGHT
-        canvas.drawText(dateText, rightX, textY, paint)
-    }
-
-    // Render Rows 0, 1, 2
-    drawTimelineRow(0, prevDay, prevNum, isToday = false)
-    drawTimelineRow(1, todayDay, todayNum, isToday = true)
-    drawTimelineRow(2, nextDay, nextNum, isToday = false)
+    canvas.drawText(footerText, startX, footerY, footerPaint)
 
     return bitmap
 }

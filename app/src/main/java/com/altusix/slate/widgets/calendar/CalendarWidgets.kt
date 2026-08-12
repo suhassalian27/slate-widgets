@@ -28,7 +28,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Diagonal Split Date", "2x2", "Calendar", CalendarDiagonalSplitReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Dashboard Calendar", "4x2", "Calendar", CalendarDashboardReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Focus Timeline Calendar", "4x2", "Calendar", CalendarFocusTimelineReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Analog Timeline Hybrid", "4x2", "Calendar", CalendarAnalogTimelineReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Analog Timeline Hybrid", "4x2", "Calendar", CalendarAnalogTimelineReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Week Progress Calendar", "4x2", "Calendar", CalendarWeekProgressReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -48,7 +49,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarDiagonalSplitReceiver::class.java,
         CalendarDashboardReceiver::class.java,
         CalendarFocusTimelineReceiver::class.java,
-        CalendarAnalogTimelineReceiver::class.java
+        CalendarAnalogTimelineReceiver::class.java,
+        CalendarWeekProgressReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -256,4 +258,10 @@ class CalendarAnalogTimelineReceiver : BaseCalendarReceiver() {
         // Ensure ticker service is alive when widgets update
         context.startService(Intent(context, SlateClockTickerService::class.java))
     }
+}
+
+// 15. WEEK PROGRESS CALENDAR (4x2 / Capsule Progress Tracker)
+class CalendarWeekProgressReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateWeekProgressCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
