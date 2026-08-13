@@ -40,7 +40,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Month Progress Capsule", "2x2", "Calendar", CalendarMonthProgressCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Timeline Pillars Date", "2x2", "Calendar", CalendarTimelinePillarsReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Tilted Badge Flip Date", "2x2", "Calendar", CalendarTiltedBadgeFlipReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Solar Landscape Date", "2x2", "Calendar", CalendarSolarLandscapeReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Solar Landscape Date", "2x2", "Calendar", CalendarSolarLandscapeReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Year Matrix Progress", "4x2", "Calendar", CalendarYearMatrixReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -72,7 +73,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarMonthProgressCapsuleReceiver::class.java,
         CalendarTimelinePillarsReceiver::class.java,
         CalendarTiltedBadgeFlipReceiver::class.java,
-        CalendarSolarLandscapeReceiver::class.java
+        CalendarSolarLandscapeReceiver::class.java,
+        CalendarYearMatrixReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -353,4 +355,10 @@ class CalendarTiltedBadgeFlipReceiver : BaseCalendarReceiver() {
 class CalendarSolarLandscapeReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateSolarLandscapeDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 27. YEAR MATRIX PROGRESS (4x2 / Year Dot Matrix & Status Header)
+class CalendarYearMatrixReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateYearMatrixProgressBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }

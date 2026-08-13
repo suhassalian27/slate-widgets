@@ -4476,3 +4476,271 @@ fun generateSolarLandscapeDateBitmap(
 
     return bitmap
 }
+
+// 27. YEAR SEGMENTED TRACK (4x2 / 12-Month Capsule Chart & Hero Stat Dashboard)
+fun generateYearMatrixProgressBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#9E9E9E")
+    val trackBgColor = if (isLight) Color.parseColor("#15000000") else Color.parseColor("#1E1E22")
+
+    // 1. Calculate Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Calendar Calculations
+    val cal = java.util.Calendar.getInstance()
+    val currentMonthIdx = cal.get(java.util.Calendar.MONTH)
+    val dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH)
+    val maxDaysInCurrentMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val dayOfYear = cal.get(java.util.Calendar.DAY_OF_YEAR)
+    val totalDaysInYear = cal.getActualMaximum(java.util.Calendar.DAY_OF_YEAR)
+
+    val daysLeft = totalDaysInYear - dayOfYear
+    val yearProgress = (dayOfYear.toFloat() / totalDaysInYear.toFloat()).coerceIn(0f, 1f)
+    val percentInt = (yearProgress * 100).toInt()
+
+    val padX = cardRect.width() * 0.05f
+    val padY = cardRect.height() * 0.08f
+
+    // 3. Layout Split: Left (~30%), Right (~65% for Bars)
+    val leftWidth = cardRect.width() * 0.30f
+    val rightLeftX = cardRect.left + leftWidth + (cardRect.width() * 0.02f)
+    val rightWidth = cardRect.right - rightLeftX - padX
+
+    val leftX = cardRect.left + padX
+
+    // Chart bounds reference for vertical centering
+    val monthLabels = arrayOf("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")
+    val numMonths = 12
+
+    val chartTopY = cardRect.top + padY
+    val chartBottomY = cardRect.bottom - padY - (18f * density)
+    val chartHeight = chartBottomY - chartTopY
+
+    // 4. Hero Typography Paints
+    var labelSize = 10f * density
+    var percentSize = 54f * density
+    var subtextSize = 14f * density
+    var dateStrSize = 12f * density
+
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = labelSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.12f
+    }
+
+    val percentStr = "$percentInt%"
+    val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt // Applied accent color to hero percentage stat
+        textSize = percentSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val daysLeftStr = "$daysLeft days left"
+    val subtextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = subtextSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val fullDateStr = "${state.monthShort.uppercase()} ${state.dayOfMonth}, ${state.dayOfWeekShort.uppercase()}"
+    val dateStrPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = dateStrSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.08f
+    }
+
+    // Auto-scale left text if constrained
+    val maxLeftTextW = leftWidth - (4f * density)
+    if (percentPaint.measureText(percentStr) > maxLeftTextW) {
+        percentSize *= (maxLeftTextW / percentPaint.measureText(percentStr))
+        percentPaint.textSize = percentSize
+    }
+    if (subtextPaint.measureText(daysLeftStr) > maxLeftTextW) {
+        subtextSize *= (maxLeftTextW / subtextPaint.measureText(daysLeftStr))
+        subtextPaint.textSize = subtextSize
+    }
+    if (dateStrPaint.measureText(fullDateStr) > maxLeftTextW) {
+        dateStrSize *= (maxLeftTextW / dateStrPaint.measureText(fullDateStr))
+        dateStrPaint.textSize = dateStrSize
+    }
+
+    // 5. Vertical Centering & Precise Gap Metrics
+    val fmLbl = labelPaint.fontMetrics
+    val fmPct = percentPaint.fontMetrics
+    val fmSub = subtextPaint.fontMetrics
+    val fmDt = dateStrPaint.fontMetrics
+
+    val hLbl = fmLbl.descent - fmLbl.ascent
+    val hPct = fmPct.descent - fmPct.ascent
+    val hSub = fmSub.descent - fmSub.ascent
+    val hDt = fmDt.descent - fmDt.ascent
+
+    // Exact gaps between each line element
+    val gapLblToPct = 2f * density
+    val gapPctToSub = 2f * density
+    val gapSubToLine = 8f * density
+    val gapLineToDt = 8f * density
+    val strokeWidthLine = 1.2f * density
+
+    val totalLeftHeight = hLbl + gapLblToPct + hPct + gapPctToSub + hSub + gapSubToLine + strokeWidthLine + gapLineToDt + hDt
+
+    // Start rendering from vertically centered position relative to the chart
+    var currentY = chartTopY + ((chartHeight - totalLeftHeight) / 2f)
+
+    // Render "YEAR PROGRESS"
+    val labelY = currentY - fmLbl.ascent
+    canvas.drawText("YEAR PROGRESS", leftX, labelY, labelPaint)
+    currentY += hLbl + gapLblToPct
+
+    // Render "61%"
+    val percentY = currentY - fmPct.ascent
+    canvas.drawText(percentStr, leftX, percentY, percentPaint)
+    currentY += hPct + gapPctToSub
+
+    // Render "139 days left"
+    val subtextY = currentY - fmSub.ascent
+    canvas.drawText(daysLeftStr, leftX, subtextY, subtextPaint)
+    currentY += hSub + gapSubToLine
+
+    // Render Divider Line
+    val dividerY = currentY + (strokeWidthLine / 2f)
+    val dividerWidth = cardRect.width() * 0.16f
+    val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.STROKE
+        strokeWidth = strokeWidthLine
+        alpha = (255 * 0.35f).toInt()
+    }
+    canvas.drawLine(leftX, dividerY, leftX + dividerWidth, dividerY, dividerPaint)
+    currentY += strokeWidthLine + gapLineToDt
+
+    // Render "AUG 14, FRI"
+    val dateStrY = currentY - fmDt.ascent
+    canvas.drawText(fullDateStr, leftX, dateStrY, dateStrPaint)
+
+    // 6. Right Section: Bars & Month Labels
+    val barGap = rightWidth * 0.018f
+    val barWidth = (rightWidth - ((numMonths - 1) * barGap)) / numMonths
+    val barRadius = barWidth / 2f
+
+    val trackBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = trackBgColor
+        style = Paint.Style.FILL
+    }
+
+    val barFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+
+    // Active Month Accent Paints
+    val barFillActivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    val currentBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = 2.0f * density
+    }
+
+    val monthLabelSize = 11.5f * density
+
+    val monthLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = monthLabelSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val monthLabelActivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = monthLabelSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    for (m in 0 until numMonths) {
+        val barLeft = rightLeftX + (m * (barWidth + barGap))
+        val barRect = RectF(barLeft, chartTopY, barLeft + barWidth, chartBottomY)
+        val barCenterX = barRect.centerX()
+
+        val monthFillRatio = when {
+            m < currentMonthIdx -> 1.0f
+            m == currentMonthIdx -> (dayOfMonth.toFloat() / maxDaysInCurrentMonth.toFloat()).coerceIn(0.05f, 1.0f)
+            else -> 0.0f
+        }
+
+        // Background Track
+        canvas.drawRoundRect(barRect, barRadius, barRadius, trackBgPaint)
+
+        // Fill Progress
+        if (monthFillRatio > 0f) {
+            val fillHeight = chartHeight * monthFillRatio
+            val fillRect = RectF(barRect.left, barRect.bottom - fillHeight, barRect.right, barRect.bottom)
+            val pillPath = Path().apply { addRoundRect(barRect, barRadius, barRadius, Path.Direction.CW) }
+
+            val fillPaintToUse = if (m == currentMonthIdx) barFillActivePaint else barFillPaint
+
+            canvas.save()
+            canvas.clipPath(pillPath)
+            canvas.drawRect(fillRect, fillPaintToUse)
+            canvas.restore()
+        }
+
+        // Active Month Border Outline
+        if (m == currentMonthIdx) {
+            canvas.drawRoundRect(barRect, barRadius, barRadius, currentBorderPaint)
+        }
+
+        // Month Letter Label
+        val labelYPos = chartBottomY + (14f * density)
+        val paintToUse = if (m == currentMonthIdx) monthLabelActivePaint else monthLabelPaint
+        canvas.drawText(monthLabels[m], barCenterX, labelYPos, paintToUse)
+    }
+
+    return bitmap
+}
