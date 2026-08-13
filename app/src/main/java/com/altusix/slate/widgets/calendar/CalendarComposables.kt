@@ -3750,3 +3750,161 @@ fun generateVerticalDateWheelBitmap(
 
     return bitmap
 }
+
+// 23. MONTH PROGRESS CAPSULE (2x2 Square / Responsive Single Card)
+fun generateMonthProgressCapsuleBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // 1. Calculate Card Rect
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Month Progress Math & Day Name
+    val cal = java.util.Calendar.getInstance()
+    val currentDayNum = state.dayOfMonth.toIntOrNull() ?: cal.get(java.util.Calendar.DAY_OF_MONTH)
+    val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val progress = (currentDayNum.toFloat() / daysInMonth.toFloat()).coerceIn(0f, 1f)
+    val percentInt = (progress * 100).toInt()
+
+    val fullWeekdayName = cal.getDisplayName(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.LONG, java.util.Locale.ENGLISH) ?: state.dayOfWeekShort
+    val cardSizeRef = minOf(rect.width(), rect.height())
+
+    // 3. Draw Thinner Vertical Capsule Progress Bar
+    val pillWidth = cardSizeRef * 0.10f
+    val pillHeight = cardSizeRef * 0.58f
+    val pillLeft = rect.left + (cardSizeRef * 0.12f)
+    val pillTop = rect.centerY() - (pillHeight / 2f)
+
+    val pillRect = RectF(pillLeft, pillTop, pillLeft + pillWidth, pillTop + pillHeight)
+    val pillRadius = pillWidth / 2f
+
+    val pillPath = Path().apply {
+        addRoundRect(pillRect, pillRadius, pillRadius, Path.Direction.CW)
+    }
+
+    // Clip & fill progress height from bottom
+    canvas.save()
+    canvas.clipPath(pillPath)
+
+    val fillHeight = pillHeight * progress
+    val fillRect = RectF(pillRect.left, pillRect.bottom - fillHeight, pillRect.right, pillRect.bottom)
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(fillRect, fillPaint)
+    canvas.restore()
+
+    // Draw Capsule Outline
+    val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = 2.0f * density // Slightly slimmer stroke outline
+    }
+    canvas.drawPath(pillPath, outlinePaint)
+
+    // 4. Typography & Slimmer Weights
+    val textLeftMargin = pillRect.right + (cardSizeRef * 0.08f)
+
+    val dateText = state.dayOfMonth
+    val weekdayText = fullWeekdayName
+    val subtext = "$percentInt% through ${state.monthShort}"
+
+    // Reduced font sizes (less bulky)
+    var dateTextSize = cardSizeRef * 0.24f
+    var weekdayTextSize = cardSizeRef * 0.08f
+    var subtextSize = cardSizeRef * 0.07f
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = dateTextSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) // Lighter weight than bold
+        textAlign = Paint.Align.LEFT
+    }
+
+    val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = weekdayTextSize
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL) // Normal clean weight
+        textAlign = Paint.Align.LEFT
+    }
+
+    val subtextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = subtextSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) // Clean medium weight
+        textAlign = Paint.Align.LEFT
+    }
+
+    // Auto-scale width bounds
+    val maxTextW = rect.right - textLeftMargin - (cardSizeRef * 0.10f)
+    if (datePaint.measureText(dateText) > maxTextW) {
+        dateTextSize *= (maxTextW / datePaint.measureText(dateText))
+        datePaint.textSize = dateTextSize
+    }
+    if (weekdayPaint.measureText(weekdayText) > maxTextW) {
+        weekdayTextSize *= (maxTextW / weekdayPaint.measureText(weekdayText))
+        weekdayPaint.textSize = weekdayTextSize
+    }
+    if (subtextPaint.measureText(subtext) > maxTextW) {
+        subtextSize *= (maxTextW / subtextPaint.measureText(subtext))
+        subtextPaint.textSize = subtextSize
+    }
+
+    // 5. Calculate Vertical Alignment with Capsule Center
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+    val weekdayBounds = Rect()
+    weekdayPaint.getTextBounds(weekdayText, 0, weekdayText.length, weekdayBounds)
+
+    val subtextBounds = Rect()
+    subtextPaint.getTextBounds(subtext, 0, subtext.length, subtextBounds)
+
+    val gap1 = cardSizeRef * 0.035f
+    val gap2 = cardSizeRef * 0.03f
+
+    val totalTextH = dateBounds.height() + gap1 + weekdayBounds.height() + gap2 + subtextBounds.height()
+    val textTopY = rect.centerY() - (totalTextH / 2f)
+
+    val dateY = textTopY + dateBounds.height()
+    val weekdayY = dateY + gap1 + weekdayBounds.height()
+    val subtextY = weekdayY + gap2 + subtextBounds.height()
+
+    // Render Text Stack
+    canvas.drawText(dateText, textLeftMargin, dateY, datePaint)
+    canvas.drawText(weekdayText, textLeftMargin, weekdayY, weekdayPaint)
+    canvas.drawText(subtext, textLeftMargin, subtextY, subtextPaint)
+
+    return bitmap
+}
