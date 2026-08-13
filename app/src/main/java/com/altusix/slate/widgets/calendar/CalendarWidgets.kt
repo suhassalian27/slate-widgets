@@ -34,7 +34,9 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Overview Calendar", "4x2", "Calendar", CalendarOverviewReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Minimal Week Strip Calendar", "4x2", "Calendar", CalendarMinimalWeekStripReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Vertical Time Pill Calendar", "4x2", "Calendar", CalendarVerticalTimePillReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Timeline Progress Calendar", "4x2", "Calendar", CalendarTimelineProgressReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Timeline Progress Calendar", "4x2", "Calendar", CalendarTimelineProgressReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Page Flip Date", "2x2", "Calendar", CalendarPageFlipReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Vertical Date Wheel", "2x2", "Calendar", CalendarVerticalWheelReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -60,7 +62,9 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarOverviewReceiver::class.java,
         CalendarMinimalWeekStripReceiver::class.java,
         CalendarVerticalTimePillReceiver::class.java,
-        CalendarTimelineProgressReceiver::class.java
+        CalendarTimelineProgressReceiver::class.java,
+        CalendarPageFlipReceiver::class.java,
+        CalendarVerticalWheelReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -304,4 +308,17 @@ class CalendarVerticalTimePillReceiver : BaseCalendarReceiver() {
 class CalendarTimelineProgressReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateTimelineProgressCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+
+// 21. CORNER BADGE DATE (2x2 Square / Responsive Single Card)
+class CalendarPageFlipReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generatePageFlipDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 22. VERTICAL DATE WHEEL (2x2 Square / Responsive Single Card)
+class CalendarVerticalWheelReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateVerticalDateWheelBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }

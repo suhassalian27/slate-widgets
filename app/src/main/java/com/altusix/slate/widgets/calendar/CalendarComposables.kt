@@ -3479,3 +3479,274 @@ fun generateTimelineProgressCalendarBitmap(
 
     return bitmap
 }
+
+// 21. PAGE FLIP DATE (2x2 Square / Responsive Single Card)
+fun generatePageFlipDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardSizeRef = minOf(rect.width(), rect.height())
+    val cardRadius = 22f * density
+    val foldSize = cardSizeRef * 0.28f
+
+    // 2. Main Card Path (Bottom-right corner sliced diagonally along crease)
+    val mainCardPath = Path().apply {
+        moveTo(rect.left + cardRadius, rect.top)
+        lineTo(rect.right - cardRadius, rect.top)
+        quadTo(rect.right, rect.top, rect.right, rect.top + cardRadius)
+        lineTo(rect.right, rect.bottom - foldSize)
+        lineTo(rect.right - foldSize, rect.bottom)
+        lineTo(rect.left + cardRadius, rect.bottom)
+        quadTo(rect.left, rect.bottom, rect.left, rect.bottom - cardRadius)
+        lineTo(rect.left, rect.top + cardRadius)
+        quadTo(rect.left, rect.top, rect.left + cardRadius, rect.top)
+        close()
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(mainCardPath, bgPaint)
+
+    // 3. Folded Flap Path (Back side of turned corner)
+    val foldFlapPath = Path().apply {
+        moveTo(rect.right - foldSize, rect.bottom)
+        lineTo(rect.right - foldSize, rect.bottom - foldSize)
+        lineTo(rect.right, rect.bottom - foldSize)
+        close()
+    }
+
+    val flapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(foldFlapPath, flapPaint)
+
+    val creaseShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#26000000")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * density
+    }
+    canvas.drawLine(
+        rect.right - foldSize, rect.bottom,
+        rect.right, rect.bottom - foldSize,
+        creaseShadowPaint
+    )
+
+    // 4. Color & Typography Setup
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    val weekdayText = state.dayOfWeekShort.uppercase()
+    val dateText = state.dayOfMonth
+
+    // FONT SIZES (Controlled here)
+    var baseWeekdaySize = cardSizeRef * 0.11f
+    var baseDateSize = cardSizeRef * 0.40f // Increased from 0.38f
+
+    val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseWeekdaySize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) // Lighter weight than bold
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.12f
+    }
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = baseDateSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) // Reduced weight to medium
+        textAlign = Paint.Align.LEFT
+    }
+
+    // Auto-scale text bounds to avoid edge clipping
+    val maxContentWidth = cardSizeRef * 0.65f
+    if (weekdayPaint.measureText(weekdayText) > maxContentWidth) {
+        baseWeekdaySize *= (maxContentWidth / weekdayPaint.measureText(weekdayText))
+        weekdayPaint.textSize = baseWeekdaySize
+    }
+
+    if (datePaint.measureText(dateText) > maxContentWidth) {
+        baseDateSize *= (maxContentWidth / datePaint.measureText(dateText))
+        datePaint.textSize = baseDateSize
+    }
+
+    // 5. Position Text Stack (Left Aligned)
+    val weekdayBounds = Rect()
+    weekdayPaint.getTextBounds(weekdayText, 0, weekdayText.length, weekdayBounds)
+
+    val dateBounds = Rect()
+    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+    val leftMargin = rect.left + (cardSizeRef * 0.12f)
+    val topMargin = rect.top + (cardSizeRef * 0.14f)
+
+    val weekdayY = topMargin + weekdayBounds.height()
+    val gapBetween = cardSizeRef * 0.07f // Increased from 0.04f for a little more space
+    val dateY = weekdayY + gapBetween + dateBounds.height()
+
+    // Render Text (Left aligned using leftMargin)
+    canvas.drawText(weekdayText, leftMargin, weekdayY, weekdayPaint)
+    canvas.drawText(dateText, leftMargin, dateY, datePaint)
+
+    return bitmap
+}
+
+// 22. VERTICAL DATE WHEEL (2x2 Square / Responsive Single Card)
+fun generateVerticalDateWheelBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Calculate Card Rect (Responsive fills container; Fixed centers 1:1 square)
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Setup Relative Reference Sizes & Colors
+    val cardSizeRef = minOf(rect.width(), rect.height())
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val fadedText = if (isLight) Color.parseColor("#A0A0A5") else Color.parseColor("#4DFFFFFF")
+
+    // 3. Date Calculations (Yesterday, Today, Tomorrow)
+    val cal = java.util.Calendar.getInstance()
+    val yesterdayCal = (cal.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_MONTH, -1) }
+    val tomorrowCal = (cal.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_MONTH, 1) }
+
+    val prevDayText = yesterdayCal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+    val todayText = state.dayOfMonth
+    val weekdayText = state.dayOfWeekShort.uppercase()
+    val nextDayText = tomorrowCal.get(java.util.Calendar.DAY_OF_MONTH).toString()
+
+    // 4. Typography Paints (Single space between date and weekday)
+    var centerTextSize = cardSizeRef * 0.20f
+    val centerText = "$todayText $weekdayText"
+
+    val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = centerTextSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val fadedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fadedText
+        textSize = cardSizeRef * 0.15f
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Auto-scale center text if width exceeds card bounds
+    val maxAllowedW = rect.width() * 0.64f
+    if (centerPaint.measureText(centerText) > maxAllowedW) {
+        centerTextSize *= (maxAllowedW / centerPaint.measureText(centerText))
+        centerPaint.textSize = centerTextSize
+    }
+
+    // 5. Measure Heights & Vertical Baselines
+    val centerBounds = Rect()
+    centerPaint.getTextBounds(centerText, 0, centerText.length, centerBounds)
+
+    val nextBounds = Rect()
+    fadedPaint.getTextBounds(nextDayText, 0, nextDayText.length, nextBounds)
+
+    val cx = rect.centerX()
+    val cy = rect.centerY() + (centerBounds.height() / 2f) - centerBounds.bottom
+
+    // Draw Top Muted Date
+    val topY = rect.centerY() - (cardSizeRef * 0.22f)
+    canvas.drawText(prevDayText, cx, topY, fadedPaint)
+
+    // Draw Main Center Row ("13 THU")
+    canvas.drawText(centerText, cx, cy, centerPaint)
+
+    // Draw Bottom Muted Date
+    val bottomY = rect.centerY() + (cardSizeRef * 0.24f) + nextBounds.height()
+    canvas.drawText(nextDayText, cx, bottomY, fadedPaint)
+
+    // 6. Draw Vector Chevron Arrows
+    val centerTextWidth = centerPaint.measureText(centerText)
+    val arrowGap = cardSizeRef * 0.055f
+    val chevronWidth = cardSizeRef * 0.022f
+    val chevronHeight = cardSizeRef * 0.038f
+    val midY = rect.centerY()
+
+    val chevronPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * density
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    // Left Chevron (<)
+    val leftChevronX = cx - (centerTextWidth / 2f) - arrowGap - chevronWidth
+    val leftChevronPath = Path().apply {
+        moveTo(leftChevronX + chevronWidth, midY - chevronHeight)
+        lineTo(leftChevronX, midY)
+        lineTo(leftChevronX + chevronWidth, midY + chevronHeight)
+    }
+    canvas.drawPath(leftChevronPath, chevronPaint)
+
+    // Right Chevron (>)
+    val rightChevronX = cx + (centerTextWidth / 2f) + arrowGap
+    val rightChevronPath = Path().apply {
+        moveTo(rightChevronX, midY - chevronHeight)
+        lineTo(rightChevronX + chevronWidth, midY)
+        lineTo(rightChevronX, midY + chevronHeight)
+    }
+    canvas.drawPath(rightChevronPath, chevronPaint)
+
+    return bitmap
+}
