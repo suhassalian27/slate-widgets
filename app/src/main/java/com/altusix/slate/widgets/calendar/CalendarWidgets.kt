@@ -37,7 +37,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Timeline Progress Calendar", "4x2", "Calendar", CalendarTimelineProgressReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Page Flip Date", "2x2", "Calendar", CalendarPageFlipReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Vertical Date Wheel", "2x2", "Calendar", CalendarVerticalWheelReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Month Progress Capsule", "2x2", "Calendar", CalendarMonthProgressCapsuleReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Month Progress Capsule", "2x2", "Calendar", CalendarMonthProgressCapsuleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Timeline Pillars Date", "2x2", "Calendar", CalendarTimelinePillarsReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -66,7 +67,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarTimelineProgressReceiver::class.java,
         CalendarPageFlipReceiver::class.java,
         CalendarVerticalWheelReceiver::class.java,
-        CalendarMonthProgressCapsuleReceiver::class.java
+        CalendarMonthProgressCapsuleReceiver::class.java,
+        CalendarTimelinePillarsReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -329,4 +331,10 @@ class CalendarVerticalWheelReceiver : BaseCalendarReceiver() {
 class CalendarMonthProgressCapsuleReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateMonthProgressCapsuleBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+}
+
+// 24. TIMELINE PILLARS DATE (2x2 Square / Responsive Single Card)
+class CalendarTimelinePillarsReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTimelinePillarsBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }

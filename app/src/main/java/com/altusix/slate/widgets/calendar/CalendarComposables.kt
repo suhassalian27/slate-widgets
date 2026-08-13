@@ -3908,3 +3908,189 @@ fun generateMonthProgressCapsuleBitmap(
 
     return bitmap
 }
+
+// 24. TIMELINE PILLARS DATE (2x2 Square / Responsive Single Card)
+fun generateTimelinePillarsBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // 1. Calculate Card Rect
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    // 2. Determine Dynamic Pillar Count (3 for narrow, 5 for square/standard, 7 for wide)
+    val aspectRatio = rect.width() / rect.height().coerceAtLeast(1f)
+    val numPillars = when {
+        aspectRatio < 0.82f -> 3  // Narrow/Thin widget -> 3 Pills
+        aspectRatio > 1.35f -> 7  // Wide widget -> 7 Pills
+        else -> 5                 // Standard Square -> 5 Pills
+    }
+    val activeIndex = numPillars / 2
+
+    // 3. Contrast Check for Active Pillar Text
+    val r = Color.red(accentColorInt)
+    val g = Color.green(accentColorInt)
+    val b = Color.blue(accentColorInt)
+    val luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+    val activeTextColor = if (luminance > 0.65) Color.parseColor("#161618") else Color.WHITE
+
+    // 4. Pyramid Height Ratios
+    val heightsRatio = when (numPillars) {
+        3 -> floatArrayOf(0.65f, 1.0f, 0.65f)
+        7 -> floatArrayOf(0.38f, 0.52f, 0.68f, 1.0f, 0.68f, 0.52f, 0.38f)
+        else -> floatArrayOf(0.48f, 0.68f, 1.0f, 0.68f, 0.48f)
+    }
+
+    // 5. Geometry Setup & Variable Active Width
+    val usableWidth = rect.width() * 0.84f
+    val gap = rect.width() * 0.025f
+
+    // --- ACTIVE PILLAR WIDTH  ---
+    val activeWidthScale = 1.25f //
+
+    val normalPillWidth = (usableWidth - ((numPillars - 1) * gap)) / (numPillars - 1 + activeWidthScale)
+    val activePillWidth = normalPillWidth * activeWidthScale
+
+    val startX = rect.centerX() - (usableWidth / 2f)
+    val pillBottom = rect.bottom - (rect.height() * 0.12f)
+    val maxPillHeight = rect.height() * 0.70f
+
+    // 6. Paints Setup
+    val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = 1.8f * density
+    }
+
+    val activeFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    val dayTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = normalPillWidth * 0.5f
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    var activeWeekdaySize = activePillWidth * 0.40f
+    var activeDateSize = activePillWidth * 0.54f
+
+    val activeWeekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeTextColor
+        textSize = activeWeekdaySize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val activeDatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeTextColor
+        textSize = activeDateSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Auto-scale active text if it exceeds active pillar width
+    val maxPillTextW = activePillWidth * 0.82f
+    val weekdayStr = state.dayOfWeekShort.uppercase()
+    val dateStr = state.dayOfMonth
+
+    if (activeWeekdayPaint.measureText(weekdayStr) > maxPillTextW) {
+        activeWeekdaySize *= (maxPillTextW / activeWeekdayPaint.measureText(weekdayStr))
+        activeWeekdayPaint.textSize = activeWeekdaySize
+    }
+
+    if (activeDatePaint.measureText(dateStr) > maxPillTextW) {
+        activeDateSize *= (maxPillTextW / activeDatePaint.measureText(dateStr))
+        activeDatePaint.textSize = activeDateSize
+    }
+
+    // 7. Render Pillars with Dynamic Horizontal Positioning
+    val cal = java.util.Calendar.getInstance()
+    var currentX = startX
+
+    for (i in 0 until numPillars) {
+        val offset = i - activeIndex
+        val dayCal = (cal.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.DAY_OF_MONTH, offset)
+        }
+
+        val currentPillWidth = if (i == activeIndex) activePillWidth else normalPillWidth
+        val pillH = maxPillHeight * heightsRatio[i]
+        val pillTop = pillBottom - pillH
+        val pillRect = RectF(currentX, pillTop, currentX + currentPillWidth, pillBottom)
+        val pillRadius = currentPillWidth / 2f
+        val pillCenterX = pillRect.centerX()
+
+        if (i == activeIndex) {
+            // Active Today Pillar
+            canvas.drawRoundRect(pillRect, pillRadius, pillRadius, activeFillPaint)
+
+            val weekdayBounds = Rect()
+            activeWeekdayPaint.getTextBounds(weekdayStr, 0, weekdayStr.length, weekdayBounds)
+
+            val dateBounds = Rect()
+            activeDatePaint.getTextBounds(dateStr, 0, dateStr.length, dateBounds)
+
+            val textGap = activePillWidth * 0.15f
+            val totalBlockHeight = weekdayBounds.height() + textGap + dateBounds.height()
+            val blockTopY = pillRect.centerY() - (totalBlockHeight / 2f)
+
+            val weekdayY = blockTopY + weekdayBounds.height() - weekdayBounds.bottom
+            val dateY = weekdayY + textGap + dateBounds.height() - dateBounds.bottom
+
+            canvas.drawText(weekdayStr, pillCenterX, weekdayY, activeWeekdayPaint)
+            canvas.drawText(dateStr, pillCenterX, dateY, activeDatePaint)
+        } else {
+            // Neighbor Pillars
+            canvas.drawRoundRect(pillRect, pillRadius, pillRadius, outlinePaint)
+
+            val dayLetter = dayCal.getDisplayName(
+                java.util.Calendar.DAY_OF_WEEK,
+                java.util.Calendar.SHORT,
+                java.util.Locale.ENGLISH
+            )?.take(1)?.uppercase() ?: ""
+
+            val letterBounds = Rect()
+            dayTextPaint.getTextBounds(dayLetter, 0, dayLetter.length, letterBounds)
+            val textY = pillRect.centerY() + (letterBounds.height() / 2f) - letterBounds.bottom
+
+            canvas.drawText(dayLetter, pillCenterX, textY, dayTextPaint)
+        }
+
+        // Advance X position for the next pillar
+        currentX += currentPillWidth + gap
+    }
+
+    return bitmap
+}
