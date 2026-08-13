@@ -4094,3 +4094,157 @@ fun generateTimelinePillarsBitmap(
 
     return bitmap
 }
+
+// 25. TILTED BADGE FLIP DATE (2x2 Square / Responsive Single Card)
+fun generateTiltedBadgeFlipDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Calculate Card Rect
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
+
+    val cardSizeRef = minOf(rect.width(), rect.height())
+
+    // 2. Elements Sizing & Layout Geometry
+    val cardGap = cardSizeRef * 0.025f
+    val groupGap = cardSizeRef * 0.05f
+
+    val digitCardW = cardSizeRef * 0.22f
+    val digitCardH = cardSizeRef * 0.36f
+    val digitCardRadius = 8f * density
+
+    val badgeW = cardSizeRef * 0.36f
+    val badgeH = cardSizeRef * 0.22f
+    val badgeRadius = 8f * density
+
+    val totalGroupW = (digitCardW * 2f) + cardGap + groupGap + badgeW
+    val startX = rect.centerX() - (totalGroupW / 2f)
+    val centerY = rect.centerY()
+
+    // 3. Theme Colors for Flip Cards & Badge
+    val flipCardBg = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val flipDigitColor = if (isLight) Color.WHITE else Color.BLACK
+    val splitLineColor = if (isLight) Color.parseColor("#3A3A3C") else Color.parseColor("#1C1C1E")
+
+    // Check contrast for text inside the accent badge
+    val r = Color.red(accentColorInt)
+    val g = Color.green(accentColorInt)
+    val b = Color.blue(accentColorInt)
+    val luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+    val badgeTextColor = if (luminance > 0.65) Color.parseColor("#161618") else Color.WHITE
+
+    // 4. Draw Flip Digit Cards (Left side)
+    val rawDate = state.dayOfMonth.padStart(2, '0')
+    val digit1 = rawDate.getOrNull(0)?.toString() ?: "0"
+    val digit2 = rawDate.getOrNull(1)?.toString() ?: "1"
+    val digits = arrayOf(digit1, digit2)
+
+    val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = flipCardBg
+        style = Paint.Style.FILL
+    }
+
+    val splitLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = splitLineColor
+        style = Paint.Style.STROKE
+        strokeWidth = 2.0f * density
+    }
+
+    val digitTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = flipDigitColor
+        textSize = digitCardH * 0.68f
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val digitCardTop = centerY - (digitCardH / 2f)
+
+    for (i in 0..1) {
+        val cardLeft = startX + (i * (digitCardW + cardGap))
+        val cardRect = RectF(cardLeft, digitCardTop, cardLeft + digitCardW, digitCardTop + digitCardH)
+
+        // Draw Flip Card Background
+        canvas.drawRoundRect(cardRect, digitCardRadius, digitCardRadius, cardPaint)
+
+        // Draw Digit Number
+        val digitStr = digits[i]
+        val digitBounds = Rect()
+        digitTextPaint.getTextBounds(digitStr, 0, digitStr.length, digitBounds)
+        val digitY = cardRect.centerY() + (digitBounds.height() / 2f) - digitBounds.bottom
+        canvas.drawText(digitStr, cardRect.centerX(), digitY, digitTextPaint)
+
+        // Draw Horizontal Split Line
+        canvas.drawLine(
+            cardRect.left,
+            cardRect.centerY(),
+            cardRect.right,
+            cardRect.centerY(),
+            splitLinePaint
+        )
+    }
+
+    // 5. Draw Tilted Accent Weekday Badge (Right side)
+    val badgeLeft = startX + (digitCardW * 2f) + cardGap + groupGap
+    val badgeCenterX = badgeLeft + (badgeW / 2f)
+    val badgeCenterY = centerY
+
+    val badgeRect = RectF(-badgeW / 2f, -badgeH / 2f, badgeW / 2f, badgeH / 2f)
+
+    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = badgeTextColor
+        textSize = badgeH * 0.48f
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.08f
+    }
+
+    val weekdayStr = state.dayOfWeekShort.uppercase()
+    val badgeTextBounds = Rect()
+    badgeTextPaint.getTextBounds(weekdayStr, 0, weekdayStr.length, badgeTextBounds)
+    val badgeTextY = (badgeTextBounds.height() / 2f) - badgeTextBounds.bottom
+
+    canvas.save()
+    canvas.translate(badgeCenterX, badgeCenterY)
+    canvas.rotate(-8f) // Tilted -8 degrees counter-clockwise
+
+    canvas.drawRoundRect(badgeRect, badgeRadius, badgeRadius, badgePaint)
+    canvas.drawText(weekdayStr, 0f, badgeTextY, badgeTextPaint)
+
+    canvas.restore()
+
+    return bitmap
+}
