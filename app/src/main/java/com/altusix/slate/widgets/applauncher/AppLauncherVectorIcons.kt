@@ -1,6 +1,12 @@
 package com.altusix.slate.widgets.applauncher
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -27,7 +33,7 @@ object AppLauncherVectorIcons {
         VectorIconItem("phone", Icons.Default.Phone),
         VectorIconItem("call", Icons.Default.Call),
         VectorIconItem("email", Icons.Default.Email),
-        VectorIconItem("send", Icons.Default.Send),
+        VectorIconItem("send", Icons.AutoMirrored.Filled.Send),
         VectorIconItem("share", Icons.Default.Share),
         VectorIconItem("thumb_up", Icons.Default.ThumbUp),
         VectorIconItem("notifications", Icons.Default.Notifications),
@@ -55,20 +61,20 @@ object AppLauncherVectorIcons {
         VectorIconItem("shopping_cart", Icons.Default.ShoppingCart),
         VectorIconItem("lock", Icons.Default.Lock),
         VectorIconItem("date_range", Icons.Default.DateRange),
-        VectorIconItem("list", Icons.Default.List),
+        VectorIconItem("list", Icons.AutoMirrored.Filled.List),
         VectorIconItem("menu", Icons.Default.Menu),
         VectorIconItem("more_vert", Icons.Default.MoreVert),
         VectorIconItem("info", Icons.Default.Info),
         VectorIconItem("warning", Icons.Default.Warning),
 
         // Arrows & Navigation Controls
-        VectorIconItem("arrow_forward", Icons.Default.ArrowForward),
-        VectorIconItem("arrow_back", Icons.Default.ArrowBack),
+        VectorIconItem("arrow_forward", Icons.AutoMirrored.Filled.ArrowForward),
+        VectorIconItem("arrow_back", Icons.AutoMirrored.Filled.ArrowBack),
         VectorIconItem("arrow_drop_down", Icons.Default.ArrowDropDown),
         VectorIconItem("keyboard_arrow_down", Icons.Default.KeyboardArrowDown),
         VectorIconItem("keyboard_arrow_up", Icons.Default.KeyboardArrowUp),
-        VectorIconItem("keyboard_arrow_left", Icons.Default.KeyboardArrowLeft),
-        VectorIconItem("keyboard_arrow_right", Icons.Default.KeyboardArrowRight)
+        VectorIconItem("keyboard_arrow_left", Icons.AutoMirrored.Filled.KeyboardArrowLeft),
+        VectorIconItem("keyboard_arrow_right", Icons.AutoMirrored.Filled.KeyboardArrowRight)
     )
 
     fun findIcon(name: String): ImageVector? {
