@@ -4248,3 +4248,231 @@ fun generateTiltedBadgeFlipDateBitmap(
 
     return bitmap
 }
+
+// 26. SOLAR LANDSCAPE DATE (2x2 Square / Responsive Single Card)
+fun generateSolarLandscapeDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast(1)
+    val h = (hDp * density).toInt().coerceAtLeast(1)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // 1. Calculate Card Rect
+    val rect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val cardSize = minOf(w, h).toFloat()
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+
+    // Clip canvas to card path for smooth rounded corner bounds
+    val cardPath = Path().apply {
+        addRoundRect(rect, cardRadius, cardRadius, Path.Direction.CW)
+    }
+
+    canvas.save()
+    canvas.clipPath(cardPath)
+    canvas.drawPath(cardPath, bgPaint)
+
+    val cardSizeRef = minOf(rect.width(), rect.height())
+
+    // 2. Background Graphics Opacity & Color Setup
+    val opacityFactor = 1.0f // --- CONTROL OPACITY HERE (1.0f = 100% Solid) ---
+    val alphaInt = (255 * opacityFactor).toInt().coerceIn(0, 255)
+
+    val artColorWithAlpha = Color.argb(
+        alphaInt,
+        Color.red(accentColorInt),
+        Color.green(accentColorInt),
+        Color.blue(accentColorInt)
+    )
+
+    val bgArtFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = artColorWithAlpha
+        style = Paint.Style.FILL
+    }
+
+    val bgArtStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = artColorWithAlpha
+        style = Paint.Style.STROKE
+        strokeWidth = 3.0f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    // A. Sun (Top Right Corner)
+    val sunCenterX = rect.right - (cardSizeRef * 0.22f)
+    val sunCenterY = rect.top + (cardSizeRef * 0.22f)
+    val sunRadius = cardSizeRef * 0.11f
+    val rayInner = cardSizeRef * 0.14f
+    val rayOuter = cardSizeRef * 0.18f
+
+    canvas.drawCircle(sunCenterX, sunCenterY, sunRadius, bgArtFillPaint)
+
+    for (angle in 0 until 360 step 45) {
+        val rad = Math.toRadians(angle.toDouble())
+        val x1 = sunCenterX + (rayInner * Math.cos(rad)).toFloat()
+        val y1 = sunCenterY + (rayInner * Math.sin(rad)).toFloat()
+        val x2 = sunCenterX + (rayOuter * Math.cos(rad)).toFloat()
+        val y2 = sunCenterY + (rayOuter * Math.sin(rad)).toFloat()
+        canvas.drawLine(x1, y1, x2, y2, bgArtStrokePaint)
+    }
+
+    // B. Mountain (Anchored to Bottom)
+    val mtnLeft = rect.left + (cardSizeRef * 0.38f)
+    val mtnRight = rect.right + (cardSizeRef * 0.05f)
+    val mtnBottom = rect.bottom
+    val mtnWidth = mtnRight - mtnLeft
+
+    val peak1X = mtnLeft + (mtnWidth * 0.28f)
+    val peak1Y = mtnBottom - (cardSizeRef * 0.22f)
+
+    val peak2X = mtnLeft + (mtnWidth * 0.72f)
+    val peak2Y = mtnBottom - (cardSizeRef * 0.34f)
+
+    val valleyX = mtnLeft + (mtnWidth * 0.50f)
+    val valleyY = mtnBottom - (cardSizeRef * 0.12f)
+
+    val mtnPath = Path().apply {
+        moveTo(mtnLeft, mtnBottom)
+        lineTo(peak1X, peak1Y)
+        lineTo(valleyX, valleyY)
+        lineTo(peak2X, peak2Y)
+        lineTo(mtnRight, mtnBottom)
+        close()
+    }
+    canvas.drawPath(mtnPath, bgArtFillPaint)
+
+    // 3. Fetch Date Strings
+    val cal = java.util.Calendar.getInstance()
+    val fullWeekday = cal.getDisplayName(
+        java.util.Calendar.DAY_OF_WEEK,
+        java.util.Calendar.LONG,
+        java.util.Locale.ENGLISH
+    )?.uppercase() ?: state.dayOfWeekShort.uppercase()
+
+    val monthStr = state.monthShort.uppercase()
+    val dateStr = state.dayOfMonth
+
+    // 4. Typography Setup
+    var monthSize = cardSizeRef * 0.11f
+    var dateSize = cardSizeRef * 0.34f
+    var weekdaySize = cardSizeRef * 0.10f
+
+    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = monthSize
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.05f
+    }
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = dateSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = weekdaySize
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.05f
+    }
+
+    // Auto-scale left column text if width exceeds allowance
+    val maxTextW = cardSizeRef * 0.52f
+    if (monthPaint.measureText(monthStr) > maxTextW) {
+        monthSize *= (maxTextW / monthPaint.measureText(monthStr))
+        monthPaint.textSize = monthSize
+    }
+    if (datePaint.measureText(dateStr) > maxTextW) {
+        dateSize *= (maxTextW / datePaint.measureText(dateStr))
+        datePaint.textSize = dateSize
+    }
+    if (weekdayPaint.measureText(fullWeekday) > maxTextW) {
+        weekdaySize *= (maxTextW / weekdayPaint.measureText(fullWeekday))
+        weekdayPaint.textSize = weekdaySize
+    }
+
+    // 5. Vertical Layout Calculation
+    val fmMonth = monthPaint.fontMetrics
+    val fmDate = datePaint.fontMetrics
+    val fmWeekday = weekdayPaint.fontMetrics
+
+    val monthH = fmMonth.descent - fmMonth.ascent
+    val dateH = fmDate.descent - fmDate.ascent
+    val weekdayH = fmWeekday.descent - fmWeekday.ascent
+
+    val gap1 = -cardSizeRef * 0.05f
+    val gap2 = -cardSizeRef * 0.04f
+
+    val totalTextH = monthH + gap1 + dateH + gap2 + weekdayH
+    val textTopY = rect.centerY() - (totalTextH / 2f)
+
+    val leftMargin = rect.left + (cardSizeRef * 0.12f)
+
+    val monthY = textTopY - fmMonth.ascent
+    val dateY = monthY + fmMonth.descent + gap1 - fmDate.ascent
+    val weekdayY = dateY + fmDate.descent + gap2 - fmWeekday.ascent
+
+    // 6. PASS 1: Render Base Text Across Main Canvas
+    canvas.drawText(monthStr, leftMargin, monthY, monthPaint)
+    canvas.drawText(dateStr, leftMargin, dateY, datePaint)
+    canvas.drawText(fullWeekday, leftMargin, weekdayY, weekdayPaint)
+
+    // 7. PASS 2: Dual-Pass Smart Clipping for Overlapping Text
+    if (opacityFactor > 0.4f) {
+        // Calculate contrast color for text passing OVER the mountain shape
+        val r = Color.red(accentColorInt)
+        val g = Color.green(accentColorInt)
+        val b = Color.blue(accentColorInt)
+        val mtnLuminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+        val mtnTextColor = if (mtnLuminance > 0.60) {
+            bgColor // Dark text when mountain is light/white
+        } else {
+            Color.WHITE // White text when mountain is dark
+        }
+
+        val monthMtnPaint = Paint(monthPaint).apply { color = mtnTextColor }
+        val dateMtnPaint = Paint(datePaint).apply { color = mtnTextColor }
+        val weekdayMtnPaint = Paint(weekdayPaint).apply { color = mtnTextColor }
+
+        canvas.save()
+        canvas.clipPath(mtnPath) // Clip strictly inside mountain bounds
+
+        // Draw same text block again in inverted color
+        canvas.drawText(monthStr, leftMargin, monthY, monthMtnPaint)
+        canvas.drawText(dateStr, leftMargin, dateY, dateMtnPaint)
+        canvas.drawText(fullWeekday, leftMargin, weekdayY, weekdayMtnPaint)
+
+        canvas.restore()
+    }
+
+    canvas.restore()
+
+    return bitmap
+}
