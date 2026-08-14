@@ -33,6 +33,8 @@ import com.altusix.slate.widgets.clock.analog.ClockTripleOrbitalDotsReceiver
 import com.altusix.slate.widgets.clock.analog.ClockSectorSweepReceiver
 import com.altusix.slate.widgets.clock.analog.ClockRotatingRingReceiver
 import com.altusix.slate.widgets.clock.analog.ClockHourglassReceiver
+import com.altusix.slate.widgets.clock.analog.ClockMinimalDotsReceiver
+
 class SlateClockTickerService : Service() {
 
     private var tickerJob: Job? = null
@@ -94,7 +96,8 @@ class SlateClockTickerService : Service() {
             ClockTripleOrbitalDotsReceiver::class.java,
             ClockSectorSweepReceiver::class.java,
             ClockRotatingRingReceiver::class.java,
-            ClockHourglassReceiver::class.java
+            ClockHourglassReceiver::class.java,
+            ClockMinimalDotsReceiver::class.java
         )
 
         var totalActiveWidgets = 0
