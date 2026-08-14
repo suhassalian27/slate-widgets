@@ -55,11 +55,13 @@ class SlateClockTickerService : Service() {
         val ids14 = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogTimelineReceiver::class.java)) ?: intArrayOf()
         val ids28 = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogCalendarHybridReceiver::class.java)) ?: intArrayOf()
         val ids29 = manager.getAppWidgetIds(ComponentName(context, CalendarArchitecturalAnalogReceiver::class.java)) ?: intArrayOf()
+        val ids30 = manager.getAppWidgetIds(ComponentName(context, CalendarRadialArcReceiver::class.java)) ?: intArrayOf()
 
         val updates = listOf(
             Pair(ids14, CalendarAnalogTimelineReceiver::class.java),
             Pair(ids28, CalendarAnalogCalendarHybridReceiver::class.java),
-            Pair(ids29, CalendarArchitecturalAnalogReceiver::class.java)
+            Pair(ids29, CalendarArchitecturalAnalogReceiver::class.java),
+            Pair(ids30, CalendarRadialArcReceiver::class.java)
         )
 
         for ((ids, receiverClass) in updates) {
@@ -72,7 +74,7 @@ class SlateClockTickerService : Service() {
             }
         }
 
-        if (ids14.isEmpty() && ids28.isEmpty() && ids29.isEmpty()) {
+        if (ids14.isEmpty() && ids28.isEmpty() && ids29.isEmpty() && ids30.isEmpty()) {
             stopSelf()
         }
     }

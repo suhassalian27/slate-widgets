@@ -43,7 +43,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Solar Landscape Date", "2x2", "Calendar", CalendarSolarLandscapeReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Year Matrix Progress", "4x2", "Calendar", CalendarYearMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Analog Month Dashboard", "4x2", "Calendar", CalendarAnalogCalendarHybridReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Architectural Analog Dashboard", "4x2", "Calendar", CalendarArchitecturalAnalogReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Architectural Analog Dashboard", "4x2", "Calendar", CalendarArchitecturalAnalogReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Radial Arc Orbital Dashboard", "4x2", "Calendar", CalendarRadialArcReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -78,7 +79,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarSolarLandscapeReceiver::class.java,
         CalendarYearMatrixReceiver::class.java,
         CalendarAnalogCalendarHybridReceiver::class.java,
-        CalendarArchitecturalAnalogReceiver::class.java
+        CalendarArchitecturalAnalogReceiver::class.java,
+        CalendarRadialArcReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -394,6 +396,28 @@ class CalendarArchitecturalAnalogReceiver : BaseCalendarReceiver() {
 
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateArchitecturalAnalogDashboardBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+}
+
+// 30. RADIAL ARC ORBITAL DASHBOARD (4x2 / Concentric Time Arcs & Life Progress)
+class CalendarRadialArcReceiver : BaseCalendarReceiver() {
+
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateRadialArcDashboardBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
