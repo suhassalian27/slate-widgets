@@ -52,30 +52,27 @@ class SlateClockTickerService : Service() {
     private fun updateAnalogClockWidgets(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
 
-        // Collect IDs for both analog clock receivers
         val ids14 = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogTimelineReceiver::class.java)) ?: intArrayOf()
         val ids28 = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogCalendarHybridReceiver::class.java)) ?: intArrayOf()
+        val ids29 = manager.getAppWidgetIds(ComponentName(context, CalendarArchitecturalAnalogReceiver::class.java)) ?: intArrayOf()
 
-        // Trigger update for Widget #14
-        if (ids14.isNotEmpty()) {
-            val intent = Intent(context, CalendarAnalogTimelineReceiver::class.java).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids14)
+        val updates = listOf(
+            Pair(ids14, CalendarAnalogTimelineReceiver::class.java),
+            Pair(ids28, CalendarAnalogCalendarHybridReceiver::class.java),
+            Pair(ids29, CalendarArchitecturalAnalogReceiver::class.java)
+        )
+
+        for ((ids, receiverClass) in updates) {
+            if (ids.isNotEmpty()) {
+                val intent = Intent(context, receiverClass).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                }
+                context.sendBroadcast(intent)
             }
-            context.sendBroadcast(intent)
         }
 
-        // Trigger update for Widget #28
-        if (ids28.isNotEmpty()) {
-            val intent = Intent(context, CalendarAnalogCalendarHybridReceiver::class.java).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids28)
-            }
-            context.sendBroadcast(intent)
-        }
-
-        // Stop service only if NO analog widgets exist on screen
-        if (ids14.isEmpty() && ids28.isEmpty()) {
+        if (ids14.isEmpty() && ids28.isEmpty() && ids29.isEmpty()) {
             stopSelf()
         }
     }

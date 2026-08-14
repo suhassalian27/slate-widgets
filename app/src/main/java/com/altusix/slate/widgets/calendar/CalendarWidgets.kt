@@ -42,7 +42,8 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Tilted Badge Flip Date", "2x2", "Calendar", CalendarTiltedBadgeFlipReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Solar Landscape Date", "2x2", "Calendar", CalendarSolarLandscapeReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Year Matrix Progress", "4x2", "Calendar", CalendarYearMatrixReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Analog Month Dashboard", "4x2", "Calendar", CalendarAnalogCalendarHybridReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Analog Month Dashboard", "4x2", "Calendar", CalendarAnalogCalendarHybridReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Architectural Analog Dashboard", "4x2", "Calendar", CalendarArchitecturalAnalogReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -76,7 +77,8 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarTiltedBadgeFlipReceiver::class.java,
         CalendarSolarLandscapeReceiver::class.java,
         CalendarYearMatrixReceiver::class.java,
-        CalendarAnalogCalendarHybridReceiver::class.java
+        CalendarAnalogCalendarHybridReceiver::class.java,
+        CalendarArchitecturalAnalogReceiver::class.java
     )
 
     for (receiver in receivers) {
@@ -383,6 +385,28 @@ class CalendarAnalogCalendarHybridReceiver : BaseCalendarReceiver() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
         // Ensure ticker service is alive when widgets update
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+}
+
+// 29. ARCHITECTURAL ANALOG DASHBOARD (4x2 / Sculpted Dial & Day Progress)
+class CalendarArchitecturalAnalogReceiver : BaseCalendarReceiver() {
+
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateArchitecturalAnalogDashboardBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
         context.startService(Intent(context, SlateClockTickerService::class.java))
     }
 }

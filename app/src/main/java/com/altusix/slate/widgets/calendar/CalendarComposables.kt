@@ -5057,3 +5057,344 @@ fun generateAnalogCalendarHybridBitmap(
 
     return bitmap
 }
+
+// 29. ARCHITECTURAL ANALOG DASHBOARD (4x2 / Sculpted Dial & Day Progress)
+fun generateArchitecturalAnalogDashboardBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#9E9E9E")
+    val trackBgColor = if (isLight) Color.parseColor("#12000000") else Color.parseColor("#1EFFFFFF")
+
+    // 1. Calculate Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = 22f * density
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.06f
+    val padY = cardRect.height() * 0.08f
+
+    // 2. Layout Split: Compact Clock (~35%), Generous Gap (~6%), Expanded Dashboard (~53%)
+    val leftWidth = cardRect.width() * 0.35f
+    val gapX = cardRect.width() * 0.06f
+    val rightLeftX = cardRect.left + leftWidth + gapX
+    val rightWidth = cardRect.right - rightLeftX - padX
+
+    // 3. LEFT SECTION: ARCHITECTURAL CLOCK DIAL
+    val maxClockDim = minOf(cardRect.height() - (padY * 2f), leftWidth)
+    val clockCx = cardRect.left + padX + (leftWidth - padX) / 2f
+    val clockCy = cardRect.centerY()
+    val clockRadius = (maxClockDim / 2f) - (2f * density)
+
+    // Time Calculations
+    val timeCal = java.util.Calendar.getInstance()
+    val hours = timeCal.get(java.util.Calendar.HOUR)
+    val minutes = timeCal.get(java.util.Calendar.MINUTE)
+    val seconds = timeCal.get(java.util.Calendar.SECOND)
+    val millis = timeCal.get(java.util.Calendar.MILLISECOND)
+
+    val secondsWithMillis = seconds + (millis / 1000f)
+    val minutesWithSeconds = minutes + (secondsWithMillis / 60f)
+    val hoursWithMinutes = (hours % 12) + (minutesWithSeconds / 60f)
+
+    val hourAngle = Math.toRadians((hoursWithMinutes * 30f - 90f).toDouble())
+    val minuteAngle = Math.toRadians((minutesWithSeconds * 6f - 90f).toDouble())
+    val secondAngle = Math.toRadians((secondsWithMillis * 6f - 90f).toDouble())
+
+    // A. Outer Sweeping Minute Progress Ring Track
+    val arcStrokeW = 2.5f * density
+    val arcRect = RectF(
+        clockCx - clockRadius,
+        clockCy - clockRadius,
+        clockCx + clockRadius,
+        clockCy + clockRadius
+    )
+
+    val trackBgArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = trackBgColor
+        style = Paint.Style.STROKE
+        strokeWidth = arcStrokeW
+    }
+    canvas.drawOval(arcRect, trackBgArcPaint)
+
+    val minProgressSweep = (minutesWithSeconds / 60f) * 360f
+    val activeArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = arcStrokeW
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawArc(arcRect, -90f, minProgressSweep, false, activeArcPaint)
+
+    // B. Dial Face Plate
+    val innerPlateRadius = clockRadius - (5f * density)
+    val platePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#08000000") else Color.parseColor("#12FFFFFF")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, innerPlateRadius, platePaint)
+
+    // C. Cardinal Numbers (12, 3, 6, 9)
+    val cardinalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = 22f * density
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        alpha = (255 * 0.20f).toInt()
+    }
+    val cardPosOffset = innerPlateRadius * 0.76f
+    val cardinalFm = cardinalPaint.fontMetrics
+    val textYCenter = -((cardinalFm.descent + cardinalFm.ascent) / 2f)
+
+    canvas.drawText("12", clockCx, clockCy - cardPosOffset + textYCenter, cardinalPaint)
+    canvas.drawText("3", clockCx + cardPosOffset, clockCy + textYCenter, cardinalPaint)
+    canvas.drawText("6", clockCx, clockCy + cardPosOffset + textYCenter, cardinalPaint)
+    canvas.drawText("9", clockCx - cardPosOffset, clockCy + textYCenter, cardinalPaint)
+
+    // D. Clock Hands
+    // 1. Hour Hand
+    val hourLength = innerPlateRadius * 0.48f
+    val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = 3.8f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        clockCx, clockCy,
+        (clockCx + hourLength * Math.cos(hourAngle)).toFloat(),
+        (clockCy + hourLength * Math.sin(hourAngle)).toFloat(),
+        hourPaint
+    )
+
+    // 2. Minute Hand
+    val minLength = innerPlateRadius * 0.78f
+    val minTailLength = innerPlateRadius * 0.18f
+    val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = 2.0f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        (clockCx - minTailLength * Math.cos(minuteAngle)).toFloat(),
+        (clockCy - minTailLength * Math.sin(minuteAngle)).toFloat(),
+        (clockCx + minLength * Math.cos(minuteAngle)).toFloat(),
+        (clockCy + minLength * Math.sin(minuteAngle)).toFloat(),
+        minPaint
+    )
+
+    // 3. Accent Second Hand
+    val secLength = innerPlateRadius * 0.86f
+    val secTailLength = innerPlateRadius * 0.22f
+    val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        (clockCx - secTailLength * Math.cos(secondAngle)).toFloat(),
+        (clockCy - secTailLength * Math.sin(secondAngle)).toFloat(),
+        (clockCx + secLength * Math.cos(secondAngle)).toFloat(),
+        (clockCy + secLength * Math.sin(secondAngle)).toFloat(),
+        secPaint
+    )
+
+    // Center Pivot Ring
+    val centerRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, 3.5f * density, centerRingPaint)
+
+    val centerCutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, 1.8f * density, centerCutoutPaint)
+
+    // 4. RIGHT SECTION: HERO DASHBOARD & DAY PROGRESS
+    val fullMonthName = when (state.monthShort.uppercase()) {
+        "JAN" -> "JANUARY"
+        "FEB" -> "FEBRUARY"
+        "MAR" -> "MARCH"
+        "APR" -> "APRIL"
+        "MAY" -> "MAY"
+        "JUN" -> "JUNE"
+        "JUL" -> "JULY"
+        "AUG" -> "AUGUST"
+        "SEP" -> "SEPTEMBER"
+        "OCT" -> "OCTOBER"
+        "NOV" -> "NOVEMBER"
+        "DEC" -> "DECEMBER"
+        else -> state.monthShort.uppercase()
+    }
+
+    val dayOfWeekFull = when (state.dayOfWeekShort.uppercase()) {
+        "MON" -> "MONDAY"
+        "TUE" -> "TUESDAY"
+        "WED" -> "WEDNESDAY"
+        "THU" -> "THURSDAY"
+        "FRI" -> "FRIDAY"
+        "SAT" -> "SATURDAY"
+        "SUN" -> "SUNDAY"
+        else -> state.dayOfWeekShort.uppercase()
+    }
+
+    // Typography Setup
+    var dateNumSize = 52f * density
+    var monthTitleSize = 16f * density
+    var dayTagSize = 14f * density
+    var progLabelSize = 9f * density
+
+    val monthTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = monthTitleSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.08f
+    }
+
+    val dateNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = dateNumSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val dayTagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = dayTagSize
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.10f
+    }
+
+    val progLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = progLabelSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.10f
+    }
+
+    val progValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = progLabelSize
+        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val dateStr = state.dayOfMonth.padStart(2, '0')
+    val yearStr = timeCal.get(java.util.Calendar.YEAR).toString()
+    val monthYearText = "$fullMonthName $yearStr"
+
+    // Measure Heights & Center Vertically
+    val fmMonth = monthTitlePaint.fontMetrics
+    val fmDate = dateNumPaint.fontMetrics
+    val fmTag = dayTagPaint.fontMetrics
+    val fmProg = progLabelPaint.fontMetrics
+
+    val hMonth = fmMonth.descent - fmMonth.ascent
+    val hDate = fmDate.descent - fmDate.ascent
+    val hTag = fmTag.descent - fmTag.ascent
+    val hProgLabel = fmProg.descent - fmProg.ascent
+
+    val gap1 = 2f * density
+    val gap2 = 2f * density
+    val gapToProgress = 10f * density
+    val gapToBar = 4f * density
+    val barHeight = 5f * density
+
+    val totalDashHeight = hMonth + gap1 + hDate + gap2 + hTag + gapToProgress + hProgLabel + gapToBar + barHeight
+    var dashStartY = cardRect.centerY() - (totalDashHeight / 2f)
+
+    // Render Month & Year Title
+    val monthY = dashStartY - fmMonth.ascent
+    canvas.drawText(monthYearText, rightLeftX, monthY, monthTitlePaint)
+    dashStartY += hMonth + gap1
+
+    // Render Giant Date Number
+    val dateY = dashStartY - fmDate.ascent
+    canvas.drawText(dateStr, rightLeftX, dateY, dateNumPaint)
+    dashStartY += hDate + gap2
+
+    // Render Day of Week Subtitle
+    val tagY = dashStartY - fmTag.ascent
+    canvas.drawText(dayOfWeekFull, rightLeftX, tagY, dayTagPaint)
+    dashStartY += hTag + gapToProgress
+
+    // 5. Day Progress Sub-header & Capsule Bar
+    val totalSecondsInDay = 24 * 3600f
+    val elapsedSecondsInDay = (timeCal.get(java.util.Calendar.HOUR_OF_DAY) * 3600) +
+            (minutes * 60) + seconds
+    val dayProgressRatio = (elapsedSecondsInDay / totalSecondsInDay).coerceIn(0f, 1f)
+    val dayPercent = (dayProgressRatio * 100).toInt()
+
+    // Draw Sub-header ("DAY PROGRESS" & "50%")
+    val progLabelY = dashStartY - fmProg.ascent
+    canvas.drawText("DAY PROGRESS", rightLeftX, progLabelY, progLabelPaint)
+    canvas.drawText("$dayPercent%", rightLeftX + rightWidth, progLabelY, progValPaint)
+    dashStartY += hProgLabel + gapToBar
+
+    // Draw Capsule Track
+    val progressRect = RectF(
+        rightLeftX,
+        dashStartY,
+        rightLeftX + rightWidth,
+        dashStartY + barHeight
+    )
+    val progressRadius = barHeight / 2f
+
+    val progressBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = trackBgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(progressRect, progressRadius, progressRadius, progressBgPaint)
+
+    // Draw Active Progress Pill
+    if (dayProgressRatio > 0f) {
+        val fillW = (rightWidth * dayProgressRatio).coerceAtLeast(barHeight)
+        val fillRect = RectF(rightLeftX, dashStartY, rightLeftX + fillW, dashStartY + barHeight)
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(fillRect, progressRadius, progressRadius, fillPaint)
+    }
+
+    return bitmap
+}
