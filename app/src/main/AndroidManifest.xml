@@ -1035,6 +1035,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 15. Tactical Radar Scope Dial (2x2) -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockRadarScopeReceiver"
+            android:exported="true"
+            android:label="Slate Tactical Radar Scope Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

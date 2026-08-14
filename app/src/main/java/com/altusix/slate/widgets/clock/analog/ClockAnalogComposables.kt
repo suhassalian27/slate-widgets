@@ -2115,3 +2115,148 @@ fun generateMinimalDotsClockBitmap(
 
     return bitmap
 }
+
+// 15. TACTICAL RADAR SCOPE DIAL (2x2 Circular / Live Radar Sweep Face)
+fun generateRadarScopeClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val gridColor = if (isLight) Color.parseColor("#1E000000") else Color.parseColor("#25FFFFFF")
+
+    // 1. Calculate Fixed Circular Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+    val radius = size / 2f
+
+    val timeState = AnalogClockTimeState.now()
+
+    // 2. Radar Grid (Concentric Range Rings & Crosshairs)
+    val scopeRadius = radius * 0.85f
+    val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = gridColor
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.008f
+    }
+
+    // Range Rings
+    canvas.drawCircle(clockCx, clockCy, scopeRadius, gridPaint)
+    canvas.drawCircle(clockCx, clockCy, scopeRadius * 0.62f, gridPaint)
+    canvas.drawCircle(clockCx, clockCy, scopeRadius * 0.32f, gridPaint)
+
+    // Crosshair Guidelines
+    canvas.drawLine(clockCx - scopeRadius, clockCy, clockCx + scopeRadius, clockCy, gridPaint)
+    canvas.drawLine(clockCx, clockCy - scopeRadius, clockCx, clockCy + scopeRadius, gridPaint)
+
+    // 3. Live Trailing Radar Sweep Sector (40-degree beam attached to seconds)
+    val secDeg = timeState.secondsWithMillis * 6f
+    val sweepRect = RectF(
+        clockCx - scopeRadius, clockCy - scopeRadius,
+        clockCx + scopeRadius, clockCy + scopeRadius
+    )
+
+    val sweepPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(
+            38,
+            Color.red(accentColorInt),
+            Color.green(accentColorInt),
+            Color.blue(accentColorInt)
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawArc(sweepRect, secDeg - 90f - 40f, 40f, true, sweepPaint)
+
+    // 4. Rotated Hands
+    val hourDeg = timeState.hoursWithMinutes * 30f
+    val minDeg = timeState.minutesWithSeconds * 6f
+
+    // A. Hour Hand (Solid Capsule Target Lock)
+    val hourWidth = size * 0.055f
+    val hourLen = scopeRadius * 0.48f
+    val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.save()
+    canvas.rotate(hourDeg, clockCx, clockCy)
+    val hourRect = RectF(
+        clockCx - (hourWidth / 2f),
+        clockCy - hourLen,
+        clockCx + (hourWidth / 2f),
+        clockCy + (hourWidth * 0.4f)
+    )
+    canvas.drawRoundRect(hourRect, hourWidth / 2f, hourWidth / 2f, hourPaint)
+    canvas.restore()
+
+    // B. Minute Hand (Wand with Target Lock Reticle Tip)
+    val minWidth = size * 0.016f
+    val minLen = scopeRadius * 0.76f
+    val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = minWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    val minRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.012f
+    }
+    canvas.save()
+    canvas.rotate(minDeg, clockCx, clockCy)
+    canvas.drawLine(clockCx, clockCy, clockCx, clockCy - minLen, minPaint)
+    canvas.drawCircle(clockCx, clockCy - minLen, size * 0.028f, minRingPaint)
+    canvas.restore()
+
+    // C. Second Hand (Leading Radar Beam Needle)
+    val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.010f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.save()
+    canvas.rotate(secDeg, clockCx, clockCy)
+    canvas.drawLine(clockCx, clockCy + (scopeRadius * 0.15f), clockCx, clockCy - scopeRadius, secPaint)
+    canvas.restore()
+
+    // D. Radar Pivot Core
+    val pivotRadius = size * 0.028f
+    val pivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val pivotCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, pivotRadius, pivotPaint)
+    canvas.drawCircle(clockCx, clockCy, pivotRadius * 0.5f, pivotCorePaint)
+
+    return bitmap
+}

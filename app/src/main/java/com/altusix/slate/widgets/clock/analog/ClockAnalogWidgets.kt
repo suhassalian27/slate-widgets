@@ -26,7 +26,8 @@ fun getClockAnalogWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Sector Sweep Accent Dial", "2x2", "Clock – Analog", ClockSectorSweepReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Triple Rotating Ring Dial", "2x2", "Clock – Analog", ClockRotatingRingReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Hourglass Dynamic Accent Dial", "2x2", "Clock – Analog", ClockHourglassReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Minimal Dot Matrix Dial", "2x2", "Clock – Analog", ClockMinimalDotsReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Minimal Dot Matrix Dial", "2x2", "Clock – Analog", ClockMinimalDotsReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Tactical Radar Scope Dial", "2x2", "Clock – Analog", ClockRadarScopeReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -46,7 +47,8 @@ fun updateAllClockAnalogWidgets(context: Context) {
         ClockSectorSweepReceiver::class.java,
         ClockRotatingRingReceiver::class.java,
         ClockHourglassReceiver::class.java,
-        ClockMinimalDotsReceiver::class.java
+        ClockMinimalDotsReceiver::class.java,
+        ClockRadarScopeReceiver::class.java
     )
 
     for (receiverClass in receivers) {
@@ -338,6 +340,27 @@ class ClockHourglassReceiver : BaseCalendarReceiver() {
 class ClockMinimalDotsReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateMinimalDotsClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+}
+
+// 15. TACTICAL RADAR SCOPE DIAL (2x2 Circular)
+class ClockRadarScopeReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateRadarScopeClockBitmap(context, config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
