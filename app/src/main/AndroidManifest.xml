@@ -60,8 +60,9 @@
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- Clock Ticker Service (Crucial for clock hand updates) -->
         <service
-            android:name=".widgets.calendar.SlateClockTickerService"
+            android:name=".core.service.SlateClockTickerService"
             android:enabled="true"
             android:exported="false" />
 
@@ -855,6 +856,70 @@
             android:name=".widgets.calendar.CalendarRadialArcReceiver"
             android:exported="true"
             android:label="Slate Radial Arc Orbital Dashboard">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+
+        <!-- ================================================================= -->
+        <!-- CLOCK WIDGETS                                                     -->
+        <!-- ================================================================= -->
+        <!-- CLOCK-ANALOG WIDGETS                                              -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockAnalogPrecisionReceiver"
+            android:exported="true"
+            android:label="Slate Analog Precision Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 2. Bauhaus Geometric Dial (2x2) -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockBauhausReceiver"
+            android:exported="true"
+            android:label="Slate Bauhaus Geometric Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 3. Chrono Architect Dual Dial (4x2) -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockChronoArchitectReceiver"
+            android:exported="true"
+            android:label="Slate Chrono Architect Dual Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+        <!-- 4. Cyber Skeleton Ring Dial (2x2) -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockCyberSkeletonReceiver"
+            android:exported="true"
+            android:label="Slate Cyber Skeleton Ring Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 5. Horizon Offset Analog (4x2) -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockHorizonOffsetReceiver"
+            android:exported="true"
+            android:label="Slate Horizon Offset Analog">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

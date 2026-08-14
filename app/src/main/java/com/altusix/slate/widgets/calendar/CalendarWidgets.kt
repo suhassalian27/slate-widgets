@@ -12,6 +12,7 @@ import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.core.service.SlateClockTickerService
 
 fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -280,12 +281,11 @@ class CalendarAnalogTimelineReceiver : BaseCalendarReceiver() {
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        context.startService(Intent(context, SlateClockTickerService::class.java))
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // Ensure ticker service is alive when widgets update
         context.startService(Intent(context, SlateClockTickerService::class.java))
     }
 }
