@@ -14,9 +14,7 @@ import com.altusix.slate.widgets.calendar.CalendarArchitecturalAnalogReceiver
 import com.altusix.slate.widgets.calendar.CalendarRadialArcReceiver
 import com.altusix.slate.widgets.clock.analog.ClockAnalogPrecisionReceiver
 import com.altusix.slate.widgets.clock.analog.ClockBauhausReceiver
-import com.altusix.slate.widgets.clock.analog.ClockChronoArchitectReceiver
 import com.altusix.slate.widgets.clock.analog.ClockCyberSkeletonReceiver
-import com.altusix.slate.widgets.clock.analog.ClockHorizonOffsetReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -81,9 +79,7 @@ class SlateClockTickerService : Service() {
             // Clock - Analog Widgets
             ClockAnalogPrecisionReceiver::class.java,
             ClockBauhausReceiver::class.java,
-            ClockChronoArchitectReceiver::class.java,
             ClockCyberSkeletonReceiver::class.java,
-            ClockHorizonOffsetReceiver::class.java
         )
 
         var totalActiveWidgets = 0

@@ -891,19 +891,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 3. Chrono Architect Dual Dial (4x2) -->
-        <receiver
-            android:name=".widgets.clock.analog.ClockChronoArchitectReceiver"
-            android:exported="true"
-            android:label="Slate Chrono Architect Dual Dial">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x2" />
-        </receiver>
-        <!-- 4. Cyber Skeleton Ring Dial (2x2) -->
+        <!-- 3. Cyber Skeleton Ring Dial (2x2) -->
         <receiver
             android:name=".widgets.clock.analog.ClockCyberSkeletonReceiver"
             android:exported="true"
@@ -915,18 +903,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 5. Horizon Offset Analog (4x2) -->
-        <receiver
-            android:name=".widgets.clock.analog.ClockHorizonOffsetReceiver"
-            android:exported="true"
-            android:label="Slate Horizon Offset Analog">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x2_min" />
-        </receiver>
+
 
 
     </application>
