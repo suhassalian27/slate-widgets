@@ -51,15 +51,31 @@ class SlateClockTickerService : Service() {
 
     private fun updateAnalogClockWidgets(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
-        val ids = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogTimelineReceiver::class.java))
-        if (ids != null && ids.isNotEmpty()) {
+
+        // Collect IDs for both analog clock receivers
+        val ids14 = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogTimelineReceiver::class.java)) ?: intArrayOf()
+        val ids28 = manager.getAppWidgetIds(ComponentName(context, CalendarAnalogCalendarHybridReceiver::class.java)) ?: intArrayOf()
+
+        // Trigger update for Widget #14
+        if (ids14.isNotEmpty()) {
             val intent = Intent(context, CalendarAnalogTimelineReceiver::class.java).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids14)
             }
             context.sendBroadcast(intent)
-        } else {
-            // Stop service if no analog clock widgets exist on screen
+        }
+
+        // Trigger update for Widget #28
+        if (ids28.isNotEmpty()) {
+            val intent = Intent(context, CalendarAnalogCalendarHybridReceiver::class.java).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids28)
+            }
+            context.sendBroadcast(intent)
+        }
+
+        // Stop service only if NO analog widgets exist on screen
+        if (ids14.isEmpty() && ids28.isEmpty()) {
             stopSelf()
         }
     }
