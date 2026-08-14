@@ -17,6 +17,7 @@ import com.altusix.slate.widgets.clock.analog.ClockBauhausReceiver
 import com.altusix.slate.widgets.clock.analog.ClockCyberSkeletonReceiver
 import com.altusix.slate.widgets.clock.analog.ClockSculptedPillReceiver
 import com.altusix.slate.widgets.clock.analog.ClockBoldTypographyReceiver
+import com.altusix.slate.widgets.clock.analog.ClockCyberCondensedReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,7 +31,6 @@ class SlateClockTickerService : Service() {
 
     private var tickerJob: Job? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -51,7 +51,6 @@ class SlateClockTickerService : Service() {
         } catch (_: Exception) {}
         startTicking()
     }
-
     private fun startTicking() {
         if (tickerJob?.isActive == true) return
         tickerJob = serviceScope.launch {
@@ -61,12 +60,10 @@ class SlateClockTickerService : Service() {
             }
         }
     }
-
     private fun stopTicking() {
         tickerJob?.cancel()
         tickerJob = null
     }
-
     private fun updateAllTickingWidgets(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
 
@@ -84,6 +81,7 @@ class SlateClockTickerService : Service() {
             ClockCyberSkeletonReceiver::class.java,
             ClockSculptedPillReceiver::class.java,
             ClockBoldTypographyReceiver::class.java,
+            ClockCyberCondensedReceiver::class.java
         )
 
         var totalActiveWidgets = 0

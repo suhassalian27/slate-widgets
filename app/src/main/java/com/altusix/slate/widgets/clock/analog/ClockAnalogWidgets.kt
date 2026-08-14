@@ -8,6 +8,8 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.service.SlateClockTickerService
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.calendar.BaseCalendarReceiver
+import com.altusix.slate.R
+import androidx.core.content.res.ResourcesCompat
 
 fun getClockAnalogWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -16,6 +18,7 @@ fun getClockAnalogWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Cyber Skeleton Ring Dial", "2x2", "Clock – Analog", ClockCyberSkeletonReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Sculpted Pill Minimal Dial", "2x2", "Clock – Analog", ClockSculptedPillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Bold Typographic Cardinal Dial", "2x2", "Clock – Analog", ClockBoldTypographyReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Cyber Condensed Cardinal Dial", "2x2", "Clock – Analog", ClockCyberCondensedReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -26,7 +29,8 @@ fun updateAllClockAnalogWidgets(context: Context) {
         ClockBauhausReceiver::class.java,
         ClockCyberSkeletonReceiver::class.java,
         ClockSculptedPillReceiver::class.java,
-        ClockBoldTypographyReceiver::class.java
+        ClockBoldTypographyReceiver::class.java,
+        ClockCyberCondensedReceiver::class.java
     )
 
     for (receiverClass in receivers) {
@@ -129,6 +133,27 @@ class ClockSculptedPillReceiver : BaseCalendarReceiver() {
 class ClockBoldTypographyReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateBoldTypographyClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+}
+
+// 6. CYBER CONDENSED CARDINAL DIAL (2x2 Circular)
+class ClockCyberCondensedReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateCyberCondensedClockBitmap(context, config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)

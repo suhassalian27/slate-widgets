@@ -9,6 +9,10 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.altusix.slate.data.local.SlateWidgetConfig
 import java.util.Calendar
+import androidx.core.content.res.ResourcesCompat
+import com.altusix.slate.R
+
+
 
 private fun getSafeBgColor(config: SlateWidgetConfig): Int {
     return try {
@@ -695,6 +699,177 @@ fun generateBoldTypographyClockBitmap(
         style = Paint.Style.FILL
     }
     canvas.drawCircle(clockCx, clockCy, size * 0.018f, hubCenterPaint)
+
+    return bitmap
+}
+
+// 6. CYBER CONDENSED CARDINAL DIAL (2x2 Circular / Ultra-Stylized Industrial Face)
+fun generateCyberCondensedClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // Subtle dark tint for background numerals
+    val numeralColor = if (isLight) Color.parseColor("#22000000") else Color.parseColor("#2BFFFFFF")
+
+    // Load custom font from res/font/outward_block.ttf
+    val customTypeface = try {
+        ResourcesCompat.getFont(context, R.font.outward_block) ?: Typeface.DEFAULT_BOLD
+    } catch (_: Exception) {
+        Typeface.create("sans-serif-condensed", Typeface.BOLD)
+    }
+
+    // 1. Calculate Fixed Circular Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+    val radius = size / 2f
+
+    val timeState = AnalogClockTimeState.now()
+
+    // 2. High-Impact Typography using Custom Outward Block Font
+    val sideNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = numeralColor
+        textSize = size * 1f
+        typeface = customTypeface
+        textAlign = Paint.Align.CENTER
+    }
+
+    val fmSide = sideNumPaint.fontMetrics
+    val sideYCenter = clockCy - ((fmSide.descent + fmSide.ascent) / 1.57f)
+
+    // Draw Left "9" and Right "3"
+    canvas.drawText("9", clockCx - (size * 0.25f), sideYCenter, sideNumPaint)
+    canvas.drawText("3", clockCx + (size * 0.25f), sideYCenter, sideNumPaint)
+
+    val topNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = numeralColor
+        textSize = size * 0.5f
+        typeface = customTypeface
+        textAlign = Paint.Align.CENTER
+    }
+
+    val fmTop = topNumPaint.fontMetrics
+    val topYCenter = (clockCy - size * 0.25f) - ((fmTop.descent + fmTop.ascent) / 2f)
+    val bottomYCenter = (clockCy + size * 0.33f) - ((fmTop.descent + fmTop.ascent) / 2f)
+
+    // Draw Top "12" and Bottom "06"
+    canvas.drawText("12", clockCx, topYCenter, topNumPaint)
+    canvas.drawText("06", clockCx, bottomYCenter, topNumPaint)
+
+    // 3. Rotated Precision Hands
+    val hourDeg = (timeState.hoursWithMinutes * 30f)
+    val minDeg = (timeState.minutesWithSeconds * 6f)
+    val secDeg = (timeState.secondsWithMillis * 6f)
+
+    // A. HOUR HAND: Slotted Architectural Capsule Blade
+    val hourWidth = size * 0.068f
+    val hourLength = radius * 0.44f
+    val hourTail = size * 0.025f
+    val slotWidth = hourWidth * 0.35f
+
+    val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    val slotCutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+
+    canvas.save()
+    canvas.rotate(hourDeg, clockCx, clockCy)
+    val hourRect = RectF(
+        clockCx - (hourWidth / 2f),
+        clockCy - hourLength,
+        clockCx + (hourWidth / 2f),
+        clockCy + hourTail
+    )
+    canvas.drawRoundRect(hourRect, hourWidth / 2f, hourWidth / 2f, hourPaint)
+
+    val slotRect = RectF(
+        clockCx - (slotWidth / 2f),
+        clockCy - (hourLength * 0.82f),
+        clockCx + (slotWidth / 2f),
+        clockCy - (hourLength * 0.20f)
+    )
+    canvas.drawRoundRect(slotRect, slotWidth / 2f, slotWidth / 2f, slotCutoutPaint)
+    canvas.restore()
+
+    // B. MINUTE HAND: Clean Minimal Precision Wand
+    val minWidth = size * 0.018f
+    val minLength = radius * 0.70f
+    val minTail = radius * 0.10f
+
+    val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = minWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    canvas.save()
+    canvas.rotate(minDeg, clockCx, clockCy)
+    canvas.drawLine(
+        clockCx, clockCy + minTail,
+        clockCx, clockCy - minLength,
+        minPaint
+    )
+    canvas.restore()
+
+    // C. SECOND HAND: Accent Line with Dual Ring Pivot Hub
+    val secLen = radius * 0.82f
+    val secTailLen = radius * 0.18f
+    val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.009f
+        strokeCap = Paint.Cap.ROUND
+    }
+    val secHubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val secCutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+
+    canvas.save()
+    canvas.rotate(secDeg, clockCx, clockCy)
+    canvas.drawLine(
+        clockCx, clockCy + secTailLen,
+        clockCx, clockCy - secLen,
+        secPaint
+    )
+    canvas.drawCircle(clockCx, clockCy, size * 0.024f, secHubPaint)
+    canvas.drawCircle(clockCx, clockCy, size * 0.012f, secCutoutPaint)
+    canvas.restore()
 
     return bitmap
 }
