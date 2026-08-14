@@ -1059,3 +1059,172 @@ fun generateCapsuleSkeletonClockBitmap(
 
     return bitmap
 }
+
+// 8. APEX ARROWHEAD CARDINAL DIAL (2x2 Circular / Accent Arrowhead Markers & Ball-Tip Hands)
+fun generateApexArrowheadClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // 1. Calculate Fixed Circular Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+    val radius = size / 2f
+
+    val timeState = AnalogClockTimeState.now()
+
+    // 2. Hour Markers (Cardinal Inward Arrowheads & Minor Line Ticks)
+    val margin = size * 0.06f
+    val outerR = radius - margin
+
+    val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.012f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val arrowLen = size * 0.16f
+    val arrowWidth = size * 0.08f
+
+    for (i in 0 until 12) {
+        val angleRad = Math.toRadians((i * 30f - 90f).toDouble())
+        val isCardinal = (i % 3 == 0)
+
+        if (isCardinal) {
+            // Draw Sharp Inward Arrowhead Path for 12, 3, 6, 9
+            val cosA = Math.cos(angleRad).toFloat()
+            val sinA = Math.sin(angleRad).toFloat()
+
+            // Perpendicular unit vector
+            val perpX = -sinA
+            val perpY = cosA
+
+            val baseX = clockCx + outerR * cosA
+            val baseY = clockCy + outerR * sinA
+
+            val tipX = clockCx + (outerR - arrowLen) * cosA
+            val tipY = clockCy + (outerR - arrowLen) * sinA
+
+            val corner1X = baseX + (arrowWidth / 2f) * perpX
+            val corner1Y = baseY + (arrowWidth / 2f) * perpY
+
+            val corner2X = baseX - (arrowWidth / 2f) * perpX
+            val corner2Y = baseY - (arrowWidth / 2f) * perpY
+
+            val arrowPath = android.graphics.Path().apply {
+                moveTo(corner1X, corner1Y)
+                lineTo(tipX, tipY)
+                lineTo(corner2X, corner2Y)
+                close()
+            }
+            canvas.drawPath(arrowPath, arrowPaint)
+        } else {
+            // Draw Clean Line Ticks for Minor Hours
+            val tickLen = size * 0.06f
+            val innerR = outerR - tickLen
+
+            val x1 = (clockCx + innerR * Math.cos(angleRad)).toFloat()
+            val y1 = (clockCy + innerR * Math.sin(angleRad)).toFloat()
+            val x2 = (clockCx + outerR * Math.cos(angleRad)).toFloat()
+            val y2 = (clockCy + outerR * Math.sin(angleRad)).toFloat()
+
+            canvas.drawLine(x1, y1, x2, y2, tickPaint)
+        }
+    }
+
+    // 3. Rotated Precision Ball-Tip Hands
+    val hourDeg = (timeState.hoursWithMinutes * 30f)
+    val minDeg = (timeState.minutesWithSeconds * 6f)
+    val secDeg = (timeState.secondsWithMillis * 6f)
+
+    val handLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.016f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    val dotBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.008f
+    }
+
+    // A. Hour Hand (Ball-Tip Wand)
+    val hourLen = radius * 0.44f
+    val hourDotR = size * 0.026f
+    canvas.save()
+    canvas.rotate(hourDeg, clockCx, clockCy)
+    canvas.drawLine(clockCx, clockCy, clockCx, clockCy - hourLen, handLinePaint)
+    canvas.drawCircle(clockCx, clockCy - hourLen, hourDotR, dotPaint)
+    canvas.drawCircle(clockCx, clockCy - hourLen, hourDotR, dotBorderPaint)
+    canvas.restore()
+
+    // B. Minute Hand (Longer Ball-Tip Wand)
+    val minLen = radius * 0.70f
+    val minDotR = size * 0.024f
+    canvas.save()
+    canvas.rotate(minDeg, clockCx, clockCy)
+    canvas.drawLine(clockCx, clockCy, clockCx, clockCy - minLen, handLinePaint)
+    canvas.drawCircle(clockCx, clockCy - minLen, minDotR, dotPaint)
+    canvas.drawCircle(clockCx, clockCy - minLen, minDotR, dotBorderPaint)
+    canvas.restore()
+
+    // C. Pivot Ring Hub
+    val pivotRadius = size * 0.032f
+    canvas.drawCircle(clockCx, clockCy, pivotRadius, dotPaint)
+    canvas.drawCircle(clockCx, clockCy, pivotRadius, dotBorderPaint)
+
+    // D. Second Hand (Thin Needle)
+    val secLen = radius * 0.82f
+    val secTailLen = radius * 0.16f
+    val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.008f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.save()
+    canvas.rotate(secDeg, clockCx, clockCy)
+    canvas.drawLine(clockCx, clockCy + secTailLen, clockCx, clockCy - secLen, secPaint)
+    canvas.restore()
+
+    return bitmap
+}

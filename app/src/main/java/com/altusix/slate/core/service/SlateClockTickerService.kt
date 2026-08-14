@@ -8,6 +8,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.IBinder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import com.altusix.slate.widgets.calendar.CalendarAnalogCalendarHybridReceiver
 import com.altusix.slate.widgets.calendar.CalendarAnalogTimelineReceiver
 import com.altusix.slate.widgets.calendar.CalendarArchitecturalAnalogReceiver
@@ -19,14 +27,7 @@ import com.altusix.slate.widgets.clock.analog.ClockSculptedPillReceiver
 import com.altusix.slate.widgets.clock.analog.ClockBoldTypographyReceiver
 import com.altusix.slate.widgets.clock.analog.ClockCyberCondensedReceiver
 import com.altusix.slate.widgets.clock.analog.ClockCapsuleSkeletonReceiver
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import com.altusix.slate.widgets.clock.analog.ClockApexArrowheadReceiver
 
 class SlateClockTickerService : Service() {
 
@@ -83,7 +84,8 @@ class SlateClockTickerService : Service() {
             ClockSculptedPillReceiver::class.java,
             ClockBoldTypographyReceiver::class.java,
             ClockCyberCondensedReceiver::class.java,
-            ClockCapsuleSkeletonReceiver::class.java
+            ClockCapsuleSkeletonReceiver::class.java,
+            ClockApexArrowheadReceiver::class.java
         )
 
         var totalActiveWidgets = 0

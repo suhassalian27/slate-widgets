@@ -951,6 +951,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 8. Apex Arrowhead Cardinal Dial (2x2) -->
+        <receiver
+            android:name=".widgets.clock.analog.ClockApexArrowheadReceiver"
+            android:exported="true"
+            android:label="Slate Apex Arrowhead Cardinal Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>
