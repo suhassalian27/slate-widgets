@@ -467,3 +467,234 @@ fun generateCyberSkeletonClockBitmap(
     return bitmap
 }
 
+// 4. SCULPTED PILL MINIMAL DIAL (2x2 Square / Ultra-Minimal Capsule Hands & Orbital Node)
+fun generateSculptedPillClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#9E9E9E")
+
+    // 1. Calculate Fixed Circular Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    // Draw perfect circular container
+    canvas.drawOval(cardRect, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+    val radius = size / 2f
+
+    val timeState = AnalogClockTimeState.now()
+
+    // 2. Subtle Outer Orbital Ring Track & Accent Satellite Node
+    val trackRadius = radius - (size * 0.08f)
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#0F000000") else Color.parseColor("#14FFFFFF")
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.008f
+    }
+    canvas.drawCircle(clockCx, clockCy, trackRadius, trackPaint)
+
+    // Orbiting Accent Node (Seconds Satellite)
+    val satX = (clockCx + trackRadius * Math.cos(timeState.secondAngleRad)).toFloat()
+    val satY = (clockCy + trackRadius * Math.sin(timeState.secondAngleRad)).toFloat()
+
+    val satPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(satX, satY, size * 0.022f, satPaint)
+
+    // 3. Hour Hand: Bold Sculpted Capsule / Pill Blade
+    val hourLen = trackRadius * 0.42f
+    val hourWidth = size * 0.085f
+    val hourTipX = (clockCx + hourLen * Math.cos(timeState.hourAngleRad)).toFloat()
+    val hourTipY = (clockCy + hourLen * Math.sin(timeState.hourAngleRad)).toFloat()
+
+    val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = hourWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(clockCx, clockCy, hourTipX, hourTipY, hourPaint)
+
+    // 4. Minute Hand: Sleek Tapered Pill Needle
+    val minLen = trackRadius * 0.76f
+    val minWidth = size * 0.038f
+    val minTipX = (clockCx + minLen * Math.cos(timeState.minuteAngleRad)).toFloat()
+    val minTipY = (clockCy + minLen * Math.sin(timeState.minuteAngleRad)).toFloat()
+
+    val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.STROKE
+        strokeWidth = minWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(clockCx, clockCy, minTipX, minTipY, minPaint)
+
+    // 5. Center Hub Cutout / Pivot Ring
+    val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, size * 0.028f, hubOuterPaint)
+
+    val hubInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, size * 0.014f, hubInnerPaint)
+
+    return bitmap
+}
+
+// 5. BOLD TYPOGRAPHIC CARDINAL DIAL (2x2 Square / Giant Overlaid Cardinal Numerals)
+fun generateBoldTypographyClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+
+    // Mid-tone numeral color with clean opacity depth
+    val numeralColor = if (isLight) Color.parseColor("#3B000000") else Color.parseColor("#45FFFFFF")
+
+    // 1. Calculate Fixed Square Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cardRadius = size * 0.18f
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+
+    val timeState = AnalogClockTimeState.now()
+
+    // 2. Proportional Cardinal Numerals (Sized & Offset to Prevent Collisions)
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = numeralColor
+        textSize = size * 0.35f
+        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val fm = numPaint.fontMetrics
+    val textYCenter = -((fm.descent + fm.ascent) / 2f)
+
+    val numOffset = size * 0.26f
+
+    // "12" Top
+    canvas.drawText("12", clockCx, clockCy - numOffset + textYCenter, numPaint)
+    // "3" Right
+    canvas.drawText("3", clockCx + numOffset, clockCy + textYCenter, numPaint)
+    // "6" Bottom
+    canvas.drawText("6", clockCx, clockCy + numOffset + textYCenter, numPaint)
+    // "9" Left
+    canvas.drawText("9", clockCx - numOffset, clockCy + textYCenter, numPaint)
+
+    // 3. Heavy Capsule Clock Hands
+    // Hour Hand
+    val hourLen = size * 0.21f
+    val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.048f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        clockCx, clockCy,
+        (clockCx + hourLen * Math.cos(timeState.hourAngleRad)).toFloat(),
+        (clockCy + hourLen * Math.sin(timeState.hourAngleRad)).toFloat(),
+        hourHandPaint
+    )
+
+    // Minute Hand
+    val minLen = size * 0.34f
+    val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.038f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        clockCx, clockCy,
+        (clockCx + minLen * Math.cos(timeState.minuteAngleRad)).toFloat(),
+        (clockCy + minLen * Math.sin(timeState.minuteAngleRad)).toFloat(),
+        minHandPaint
+    )
+
+    // Second Hand
+    val secLen = size * 0.38f
+    val secTailLen = size * 0.08f
+    val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.010f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        (clockCx - secTailLen * Math.cos(timeState.secondAngleRad)).toFloat(),
+        (clockCy - secTailLen * Math.sin(timeState.secondAngleRad)).toFloat(),
+        (clockCx + secLen * Math.cos(timeState.secondAngleRad)).toFloat(),
+        (clockCy + secLen * Math.sin(timeState.secondAngleRad)).toFloat(),
+        secHandPaint
+    )
+
+    // 4. Center Hub Pivot
+    val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, size * 0.038f, hubOuterPaint)
+
+    val hubCenterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, size * 0.018f, hubCenterPaint)
+
+    return bitmap
+}
