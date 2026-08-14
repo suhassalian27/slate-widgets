@@ -20,7 +20,9 @@ fun getClockAnalogWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Bold Typographic Cardinal Dial", "2x2", "Clock – Analog", ClockBoldTypographyReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Cyber Condensed Cardinal Dial", "2x2", "Clock – Analog", ClockCyberCondensedReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Capsule Skeleton Accent Dial", "2x2", "Clock – Analog", ClockCapsuleSkeletonReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Apex Arrowhead Cardinal Dial", "2x2", "Clock – Analog", ClockApexArrowheadReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Apex Arrowhead Cardinal Dial", "2x2", "Clock – Analog", ClockApexArrowheadReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Concentric Orbital Arc Dial", "2x2", "Clock – Analog", ClockConcentricOrbitalReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Triple Orbital Dots Dial", "2x2", "Clock – Analog", ClockTripleOrbitalDotsReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -34,7 +36,9 @@ fun updateAllClockAnalogWidgets(context: Context) {
         ClockBoldTypographyReceiver::class.java,
         ClockCyberCondensedReceiver::class.java,
         ClockCapsuleSkeletonReceiver::class.java,
-        ClockApexArrowheadReceiver::class.java
+        ClockApexArrowheadReceiver::class.java,
+        ClockConcentricOrbitalReceiver::class.java,
+        ClockTripleOrbitalDotsReceiver::class.java
     )
 
     for (receiverClass in receivers) {
@@ -200,6 +204,48 @@ class ClockCapsuleSkeletonReceiver : BaseCalendarReceiver() {
 class ClockApexArrowheadReceiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateApexArrowheadClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+}
+
+// 9. CONCENTRIC ORBITAL ARC DIAL (2x2 Circular)
+class ClockConcentricOrbitalReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateConcentricOrbitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        context.stopService(Intent(context, SlateClockTickerService::class.java))
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        context.startService(Intent(context, SlateClockTickerService::class.java))
+    }
+}
+
+// 10. TRIPLE ORBITAL DOTS DIAL (2x2 Circular)
+class ClockTripleOrbitalDotsReceiver : BaseCalendarReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTripleOrbitalDotsClockBitmap(context, config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)

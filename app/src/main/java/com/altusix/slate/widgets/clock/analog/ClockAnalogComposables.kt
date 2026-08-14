@@ -1228,3 +1228,229 @@ fun generateApexArrowheadClockBitmap(
 
     return bitmap
 }
+
+// 9. CONCENTRIC ORBITAL ARC DIAL (2x2 Circular / Swapped Rings & Customizable Controls)
+fun generateConcentricOrbitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#20000000") else Color.parseColor("#25FFFFFF")
+
+    // 1. Calculate Fixed Circular Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+    val radius = size / 2f
+
+    val timeState = AnalogClockTimeState.now()
+
+    // -------------------------------------------------------------------------
+    // 🎛️ DESIGN TUNING CONTROLS (Adjust these variables to change geometry)
+    // -------------------------------------------------------------------------
+    val outerRadiusMultiplier = 0.76f  // Outer Ring Radius (Minute Arc)
+    val innerRadiusMultiplier = 0.58f  // Inner Ring Radius (Hour Arc) -> WIDER GAP
+    val secOrbitMultiplier    = 0.89f  // Orbiting Seconds Dot Radius
+
+    val outerStrokeWidth      = size * 0.030f // Thicker Minute Ring
+    val innerStrokeWidth      = size * 0.035f // Thicker Hour Ring
+    val bgTrackStrokeWidth    = size * 0.018f // Dark Background Track Thickness
+    val secondsDotSize        = size * 0.028f // Orbiting Seconds Satellite Size
+    // -------------------------------------------------------------------------
+
+    val outerRadius = radius * outerRadiusMultiplier
+    val innerRadius = radius * innerRadiusMultiplier
+    val secOrbitRadius = radius * secOrbitMultiplier
+
+    // Background Ring Tracks
+    val trackPaintOuter = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.STROKE
+        strokeWidth = bgTrackStrokeWidth
+    }
+    val trackPaintInner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.STROKE
+        strokeWidth = bgTrackStrokeWidth
+    }
+
+    canvas.drawCircle(clockCx, clockCy, outerRadius, trackPaintOuter)
+    canvas.drawCircle(clockCx, clockCy, innerRadius, trackPaintInner)
+
+    // 2. OUTER RING: MINUTE PROGRESS ARC
+    val minProgress = timeState.minutesWithSeconds / 60f
+    val minSweepAngle = (minProgress * 360f).coerceAtLeast(1f)
+
+    val minArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = outerStrokeWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    val outerRect = RectF(
+        clockCx - outerRadius, clockCy - outerRadius,
+        clockCx + outerRadius, clockCy + outerRadius
+    )
+    canvas.drawArc(outerRect, -90f, minSweepAngle, false, minArcPaint)
+
+    // 3. INNER RING: HOUR PROGRESS ARC
+    val hourProgress = (timeState.hoursWithMinutes % 12f) / 12f
+    val hourSweepAngle = (hourProgress * 360f).coerceAtLeast(1f)
+
+    val hourArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = innerStrokeWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    val innerRect = RectF(
+        clockCx - innerRadius, clockCy - innerRadius,
+        clockCx + innerRadius, clockCy + innerRadius
+    )
+    canvas.drawArc(innerRect, -90f, hourSweepAngle, false, hourArcPaint)
+
+    // 4. ORBITING SECONDS SATELLITE NODE
+    val secX = (clockCx + secOrbitRadius * Math.cos(timeState.secondAngleRad)).toFloat()
+    val secY = (clockCy + secOrbitRadius * Math.sin(timeState.secondAngleRad)).toFloat()
+
+    val secDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(secX, secY, secondsDotSize, secDotPaint)
+
+    return bitmap
+}
+
+// 10. TRIPLE ORBITAL DOTS DIAL (2x2 Circular / Minimalist 3-Node Planetary Clock)
+fun generateTripleOrbitalDotsClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#20000000") else Color.parseColor("#25FFFFFF")
+
+    // 1. Calculate Fixed Circular Card Bounds
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+    val radius = size / 2f
+
+    val timeState = AnalogClockTimeState.now()
+
+    // -------------------------------------------------------------------------
+    // 🎛️ DESIGN TUNING CONTROLS
+    // -------------------------------------------------------------------------
+    val secOrbitMultiplier  = 0.86f // Outer Track (Seconds)
+    val minOrbitMultiplier  = 0.68f // Middle Track (Minutes)
+    val hourOrbitMultiplier = 0.50f // Inner Track (Hours)
+
+    val trackStrokeWidth = size * 0.014f // Track Ring Thickness
+    val hourDotRadius    = size * 0.038f // Inner Hour Node Radius
+    val minDotRadius     = size * 0.030f // Middle Minute Node Radius
+    val secDotRadius     = size * 0.022f // Outer Second Node Radius
+    // -------------------------------------------------------------------------
+
+    val secOrbitRadius  = radius * secOrbitMultiplier
+    val minOrbitRadius  = radius * minOrbitMultiplier
+    val hourOrbitRadius = radius * hourOrbitMultiplier
+
+    // 2. Render 3 Concentric Track Rings
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.STROKE
+        strokeWidth = trackStrokeWidth
+    }
+
+    canvas.drawCircle(clockCx, clockCy, secOrbitRadius, trackPaint)
+    canvas.drawCircle(clockCx, clockCy, minOrbitRadius, trackPaint)
+    canvas.drawCircle(clockCx, clockCy, hourOrbitRadius, trackPaint)
+
+    // 3. Orbiting Nodes Geometry
+    // A. INNER TRACK: Hour Node
+    val hourX = (clockCx + hourOrbitRadius * Math.cos(timeState.hourAngleRad)).toFloat()
+    val hourY = (clockCy + hourOrbitRadius * Math.sin(timeState.hourAngleRad)).toFloat()
+
+    val hourDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(hourX, hourY, hourDotRadius, hourDotPaint)
+
+    // B. MIDDLE TRACK: Minute Node
+    val minX = (clockCx + minOrbitRadius * Math.cos(timeState.minuteAngleRad)).toFloat()
+    val minY = (clockCy + minOrbitRadius * Math.sin(timeState.minuteAngleRad)).toFloat()
+
+    val minDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(minX, minY, minDotRadius, minDotPaint)
+
+    // C. OUTER TRACK: Second Node (Accent Color)
+    val secX = (clockCx + secOrbitRadius * Math.cos(timeState.secondAngleRad)).toFloat()
+    val secY = (clockCy + secOrbitRadius * Math.sin(timeState.secondAngleRad)).toFloat()
+
+    val secDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(secX, secY, secDotRadius, secDotPaint)
+
+    // Center Core Axis Dot
+    val centerPivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(clockCx, clockCy, size * 0.015f, centerPivotPaint)
+
+    return bitmap
+}

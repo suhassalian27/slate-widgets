@@ -28,6 +28,8 @@ import com.altusix.slate.widgets.clock.analog.ClockBoldTypographyReceiver
 import com.altusix.slate.widgets.clock.analog.ClockCyberCondensedReceiver
 import com.altusix.slate.widgets.clock.analog.ClockCapsuleSkeletonReceiver
 import com.altusix.slate.widgets.clock.analog.ClockApexArrowheadReceiver
+import com.altusix.slate.widgets.clock.analog.ClockConcentricOrbitalReceiver
+import com.altusix.slate.widgets.clock.analog.ClockTripleOrbitalDotsReceiver
 
 class SlateClockTickerService : Service() {
 
@@ -85,7 +87,9 @@ class SlateClockTickerService : Service() {
             ClockBoldTypographyReceiver::class.java,
             ClockCyberCondensedReceiver::class.java,
             ClockCapsuleSkeletonReceiver::class.java,
-            ClockApexArrowheadReceiver::class.java
+            ClockApexArrowheadReceiver::class.java,
+            ClockConcentricOrbitalReceiver::class.java,
+            ClockTripleOrbitalDotsReceiver::class.java
         )
 
         var totalActiveWidgets = 0
