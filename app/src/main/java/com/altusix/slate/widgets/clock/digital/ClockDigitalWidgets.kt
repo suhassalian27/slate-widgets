@@ -26,8 +26,8 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Compact Block Digital", "2x2", "Clock – Digital", ClockDigitalCompactBlockReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Asymmetric Overlay Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricOverlayReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false)
-
+        SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -41,7 +41,8 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalCompactBlockReceiver::class.java,
         ClockDigitalAsymmetricOverlayReceiver::class.java,
         ClockDigitalTextWordReceiver::class.java,
-        ClockDigitalGiantHourCapsuleReceiver::class.java
+        ClockDigitalGiantHourCapsuleReceiver::class.java,
+        ClockDigitalModern3dLedReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -264,4 +265,10 @@ class ClockDigitalTextWordReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalGiantHourCapsuleReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateGiantHourCapsuleDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 9. MODERN 3D LED HORIZONTAL DIGITAL (4x2 / Contoured 3D LED Clock)
+class ClockDigitalModern3dLedReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateModern3dLedHorizontalDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

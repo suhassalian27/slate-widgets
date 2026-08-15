@@ -901,3 +901,156 @@ fun generateGiantHourCapsuleDigitalClockBitmap(
 
     return bitmap
 }
+
+// 9. MODERN 3D LED HORIZONTAL DIGITAL (4x2 / Tightly Bounded Max Fit with Custom BG & Accent Minutes)
+fun generateModern3dLedHorizontalDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+
+    // Create a tightly bound bitmap exactly matching the 2.4 aspect ratio
+    val targetRatio = 2.4f
+    val rawH = hDp * density
+    val safeH = rawH.coerceIn(150f * density, 400f * density)
+
+    val bitmapHeight = safeH.toInt()
+    val bitmapWidth = (safeH * targetRatio).toInt()
+
+    val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    // --- THE FIX: Pull custom background color directly from user config ---
+    val chassisBgColor = getSafeBgColor(config)
+
+    val outerHighlightColor = if (isLight) Color.parseColor("#383437") else Color.parseColor("#FFFFFF")
+
+    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    val accentActivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // Transparent overlay creates realistic unlit segments automatically against any BG color
+        color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    val cardRect = RectF(0f, 0f, bitmapWidth.toFloat(), bitmapHeight.toFloat())
+
+    // 1. Mathematically Stable Pod Geometry
+    val H = cardRect.height()
+
+    val strokeW = H * 0.025f
+    val inset = strokeW / 2f
+
+    val top = cardRect.top + inset
+    val bottom = cardRect.bottom - inset
+
+    val usableW = cardRect.width() - (inset * 2f)
+    val iDw = usableW * (0.65f / 2.4f)
+    val iCw = usableW * (0.40f / 2.4f)
+    val iOv = usableW * (0.15f / 2.4f)
+    val chamfer = H * 0.18f
+
+    fun createOctagonPath(l: Float, t: Float, r: Float, b: Float, c: Float): Path {
+        return Path().apply {
+            moveTo(l + c, t)
+            lineTo(r - c, t)
+            lineTo(r, t + c)
+            lineTo(r, b - c)
+            lineTo(r - c, b)
+            lineTo(l + c, b)
+            lineTo(l, b - c)
+            lineTo(l, t + c)
+            close()
+        }
+    }
+
+    val p1L = inset
+    val p1R = p1L + iDw
+    val p2L = p1R - iOv
+    val p2R = p2L + iDw
+    val pCL = p2R - iOv
+    val pCR = pCL + iCw
+    val p3L = pCR - iOv
+    val p3R = p3L + iDw
+    val p4L = p3R - iOv
+    val p4R = p4L + iDw
+
+    val colonTopInset = H * 0.18f
+    val colonChamfer = chamfer * 0.8f
+
+    val pod1 = createOctagonPath(p1L, top, p1R, bottom, chamfer)
+    val pod2 = createOctagonPath(p2L, top, p2R, bottom, chamfer)
+    val podC = createOctagonPath(pCL, top + colonTopInset, pCR, bottom - colonTopInset, colonChamfer)
+    val pod3 = createOctagonPath(p3L, top, p3R, bottom, chamfer)
+    val pod4 = createOctagonPath(p4L, top, p4R, bottom, chamfer)
+
+    val chassisPath = Path(pod1).apply {
+        op(pod2, Path.Op.UNION)
+        op(podC, Path.Op.UNION)
+        op(pod3, Path.Op.UNION)
+        op(pod4, Path.Op.UNION)
+    }
+
+    // 2. Render 3D Scalloped Chassis Fill & Outer Outline
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = chassisBgColor
+        style = Paint.Style.FILL
+    }
+    val outerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = outerHighlightColor
+        style = Paint.Style.STROKE
+        strokeWidth = strokeW
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    canvas.drawPath(chassisPath, fillPaint)
+    canvas.drawPath(chassisPath, outerBorderPaint)
+
+    // 3. Centered 7-Segment Digits inside Pods
+    val digitH = H * 0.82f
+    val digitW = iDw * 0.68f
+    val digitY = top + ((bottom - top - digitH) / 2f)
+
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+
+    fun getPodCenterX(l: Float, r: Float): Float = l + ((r - l) / 2f)
+
+    // Hour Digits (Primary Color)
+    val d1X = getPodCenterX(p1L, p1R) - (digitW / 2f)
+    drawAngled7SegmentDigit(canvas, hourStr[0], d1X, digitY, digitW, digitH, activePaint, inactivePaint)
+
+    val d2X = getPodCenterX(p2L, p2R) - (digitW / 2f)
+    drawAngled7SegmentDigit(canvas, hourStr[1], d2X, digitY, digitW, digitH, activePaint, inactivePaint)
+
+    // Colon Dots (Primary Color)
+    val colonCx = getPodCenterX(pCL, pCR)
+    val colonRadius = digitW * 0.14f
+    val dot1Y = digitY + (digitH * 0.28f)
+    val dot2Y = digitY + (digitH * 0.72f)
+    canvas.drawCircle(colonCx, dot1Y, colonRadius, activePaint)
+    canvas.drawCircle(colonCx, dot2Y, colonRadius, activePaint)
+
+    // Minute Digits (Accent Color)
+    val d3X = getPodCenterX(p3L, p3R) - (digitW / 2f)
+    drawAngled7SegmentDigit(canvas, minStr[0], d3X, digitY, digitW, digitH, accentActivePaint, inactivePaint)
+
+    val d4X = getPodCenterX(p4L, p4R) - (digitW / 2f)
+    drawAngled7SegmentDigit(canvas, minStr[1], d4X, digitY, digitW, digitH, accentActivePaint, inactivePaint)
+
+    return bitmap
+}
