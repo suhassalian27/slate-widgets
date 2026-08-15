@@ -9,6 +9,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import com.altusix.slate.data.local.SlateWidgetConfig
+import androidx.core.content.res.ResourcesCompat
+import com.altusix.slate.R
 
 // --- SHARED GEOMETRY & THEMING HELPERS ---
 
@@ -531,6 +533,151 @@ fun generateAsymmetricSlantedDigitalClockBitmap(
     }
     val dateLabel = "${timeState.dayOfMonth} ${timeState.monthName.take(3).uppercase()}"
     drawAutoFitText(canvas, dateLabel, dateLeftX, minY, size * 0.38f, datePaint)
+
+    return bitmap
+}
+
+// 5. COMPACT BLOCK DIGITAL (2x2 / Full-Card Centered 4-Digit Time)
+fun generateCompactBlockDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val timeState = DigitalClockTimeState.now()
+    val clockCx = cardRect.centerX()
+
+    // Custom Font Fallback Pipeline
+    val customTypeface = try {
+        ResourcesCompat.getFont(context, R.font.outward_block) ?: Typeface.DEFAULT_BOLD
+    } catch (_: Exception) {
+        Typeface.create("sans-serif-condensed", Typeface.BOLD)
+    }
+
+    // 4-Digit 24-Hour Time Format (e.g. "1948")
+    val timeString = "${timeState.hour24.padStart(2, '0')}${timeState.minute.padStart(2, '0')}"
+
+    // Full-Card Scaled Block Time Display
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        typeface = customTypeface
+        textSize = size * 1.3f
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Exact Mathematical Vertical Centering
+    val timeY = topY + (size * 0.955f)
+    drawAutoFitText(canvas, timeString, clockCx, timeY, size * 0.86f, timePaint)
+
+    return bitmap
+}
+
+// 6. ASYMMETRIC OVERLAY DIGITAL (2x2 / Background Muted Time with Accent Day & Refined Typography)
+fun generateAsymmetricOverlayDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val timeState = DigitalClockTimeState.now()
+
+    // 1. Subtle Muted Background Time Digits
+    val timeAlpha = if (isLight) 32 else 45
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(timeAlpha, Color.red(primaryText), Color.green(primaryText), Color.blue(primaryText))
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        textSize = size * 0.48f
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val timeRightX = leftX + size * 0.94f
+    val hourY = topY + size * 0.44f
+    val minY = topY + size * 0.83f
+
+    canvas.drawText(timeState.hour24.padStart(2, '0'), timeRightX, hourY, timePaint)
+    canvas.drawText(timeState.minute.padStart(2, '0'), timeRightX, minY, timePaint)
+
+    // Guaranteed Full Date Names ("SATURDAY" & "AUGUST 15")
+    val now = java.util.Date()
+    val fullDayName = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(now).uppercase()
+    val fullMonthDay = java.text.SimpleDateFormat("MMMM d", java.util.Locale.getDefault()).format(now).uppercase()
+
+    // 2. Full Day of Week Label (Accent Color, Size 0.12f, Normal Weight)
+    val dateLeftX = leftX + size * 0.08f
+    val dayNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        typeface = Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        textSize = size * 0.12f
+        textAlign = Paint.Align.LEFT
+    }
+    val dayNameY = topY + size * 0.81f
+    drawAutoFitText(canvas, fullDayName, dateLeftX, dayNameY, size * 0.65f, dayNamePaint)
+
+    // 3. Full Month & Date Label (Primary Color, Size 0.08f, Normal Weight)
+    val dateSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        typeface = Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        textSize = size * 0.08f
+        textAlign = Paint.Align.LEFT
+    }
+    val dateSubY = topY + size * 0.90f
+    drawAutoFitText(canvas, fullMonthDay, dateLeftX, dateSubY, size * 0.65f, dateSubPaint)
 
     return bitmap
 }

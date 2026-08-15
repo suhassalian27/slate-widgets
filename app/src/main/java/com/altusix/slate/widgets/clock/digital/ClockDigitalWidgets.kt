@@ -22,7 +22,10 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Bold Typographic Digital", "2x2", "Clock – Digital", ClockDigitalBoldTypographicReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Minimal Divider Digital", "2x2", "Clock – Digital", ClockDigitalMinimalDividerReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("LCD Seven Segment Digital", "2x2", "Clock – Digital", ClockDigitalLcdSevenSegmentReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Asymmetric Slanted Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricSlantedReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Asymmetric Slanted Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricSlantedReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Compact Block Digital", "2x2", "Clock – Digital", ClockDigitalCompactBlockReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Asymmetric Overlay Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricOverlayReceiver::class.java, hasModeOption = false)
+
     )
 }
 
@@ -32,7 +35,9 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalBoldTypographicReceiver::class.java,
         ClockDigitalMinimalDividerReceiver::class.java,
         ClockDigitalLcdSevenSegmentReceiver::class.java,
-        ClockDigitalAsymmetricSlantedReceiver::class.java
+        ClockDigitalAsymmetricSlantedReceiver::class.java,
+        ClockDigitalCompactBlockReceiver::class.java,
+        ClockDigitalAsymmetricOverlayReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -231,4 +236,16 @@ class ClockDigitalLcdSevenSegmentReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalAsymmetricSlantedReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateAsymmetricSlantedDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 5. COMPACT BLOCK DIGITAL (2x2 / 4-Digit Block Time in Condensed Font)
+class ClockDigitalCompactBlockReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateCompactBlockDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 6. ASYMMETRIC OVERLAY DIGITAL (2x2 / Translucent Giant Right Time with Bottom-Left Date)
+class ClockDigitalAsymmetricOverlayReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateAsymmetricOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
