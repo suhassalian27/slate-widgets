@@ -19,16 +19,17 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Bold Typographic Digital", "2x2", "Clock – Digital", ClockDigitalBoldTypographicReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Bold Typographic Digital", "2x2", "Clock – Digital", ClockDigitalBoldTypographicReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Minimal Divider Digital", "2x2", "Clock – Digital", ClockDigitalMinimalDividerReceiver::class.java, hasModeOption = false)
     )
 }
 
 fun updateAllClockDigitalWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
     val receivers = listOf(
-        ClockDigitalBoldTypographicReceiver::class.java
+        ClockDigitalBoldTypographicReceiver::class.java,
+        ClockDigitalMinimalDividerReceiver::class.java
     )
-
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
         if (ids.isNotEmpty()) {
@@ -56,7 +57,7 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         val manager = AppWidgetManager.getInstance(context)
-        val ids = manager.getAppWidgetIds(ComponentName(context, this::class.java))
+        val ids = manager.getAppWidgetIds(ComponentName(context, javaClass))
         if (ids != null && ids.isNotEmpty()) {
             onUpdate(context, manager, ids)
         }
@@ -115,8 +116,6 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
             val hDp = maxOf(minH, maxH, 60).coerceAtMost(220)
 
             val rawBitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
-
-            // IPC Safety Downscaling (<150KB payload protection)
             val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 320)
 
             val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
@@ -188,12 +187,18 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
     }
 }
 
+
 // --- WIDGET RECEIVERS ---
 
 // 1. BOLD TYPOGRAPHIC DIGITAL (2x2 Square / Stacked Giant Hour & Minute Display)
 class ClockDigitalBoldTypographicReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateBoldTypographicDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateBoldTypographicDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
@@ -202,11 +207,12 @@ class ClockDigitalBoldTypographicReceiver : BaseDigitalClockReceiver() {
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        super.onUpdate(context, appWidgetManager, appWidgetIds)
         context.startService(Intent(context, SlateClockTickerService::class.java))
     }
+}
+
+// 2. MINIMAL DIVIDER DIGITAL (2x2 / Stacked Time with Accent Line Divider)
+class ClockDigitalMinimalDividerReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateMinimalDividerDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

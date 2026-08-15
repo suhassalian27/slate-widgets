@@ -154,3 +154,81 @@ fun generateBoldTypographicDigitalClockBitmap(
 
     return bitmap
 }
+
+// 2. MINIMAL DIVIDER DIGITAL (2x2 / Stacked Time with Accent Line Divider)
+fun generateMinimalDividerDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    // 1. Card Container & Corner Radius Standard
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cornerRadius = getStandardCornerRadius(density)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val timeState = DigitalClockTimeState.now()
+
+    // 2. Stacked Typography (Hours & Minutes)
+    val timeFont = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        typeface = timeFont
+        textSize = size * 0.33f
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Hour (Top)
+    val hourY = topY + size * 0.36f
+    drawAutoFitText(canvas, timeState.hour12, clockCx, hourY, size * 0.72f, timePaint)
+
+    // 3. Accent Line Divider
+    val dividerW = size * 0.34f
+    val dividerY = topY + size * 0.44f
+    val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.024f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(clockCx - (dividerW / 2f), dividerY, clockCx + (dividerW / 2f), dividerY, dividerPaint)
+
+    // Minute (Bottom)
+    val minY = topY + size * 0.73f
+    drawAutoFitText(canvas, timeState.minute, clockCx, minY, size * 0.72f, timePaint)
+
+    // 4. Accent AM/PM Label
+    val amPmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        textSize = size * 0.105f
+        textAlign = Paint.Align.CENTER
+    }
+    val amPmY = topY + size * 0.86f
+    drawAutoFitText(canvas, timeState.amPm, clockCx, amPmY, size * 0.5f, amPmPaint)
+
+    return bitmap
+}

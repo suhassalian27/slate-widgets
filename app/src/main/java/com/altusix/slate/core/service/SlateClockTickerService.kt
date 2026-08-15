@@ -44,22 +44,20 @@ import com.altusix.slate.widgets.clock.analog.ClockMinimalDotsReceiver
 import com.altusix.slate.widgets.clock.analog.ClockRadarScopeReceiver
 import com.altusix.slate.widgets.clock.analog.BaseClockReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalBoldTypographicReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalMinimalDividerReceiver
 
 class SlateClockTickerService : Service() {
 
     private var tickerJob: Job? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // ⚡ CACHED RECEIVERS: Prevents Garbage Collection churn every second
-    private val receiverInstances: Map<Class<*>, Any> by lazy {
+    // 1-Second Ticker Receivers (Analog / Animated)
+    private val secondReceivers: Map<Class<*>, Any> by lazy {
         listOf(
-            // Calendar Analog Hybrids
             CalendarAnalogTimelineReceiver::class.java,
             CalendarAnalogCalendarHybridReceiver::class.java,
             CalendarArchitecturalAnalogReceiver::class.java,
             CalendarRadialArcReceiver::class.java,
-
-            // Clock Analog Widgets
             ClockAnalogPrecisionReceiver::class.java,
             ClockBauhausReceiver::class.java,
             ClockCyberSkeletonReceiver::class.java,
@@ -74,16 +72,19 @@ class SlateClockTickerService : Service() {
             ClockRotatingRingReceiver::class.java,
             ClockHourglassReceiver::class.java,
             ClockMinimalDotsReceiver::class.java,
-            ClockRadarScopeReceiver::class.java,
-
-            // Clock Digital Widgets
-            ClockDigitalBoldTypographicReceiver::class.java
+            ClockRadarScopeReceiver::class.java
         ).associateWith { clazz ->
-            try {
-                clazz.getDeclaredConstructor().newInstance()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    // 1-Minute Ticker Receivers (Digital / Static Clocks)
+    private val minuteReceivers: Map<Class<*>, Any> by lazy {
+        listOf(
+            ClockDigitalBoldTypographicReceiver::class.java,
+            ClockDigitalMinimalDividerReceiver::class.java
+        ).associateWith { clazz ->
+            try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }
     }
 
@@ -118,15 +119,25 @@ class SlateClockTickerService : Service() {
         tickerJob = serviceScope.launch {
             while (isActive) {
                 val now = System.currentTimeMillis()
+                val hasActiveSecondWidgets = updateSecondWidgets()
+                val hasActiveMinuteWidgets = updateMinuteWidgets()
 
-                // 1. Perform Widget Updates
-                updateAllTickingWidgets(this@SlateClockTickerService)
+                if (!hasActiveSecondWidgets && !hasActiveMinuteWidgets) {
+                    stopSelf()
+                    break
+                }
 
-                // 2. Exact Millisecond Alignment: Prevents timing drift
-                val millisInSecond = now % 1000L
-                val nextTickDelay = (1000L - millisInSecond).coerceIn(100L, 1000L)
-
-                delay(nextTickDelay)
+                if (hasActiveSecondWidgets) {
+                    // Precision 1-second alignment
+                    val millisInSecond = now % 1000L
+                    val nextTickDelay = (1000L - millisInSecond).coerceIn(100L, 1000L)
+                    delay(nextTickDelay)
+                } else {
+                    // Exact top-of-minute alignment (:00.050s)
+                    val millisInMinute = now % 60000L
+                    val nextMinuteDelay = (60000L - millisInMinute + 50L).coerceIn(500L, 60000L)
+                    delay(nextMinuteDelay)
+                }
             }
         }
     }
@@ -136,39 +147,36 @@ class SlateClockTickerService : Service() {
         tickerJob = null
     }
 
-    private fun updateAllTickingWidgets(context: Context) {
-        val manager = AppWidgetManager.getInstance(context)
-        var totalActiveWidgets = 0
-
-        for ((receiverClass, instance) in receiverInstances) {
-            val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
+    private fun updateSecondWidgets(): Boolean {
+        val manager = AppWidgetManager.getInstance(this)
+        var count = 0
+        for ((receiverClass, instance) in secondReceivers) {
+            val ids = manager.getAppWidgetIds(ComponentName(this, receiverClass)) ?: intArrayOf()
             if (ids.isNotEmpty()) {
-                totalActiveWidgets += ids.size
-
+                count += ids.size
                 try {
-                    when (instance) {
-                        is BaseClockReceiver -> instance.onUpdate(context, manager, ids)
-                        else -> {
-                            // Fallback invocation for hybrid receivers
-                            val method = receiverClass.getMethod(
-                                "onUpdate",
-                                Context::class.java,
-                                AppWidgetManager::class.java,
-                                IntArray::class.java
-                            )
-                            method.invoke(instance, context, manager, ids)
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                    val method = receiverClass.getMethod("onUpdate", Context::class.java, AppWidgetManager::class.java, IntArray::class.java)
+                    method.invoke(instance, this, manager, ids)
+                } catch (e: Exception) { e.printStackTrace() }
             }
         }
+        return count > 0
+    }
 
-        // Auto-stop service if no clock/hybrid widgets are placed on home screen
-        if (totalActiveWidgets == 0) {
-            stopSelf()
+    private fun updateMinuteWidgets(): Boolean {
+        val manager = AppWidgetManager.getInstance(this)
+        var count = 0
+        for ((receiverClass, instance) in minuteReceivers) {
+            val ids = manager.getAppWidgetIds(ComponentName(this, receiverClass)) ?: intArrayOf()
+            if (ids.isNotEmpty()) {
+                count += ids.size
+                try {
+                    val method = receiverClass.getMethod("onUpdate", Context::class.java, AppWidgetManager::class.java, IntArray::class.java)
+                    method.invoke(instance, this, manager, ids)
+                } catch (e: Exception) { e.printStackTrace() }
+            }
         }
+        return count > 0
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -178,9 +186,7 @@ class SlateClockTickerService : Service() {
 
     override fun onDestroy() {
         stopTicking()
-        try {
-            unregisterReceiver(screenStateReceiver)
-        } catch (_: Exception) {}
+        try { unregisterReceiver(screenStateReceiver) } catch (_: Exception) {}
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -189,12 +195,8 @@ class SlateClockTickerService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Slate Clock Ticker",
-                NotificationManager.IMPORTANCE_MIN
-            ).apply {
-                description = "Keeps analog clock widgets active"
+            val channel = NotificationChannel(CHANNEL_ID, "Slate Clock Ticker", NotificationManager.IMPORTANCE_MIN).apply {
+                description = "Keeps live clock widgets updated"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)

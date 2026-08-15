@@ -1072,6 +1072,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 2. Minimal Divider Digital (2x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalMinimalDividerReceiver"
+            android:exported="true"
+            android:label="Slate Minimal Divider Digital">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>
