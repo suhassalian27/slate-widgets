@@ -25,6 +25,35 @@ private fun getSafeBgColor(config: SlateWidgetConfig): Int {
 
 private fun getStandardCornerRadius(density: Float): Float = 22f * density
 
+fun getSlateFont(
+    context: Context,
+    weight: Int = 400,
+    isItalic: Boolean = false
+): Typeface {
+    val fontRes = if (isItalic) {
+        R.font.inter_tight_italic_variable
+    } else {
+        R.font.inter_tight_variable
+    }
+
+    return try {
+        val baseTypeface = ResourcesCompat.getFont(context, fontRes) ?: Typeface.DEFAULT
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            Typeface.create(baseTypeface, weight, isItalic)
+        } else {
+            val style = when {
+                weight >= 700 && isItalic -> Typeface.BOLD_ITALIC
+                weight >= 700 -> Typeface.BOLD
+                isItalic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
+            Typeface.create(baseTypeface, style)
+        }
+    } catch (_: Exception) {
+        Typeface.create(Typeface.SANS_SERIF, if (weight >= 700) Typeface.BOLD else Typeface.NORMAL)
+    }
+}
+
 /**
  * Dynamic Accent Contrast luminance evaluation
  */
@@ -243,7 +272,7 @@ fun generateBoldTypographicDigitalClockBitmap(
     val timeState = DigitalClockTimeState.now()
 
     // 2. Stacked Typography (Hour & Minute)
-    val timeFont = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    val timeFont = getSlateFont(context, weight = 700, isItalic = false)
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         typeface = timeFont
@@ -338,7 +367,7 @@ fun generateMinimalDividerDigitalClockBitmap(
     val timeState = DigitalClockTimeState.now()
 
     // 2. Stacked Typography (Hours & Minutes)
-    val timeFont = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    val timeFont = getSlateFont(context, weight = 600, isItalic = false)
     val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         typeface = timeFont
@@ -368,7 +397,7 @@ fun generateMinimalDividerDigitalClockBitmap(
     // 4. Accent AM/PM Label
     val amPmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        typeface = getSlateFont(context, weight = 700, isItalic = false)
         textSize = size * 0.105f
         textAlign = Paint.Align.CENTER
     }
@@ -477,7 +506,7 @@ fun generateLcdSevenSegmentDigitalClockBitmap(
 
     val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+        typeface = getSlateFont(context, weight = 500, isItalic = false)
         textSize = size * 0.072f
         textAlign = Paint.Align.LEFT
     }
@@ -539,7 +568,7 @@ fun generateAsymmetricSlantedDigitalClockBitmap(
     // 1. Bold Slanted Hour (Top Right)
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD_ITALIC)
+        typeface = getSlateFont(context, weight = 600, isItalic = true)
         textSize = size * 0.35f
         textAlign = Paint.Align.RIGHT
     }
@@ -549,7 +578,7 @@ fun generateAsymmetricSlantedDigitalClockBitmap(
     // 2. Accent Slanted Minute (Bottom Right)
     val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.ITALIC)
+        typeface = getSlateFont(context, weight = 200, isItalic = true)
         textSize = size * 0.35f
         textAlign = Paint.Align.RIGHT
     }
@@ -559,7 +588,7 @@ fun generateAsymmetricSlantedDigitalClockBitmap(
     // 3. Slanted Date Label (Bottom Far Left)
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.ITALIC)
+        typeface = getSlateFont(context, weight = 200, isItalic = true)
         textSize = size * 0.16f
         textAlign = Paint.Align.LEFT
     }
@@ -694,7 +723,7 @@ fun generateAsymmetricOverlayDigitalClockBitmap(
     val dateLeftX = leftX + size * 0.08f
     val dayNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
-        typeface = Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        typeface = getSlateFont(context, weight = 300, isItalic = false)
         textSize = size * 0.12f
         textAlign = Paint.Align.LEFT
     }
@@ -704,7 +733,7 @@ fun generateAsymmetricOverlayDigitalClockBitmap(
     // 3. Full Month & Date Label (Primary Color, Size 0.08f, Normal Weight)
     val dateSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        typeface = Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        typeface = getSlateFont(context, weight = 300, isItalic = false)
         textSize = size * 0.08f
         textAlign = Paint.Align.LEFT
     }
@@ -758,7 +787,7 @@ fun generateTextWordClockBitmap(
     // 1. Heavy Ultra-Bold Paint for Primary Time Words ("Quarter", "Nine")
     val mainWordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
-        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        typeface = getSlateFont(context, weight = 800, isItalic = false)
         textSize = size * 0.22f
         textAlign = Paint.Align.LEFT
         letterSpacing = -0.02f
@@ -767,7 +796,7 @@ fun generateTextWordClockBitmap(
     // 2. Refined Light Italic Paint for Connector Words ("to", "past")
     val connectorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(215, Color.red(primaryText), Color.green(primaryText), Color.blue(primaryText))
-        typeface = Typeface.create("sans-serif-light", Typeface.ITALIC)
+        typeface = getSlateFont(context, weight = 200, isItalic = true)
         textSize = size * 0.13f
         textAlign = Paint.Align.LEFT
         letterSpacing = 0.04f
@@ -788,6 +817,87 @@ fun generateTextWordClockBitmap(
         drawAutoFitText(canvas, wordTime.midWord, startX, line2Y, maxTextWidth, connectorPaint)
         drawAutoFitText(canvas, wordTime.bottomWord, startX, line3Y, maxTextWidth, mainWordPaint)
     }
+
+    return bitmap
+}
+
+// 8. GIANT HOUR CAPSULE DIGITAL (2x2 / Giant Hour with Accent Minute Pill)
+fun generateGiantHourCapsuleDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val timeState = DigitalClockTimeState.now()
+    val clockCx = cardRect.centerX()
+
+    // 1. Giant Hour Text
+    val hourStr = timeState.hour12
+    val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        typeface = getSlateFont(context, weight = 800)
+        textSize = size * 0.68f
+        textAlign = Paint.Align.CENTER
+    }
+
+    val hourY = cardRect.centerY() - ((hourPaint.descent() + hourPaint.ascent()) / 2f) - (size * 0.035f)
+    drawAutoFitText(canvas, hourStr, clockCx, hourY, size * 0.82f, hourPaint)
+
+    // 2. Bottom Right Accent Minute Pill
+    val minStr = timeState.minute.padStart(2, '0')
+    val minTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = getContrastColor(accentColorInt)
+        typeface = getSlateFont(context, weight = 800)
+        textSize = size * 0.115f
+        textAlign = Paint.Align.CENTER
+    }
+
+    val minTextW = minTextPaint.measureText(minStr)
+    val pillPaddingH = size * 0.045f
+    val pillW = (minTextW + (pillPaddingH * 2f)).coerceAtLeast(size * 0.22f)
+    val pillH = size * 0.145f
+    val pillRadius = size * 0.045f
+
+    val pillRight = leftX + size * 0.92f
+    val pillBottom = topY + size * 0.92f
+    val pillRect = RectF(pillRight - pillW, pillBottom - pillH, pillRight, pillBottom)
+
+    val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, pillPaint)
+
+    val minTextY = pillRect.centerY() - ((minTextPaint.descent() + minTextPaint.ascent()) / 2f)
+    canvas.drawText(minStr, pillRect.centerX(), minTextY, minTextPaint)
 
     return bitmap
 }

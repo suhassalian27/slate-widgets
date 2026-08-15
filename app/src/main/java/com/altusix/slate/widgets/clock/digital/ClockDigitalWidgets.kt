@@ -25,7 +25,8 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Asymmetric Slanted Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricSlantedReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Compact Block Digital", "2x2", "Clock – Digital", ClockDigitalCompactBlockReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Asymmetric Overlay Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricOverlayReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false)
 
     )
 }
@@ -39,7 +40,8 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalAsymmetricSlantedReceiver::class.java,
         ClockDigitalCompactBlockReceiver::class.java,
         ClockDigitalAsymmetricOverlayReceiver::class.java,
-        ClockDigitalTextWordReceiver::class.java
+        ClockDigitalTextWordReceiver::class.java,
+        ClockDigitalGiantHourCapsuleReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -251,8 +253,15 @@ class ClockDigitalAsymmetricOverlayReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateAsymmetricOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
+
 // 7. TYPOGRAPHIC WORD DIGITAL (2x2 / Stacked Natural Language Word Time)
 class ClockDigitalTextWordReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateTextWordClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 8. GIANT HOUR CAPSULE DIGITAL (2x2 / Giant Hour with Accent Minute Pill)
+class ClockDigitalGiantHourCapsuleReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateGiantHourCapsuleDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
