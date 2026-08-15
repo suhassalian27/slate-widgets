@@ -36,8 +36,6 @@ fun getContrastColor(colorInt: Int): Int {
     return if (luminance > 0.5) Color.parseColor("#121214") else Color.WHITE
 }
 
-
-
 /**
  * Auto-fits text width inside available bounds without clipping
  */
@@ -165,6 +163,40 @@ private fun drawAngled7SegmentDigit(
     for (i in 0..6) {
         val paint = if (states[i]) activePaint else inactivePaint
         canvas.drawPath(paths[i], paint)
+    }
+}
+
+// --- FUZZY TIME WORD CONVERTER ---
+
+private data class WordClockState(
+    val topWord: String,
+    val midWord: String,
+    val bottomWord: String
+)
+
+private fun getFuzzyWordTimeState(hour24: Int, minute: Int): WordClockState {
+    val hourWords = arrayOf(
+        "Twelve", "One", "Two", "Three", "Four", "Five",
+        "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"
+    )
+
+    val currentHour12 = if (hour24 % 12 == 0) 12 else hour24 % 12
+    val nextHour12 = if ((hour24 + 1) % 12 == 0) 12 else (hour24 + 1) % 12
+
+    return when (minute) {
+        in 0..2 -> WordClockState(hourWords[currentHour12], "O'Clock", "")
+        in 3..7 -> WordClockState("Five", "past", hourWords[currentHour12])
+        in 8..12 -> WordClockState("Ten", "past", hourWords[currentHour12])
+        in 13..17 -> WordClockState("Quarter", "to", hourWords[nextHour12]) // Or "past"
+        in 18..22 -> WordClockState("Twenty", "past", hourWords[currentHour12])
+        in 23..27 -> WordClockState("Twenty Five", "past", hourWords[currentHour12])
+        in 28..32 -> WordClockState("Half", "past", hourWords[currentHour12])
+        in 33..37 -> WordClockState("Twenty Five", "to", hourWords[nextHour12])
+        in 38..42 -> WordClockState("Twenty", "to", hourWords[nextHour12])
+        in 43..47 -> WordClockState("Quarter", "to", hourWords[nextHour12])
+        in 48..52 -> WordClockState("Ten", "to", hourWords[nextHour12])
+        in 53..57 -> WordClockState("Five", "to", hourWords[nextHour12])
+        else -> WordClockState(hourWords[nextHour12], "O'Clock", "")
     }
 }
 
@@ -678,6 +710,84 @@ fun generateAsymmetricOverlayDigitalClockBitmap(
     }
     val dateSubY = topY + size * 0.90f
     drawAutoFitText(canvas, fullMonthDay, dateLeftX, dateSubY, size * 0.65f, dateSubPaint)
+
+    return bitmap
+}
+
+// 7. TYPOGRAPHIC WORD CLOCK (2x2 / Editorial Stacked Word Time)
+fun generateTextWordClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val timeState = DigitalClockTimeState.now()
+    val wordTime = getFuzzyWordTimeState(timeState.hour24.toIntOrNull() ?: 12, timeState.minute.toIntOrNull() ?: 0)
+
+    val startX = leftX + size * 0.12f
+    val maxTextWidth = size * 0.76f
+
+    // 1. Heavy Ultra-Bold Paint for Primary Time Words ("Quarter", "Nine")
+    val mainWordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        textSize = size * 0.22f
+        textAlign = Paint.Align.LEFT
+        letterSpacing = -0.02f
+    }
+
+    // 2. Refined Light Italic Paint for Connector Words ("to", "past")
+    val connectorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(215, Color.red(primaryText), Color.green(primaryText), Color.blue(primaryText))
+        typeface = Typeface.create("sans-serif-light", Typeface.ITALIC)
+        textSize = size * 0.13f
+        textAlign = Paint.Align.LEFT
+        letterSpacing = 0.04f
+    }
+
+    // 3. Compact Stack Layout Math
+    if (wordTime.bottomWord.isEmpty()) {
+        val line1Y = topY + size * 0.44f
+        val line2Y = topY + size * 0.68f
+        drawAutoFitText(canvas, wordTime.topWord, startX, line1Y, maxTextWidth, mainWordPaint)
+        drawAutoFitText(canvas, wordTime.midWord, startX, line2Y, maxTextWidth, connectorPaint)
+    } else {
+        val line1Y = topY + size * 0.35f
+        val line2Y = topY + size * 0.53f
+        val line3Y = topY + size * 0.77f
+
+        drawAutoFitText(canvas, wordTime.topWord, startX, line1Y, maxTextWidth, mainWordPaint)
+        drawAutoFitText(canvas, wordTime.midWord, startX, line2Y, maxTextWidth, connectorPaint)
+        drawAutoFitText(canvas, wordTime.bottomWord, startX, line3Y, maxTextWidth, mainWordPaint)
+    }
 
     return bitmap
 }
