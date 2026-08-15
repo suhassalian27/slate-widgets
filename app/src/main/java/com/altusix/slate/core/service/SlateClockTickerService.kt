@@ -43,8 +43,10 @@ import com.altusix.slate.widgets.clock.analog.ClockHourglassReceiver
 import com.altusix.slate.widgets.clock.analog.ClockMinimalDotsReceiver
 import com.altusix.slate.widgets.clock.analog.ClockRadarScopeReceiver
 import com.altusix.slate.widgets.clock.analog.BaseClockReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalAsymmetricSlantedReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalBoldTypographicReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalMinimalDividerReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalLcdSevenSegmentReceiver
 
 class SlateClockTickerService : Service() {
 
@@ -82,7 +84,9 @@ class SlateClockTickerService : Service() {
     private val minuteReceivers: Map<Class<*>, Any> by lazy {
         listOf(
             ClockDigitalBoldTypographicReceiver::class.java,
-            ClockDigitalMinimalDividerReceiver::class.java
+            ClockDigitalMinimalDividerReceiver::class.java,
+            ClockDigitalLcdSevenSegmentReceiver::class.java,
+            ClockDigitalAsymmetricSlantedReceiver::class.java
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }

@@ -20,7 +20,9 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Bold Typographic Digital", "2x2", "Clock – Digital", ClockDigitalBoldTypographicReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Minimal Divider Digital", "2x2", "Clock – Digital", ClockDigitalMinimalDividerReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Minimal Divider Digital", "2x2", "Clock – Digital", ClockDigitalMinimalDividerReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("LCD Seven Segment Digital", "2x2", "Clock – Digital", ClockDigitalLcdSevenSegmentReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Asymmetric Slanted Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricSlantedReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -28,7 +30,9 @@ fun updateAllClockDigitalWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
     val receivers = listOf(
         ClockDigitalBoldTypographicReceiver::class.java,
-        ClockDigitalMinimalDividerReceiver::class.java
+        ClockDigitalMinimalDividerReceiver::class.java,
+        ClockDigitalLcdSevenSegmentReceiver::class.java,
+        ClockDigitalAsymmetricSlantedReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -116,7 +120,7 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
             val hDp = maxOf(minH, maxH, 60).coerceAtMost(220)
 
             val rawBitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
-            val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 320)
+            val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 600)
 
             val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
             views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
@@ -215,4 +219,16 @@ class ClockDigitalBoldTypographicReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalMinimalDividerReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateMinimalDividerDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 3. LCD SEVEN SEGMENT DIGITAL (2x2 / Stacked 7-Segment LCD with Vertical Date)
+class ClockDigitalLcdSevenSegmentReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateLcdSevenSegmentDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 4. ASYMMETRIC SLANTED DIGITAL (2x2 / Minimal Bottom-Weighted Layout)
+class ClockDigitalAsymmetricSlantedReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateAsymmetricSlantedDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

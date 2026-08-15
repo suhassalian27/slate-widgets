@@ -87,7 +87,7 @@ abstract class BaseClockReceiver : AppWidgetProvider() {
             val rawBitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
 
             // Downscale bitmap if it exceeds 320px bounding box (guarantees <150KB Binder payload)
-            val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 320)
+            val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 600)
 
             val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
             views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
