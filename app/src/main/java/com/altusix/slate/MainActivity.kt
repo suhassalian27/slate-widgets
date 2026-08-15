@@ -41,7 +41,12 @@ import com.altusix.slate.widgets.bluetooth.getBluetoothWidgetsCatalog
 import com.altusix.slate.widgets.calculator.getCalculatorWidgetsCatalog
 import com.altusix.slate.widgets.calendar.getCalendarWidgetsCatalog
 import com.altusix.slate.widgets.clock.analog.getClockAnalogWidgetsCatalog
+import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
 
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,8 +59,9 @@ class MainActivity : ComponentActivity() {
         val calculatorWidgets = getCalculatorWidgetsCatalog()
         val calendarWidgets = getCalendarWidgetsCatalog()
         val clockWidgets = getClockAnalogWidgetsCatalog()
+        val clockDigitalWidgets = getClockDigitalWidgetsCatalog()
 
-        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Analog Clock")
+        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Analog Clock", "Digital Clock")
 
         setContent {
             MaterialTheme(
@@ -75,7 +81,8 @@ class MainActivity : ComponentActivity() {
                     5 -> calculatorWidgets
                     6 -> calendarWidgets
                     7 -> clockWidgets
-                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + clockWidgets
+                    8 -> clockDigitalWidgets
+                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + clockWidgets + clockDigitalWidgets
                 }
 
                 Column(
@@ -159,6 +166,18 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+            }
+        }
+    }
+
+    private fun checkAndRequestBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    this.data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
             }
         }
     }

@@ -7,9 +7,6 @@ import android.content.Intent
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.service.SlateClockTickerService
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.widgets.calendar.BaseCalendarReceiver
-import com.altusix.slate.R
-import androidx.core.content.res.ResourcesCompat
 
 fun getClockAnalogWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -64,7 +61,7 @@ fun updateAllClockAnalogWidgets(context: Context) {
 }
 
 // 1. ANALOG PRECISION DIAL (2x2 Square)
-class ClockAnalogPrecisionReceiver : BaseCalendarReceiver() {
+class ClockAnalogPrecisionReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateAnalogPrecisionClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -85,7 +82,7 @@ class ClockAnalogPrecisionReceiver : BaseCalendarReceiver() {
 }
 
 // 2. BAUHAUS GEOMETRIC DIAL (2x2 Square)
-class ClockBauhausReceiver : BaseCalendarReceiver() {
+class ClockBauhausReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateBauhausClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -106,7 +103,7 @@ class ClockBauhausReceiver : BaseCalendarReceiver() {
 }
 
 // 3. CYBER SKELETON RING DIAL (2x2 Square / Circular Skeleton Face)
-class ClockCyberSkeletonReceiver : BaseCalendarReceiver() {
+class ClockCyberSkeletonReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateCyberSkeletonClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -127,7 +124,7 @@ class ClockCyberSkeletonReceiver : BaseCalendarReceiver() {
 }
 
 // 4. SCULPTED PILL MINIMAL DIAL (2x2 Square / Ultra-Minimal Capsule Face)
-class ClockSculptedPillReceiver : BaseCalendarReceiver() {
+class ClockSculptedPillReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateSculptedPillClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -148,7 +145,7 @@ class ClockSculptedPillReceiver : BaseCalendarReceiver() {
 }
 
 // 5. BOLD TYPOGRAPHIC CARDINAL DIAL (2x2 Square)
-class ClockBoldTypographyReceiver : BaseCalendarReceiver() {
+class ClockBoldTypographyReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateBoldTypographyClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -169,7 +166,7 @@ class ClockBoldTypographyReceiver : BaseCalendarReceiver() {
 }
 
 // 6. CYBER CONDENSED CARDINAL DIAL (2x2 Circular)
-class ClockCyberCondensedReceiver : BaseCalendarReceiver() {
+class ClockCyberCondensedReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateCyberCondensedClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -190,7 +187,7 @@ class ClockCyberCondensedReceiver : BaseCalendarReceiver() {
 }
 
 // 7. CAPSULE SKELETON ACCENT DIAL (2x2 Circular)
-class ClockCapsuleSkeletonReceiver : BaseCalendarReceiver() {
+class ClockCapsuleSkeletonReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateCapsuleSkeletonClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -211,7 +208,7 @@ class ClockCapsuleSkeletonReceiver : BaseCalendarReceiver() {
 }
 
 // 8. APEX ARROWHEAD CARDINAL DIAL (2x2 Circular)
-class ClockApexArrowheadReceiver : BaseCalendarReceiver() {
+class ClockApexArrowheadReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateApexArrowheadClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -232,7 +229,7 @@ class ClockApexArrowheadReceiver : BaseCalendarReceiver() {
 }
 
 // 9. CONCENTRIC ORBITAL ARC DIAL (2x2 Circular)
-class ClockConcentricOrbitalReceiver : BaseCalendarReceiver() {
+class ClockConcentricOrbitalReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateConcentricOrbitalClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -253,7 +250,7 @@ class ClockConcentricOrbitalReceiver : BaseCalendarReceiver() {
 }
 
 // 10. TRIPLE ORBITAL DOTS DIAL (2x2 Circular)
-class ClockTripleOrbitalDotsReceiver : BaseCalendarReceiver() {
+class ClockTripleOrbitalDotsReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateTripleOrbitalDotsClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -274,7 +271,7 @@ class ClockTripleOrbitalDotsReceiver : BaseCalendarReceiver() {
 }
 
 // 11. SECTOR SWEEP ACCENT DIAL (2x2 Circular)
-class ClockSectorSweepReceiver : BaseCalendarReceiver() {
+class ClockSectorSweepReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateSectorSweepClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -295,7 +292,7 @@ class ClockSectorSweepReceiver : BaseCalendarReceiver() {
 }
 
 // 12. TRIPLE ROTATING RING DIAL (2x2 Circular)
-class ClockRotatingRingReceiver : BaseCalendarReceiver() {
+class ClockRotatingRingReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateRotatingRingClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -316,7 +313,7 @@ class ClockRotatingRingReceiver : BaseCalendarReceiver() {
 }
 
 // 13. HOURGLASS DYNAMIC ACCENT DIAL (2x2 Square)
-class ClockHourglassReceiver : BaseCalendarReceiver() {
+class ClockHourglassReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateHourglassClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -337,7 +334,7 @@ class ClockHourglassReceiver : BaseCalendarReceiver() {
 }
 
 // 14. MINIMAL DOT MATRIX DIAL (2x2 Circular)
-class ClockMinimalDotsReceiver : BaseCalendarReceiver() {
+class ClockMinimalDotsReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateMinimalDotsClockBitmap(context, config, isResponsive, wDp, hDp)
 
@@ -358,7 +355,7 @@ class ClockMinimalDotsReceiver : BaseCalendarReceiver() {
 }
 
 // 15. TACTICAL RADAR SCOPE DIAL (2x2 Circular)
-class ClockRadarScopeReceiver : BaseCalendarReceiver() {
+class ClockRadarScopeReceiver : BaseClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateRadarScopeClockBitmap(context, config, isResponsive, wDp, hDp)
 

@@ -19,6 +19,8 @@
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:allowBackup="true"
@@ -61,10 +63,19 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- Clock Ticker Service (Crucial for clock hand updates) -->
+<!--        <service-->
+<!--            android:name=".core.service.SlateClockTickerService"-->
+<!--            android:enabled="true"-->
+<!--            android:exported="false" />-->
         <service
             android:name=".core.service.SlateClockTickerService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Real-time home screen clock widget ticker update loop" />
+        </service>
 
         <!-- ================================================================= -->
         <!-- AI WIDGETS                                                        -->
@@ -867,7 +878,7 @@
         <!-- ================================================================= -->
         <!-- CLOCK WIDGETS                                                     -->
         <!-- ================================================================= -->
-        <!-- CLOCK-ANALOG WIDGETS                                              -->
+        <!-- 1. ANALOG CLOCK WIDGETS                                           -->
         <receiver
             android:name=".widgets.clock.analog.ClockAnalogPrecisionReceiver"
             android:exported="true"
@@ -1048,6 +1059,19 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
+        <!-- 2. DIGITAL CLOCK WIDGETS                                          -->
+        <!-- 1. Bold Typographic Digital (2x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalBoldTypographicReceiver"
+            android:exported="true"
+            android:label="Slate Bold Typographic Digital">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>
