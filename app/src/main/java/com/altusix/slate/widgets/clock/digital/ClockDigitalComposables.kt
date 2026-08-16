@@ -1640,3 +1640,268 @@ fun generateSplitFlapDigitalClockBitmap(
 
     return bitmap
 }
+
+// 13. VERTICAL CAPSULE DIGITAL (1x2 / Unified Pill Capsule Monolith with Constant Gap)
+fun generateVerticalCapsuleDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((200 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    // 1. Calculate Card Bounds (1:2 Target Aspect Ratio for 1x2 Fixed Mode)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 0.5f
+        var cardW = w.toFloat()
+        var cardH = cardW / targetRatio
+
+        if (cardH > h.toFloat()) {
+            cardH = h.toFloat()
+            cardW = cardH * targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    // Outer Pill Capsule Shape (Half-Width Radius)
+    val cardRadius = cardRect.width() / 2f
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.10f
+    val padY = cardRect.height() * 0.08f
+
+    // Time & Date Data
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+
+    val cal = java.util.Calendar.getInstance()
+    val dayWeekStr = java.text.SimpleDateFormat("EEE", java.util.Locale.ENGLISH).format(cal.time).uppercase()
+    val dayNumStr = timeState.dayOfMonth
+    val badgeText = "$dayWeekStr $dayNumStr"
+
+    // 2. Uniform Font Sizing
+    val timeMaxW = cardRect.width() - (padX * 2f)
+    val maxDigitH = (cardRect.height() - (padY * 2f)) * 0.30f
+
+    val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 700)
+        textSize = 100f
+    }
+    val refW = refPaint.measureText("00")
+    val timeTextSize = minOf(maxDigitH, 100f * (timeMaxW / refW))
+
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = timeTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = android.graphics.Rect()
+    timePaint.getTextBounds("00", 0, 2, timeBounds)
+    val digitH = timeBounds.height().toFloat()
+
+    // Badge Dimensions
+    val badgeW = cardRect.width() - (padX * 2f)
+    val badgeHeight = (timeTextSize * 0.42f).coerceIn(22f * density, 42f * density)
+    val badgeRadius = badgeHeight / 2f
+
+    // Constant Gap between elements regardless of vertical stretching
+    val gapY = (cardRect.width() * 0.08f).coerceIn(6f * density, 16f * density)
+
+    // 3. Center Entire Stack (Hour + Gap + Badge + Gap + Minute) Vertically in cardRect
+    val totalStackH = digitH + gapY + badgeHeight + gapY + digitH
+    val stackTopY = cardRect.centerY() - (totalStackH / 2f)
+
+    val hourY = stackTopY + digitH - timeBounds.bottom
+    val badgeTop = stackTopY + digitH + gapY
+    val minY = badgeTop + badgeHeight + gapY + digitH - timeBounds.bottom
+
+    // Draw Top Hour Digits
+    canvas.drawText(hourStr, cardRect.centerX(), hourY, timePaint)
+
+    // Draw Center Accent Pill Badge
+    val badgeLeft = cardRect.centerX() - (badgeW / 2f)
+    val badgeRect = RectF(badgeLeft, badgeTop, badgeLeft + badgeW, badgeTop + badgeHeight)
+
+    val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(badgeRect, badgeRadius, badgeRadius, badgeBgPaint)
+
+    // Dynamic Contrast Color for Badge Text
+    val r = Color.red(accentColorInt) / 255f
+    val g = Color.green(accentColorInt) / 255f
+    val b = Color.blue(accentColorInt) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val badgeTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    var badgeTextSize = badgeHeight * 0.48f
+    val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = badgeTextColor
+        textSize = badgeTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.06f
+    }
+
+    val maxBadgeTextW = badgeRect.width() * 0.82f
+    if (badgeTextPaint.measureText(badgeText) > maxBadgeTextW) {
+        badgeTextSize *= (maxBadgeTextW / badgeTextPaint.measureText(badgeText))
+        badgeTextPaint.textSize = badgeTextSize
+    }
+
+    val badgeTextBounds = android.graphics.Rect()
+    badgeTextPaint.getTextBounds(badgeText, 0, badgeText.length, badgeTextBounds)
+    val badgeTextY = badgeRect.centerY() + (badgeTextBounds.height() / 2f) - (1f * density)
+
+    canvas.drawText(badgeText, badgeRect.centerX(), badgeTextY, badgeTextPaint)
+
+    // Draw Bottom Minute Digits
+    canvas.drawText(minStr, cardRect.centerX(), minY, timePaint)
+
+    return bitmap
+}
+
+// 14. MINIMAL STACKED DIGITAL (1x2 / Clean Two-Tone Vertical Time with Accent Divider)
+fun generateMinimalStackedDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((200 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    // 1. Calculate Card Bounds (1:2 Target Aspect Ratio for 1x2 Fixed Mode)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 0.5f
+        var cardW = w.toFloat()
+        var cardH = cardW / targetRatio
+
+        if (cardH > h.toFloat()) {
+            cardH = h.toFloat()
+            cardW = cardH * targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    // Standard Card Radius (Not Pill Shaped)
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.12f
+    val padY = cardRect.height() * 0.10f
+
+    // Time Data Only
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+
+    val usableW = cardRect.width() - (padX * 2f)
+    val usableH = cardRect.height() - (padY * 2f)
+
+    // Center Accent Divider Bar Specs
+    val dividerW = usableW * 0.35f
+    val dividerH = (2.5f * density).coerceAtLeast(2f)
+    val dividerGapY = cardRect.height() * 0.04f
+
+    val maxDigitH = (usableH - dividerH - (dividerGapY * 2f)) / 2f
+
+    // 2. Uniform Font Sizing
+    val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 700)
+        textSize = 100f
+    }
+    val refW = refPaint.measureText("00")
+    val timeTextSize = minOf(maxDigitH * 0.88f, 100f * (usableW / refW))
+
+    val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = timeTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = timeTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = android.graphics.Rect()
+    hourPaint.getTextBounds("00", 0, 2, timeBounds)
+    val digitH = timeBounds.height().toFloat()
+
+    // 3. Center Stack (Hour + Gap + Divider + Gap + Minute) Vertically
+    val totalStackH = digitH + dividerGapY + dividerH + dividerGapY + digitH
+    val stackTopY = cardRect.centerY() - (totalStackH / 2f)
+
+    val hourY = stackTopY + digitH - timeBounds.bottom
+    val dividerCenterY = stackTopY + digitH + dividerGapY + (dividerH / 2f)
+    val minY = dividerCenterY + (dividerH / 2f) + dividerGapY + digitH - timeBounds.bottom
+
+    // Draw Top Hour Digits (Primary Text)
+    canvas.drawText(hourStr, cardRect.centerX(), hourY, hourPaint)
+
+    // Draw Minimal Accent Center Divider Line
+    val dividerLeft = cardRect.centerX() - (dividerW / 2f)
+    val dividerRect = RectF(
+        dividerLeft,
+        dividerCenterY - (dividerH / 2f),
+        dividerLeft + dividerW,
+        dividerCenterY + (dividerH / 2f)
+    )
+    val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(dividerRect, dividerH / 2f, dividerH / 2f, dividerPaint)
+
+    // Draw Bottom Minute Digits (Accent Text Color)
+    canvas.drawText(minStr, cardRect.centerX(), minY, minPaint)
+
+    return bitmap
+}

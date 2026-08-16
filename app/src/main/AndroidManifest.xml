@@ -1204,6 +1204,30 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
+        <!-- 13. Vertical Capsule Digital (1x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalVerticalCapsuleReceiver"
+            android:exported="true"
+            android:label="Slate Vertical Capsule Digital">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
+        <!-- 14. Dual Pill Stack Digital (1x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalDualPillStackReceiver"
+            android:exported="true"
+            android:label="Slate Dual Pill Stack Digital">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
 
 
     </application>

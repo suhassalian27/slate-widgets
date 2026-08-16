@@ -30,7 +30,9 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Gradient Tall Digital", "4x2", "Clock – Digital", ClockDigitalGradientTallReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Script Overlay Digital", "4x2", "Clock – Digital", ClockDigitalScriptOverlayReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Split Flap Digital", "4x2", "Clock – Digital", ClockDigitalSplitFlapReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Split Flap Digital", "4x2", "Clock – Digital", ClockDigitalSplitFlapReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Vertical Capsule Digital", "1x2", "Clock – Digital", ClockDigitalVerticalCapsuleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Dual Pill Stack Digital", "1x2", "Clock – Digital", ClockDigitalDualPillStackReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -48,7 +50,9 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalModern3dLedReceiver::class.java,
         ClockDigitalGradientTallReceiver::class.java,
         ClockDigitalScriptOverlayReceiver::class.java,
-        ClockDigitalSplitFlapReceiver::class.java
+        ClockDigitalSplitFlapReceiver::class.java,
+        ClockDigitalVerticalCapsuleReceiver::class.java,
+        ClockDigitalDualPillStackReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -323,4 +327,16 @@ class ClockDigitalScriptOverlayReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalSplitFlapReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateSplitFlapDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 13. VERTICAL CAPSULE DIGITAL (1x2 / Pill Capsule Monolith with Center Date Badge)
+class ClockDigitalVerticalCapsuleReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateVerticalCapsuleDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 14. DUAL PILL STACK DIGITAL (1x2 / Dual Nested Pill Tiles for Time & Accent Date)
+class ClockDigitalDualPillStackReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateMinimalStackedDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

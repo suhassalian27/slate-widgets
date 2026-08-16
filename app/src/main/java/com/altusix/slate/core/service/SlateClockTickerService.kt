@@ -49,12 +49,14 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalBoldTypographicReceiv
 import com.altusix.slate.widgets.clock.digital.ClockDigitalMinimalDividerReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalLcdSevenSegmentReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalCompactBlockReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalDualPillStackReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalGiantHourCapsuleReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalGradientTallReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalModern3dLedReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalScriptOverlayReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalSplitFlapReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalVerticalCapsuleReceiver
 
 class SlateClockTickerService : Service() {
 
@@ -102,7 +104,9 @@ class SlateClockTickerService : Service() {
             ClockDigitalModern3dLedReceiver::class.java,
             ClockDigitalGradientTallReceiver::class.java,
             ClockDigitalScriptOverlayReceiver::class.java,
-            ClockDigitalSplitFlapReceiver::class.java
+            ClockDigitalSplitFlapReceiver::class.java,
+            ClockDigitalVerticalCapsuleReceiver::class.java,
+            ClockDigitalDualPillStackReceiver::class.java
 
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
