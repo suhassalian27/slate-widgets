@@ -29,7 +29,8 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Gradient Tall Digital", "4x2", "Clock – Digital", ClockDigitalGradientTallReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Script Overlay Digital", "4x2", "Clock – Digital", ClockDigitalScriptOverlayReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Script Overlay Digital", "4x2", "Clock – Digital", ClockDigitalScriptOverlayReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Split Flap Digital", "4x2", "Clock – Digital", ClockDigitalSplitFlapReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -46,7 +47,8 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalGiantHourCapsuleReceiver::class.java,
         ClockDigitalModern3dLedReceiver::class.java,
         ClockDigitalGradientTallReceiver::class.java,
-        ClockDigitalScriptOverlayReceiver::class.java
+        ClockDigitalScriptOverlayReceiver::class.java,
+        ClockDigitalSplitFlapReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -310,8 +312,15 @@ class ClockDigitalGradientTallReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateGradientTallDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
+
 // 11. SCRIPT OVERLAY DIGITAL (4x2 / Giant Pastel Time with Cursive Day & Uppercase Date)
 class ClockDigitalScriptOverlayReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateScriptOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 12. SPLIT FLAP DIGITAL (4x2 / Dual Flip Card Time with Centered Date)
+class ClockDigitalSplitFlapReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateSplitFlapDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

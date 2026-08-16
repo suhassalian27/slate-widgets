@@ -1467,3 +1467,176 @@ fun generateScriptOverlayDigitalClockBitmap(
 
     return bitmap
 }
+
+// 12. SPLIT FLAP DIGITAL (4x2 / Centered Dual Flip Cards & Tight Date Stack)
+fun generateSplitFlapDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((70 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Calculate Card Bounds (Responsive: 100% boundary; Fixed: 2:1 ratio container)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.08f
+    val padY = cardRect.height() * 0.08f
+
+    // Time & Date Formats
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+
+    val cal = java.util.Calendar.getInstance()
+    val dateStr = java.text.SimpleDateFormat("EEE, d MMM", java.util.Locale.ENGLISH).format(cal.time)
+
+    // 2. Proportional Tile & Date Geometry Setup
+    val tileGapX = cardRect.width() * 0.05f
+    val usableW = cardRect.width() - (padX * 2f)
+    val maxTileW = (usableW - tileGapX) / 2f
+
+    // Reserve vertical space for tile stack while allocating 28% for date + gap
+    val usableH = cardRect.height() - (padY * 2f)
+    val maxTileH = usableH * 0.72f
+
+    val tileW = minOf(maxTileW, maxTileH * 1.05f)
+    val tileH = minOf(maxTileH, tileW / 1.05f)
+
+    val totalTilesW = (tileW * 2f) + tileGapX
+    val tileStartX = cardRect.centerX() - (totalTilesW / 2f)
+
+    // Date Line Sizing & Exact Text Metrics
+    var dateTextSize = (tileH * 0.22f).coerceIn(12f * density, 20f * density)
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = dateTextSize
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val maxDateW = cardRect.width() - (padX * 2f)
+    if (datePaint.measureText(dateStr) > maxDateW) {
+        dateTextSize *= (maxDateW / datePaint.measureText(dateStr))
+        datePaint.textSize = dateTextSize
+    }
+
+    val dateBounds = android.graphics.Rect()
+    datePaint.getTextBounds(dateStr, 0, dateStr.length, dateBounds)
+    val dateTextHeight = dateBounds.height().toFloat()
+
+    // Fixed Proportional Gap between Tiles and Date
+    val gapY = (tileH * 0.16f).coerceIn(8f * density, 18f * density)
+
+    // 3. Center Entire Content Stack (Tiles + Gap + Date) Vertically in cardRect
+    val totalBlockHeight = tileH + gapY + dateTextHeight
+    val blockTopY = cardRect.centerY() - (totalBlockHeight / 2f)
+
+    val tileTopY = blockTopY
+    val dateY = blockTopY + tileH + gapY + dateTextHeight - dateBounds.bottom
+
+    val tileRadius = (tileH * 0.14f).coerceIn(6f * density, 14f * density)
+    val tileBgColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#222226")
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
+        style = Paint.Style.FILL
+    }
+
+    val splitLineColor = if (isLight) Color.parseColor("#C7C7CC") else Color.parseColor("#141416")
+    val splitLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = splitLineColor
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
+    }
+
+    val pinColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#3A3A3C")
+    val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = pinColor
+        style = Paint.Style.FILL
+    }
+
+    // 4. Render Individual Flip Cards
+    fun drawFlipCard(tileRect: RectF, digits: String) {
+        canvas.drawRoundRect(tileRect, tileRadius, tileRadius, tileBgPaint)
+
+        val maxTextW = tileRect.width() * 0.78f
+        val maxTextH = tileRect.height() * 0.76f
+
+        val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = getSlateFont(context, weight = 700)
+            textSize = 100f
+        }
+        val refW = refPaint.measureText(digits)
+        val textScale = minOf(maxTextH / 100f, maxTextW / refW)
+        val textSize = 100f * textScale
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            this.textSize = textSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.CENTER
+        }
+
+        val textBounds = android.graphics.Rect()
+        textPaint.getTextBounds(digits, 0, digits.length, textBounds)
+        val textY = tileRect.centerY() + (textBounds.height() / 2f) - (2f * density)
+
+        canvas.drawText(digits, tileRect.centerX(), textY, textPaint)
+
+        // Draw Center Split Line & Hinge Pins
+        val midY = tileRect.centerY()
+        canvas.drawLine(tileRect.left, midY, tileRect.right, midY, splitLinePaint)
+
+        val pinW = 4.5f * density
+        val pinH = 3f * density
+        val leftPin = RectF(tileRect.left, midY - (pinH / 2f), tileRect.left + pinW, midY + (pinH / 2f))
+        val rightPin = RectF(tileRect.right - pinW, midY - (pinH / 2f), tileRect.right, midY + (pinH / 2f))
+        canvas.drawRoundRect(leftPin, 1f * density, 1f * density, pinPaint)
+        canvas.drawRoundRect(rightPin, 1f * density, 1f * density, pinPaint)
+    }
+
+    // Render Tiles
+    val hourTileRect = RectF(tileStartX, tileTopY, tileStartX + tileW, tileTopY + tileH)
+    val minTileRect = RectF(hourTileRect.right + tileGapX, tileTopY, hourTileRect.right + tileGapX + tileW, tileTopY + tileH)
+
+    drawFlipCard(hourTileRect, hourStr)
+    drawFlipCard(minTileRect, minStr)
+
+    // Render Centered Date Line
+    canvas.drawText(dateStr, cardRect.centerX(), dateY, datePaint)
+
+    return bitmap
+}

@@ -1192,6 +1192,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
+        <!-- 12. Split Flap Digital (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalSplitFlapReceiver"
+            android:exported="true"
+            android:label="Slate Split Flap Digital">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
 
 
     </application>
