@@ -55,6 +55,7 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalGradientTallReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalModern3dLedReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalScriptOverlayReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalSplitFlapReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont1Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalVerticalCapsuleReceiver
 
@@ -106,7 +107,8 @@ class SlateClockTickerService : Service() {
             ClockDigitalScriptOverlayReceiver::class.java,
             ClockDigitalSplitFlapReceiver::class.java,
             ClockDigitalVerticalCapsuleReceiver::class.java,
-            ClockDigitalDualPillStackReceiver::class.java
+            ClockDigitalDualPillStackReceiver::class.java,
+            ClockDigitalTextFont1Receiver::class.java
 
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }

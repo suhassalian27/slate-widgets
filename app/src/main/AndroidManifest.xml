@@ -1228,6 +1228,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_1x2" />
         </receiver>
+        <!-- 15. Text Digital Font 1 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont1Receiver"
+            android:exported="true"
+            android:label="Slate Text Digital 1">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
 
 
     </application>

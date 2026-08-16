@@ -5,5 +5,6 @@ data class SlateWidgetInfo(
     val sizeText: String,
     val category: String,
     val receiverClass: Class<*>,
-    val hasModeOption: Boolean = false
+    val hasModeOption: Boolean = false,
+    val defaultOpacity: Float = 1.0f
 )

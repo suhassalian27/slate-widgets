@@ -1905,3 +1905,78 @@ fun generateMinimalStackedDigitalClockBitmap(
 
     return bitmap
 }
+
+// 15. TEXT DIGITAL FONT 1 (4x2 / Pure Typographic Giant 4-Digit Time)
+fun generateTextFont1DigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // Fixed 2:1 Container Bounds
+    val targetRatio = 2.0f
+    var cardH = h.toFloat()
+    var cardW = cardH * targetRatio
+
+    if (cardW > w.toFloat()) {
+        cardW = w.toFloat()
+        cardH = cardW / targetRatio
+    }
+
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // Time Data (4-digit format without colon)
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+    val timeText = "$hourStr$minStr"
+
+    val padX = cardRect.width() * 0.05f
+    val padY = cardRect.height() * 0.06f
+    val maxW = cardRect.width() - (padX * 2f)
+    val maxH = cardRect.height() - (padY * 2f)
+
+    // Measure & scale text to fill maximal bounds cleanly
+    val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 700)
+        textSize = 100f
+    }
+    val refW = refPaint.measureText(timeText)
+    val timeTextSize = minOf(maxH * 0.96f, 100f * (maxW / refW))
+
+    // Text paint set to accent color
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = timeTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = android.graphics.Rect()
+    timePaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
+    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
+
+    canvas.drawText(timeText, cardRect.centerX(), timeY, timePaint)
+
+    return bitmap
+}

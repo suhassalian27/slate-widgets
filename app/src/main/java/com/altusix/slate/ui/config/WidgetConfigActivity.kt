@@ -44,12 +44,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
 import com.altusix.slate.widgets.ai.updateAllAiWidgets
+import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
 import com.altusix.slate.widgets.applauncher.updateAllAppLauncherWidgets
+import com.altusix.slate.widgets.battery.getBatteryWidgetsCatalog
 import com.altusix.slate.widgets.battery.updateAllBatteryWidgets
+import com.altusix.slate.widgets.bluetooth.getBluetoothWidgetsCatalog
 import com.altusix.slate.widgets.bluetooth.updateAllBluetoothWidgets
+import com.altusix.slate.widgets.calendar.getCalendarWidgetsCatalog
 import com.altusix.slate.widgets.calendar.updateAllCalendarWidgets
+import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
@@ -79,6 +85,16 @@ class WidgetConfigActivity : ComponentActivity() {
 
         setContent {
             SlateConfigTheme {
+                val defaultWidgetOpacity = remember(widgetClassName) {
+                    val allWidgets = getClockDigitalWidgetsCatalog() +
+                            getBatteryWidgetsCatalog() +
+                            getAiWidgetsCatalog() +
+                            getBluetoothWidgetsCatalog() +
+                            getAppLauncherWidgetsCatalog() +
+                            getCalendarWidgetsCatalog()
+
+                    allWidgets.find { it.receiverClass.name == widgetClassName }?.defaultOpacity ?: 1.0f
+                }
                 var selectedBgHex by remember { mutableLongStateOf(0xFF161618L) }
                 var selectedAccentHex by remember { mutableLongStateOf(0xFFFFFFFFL) }
                 var opacity by remember { mutableFloatStateOf(1.0f) }
@@ -87,9 +103,11 @@ class WidgetConfigActivity : ComponentActivity() {
                 // Load existing configuration from SharedPreferences
                 LaunchedEffect(appWidgetId) {
                     val prefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+
+                    opacity = prefs.getFloat("widget_${appWidgetId}_opacity", defaultWidgetOpacity)
+
                     if (prefs.contains("widget_${appWidgetId}_bg_color")) {
                         selectedBgHex = prefs.getLong("widget_${appWidgetId}_bg_color", 0xFF161618L)
-                        opacity = prefs.getFloat("widget_${appWidgetId}_opacity", 1.0f)
                         selectedAccentHex = prefs.getLong("widget_${appWidgetId}_accent_color", 0xFFFFFFFFL)
                     }
                 }

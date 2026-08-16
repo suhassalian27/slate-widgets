@@ -32,7 +32,8 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Script Overlay Digital", "4x2", "Clock – Digital", ClockDigitalScriptOverlayReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Split Flap Digital", "4x2", "Clock – Digital", ClockDigitalSplitFlapReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Vertical Capsule Digital", "1x2", "Clock – Digital", ClockDigitalVerticalCapsuleReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Dual Pill Stack Digital", "1x2", "Clock – Digital", ClockDigitalDualPillStackReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Dual Pill Stack Digital", "1x2", "Clock – Digital", ClockDigitalDualPillStackReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Typeface 1", "4x2", "Clock – Digital", ClockDigitalTextFont1Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f)
     )
 }
 
@@ -52,7 +53,8 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalScriptOverlayReceiver::class.java,
         ClockDigitalSplitFlapReceiver::class.java,
         ClockDigitalVerticalCapsuleReceiver::class.java,
-        ClockDigitalDualPillStackReceiver::class.java
+        ClockDigitalDualPillStackReceiver::class.java,
+        ClockDigitalTextFont1Receiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -113,8 +115,13 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
             val defaultAccent = if (themeMode == "LIGHT") 0xFF000000L else 0xFFFFFFFFL
 
             val bgColor = widgetPrefs.getLong("widget_${id}_bg_color", defaultBg)
-            val opacity = widgetPrefs.getFloat("widget_${id}_opacity", 1.0f)
+//            val opacity = widgetPrefs.getFloat("widget_${id}_opacity", 1.0f)
             val accentColor = widgetPrefs.getLong("widget_${id}_accent_color", defaultAccent)
+
+            val widgetInfo = getClockDigitalWidgetsCatalog().find { it.receiverClass == javaClass }
+            val defaultOpacity = widgetInfo?.defaultOpacity ?: 1.0f
+
+            val opacity = widgetPrefs.getFloat("widget_${id}_opacity", defaultOpacity)
 
             val config = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
 
@@ -339,4 +346,10 @@ class ClockDigitalVerticalCapsuleReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalDualPillStackReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateMinimalStackedDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 15. TEXT DIGITAL FONT 1 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont1Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont1DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
