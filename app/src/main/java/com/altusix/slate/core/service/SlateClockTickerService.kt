@@ -55,7 +55,18 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalGradientTallReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalModern3dLedReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalScriptOverlayReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalSplitFlapReceiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont10Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont11Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont12Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont1Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont2Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont3Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont4Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont5Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont6Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont7Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont8Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont9Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalVerticalCapsuleReceiver
 
@@ -108,8 +119,18 @@ class SlateClockTickerService : Service() {
             ClockDigitalSplitFlapReceiver::class.java,
             ClockDigitalVerticalCapsuleReceiver::class.java,
             ClockDigitalDualPillStackReceiver::class.java,
-            ClockDigitalTextFont1Receiver::class.java
-
+            ClockDigitalTextFont1Receiver::class.java,
+            ClockDigitalTextFont2Receiver::class.java,
+            ClockDigitalTextFont3Receiver::class.java,
+            ClockDigitalTextFont4Receiver::class.java,
+            ClockDigitalTextFont5Receiver::class.java,
+            ClockDigitalTextFont6Receiver::class.java,
+            ClockDigitalTextFont7Receiver::class.java,
+            ClockDigitalTextFont8Receiver::class.java,
+            ClockDigitalTextFont9Receiver::class.java,
+            ClockDigitalTextFont10Receiver::class.java,
+            ClockDigitalTextFont11Receiver::class.java,
+            ClockDigitalTextFont12Receiver::class.java
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }

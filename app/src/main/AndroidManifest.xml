@@ -1240,6 +1240,138 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
+        <!-- 16. Text Digital Font 2 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont2Receiver"
+            android:exported="true"
+            android:label="Slate Text Digital 2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 17. Text Digital Font 3 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont3Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 3">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 18. Text Digital Font 4 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont4Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 4">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 19. Text Digital Font 5 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont5Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 5">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 20. Text Digital Font 6 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont6Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 6">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 21. Text Digital Font 7 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont7Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 7">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 22. Text Digital Font 8 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont8Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 8">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 23. Text Digital Font 9 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont9Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 9">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 24. Text Digital Font 10 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont10Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 10">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 25. Text Digital Font 11 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont11Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 11">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 26. Text Digital Font 12 (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont12Receiver"
+            android:exported="true"
+            android:label="Slate Typeface 12">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
 
 
     </application>

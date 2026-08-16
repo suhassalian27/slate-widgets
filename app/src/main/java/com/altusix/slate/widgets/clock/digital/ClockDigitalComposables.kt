@@ -1980,3 +1980,125 @@ fun generateTextFont1DigitalClockBitmap(
 
     return bitmap
 }
+
+fun generateTextCustomFontDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    fontResId: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val customTypeface = androidx.core.content.res.ResourcesCompat.getFont(
+        context,
+        fontResId
+    ) ?: Typeface.DEFAULT_BOLD
+
+    // Fixed 2:1 Container Bounds
+    val targetRatio = 2.0f
+    var cardH = h.toFloat()
+    var cardW = cardH * targetRatio
+
+    if (cardW > w.toFloat()) {
+        cardW = w.toFloat()
+        cardH = cardW / targetRatio
+    }
+
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    // Time Data (4-digit format without colon)
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+    val timeText = "$hourStr$minStr"
+
+    val padX = cardRect.width() * 0.05f
+    val padY = cardRect.height() * 0.06f
+    val maxW = cardRect.width() - (padX * 2f)
+    val maxH = cardRect.height() - (padY * 2f)
+
+    val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = customTypeface
+        textSize = 100f
+    }
+    val refW = refPaint.measureText(timeText)
+    val timeTextSize = minOf(maxH * 0.96f, 100f * (maxW / refW))
+
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = timeTextSize
+        typeface = customTypeface
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = android.graphics.Rect()
+    timePaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
+    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
+
+    canvas.drawText(timeText, cardRect.centerX(), timeY, timePaint)
+
+    return bitmap
+}
+
+// 16. TEXT DIGITAL FONT 2 (4x2 / Saint Regular)
+fun generateTextFont2DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.basteleur_bold)
+
+// 17. TEXT DIGITAL FONT 3 (4x2 / Saint Regular)
+fun generateTextFont3DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.saint_regular)
+
+// 18. TEXT DIGITAL FONT 4 (4x2 / Heal The Web)
+fun generateTextFont4DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.heal_the_web)
+
+// 19. TEXT DIGITAL FONT 5 (4x2 / Slibinas)
+fun generateTextFont5DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.slibinas)
+
+// 20. TEXT DIGITAL FONT 6 (4x2 / Trille GX)
+fun generateTextFont6DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.trille_gx)
+
+// 21. TEXT DIGITAL FONT 7 (4x2 / Kulture Type)
+fun generateTextFont7DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.kulture_type)
+
+// 22. TEXT DIGITAL FONT 8 (4x2 / Trickster)
+fun generateTextFont8DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.trickster)
+
+// 23. TEXT DIGITAL FONT 9 (4x2 / Kihim)
+fun generateTextFont9DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.kihim)
+
+// 24. TEXT DIGITAL FONT 10 (4x2 / Styro Extrabold)
+fun generateTextFont10DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.styro_extrabold)
+
+// 25. TEXT DIGITAL FONT 11 (4x2 / Le Murmure)
+fun generateTextFont11DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.le_murmure)
+
+// 26. TEXT DIGITAL FONT 12 (4x2 / Phosphene Font)
+fun generateTextFont12DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.phosphene_font)
