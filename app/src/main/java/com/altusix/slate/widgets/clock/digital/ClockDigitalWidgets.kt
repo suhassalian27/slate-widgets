@@ -28,7 +28,8 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Gradient Tall Digital", "4x2", "Clock – Digital", ClockDigitalGradientTallReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Gradient Tall Digital", "4x2", "Clock – Digital", ClockDigitalGradientTallReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Script Overlay Digital", "4x2", "Clock – Digital", ClockDigitalScriptOverlayReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -44,7 +45,8 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalTextWordReceiver::class.java,
         ClockDigitalGiantHourCapsuleReceiver::class.java,
         ClockDigitalModern3dLedReceiver::class.java,
-        ClockDigitalGradientTallReceiver::class.java
+        ClockDigitalGradientTallReceiver::class.java,
+        ClockDigitalScriptOverlayReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -307,4 +309,9 @@ class ClockDigitalModern3dLedReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalGradientTallReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateGradientTallDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+// 11. SCRIPT OVERLAY DIGITAL (4x2 / Giant Pastel Time with Cursive Day & Uppercase Date)
+class ClockDigitalScriptOverlayReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateScriptOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
