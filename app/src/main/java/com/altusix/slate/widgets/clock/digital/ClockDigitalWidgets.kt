@@ -27,7 +27,8 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Asymmetric Overlay Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricOverlayReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Gradient Tall Digital", "4x2", "Clock – Digital", ClockDigitalGradientTallReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -42,7 +43,8 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalAsymmetricOverlayReceiver::class.java,
         ClockDigitalTextWordReceiver::class.java,
         ClockDigitalGiantHourCapsuleReceiver::class.java,
-        ClockDigitalModern3dLedReceiver::class.java
+        ClockDigitalModern3dLedReceiver::class.java,
+        ClockDigitalGradientTallReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -96,6 +98,7 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
     private fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
         try {
             val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+            val appLauncherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
 
             val themeMode = widgetPrefs.getString("widget_${id}_theme_mode", "DARK") ?: "DARK"
             val defaultBg = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
@@ -107,30 +110,28 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
 
             val config = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
 
-            val keyWMode = "widget_${id}_mode"
-            val keyWResponsive = "widget_${id}_is_responsive"
-
-            val isResponsive = when {
-                widgetPrefs.contains(keyWMode) -> {
-                    widgetPrefs.getString(keyWMode, "RESPONSIVE").equals("RESPONSIVE", ignoreCase = true)
-                }
-                widgetPrefs.contains(keyWResponsive) -> {
-                    widgetPrefs.getBoolean(keyWResponsive, true)
-                }
-                else -> true
-            }
+            // --- PER-INSTANCE LOCK: Reads global default ONLY on first render, then locks to widget_${id} ---
+            val isResponsive = parseAndLockIsResponsive(widgetPrefs, appLauncherPrefs, id)
 
             val options = manager.getAppWidgetOptions(id)
-            val minW = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
-            val minH = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
-            val maxW = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH) ?: 0
-            val maxH = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) ?: 0
+            val isPortrait = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
 
-            val wDp = maxOf(minW, maxW, 140).coerceAtMost(220)
-            val hDp = maxOf(minH, maxH, 60).coerceAtMost(220)
+            val rawW = if (isPortrait) {
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
+            } else {
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH) ?: 0
+            }
+            val rawH = if (isPortrait) {
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) ?: 0
+            } else {
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
+            }
+
+            val wDp = rawW.coerceAtLeast(180)
+            val hDp = rawH.coerceAtLeast(80)
 
             val rawBitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
-            val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 600)
+            val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 800)
 
             val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
             views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
@@ -152,6 +153,35 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun parseAndLockIsResponsive(
+        widgetPrefs: android.content.SharedPreferences,
+        appLauncherPrefs: android.content.SharedPreferences,
+        id: Int
+    ): Boolean {
+        val keyWMode = "widget_${id}_mode"
+        val keyWResponsive = "widget_${id}_is_responsive"
+
+        // 1. If this widget instance already has its own saved preference, use it!
+        if (widgetPrefs.contains(keyWMode)) {
+            val modeStr = widgetPrefs.getString(keyWMode, "RESPONSIVE")
+            return modeStr.equals("RESPONSIVE", ignoreCase = true)
+        }
+        if (widgetPrefs.contains(keyWResponsive)) {
+            return widgetPrefs.getBoolean(keyWResponsive, true)
+        }
+
+        // 2. First-time render for this ID! Read current pinning default from MainActivity...
+        val defaultIsResponsive = appLauncherPrefs.getBoolean("default_is_responsive", true)
+
+        // 3. ...and IMMEDIATELY lock it to this specific widget ID!
+        widgetPrefs.edit()
+            .putBoolean(keyWResponsive, defaultIsResponsive)
+            .putString(keyWMode, if (defaultIsResponsive) "RESPONSIVE" else "FIXED")
+            .apply()
+
+        return defaultIsResponsive
     }
 
     private fun scaleBitmapForIPC(src: Bitmap, maxDimensionPx: Int): Bitmap {
@@ -271,4 +301,10 @@ class ClockDigitalGiantHourCapsuleReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalModern3dLedReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateModern3dLedHorizontalDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 10. GRADIENT TALL DIGITAL (4x2 / Responsive Tall Time with Gradient)
+class ClockDigitalGradientTallReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateGradientTallDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

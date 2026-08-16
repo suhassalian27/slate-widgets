@@ -1054,3 +1054,284 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(
 
     return bitmap
 }
+
+// 10. GRADIENT TALL DIGITAL (4x2 / Smart Adaptive Dual-Mode)
+fun generateGradientTallDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
+    val h = (hDp * density).toInt().coerceAtLeast((70 * density).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+
+    // Dynamic Gradient Accent Setup
+    val accentBottom = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val hsv = FloatArray(3)
+    Color.colorToHSV(accentBottom, hsv)
+    hsv[0] = (hsv[0] - 18f + 360f) % 360f
+    hsv[1] = (hsv[1] * 0.75f).coerceIn(0f, 1f)
+    hsv[2] = (hsv[2] * 1.15f).coerceIn(0f, 1f)
+    val accentTop = Color.HSVToColor(hsv)
+
+    // 1. Calculate Card Bounds (Responsive: 100% boundary; Fixed: 2:1 ratio centered)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardRadius = getStandardCornerRadius(density)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.07f
+    val padY = cardRect.height() * 0.08f
+
+    // Time & Date Data
+    val timeState = DigitalClockTimeState.now()
+    val hourStr = timeState.hour24.padStart(2, '0')
+    val minStr = timeState.minute.padStart(2, '0')
+
+    val cal = java.util.Calendar.getInstance()
+    val dayNumStr = timeState.dayOfMonth
+    val dayWeekStr = java.text.SimpleDateFormat("EEE", java.util.Locale.ENGLISH).format(cal.time)
+    val monthNumStr = String.format(java.util.Locale.getDefault(), "%02d", cal.get(java.util.Calendar.MONTH) + 1)
+    val yearStr = cal.get(java.util.Calendar.YEAR).toString()
+    val dateLine2 = "$yearStr.$monthNumStr"
+
+    val aspect = cardRect.width() / cardRect.height()
+    val naturalScaleX = 0.72f // Natural, unsquished condensed scale
+
+    if (aspect >= 1.25f) {
+        // =========================================================================
+        // WIDE LAYOUT (Horizontal Split: Time Left, Date Top-Right)
+        // =========================================================================
+        var dateTextSize = (cardRect.height() * 0.13f).coerceAtLeast(10f * density)
+        val datePaintPrimary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = dateTextSize
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            textAlign = Paint.Align.RIGHT
+        }
+        val datePaintAccent = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentTop
+            textSize = dateTextSize
+            typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+        }
+        val datePaintSecondary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = dateTextSize * 0.95f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val dateRightX = cardRect.right - padX
+        val dateTopY = cardRect.top + padY + (cardRect.height() * 0.18f)
+
+        val dayWeekW = datePaintAccent.measureText(dayWeekStr)
+        val line1W = datePaintPrimary.measureText("$dayNumStr ") + dayWeekW
+        val line2W = datePaintSecondary.measureText(dateLine2)
+        val maxDateLineW = maxOf(line1W, line2W)
+
+        val leftSectionW = cardRect.width() - (padX * 2.2f) - maxDateLineW
+        val leftSectionH = cardRect.height() - (padY * 2f)
+
+        // Measure unscaled time width at 100f reference
+        val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            textSize = 100f
+            textScaleX = naturalScaleX
+        }
+        val refHourW = refPaint.measureText(hourStr)
+        val refColonGap = 100f * 0.10f
+        val refMinW = refPaint.measureText(minStr)
+        val refTotalW = refHourW + refColonGap + refMinW
+
+        // Smart double-constrained font size (Fits BOTH width and height)
+        val maxFromHeight = leftSectionH * 0.78f
+        val maxFromWidth = 100f * (leftSectionW / refTotalW)
+        val timeTextSize = minOf(maxFromHeight, maxFromWidth).coerceAtLeast(12f * density)
+
+        val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            textSize = timeTextSize
+            textScaleX = naturalScaleX
+        }
+
+        val hourW = timePaint.measureText(hourStr)
+        val colonGap = timeTextSize * 0.10f
+        val minW = timePaint.measureText(minStr)
+
+        val timeStartX = cardRect.left + padX
+
+        val timeBounds = android.graphics.Rect()
+        timePaint.getTextBounds("00", 0, 2, timeBounds)
+        val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
+
+        val gradientTopY = timeY - timeBounds.height()
+        val gradientBottomY = timeY
+
+        val shader = android.graphics.LinearGradient(
+            0f, gradientTopY, 0f, gradientBottomY,
+            accentTop, accentBottom,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+        timePaint.shader = shader
+
+        val colonCx = timeStartX + hourW + (colonGap / 2f)
+        val minStartX = timeStartX + hourW + colonGap
+
+        // Draw Hours
+        canvas.drawText(hourStr, timeStartX, timeY, timePaint)
+
+        // Draw Colon
+        val dotRadius = timeTextSize * 0.040f
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            this.shader = shader
+        }
+        val dot1Y = timeY - (timeBounds.height() * 0.28f)
+        val dot2Y = timeY - (timeBounds.height() * 0.68f)
+        canvas.drawCircle(colonCx, dot1Y, dotRadius, dotPaint)
+        canvas.drawCircle(colonCx, dot2Y, dotRadius, dotPaint)
+
+        // Draw Minutes
+        canvas.drawText(minStr, minStartX, timeY, timePaint)
+
+        // Draw Date Block (Top Right)
+        val currentDayWeekW = datePaintAccent.measureText(dayWeekStr)
+        canvas.drawText(dayWeekStr, dateRightX, dateTopY, datePaintAccent)
+        canvas.drawText("$dayNumStr ", dateRightX - currentDayWeekW, dateTopY, datePaintPrimary)
+
+        val line2Y = dateTopY + (dateTextSize * 1.35f)
+        canvas.drawText(dateLine2, dateRightX, line2Y, datePaintSecondary)
+
+    } else {
+        // =========================================================================
+        // TALL / SQUARE LAYOUT (Vertical Stack: Date Top-Right, Time Below)
+        // =========================================================================
+        var dateTextSize = (cardRect.height() * 0.09f).coerceIn(10f * density, 18f * density)
+        val datePaintPrimary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = dateTextSize
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            textAlign = Paint.Align.RIGHT
+        }
+        val datePaintAccent = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentTop
+            textSize = dateTextSize
+            typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+        }
+        val datePaintSecondary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = dateTextSize * 0.95f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val dateRightX = cardRect.right - padX
+        val dateTopY = cardRect.top + padY + dateTextSize
+
+        val currentDayWeekW = datePaintAccent.measureText(dayWeekStr)
+        canvas.drawText(dayWeekStr, dateRightX, dateTopY, datePaintAccent)
+        canvas.drawText("$dayNumStr ", dateRightX - currentDayWeekW, dateTopY, datePaintPrimary)
+
+        val line2Y = dateTopY + (dateTextSize * 1.30f)
+        canvas.drawText(dateLine2, dateRightX, line2Y, datePaintSecondary)
+
+        // Time Area strictly below Date Block (Zero overlap)
+        val timeAreaTop = line2Y + (cardRect.height() * 0.05f)
+        val timeAreaH = (cardRect.bottom - padY - timeAreaTop).coerceAtLeast(10f)
+        val timeAreaW = cardRect.width() - (padX * 2f)
+
+        val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            textSize = 100f
+            textScaleX = naturalScaleX
+        }
+        val refHourW = refPaint.measureText(hourStr)
+        val refColonGap = 100f * 0.10f
+        val refMinW = refPaint.measureText(minStr)
+        val refTotalW = refHourW + refColonGap + refMinW
+
+        val maxFromHeight = timeAreaH * 0.85f
+        val maxFromWidth = 100f * (timeAreaW / refTotalW)
+        val timeTextSize = minOf(maxFromHeight, maxFromWidth).coerceAtLeast(12f * density)
+
+        val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            textSize = timeTextSize
+            textScaleX = naturalScaleX
+        }
+
+        val hourW = timePaint.measureText(hourStr)
+        val colonGap = timeTextSize * 0.10f
+        val minW = timePaint.measureText(minStr)
+        val totalTimeW = hourW + colonGap + minW
+
+        val timeStartX = cardRect.left + padX + ((timeAreaW - totalTimeW) / 2f).coerceAtLeast(0f)
+
+        val timeBounds = android.graphics.Rect()
+        timePaint.getTextBounds("00", 0, 2, timeBounds)
+        val timeY = timeAreaTop + (timeAreaH + timeBounds.height()) / 2f - (2f * density)
+
+        val gradientTopY = timeY - timeBounds.height()
+        val gradientBottomY = timeY
+
+        val shader = android.graphics.LinearGradient(
+            0f, gradientTopY, 0f, gradientBottomY,
+            accentTop, accentBottom,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+        timePaint.shader = shader
+
+        val colonCx = timeStartX + hourW + (colonGap / 2f)
+        val minStartX = timeStartX + hourW + colonGap
+
+        // Draw Hours
+        canvas.drawText(hourStr, timeStartX, timeY, timePaint)
+
+        // Draw Colon
+        val dotRadius = timeTextSize * 0.040f
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            this.shader = shader
+        }
+        val dot1Y = timeY - (timeBounds.height() * 0.28f)
+        val dot2Y = timeY - (timeBounds.height() * 0.68f)
+        canvas.drawCircle(colonCx, dot1Y, dotRadius, dotPaint)
+        canvas.drawCircle(colonCx, dot2Y, dotRadius, dotPaint)
+
+        // Draw Minutes
+        canvas.drawText(minStr, minStartX, timeY, timePaint)
+    }
+
+    return bitmap
+}
