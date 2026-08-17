@@ -2646,3 +2646,177 @@ fun generateArcDateWedgeClockBitmap(
 
     return bitmap
 }
+
+// 16. HORIZONTAL PILL HYBRID (2x1 Horizontal Pill / Inset Left Analog Dial & Right Digital Time)
+fun generateHorizontalPillHybridClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(210)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#80FFFFFF")
+
+    // Enforce Fixed 2:1 Aspect Ratio
+    val targetRatio = 2.0f
+    var cardH = h.toFloat()
+    var cardW = cardH * targetRatio
+
+    if (cardW > w.toFloat()) {
+        cardW = w.toFloat()
+        cardH = cardW / targetRatio
+    }
+
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    // Outer Pill Capsule
+    val pillRadius = cardRect.height() / 2f
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
+
+    val timeState = HybridClockTimeState.now()
+
+    // =========================================================================
+    // 1. LEFT SECTION: INSET ANALOG DIAL
+    // =========================================================================
+    val dialCenterX = cardRect.left + pillRadius
+    val dialCenterY = cardRect.centerY()
+    val dialRadius = pillRadius * 0.78f
+
+    // Inset Dark/Light Inner Circle Dial Background
+    val dialBgColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+    val dialBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dialBgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(dialCenterX, dialCenterY, dialRadius, dialBgPaint)
+
+    // Dial Hour Marks (12 Dots/Ticks)
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        style = Paint.Style.FILL
+    }
+
+    for (i in 0 until 12) {
+        val angleRad = Math.toRadians((i * 30).toDouble())
+        val cos = Math.cos(angleRad).toFloat()
+        val sin = Math.sin(angleRad).toFloat()
+        val tickR = dialRadius * 0.80f
+
+        val dotSize = if (i % 3 == 0) scaleFactor * 1.8f else scaleFactor * 1.0f
+        canvas.drawCircle(
+            dialCenterX + cos * tickR,
+            dialCenterY + sin * tickR,
+            dotSize,
+            tickPaint
+        )
+    }
+
+    // Hands Calculations
+    val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
+    val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
+    val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
+
+    // Hour Hand
+    val hourHandLen = dialRadius * 0.48f
+    val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.8f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        dialCenterX, dialCenterY,
+        dialCenterX + (Math.cos(hourAngleRad) * hourHandLen).toFloat(),
+        dialCenterY + (Math.sin(hourAngleRad) * hourHandLen).toFloat(),
+        hourHandPaint
+    )
+
+    // Minute Hand
+    val minHandLen = dialRadius * 0.74f
+    val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.8f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        dialCenterX, dialCenterY,
+        dialCenterX + (Math.cos(minAngleRad) * minHandLen).toFloat(),
+        dialCenterY + (Math.sin(minAngleRad) * minHandLen).toFloat(),
+        minHandPaint
+    )
+
+    // Second Needle Hand
+    val secHandLen = dialRadius * 0.82f
+    val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.9f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        dialCenterX, dialCenterY,
+        dialCenterX + (Math.cos(secAngleRad) * secHandLen).toFloat(),
+        dialCenterY + (Math.sin(secAngleRad) * secHandLen).toFloat(),
+        secHandPaint
+    )
+
+    // Pivot Center Cap Dot
+    val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(dialCenterX, dialCenterY, scaleFactor * 2.0f, capPaint)
+
+    // =========================================================================
+    // 2. RIGHT SECTION: CENTERED DIGITAL TIME
+    // =========================================================================
+    val hourStr = timeState.hour24.toString().padStart(2, '0')
+    val minStr = timeState.minute.toString().padStart(2, '0')
+    val digitalTimeStr = "$hourStr:$minStr"
+
+    val rightCenterX = cardRect.left + (pillRadius * 2f) + ((cardW - (pillRadius * 2f)) / 2f) - (cardW * 0.04f)
+
+    val maxDigitalW = (cardW - (pillRadius * 2f)) * 0.82f
+    val refTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 700)
+        textSize = 100f
+    }
+    val refTimeW = refTimePaint.measureText(digitalTimeStr)
+    val digitalTextSize = minOf(cardH * 0.42f, 100f * (maxDigitalW / refTimeW))
+
+    val digitalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = digitalTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = Rect()
+    digitalPaint.getTextBounds(digitalTimeStr, 0, digitalTimeStr.length, timeBounds)
+    val digitalY = cardRect.centerY() + (timeBounds.height() / 2f) - (1f * scaleFactor)
+
+    canvas.drawText(digitalTimeStr, rightCenterX, digitalY, digitalPaint)
+
+    return bitmap
+}
