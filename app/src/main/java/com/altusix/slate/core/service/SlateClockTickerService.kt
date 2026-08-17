@@ -43,18 +43,11 @@ import com.altusix.slate.widgets.clock.analog.ClockHourglassReceiver
 import com.altusix.slate.widgets.clock.analog.ClockMinimalDotsReceiver
 import com.altusix.slate.widgets.clock.analog.ClockRadarScopeReceiver
 import com.altusix.slate.widgets.clock.analog.BaseClockReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalAsymmetricOverlayReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalAsymmetricSlantedReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalBoldTypographicReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalMinimalDividerReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalLcdSevenSegmentReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalCompactBlockReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalDualPillStackReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalGiantHourCapsuleReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalGradientTallReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalModern3dLedReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalScriptOverlayReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalSplitFlapReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont10Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont11Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont12Receiver
@@ -90,8 +83,16 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont7Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont8Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont9Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver
-import com.altusix.slate.widgets.clock.digital.ClockDigitalVerticalCapsuleReceiver
+
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalVerticalCapsuleReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalAsymmetricOverlayReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalAsymmetricSlantedReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalBoldTypographicReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalLcdSevenSegmentReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalGradientTallReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridAnalogDigitalSplitReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalScriptOverlayReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockDigitalSplitFlapReceiver
 
 class SlateClockTickerService : Service() {
 

@@ -19,19 +19,16 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Bold Typographic Digital", "2x2", "Clock – Digital", ClockDigitalBoldTypographicReceiver::class.java, hasModeOption = false),
+
         SlateWidgetInfo("Minimal Divider Digital", "2x2", "Clock – Digital", ClockDigitalMinimalDividerReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("LCD Seven Segment Digital", "2x2", "Clock – Digital", ClockDigitalLcdSevenSegmentReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Asymmetric Slanted Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricSlantedReceiver::class.java, hasModeOption = false),
+
+
         SlateWidgetInfo("Compact Block Digital", "2x2", "Clock – Digital", ClockDigitalCompactBlockReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Asymmetric Overlay Digital", "2x2", "Clock – Digital", ClockDigitalAsymmetricOverlayReceiver::class.java, hasModeOption = false),
+
         SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Gradient Tall Digital", "4x2", "Clock – Digital", ClockDigitalGradientTallReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Script Overlay Digital", "4x2", "Clock – Digital", ClockDigitalScriptOverlayReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Split Flap Digital", "4x2", "Clock – Digital", ClockDigitalSplitFlapReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Vertical Capsule Digital", "1x2", "Clock – Digital", ClockDigitalVerticalCapsuleReceiver::class.java, hasModeOption = true),
+
         SlateWidgetInfo("Dual Pill Stack Digital", "1x2", "Clock – Digital", ClockDigitalDualPillStackReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Typeface 1", "4x2", "Clock – Digital", ClockDigitalTextFont1Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
         SlateWidgetInfo("Typeface 2", "4x2", "Clock – Digital", ClockDigitalTextFont2Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
@@ -75,19 +72,15 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
 fun updateAllClockDigitalWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
     val receivers = listOf(
-        ClockDigitalBoldTypographicReceiver::class.java,
+
         ClockDigitalMinimalDividerReceiver::class.java,
-        ClockDigitalLcdSevenSegmentReceiver::class.java,
-        ClockDigitalAsymmetricSlantedReceiver::class.java,
+
         ClockDigitalCompactBlockReceiver::class.java,
-        ClockDigitalAsymmetricOverlayReceiver::class.java,
+
         ClockDigitalTextWordReceiver::class.java,
         ClockDigitalGiantHourCapsuleReceiver::class.java,
         ClockDigitalModern3dLedReceiver::class.java,
-        ClockDigitalGradientTallReceiver::class.java,
-        ClockDigitalScriptOverlayReceiver::class.java,
-        ClockDigitalSplitFlapReceiver::class.java,
-        ClockDigitalVerticalCapsuleReceiver::class.java,
+
         ClockDigitalDualPillStackReceiver::class.java,
         ClockDigitalTextFont1Receiver::class.java,
         ClockDigitalTextFont2Receiver::class.java,
@@ -317,26 +310,7 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
 
 // --- WIDGET RECEIVERS ---
 
-// 1. BOLD TYPOGRAPHIC DIGITAL (2x2 Square / Stacked Giant Hour & Minute Display)
-class ClockDigitalBoldTypographicReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateBoldTypographicDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 
-    override fun onEnabled(context: Context) {
-        super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-}
 
 // 2. MINIMAL DIVIDER DIGITAL (2x2 / Stacked Time with Accent Line Divider)
 class ClockDigitalMinimalDividerReceiver : BaseDigitalClockReceiver() {
@@ -344,28 +318,12 @@ class ClockDigitalMinimalDividerReceiver : BaseDigitalClockReceiver() {
         generateMinimalDividerDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
 
-// 3. LCD SEVEN SEGMENT DIGITAL (2x2 / Stacked 7-Segment LCD with Vertical Date)
-class ClockDigitalLcdSevenSegmentReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateLcdSevenSegmentDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
 
-// 4. ASYMMETRIC SLANTED DIGITAL (2x2 / Minimal Bottom-Weighted Layout)
-class ClockDigitalAsymmetricSlantedReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateAsymmetricSlantedDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
 
 // 5. COMPACT BLOCK DIGITAL (2x2 / 4-Digit Block Time in Condensed Font)
 class ClockDigitalCompactBlockReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateCompactBlockDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 6. ASYMMETRIC OVERLAY DIGITAL (2x2 / Translucent Giant Right Time with Bottom-Left Date)
-class ClockDigitalAsymmetricOverlayReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateAsymmetricOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
 
 // 7. TYPOGRAPHIC WORD DIGITAL (2x2 / Stacked Natural Language Word Time)
@@ -384,30 +342,6 @@ class ClockDigitalGiantHourCapsuleReceiver : BaseDigitalClockReceiver() {
 class ClockDigitalModern3dLedReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateModern3dLedHorizontalDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 10. GRADIENT TALL DIGITAL (4x2 / Responsive Tall Time with Gradient)
-class ClockDigitalGradientTallReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateGradientTallDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 11. SCRIPT OVERLAY DIGITAL (4x2 / Giant Pastel Time with Cursive Day & Uppercase Date)
-class ClockDigitalScriptOverlayReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateScriptOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 12. SPLIT FLAP DIGITAL (4x2 / Dual Flip Card Time with Centered Date)
-class ClockDigitalSplitFlapReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateSplitFlapDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 13. VERTICAL CAPSULE DIGITAL (1x2 / Pill Capsule Monolith with Center Date Badge)
-class ClockDigitalVerticalCapsuleReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateVerticalCapsuleDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
 
 // 14. DUAL PILL STACK DIGITAL (1x2 / Dual Nested Pill Tiles for Time & Accent Date)
