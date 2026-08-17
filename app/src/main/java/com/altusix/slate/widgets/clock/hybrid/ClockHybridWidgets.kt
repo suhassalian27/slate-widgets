@@ -24,7 +24,8 @@ fun getClockHybridWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Split Flap Hybrid", "4x2", "Clock – Hybrid", ClockHybridSplitFlapReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Vertical Capsule Hybrid", "1x2", "Clock – Hybrid", ClockHybridVerticalCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Pill Capsule Hybrid", sizeText = "1x2", category = "Clock – Hybrid", receiverClass = ClockHybridPillCapsuleReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Overlapping Typography Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridOverlappingTypographyReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Overlapping Typography Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridOverlappingTypographyReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Giant Hour Typographic Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridGiantHourReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -42,8 +43,8 @@ fun updateAllClockHybridWidgets(context: Context) {
         ClockHybridSplitFlapReceiver::class.java,
         ClockHybridVerticalCapsuleReceiver::class.java,
         ClockHybridPillCapsuleReceiver::class.java,
-        ClockHybridOverlappingTypographyReceiver::class.java
-
+        ClockHybridOverlappingTypographyReceiver::class.java,
+        ClockHybridGiantHourReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -164,4 +165,15 @@ class ClockHybridOverlappingTypographyReceiver : BaseDigitalClockReceiver() {
         wDp: Int,
         hDp: Int
     ): Bitmap = generateOverlappingTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 13. GIANT HOUR TYPOGRAPHIC HYBRID (2x2 / Circular Watch Face with Bottom Giant Hour & Mid-Right Stack)
+class ClockHybridGiantHourReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateGiantHourTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
 }

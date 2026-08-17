@@ -2098,3 +2098,253 @@ fun generateOverlappingTypographicHybridClockBitmap(
     return bitmap
 }
 
+// 13. GIANT HOUR TYPOGRAPHIC HYBRID (2x2 Square / Circular Watch Face with Bottom Giant Hour & Mid-Right Digital Stack)
+fun generateGiantHourTypographicHybridClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val density = displayDensity
+
+    val size = minOf(w, h).toFloat()
+    val cx = w / 2f
+    val cy = h / 2f
+    val circleRadius = size / 2f
+
+    // 1. CIRCULAR BOUNDARY & CANVAS CLIPPING
+    val circlePath = Path().apply {
+        addCircle(cx, cy, circleRadius, Path.Direction.CW)
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(circlePath, bgPaint)
+
+    canvas.save()
+    canvas.clipPath(circlePath)
+
+    val faceBgColor = if (isLight) Color.parseColor("#EFEFEF") else Color.parseColor("#0A0A0C")
+    val facePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, circleRadius, facePaint)
+
+    // =========================================================================
+    // USER CONTROLS & MANUAL CONFIGURATION
+    // =========================================================================
+    val hourX = cx - circleRadius * 0.88f          // Giant hour horizontal position
+    val hourY = cy + circleRadius * 0.82f          // Giant hour vertical baseline
+    val digitGap = circleRadius * 0.44f            // Spacing between 1st and 2nd hour digit
+
+    val infoX = cx + circleRadius * 0.70f          // Digital time & date right-aligned position
+    val infoY = cy + circleRadius * -0.44f          // Digital time baseline
+    val dateLineGap = circleRadius * 0.16f         // Vertical space between time & date
+
+    val digitStrokeWidth = circleRadius * 0.04f    // Separation stroke between overlapping hour digits
+    val handOutlineWidth = 1.5f * density          // Background outline stroke around hands
+
+    val dimDigitAlpha = 180                        // Opacity for 1st hour digit (0..255)
+    val fullDigitAlpha = 255                       // Opacity for 2nd hour digit (0..255)
+    // =========================================================================
+
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val creamColor = if (isLight) Color.parseColor("#2C2C2E") else Color.parseColor("#F2EAD3")
+
+    val r = Color.red(accentColorInt)
+    val g = Color.green(accentColorInt)
+    val b = Color.blue(accentColorInt)
+    val fullAccentColor = Color.argb(fullDigitAlpha, r, g, b)
+
+    val timeState = HybridClockTimeState.now()
+    val hourStr = timeState.hour24.toString().padStart(2, '0')
+    val minStr = timeState.minute.toString().padStart(2, '0')
+
+    // 2. GIANT HOUR DIGITS (Bottom Anchor)
+    val displayTypeface = getSlateFont(context, weight = 900)
+    val numTextSize = circleRadius * 1.15f
+
+    val h1 = hourStr[0].toString()
+    val h2 = hourStr[1].toString()
+
+    val h1Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = creamColor
+        textSize = numTextSize
+        typeface = displayTypeface
+        textAlign = Paint.Align.LEFT
+    }
+
+    val h2Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fullAccentColor
+        textSize = numTextSize
+        typeface = displayTypeface
+        textAlign = Paint.Align.LEFT
+    }
+
+    val digitCutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        textSize = numTextSize
+        typeface = displayTypeface
+        textAlign = Paint.Align.LEFT
+        style = Paint.Style.STROKE
+        strokeWidth = digitStrokeWidth
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    // Render 1st Hour Digit
+    canvas.drawText(h1, hourX, hourY, h1Paint)
+
+    // Render 2nd Hour Digit with Cutout Stroke
+    canvas.drawText(h2, hourX + digitGap, hourY, digitCutoutPaint)
+    canvas.drawText(h2, hourX + digitGap, hourY, h2Paint)
+
+    // 3. MID-RIGHT DIGITAL TIME & DATE STACK
+    val digitalTimeStr = "${timeState.hour24.toString().padStart(2, '0')}:${minStr}"
+    val dateStr = "${timeState.monthName.take(3)} ${timeState.dayOfMonth}"
+
+    val digitalTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = circleRadius * 0.18f
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fullAccentColor
+        textSize = circleRadius * 0.16f
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val infoKnockoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        style = Paint.Style.STROKE
+        strokeWidth = circleRadius * 0.035f
+        strokeJoin = Paint.Join.ROUND
+        textAlign = Paint.Align.RIGHT
+    }
+
+    // Draw Digital Time with Knockout
+    infoKnockoutPaint.textSize = digitalTimePaint.textSize
+    infoKnockoutPaint.typeface = digitalTimePaint.typeface
+    canvas.drawText(digitalTimeStr, infoX, infoY, infoKnockoutPaint)
+    canvas.drawText(digitalTimeStr, infoX, infoY, digitalTimePaint)
+
+    // Draw Date with Knockout
+    infoKnockoutPaint.textSize = dateTextPaint.textSize
+    infoKnockoutPaint.typeface = dateTextPaint.typeface
+    canvas.drawText(dateStr, infoX, infoY + dateLineGap, infoKnockoutPaint)
+    canvas.drawText(dateStr, infoX, infoY + dateLineGap, dateTextPaint)
+
+    // 4. ANALOG CLOCK HANDS
+    val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
+    val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
+    val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
+
+    // HOUR HAND: Skeleton Loop Hand
+    canvas.save()
+    canvas.translate(cx, cy)
+    canvas.rotate(Math.toDegrees(hourAngleRad).toFloat() + 90f)
+
+    val hourLen = circleRadius * 0.50f
+    val hourWidth = circleRadius * 0.15f
+    val loopRect = RectF(-hourWidth / 2f, -hourLen, hourWidth / 2f, 0f)
+
+    val hourOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        style = Paint.Style.STROKE
+        strokeWidth = circleRadius * 0.038f + (handOutlineWidth * 2f)
+    }
+    canvas.drawRoundRect(loopRect, hourWidth / 2f, hourWidth / 2f, hourOutlinePaint)
+
+    val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = circleRadius * 0.038f
+    }
+    canvas.drawRoundRect(loopRect, hourWidth / 2f, hourWidth / 2f, hourHandPaint)
+    canvas.restore()
+
+    // MINUTE HAND: Solid Needle Hand
+    val minHandLen = circleRadius * 0.82f
+    val minHandWidth = circleRadius * 0.032f
+
+    val minOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        style = Paint.Style.STROKE
+        strokeWidth = minHandWidth + (handOutlineWidth * 2f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = minHandWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val minStopX = cx + (Math.cos(minAngleRad) * minHandLen).toFloat()
+    val minStopY = cy + (Math.sin(minAngleRad) * minHandLen).toFloat()
+    canvas.drawLine(cx, cy, minStopX, minStopY, minOutlinePaint)
+    canvas.drawLine(cx, cy, minStopX, minStopY, minHandPaint)
+
+    // SECOND HAND: Accent Needle
+    val secHandLen = circleRadius * 0.88f
+    val secHandWidth = circleRadius * 0.014f
+
+    val secOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        style = Paint.Style.STROKE
+        strokeWidth = secHandWidth + (handOutlineWidth * 2f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fullAccentColor
+        style = Paint.Style.STROKE
+        strokeWidth = secHandWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val secStopX = cx + (Math.cos(secAngleRad) * secHandLen).toFloat()
+    val secStopY = cy + (Math.sin(secAngleRad) * secHandLen).toFloat()
+    canvas.drawLine(cx, cy, secStopX, secStopY, secOutlinePaint)
+    canvas.drawLine(cx, cy, secStopX, secStopY, secHandPaint)
+
+    // CENTER CAP
+    val capOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = faceBgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, circleRadius * 0.052f, capOutlinePaint)
+
+    val capOuter = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, circleRadius * 0.040f, capOuter)
+
+    val capInner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fullAccentColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, circleRadius * 0.020f, capInner)
+
+    canvas.restore()
+
+    return bitmap
+}
