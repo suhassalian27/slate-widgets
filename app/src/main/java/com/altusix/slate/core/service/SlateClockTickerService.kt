@@ -58,8 +58,30 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalSplitFlapReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont10Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont11Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont12Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont13Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont14Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont15Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont16Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont17Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont18Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont19Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont1Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont20Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont21Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont22Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont23Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont24Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont25Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont26Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont27Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont28Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont29Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont2Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont30Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont31Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont32Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont33Receiver
+import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont34Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont3Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont4Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont5Receiver
@@ -130,7 +152,29 @@ class SlateClockTickerService : Service() {
             ClockDigitalTextFont9Receiver::class.java,
             ClockDigitalTextFont10Receiver::class.java,
             ClockDigitalTextFont11Receiver::class.java,
-            ClockDigitalTextFont12Receiver::class.java
+            ClockDigitalTextFont12Receiver::class.java,
+            ClockDigitalTextFont13Receiver::class.java,
+            ClockDigitalTextFont14Receiver::class.java,
+            ClockDigitalTextFont15Receiver::class.java,
+            ClockDigitalTextFont16Receiver::class.java,
+            ClockDigitalTextFont17Receiver::class.java,
+            ClockDigitalTextFont18Receiver::class.java,
+            ClockDigitalTextFont19Receiver::class.java,
+            ClockDigitalTextFont20Receiver::class.java,
+            ClockDigitalTextFont21Receiver::class.java,
+            ClockDigitalTextFont22Receiver::class.java,
+            ClockDigitalTextFont23Receiver::class.java,
+            ClockDigitalTextFont24Receiver::class.java,
+            ClockDigitalTextFont25Receiver::class.java,
+            ClockDigitalTextFont26Receiver::class.java,
+            ClockDigitalTextFont27Receiver::class.java,
+            ClockDigitalTextFont28Receiver::class.java,
+            ClockDigitalTextFont29Receiver::class.java,
+            ClockDigitalTextFont30Receiver::class.java,
+            ClockDigitalTextFont31Receiver::class.java,
+            ClockDigitalTextFont32Receiver::class.java,
+            ClockDigitalTextFont33Receiver::class.java,
+            ClockDigitalTextFont34Receiver::class.java
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }

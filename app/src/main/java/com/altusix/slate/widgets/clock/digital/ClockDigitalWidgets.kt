@@ -44,7 +44,31 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Typeface 9", "4x2", "Clock – Digital", ClockDigitalTextFont9Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
         SlateWidgetInfo("Typeface 10", "4x2", "Clock – Digital", ClockDigitalTextFont10Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
         SlateWidgetInfo("Typeface 11", "4x2", "Clock – Digital", ClockDigitalTextFont11Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
-        SlateWidgetInfo("Typeface 12", "4x2", "Clock – Digital", ClockDigitalTextFont12Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f)
+        SlateWidgetInfo("Typeface 12", "4x2", "Clock – Digital", ClockDigitalTextFont12Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 13", "4x2", "Clock – Digital", ClockDigitalTextFont13Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 14", "4x2", "Clock – Digital", ClockDigitalTextFont14Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 15", "4x2", "Clock – Digital", ClockDigitalTextFont15Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 16", "4x2", "Clock – Digital", ClockDigitalTextFont16Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 17", "4x2", "Clock – Digital", ClockDigitalTextFont17Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 18", "4x2", "Clock – Digital", ClockDigitalTextFont18Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 19", "4x2", "Clock – Digital", ClockDigitalTextFont19Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 20", "4x2", "Clock – Digital", ClockDigitalTextFont20Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 21", "4x2", "Clock – Digital", ClockDigitalTextFont21Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 22", "4x2", "Clock – Digital", ClockDigitalTextFont22Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 23", "4x2", "Clock – Digital", ClockDigitalTextFont23Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 24", "4x2", "Clock – Digital", ClockDigitalTextFont24Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 25", "4x2", "Clock – Digital", ClockDigitalTextFont25Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 26", "4x2", "Clock – Digital", ClockDigitalTextFont26Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 27", "4x2", "Clock – Digital", ClockDigitalTextFont27Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 28", "4x2", "Clock – Digital", ClockDigitalTextFont28Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 29", "4x2", "Clock – Digital", ClockDigitalTextFont29Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 30", "4x2", "Clock – Digital", ClockDigitalTextFont30Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 31", "4x2", "Clock – Digital", ClockDigitalTextFont31Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 32", "4x2", "Clock – Digital", ClockDigitalTextFont32Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 33", "4x2", "Clock – Digital", ClockDigitalTextFont33Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
+        SlateWidgetInfo("Typeface 34", "4x2", "Clock – Digital", ClockDigitalTextFont34Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f)
+
+// --- BATCH UPDATE RECEIVERS LIST ---
     )
 }
 
@@ -76,7 +100,29 @@ fun updateAllClockDigitalWidgets(context: Context) {
         ClockDigitalTextFont9Receiver::class.java,
         ClockDigitalTextFont10Receiver::class.java,
         ClockDigitalTextFont11Receiver::class.java,
-        ClockDigitalTextFont12Receiver::class.java
+        ClockDigitalTextFont12Receiver::class.java,
+        ClockDigitalTextFont13Receiver::class.java,
+        ClockDigitalTextFont14Receiver::class.java,
+        ClockDigitalTextFont15Receiver::class.java,
+        ClockDigitalTextFont16Receiver::class.java,
+        ClockDigitalTextFont17Receiver::class.java,
+        ClockDigitalTextFont18Receiver::class.java,
+        ClockDigitalTextFont19Receiver::class.java,
+        ClockDigitalTextFont20Receiver::class.java,
+        ClockDigitalTextFont21Receiver::class.java,
+        ClockDigitalTextFont22Receiver::class.java,
+        ClockDigitalTextFont23Receiver::class.java,
+        ClockDigitalTextFont24Receiver::class.java,
+        ClockDigitalTextFont25Receiver::class.java,
+        ClockDigitalTextFont26Receiver::class.java,
+        ClockDigitalTextFont27Receiver::class.java,
+        ClockDigitalTextFont28Receiver::class.java,
+        ClockDigitalTextFont29Receiver::class.java,
+        ClockDigitalTextFont30Receiver::class.java,
+        ClockDigitalTextFont31Receiver::class.java,
+        ClockDigitalTextFont32Receiver::class.java,
+        ClockDigitalTextFont33Receiver::class.java,
+        ClockDigitalTextFont34Receiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -440,4 +486,136 @@ class ClockDigitalTextFont11Receiver : BaseDigitalClockReceiver() {
 class ClockDigitalTextFont12Receiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateTextFont12DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 27. TEXT DIGITAL FONT 13 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont13Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont13DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 28. TEXT DIGITAL FONT 14 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont14Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont14DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 29. TEXT DIGITAL FONT 15 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont15Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont15DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 30. TEXT DIGITAL FONT 16 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont16Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont16DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 31. TEXT DIGITAL FONT 17 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont17Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont17DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 32. TEXT DIGITAL FONT 18 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont18Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont18DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 33. TEXT DIGITAL FONT 19 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont19Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont19DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 34. TEXT DIGITAL FONT 20 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont20Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont20DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 35. TEXT DIGITAL FONT 21 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont21Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont21DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 36. TEXT DIGITAL FONT 22 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont22Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont22DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 37. TEXT DIGITAL FONT 23 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont23Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont23DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 38. TEXT DIGITAL FONT 24 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont24Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont24DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 39. TEXT DIGITAL FONT 25 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont25Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont25DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 40. TEXT DIGITAL FONT 26 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont26Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont26DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 41. TEXT DIGITAL FONT 27 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont27Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont27DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 42. TEXT DIGITAL FONT 28 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont28Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont28DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 43. TEXT DIGITAL FONT 29 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont29Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont29DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 44. TEXT DIGITAL FONT 30 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont30Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont30DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 45. TEXT DIGITAL FONT 31 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont31Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont31DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 46. TEXT DIGITAL FONT 32 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont32Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont32DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 47. TEXT DIGITAL FONT 33 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont33Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont33DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 48. TEXT DIGITAL FONT 34 (4x2 / Pure Typographic Giant 4-Digit Time)
+class ClockDigitalTextFont34Receiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateTextFont34DigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

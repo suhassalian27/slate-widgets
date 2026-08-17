@@ -2102,3 +2102,91 @@ fun generateTextFont11DigitalClockBitmap(context: Context, config: SlateWidgetCo
 // 26. TEXT DIGITAL FONT 12 (4x2 / Phosphene Font)
 fun generateTextFont12DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
     generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.phosphene_font)
+
+// 27. TEXT DIGITAL FONT 13 (4x2 / Sankofa Display)
+fun generateTextFont13DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.sankofadisplay)
+
+// 28. TEXT DIGITAL FONT 14 (4x2 / Bitcount Roman)
+fun generateTextFont14DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.bitcount_roman)
+
+// 29. TEXT DIGITAL FONT 15 (4x2 / Rubik Dirt)
+fun generateTextFont15DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.rubikdirt)
+
+// 30. TEXT DIGITAL FONT 16 (4x2 / Rubik Glitch)
+fun generateTextFont16DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.rubikglitch)
+
+// 31. TEXT DIGITAL FONT 17 (4x2 / Rubik Marker Hatch)
+fun generateTextFont17DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.rubikmarkerhatch)
+
+// 32. TEXT DIGITAL FONT 18 (4x2 / Modak)
+fun generateTextFont18DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.modak)
+
+// 33. TEXT DIGITAL FONT 19 (4x2 / Moolahlah)
+fun generateTextFont19DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.moolahlah)
+
+// 34. TEXT DIGITAL FONT 20 (4x2 / Caesar Dressing)
+fun generateTextFont20DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.caesardressing)
+
+// 35. TEXT DIGITAL FONT 21 (4x2 / Doto Rounded)
+fun generateTextFont21DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.doto_rounded)
+
+// 36. TEXT DIGITAL FONT 22 (4x2 / Blaka)
+fun generateTextFont22DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.blaka)
+
+// 37. TEXT DIGITAL FONT 23 (4x2 / Barrio)
+fun generateTextFont23DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.barrio)
+
+// 38. TEXT DIGITAL FONT 24 (4x2 / Blaka Hollow)
+fun generateTextFont24DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.blakahollow)
+
+// 39. TEXT DIGITAL FONT 25 (4x2 / Tourney)
+fun generateTextFont25DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.tourney)
+
+// 40. TEXT DIGITAL FONT 26 (4x2 / Sixtyfour)
+fun generateTextFont26DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.sixtyfour)
+
+// 41. TEXT DIGITAL FONT 27 (4x2 / Monoton)
+fun generateTextFont27DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.monoton)
+
+// 42. TEXT DIGITAL FONT 28 (4x2 / Matemasie)
+fun generateTextFont28DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.matemasie)
+
+// 43. TEXT DIGITAL FONT 29 (4x2 / Fascinate)
+fun generateTextFont29DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.fascinate)
+
+// 44. TEXT DIGITAL FONT 30 (4x2 / Foldit Bold)
+fun generateTextFont30DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.foldit_bold)
+
+// 45. TEXT DIGITAL FONT 31 (4x2 / Frijole)
+fun generateTextFont31DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.frijole)
+
+// 46. TEXT DIGITAL FONT 32 (4x2 / Fruktur)
+fun generateTextFont32DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.fruktur)
+
+// 47. TEXT DIGITAL FONT 33 (4x2 / Londrina Outline)
+fun generateTextFont33DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.londrinaoutline)
+
+// 48. TEXT DIGITAL FONT 34 (4x2 / Molle Italic)
+fun generateTextFont34DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+    generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.molle_italic)
