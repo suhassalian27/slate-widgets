@@ -84,15 +84,18 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont8Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont9Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver
 
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalVerticalCapsuleReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalAsymmetricOverlayReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalAsymmetricSlantedReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalBoldTypographicReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalLcdSevenSegmentReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalGradientTallReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridVerticalCapsuleReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridAsymmetricOverlayReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridAsymmetricSlantedReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridBoldTypographicReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridLcdSevenSegmentReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridGradientTallReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridAnalogDigitalSplitReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalScriptOverlayReceiver
-import com.altusix.slate.widgets.clock.hybrid.ClockDigitalSplitFlapReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridMinimalDialReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridOverlappingTypographyReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridPillCapsuleReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridScriptOverlayReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridSplitFlapReceiver
 
 class SlateClockTickerService : Service() {
 
@@ -130,19 +133,11 @@ class SlateClockTickerService : Service() {
     // 1-Minute Ticker Receivers (Digital / Static Clocks)
     private val minuteReceivers: Map<Class<*>, Any> by lazy {
         listOf(
-            ClockDigitalBoldTypographicReceiver::class.java,
             ClockDigitalMinimalDividerReceiver::class.java,
-            ClockDigitalLcdSevenSegmentReceiver::class.java,
-            ClockDigitalAsymmetricSlantedReceiver::class.java,
             ClockDigitalCompactBlockReceiver::class.java,
-            ClockDigitalAsymmetricOverlayReceiver::class.java,
             ClockDigitalTextWordReceiver::class.java,
             ClockDigitalGiantHourCapsuleReceiver::class.java,
             ClockDigitalModern3dLedReceiver::class.java,
-            ClockDigitalGradientTallReceiver::class.java,
-            ClockDigitalScriptOverlayReceiver::class.java,
-            ClockDigitalSplitFlapReceiver::class.java,
-            ClockDigitalVerticalCapsuleReceiver::class.java,
             ClockDigitalDualPillStackReceiver::class.java,
             ClockDigitalTextFont1Receiver::class.java,
             ClockDigitalTextFont2Receiver::class.java,
@@ -178,7 +173,18 @@ class SlateClockTickerService : Service() {
             ClockDigitalTextFont32Receiver::class.java,
             ClockDigitalTextFont33Receiver::class.java,
             ClockDigitalTextFont34Receiver::class.java,
-            ClockHybridAnalogDigitalSplitReceiver::class.java
+            ClockHybridAnalogDigitalSplitReceiver::class.java,
+            ClockHybridBoldTypographicReceiver::class.java,
+            ClockHybridLcdSevenSegmentReceiver::class.java,
+            ClockHybridAsymmetricSlantedReceiver::class.java,
+            ClockHybridAsymmetricOverlayReceiver::class.java,
+            ClockHybridGradientTallReceiver::class.java,
+            ClockHybridScriptOverlayReceiver::class.java,
+            ClockHybridSplitFlapReceiver::class.java,
+            ClockHybridVerticalCapsuleReceiver::class.java,
+            ClockHybridPillCapsuleReceiver::class.java,
+            ClockHybridMinimalDialReceiver::class.java,
+            ClockHybridOverlappingTypographyReceiver::class.java
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }

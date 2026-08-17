@@ -1557,9 +1557,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
-        <!-- 2. Bold Typographic Digital (2x2) -->
+        <!-- 2. Minimal Dial Hybrid (2x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalBoldTypographicReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridMinimalDialReceiver"
+            android:exported="true"
+            android:label="Slate Minimal Dial Hybrid">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 3. Bold Typographic Digital (2x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridBoldTypographicReceiver"
             android:exported="true"
             android:label="Slate Bold Typographic Digital">
             <intent-filter>
@@ -1569,9 +1581,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 3. LCD Seven Segment Digital (2x2) -->
+        <!-- 4. LCD Seven Segment Digital (2x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalLcdSevenSegmentReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridLcdSevenSegmentReceiver"
             android:exported="true"
             android:label="Slate LCD Seven Segment Digital">
             <intent-filter>
@@ -1581,9 +1593,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 4. Asymmetric Slanted Digital (2x2) -->
+        <!-- 5. Asymmetric Slanted Digital (2x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalAsymmetricSlantedReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridAsymmetricSlantedReceiver"
             android:exported="true"
             android:label="Slate Asymmetric Slanted Digital">
             <intent-filter>
@@ -1593,9 +1605,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 5. Asymmetric Overlay Digital (2x2) -->
+        <!-- 6. Asymmetric Overlay Digital (2x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalAsymmetricOverlayReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridAsymmetricOverlayReceiver"
             android:exported="true"
             android:label="Slate Asymmetric Overlay Digital">
             <intent-filter>
@@ -1605,9 +1617,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 6. Gradient Tall Digital (4x2) -->
+        <!-- 7. Gradient Tall Digital (4x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalGradientTallReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridGradientTallReceiver"
             android:exported="true"
             android:label="Slate Gradient Tall Digital">
             <intent-filter>
@@ -1617,9 +1629,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
-        <!-- 7. Script Overlay Digital (4x2) -->
+        <!-- 8. Script Overlay Digital (4x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalScriptOverlayReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridScriptOverlayReceiver"
             android:exported="true"
             android:label="Slate Script Overlay Digital">
             <intent-filter>
@@ -1629,9 +1641,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
-        <!-- 8. Split Flap Digital (4x2) -->
+        <!-- 9. Split Flap Digital (4x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalSplitFlapReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridSplitFlapReceiver"
             android:exported="true"
             android:label="Slate Split Flap Digital">
             <intent-filter>
@@ -1641,9 +1653,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
-        <!-- 9. Vertical Capsule Digital (1x2) -->
+        <!-- 10. Vertical Capsule Digital (1x2) -->
         <receiver
-            android:name="com.altusix.slate.widgets.clock.hybrid.ClockDigitalVerticalCapsuleReceiver"
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridVerticalCapsuleReceiver"
             android:exported="true"
             android:label="Slate Vertical Capsule Digital">
             <intent-filter>
@@ -1652,6 +1664,30 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_1x2" />
+        </receiver>
+        <!-- 11. Pill Capsule Hybrid (1x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridPillCapsuleReceiver"
+            android:exported="true"
+            android:label="Slate Pill Capsule Hybrid">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
+        <!-- 12. Overlapping Typography Hybrid (2x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridOverlappingTypographyReceiver"
+            android:exported="true"
+            android:label="Slate Overlapping Typography Hybrid">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
         </receiver>
 
     </application>
