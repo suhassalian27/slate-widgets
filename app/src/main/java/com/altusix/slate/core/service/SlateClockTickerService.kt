@@ -91,6 +91,7 @@ import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont8Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextFont9Receiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver
 import com.altusix.slate.widgets.clock.digital.ClockDigitalVerticalCapsuleReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridAnalogDigitalSplitReceiver
 
 class SlateClockTickerService : Service() {
 
@@ -118,7 +119,8 @@ class SlateClockTickerService : Service() {
             ClockRotatingRingReceiver::class.java,
             ClockHourglassReceiver::class.java,
             ClockMinimalDotsReceiver::class.java,
-            ClockRadarScopeReceiver::class.java
+            ClockRadarScopeReceiver::class.java,
+
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }
@@ -174,7 +176,8 @@ class SlateClockTickerService : Service() {
             ClockDigitalTextFont31Receiver::class.java,
             ClockDigitalTextFont32Receiver::class.java,
             ClockDigitalTextFont33Receiver::class.java,
-            ClockDigitalTextFont34Receiver::class.java
+            ClockDigitalTextFont34Receiver::class.java,
+            ClockHybridAnalogDigitalSplitReceiver::class.java
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }

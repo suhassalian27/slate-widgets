@@ -1637,5 +1637,19 @@
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
 
+        <!-- 3. HYBRID CLOCK WIDGETS                                           -->
+        <!-- 1. Analog Digital Split Hybrid (4x2) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.clock.hybrid.ClockHybridAnalogDigitalSplitReceiver"
+            android:exported="true"
+            android:label="Slate Analog Digital Split Hybrid">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+
     </application>
 </manifest>
