@@ -28,7 +28,8 @@ fun getClockHybridWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Giant Hour Typographic Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridGiantHourReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Squircle Perimeter Tick Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridSquircleTickReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Arc Date Wedge Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridArcDateWedgeReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Horizontal Pill Hybrid", sizeText = "2x1", category = "Clock – Hybrid", receiverClass = ClockHybridHorizontalPillReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Horizontal Pill Hybrid", sizeText = "2x1", category = "Clock – Hybrid", receiverClass = ClockHybridHorizontalPillReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Minimal Capsule Pill", sizeText = "2x1", category = "Clock – Hybrid", receiverClass = ClockHybridMinimalCapsulePillReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -50,7 +51,8 @@ fun updateAllClockHybridWidgets(context: Context) {
         ClockHybridGiantHourReceiver::class.java,
         ClockHybridSquircleTickReceiver::class.java,
         ClockHybridArcDateWedgeReceiver::class.java,
-        ClockHybridHorizontalPillReceiver::class.java
+        ClockHybridHorizontalPillReceiver::class.java,
+        ClockHybridMinimalCapsulePillReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -215,4 +217,15 @@ class ClockHybridHorizontalPillReceiver : BaseDigitalClockReceiver() {
         wDp: Int,
         hDp: Int
     ): Bitmap = generateHorizontalPillHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 17. MINIMAL CAPSULE PILL (2x1 / Inset Date Badge & Clean Digital Time)
+class ClockHybridMinimalCapsulePillReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateMinimalCapsulePillClockBitmap(context, config, isResponsive, wDp, hDp)
 }

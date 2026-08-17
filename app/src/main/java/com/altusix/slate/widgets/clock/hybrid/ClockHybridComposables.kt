@@ -2820,3 +2820,130 @@ fun generateHorizontalPillHybridClockBitmap(
 
     return bitmap
 }
+
+// 17. MINIMAL CAPSULE PILL (2x1 Horizontal Pill / Inset Date Badge & Shifted Digital Time)
+fun generateMinimalCapsulePillClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(210)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    // Enforce 2:1 Aspect Ratio
+    val targetRatio = 2.0f
+    var cardH = h.toFloat()
+    var cardW = cardH * targetRatio
+
+    if (cardW > w.toFloat()) {
+        cardW = w.toFloat()
+        cardH = cardW / targetRatio
+    }
+
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    // Outer Pill Capsule Container
+    val pillRadius = cardRect.height() / 2f
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
+
+    val timeState = HybridClockTimeState.now()
+
+    // =========================================================================
+    // 1. LEFT SECTION: INSET ACCENT DATE BADGE
+    // =========================================================================
+    val badgeCx = cardRect.left + pillRadius
+    val badgeCy = cardRect.centerY()
+    val badgeRadius = pillRadius * 0.74f
+
+    val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(badgeCx, badgeCy, badgeRadius, badgeBgPaint)
+
+    // Contrast text color for badge
+    val r = Color.red(accentColorInt) / 255f
+    val g = Color.green(accentColorInt) / 255f
+    val b = Color.blue(accentColorInt) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+    val badgeTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val dayStr = timeState.dayOfWeek.take(3).uppercase()
+    val dateNumStr = timeState.dayOfMonth.toString()
+
+    val dayTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = badgeTextColor
+        textSize = badgeRadius * 0.38f
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.08f
+    }
+
+    val dateNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = badgeTextColor
+        textSize = badgeRadius * 0.78f
+        typeface = getSlateFont(context, weight = 900)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val dayY = badgeCy - (badgeRadius * 0.12f)
+    val dateY = badgeCy + (badgeRadius * 0.52f)
+
+    canvas.drawText(dayStr, badgeCx, dayY, dayTextPaint)
+    canvas.drawText(dateNumStr, badgeCx, dateY, dateNumPaint)
+
+    // =========================================================================
+    // 2. RIGHT SECTION: BOLD DIGITAL TIME (SHIFTED LEFT)
+    // =========================================================================
+    val hourStr = timeState.hour24.toString().padStart(2, '0')
+    val minStr = timeState.minute.toString().padStart(2, '0')
+    val digitalTimeStr = "$hourStr:$minStr"
+
+    // Shift time position closer to the date badge to eliminate excess gap
+    val badgeRightEdge = badgeCx + badgeRadius
+    val availableWidth = cardRect.right - badgeRightEdge
+    val digitalCenterX = badgeRightEdge + (availableWidth * 0.48f)
+
+    val maxDigitalW = availableWidth * 0.85f
+    val refTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 800)
+        textSize = 110f
+    }
+    val refTimeW = refTimePaint.measureText(digitalTimeStr)
+    val digitalTextSize = minOf(cardH * 0.38f, 100f * (maxDigitalW / refTimeW))
+
+    val digitalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = digitalTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = Rect()
+    digitalPaint.getTextBounds(digitalTimeStr, 0, digitalTimeStr.length, timeBounds)
+    val digitalY = cardRect.centerY() + (timeBounds.height() / 2f) - (1f * scaleFactor)
+
+    canvas.drawText(digitalTimeStr, digitalCenterX, digitalY, digitalPaint)
+
+    return bitmap
+}
