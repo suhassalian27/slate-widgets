@@ -2494,3 +2494,155 @@ fun generateSquircleTickDigitalClockBitmap(
 
     return bitmap
 }
+
+// 15. ARC DATE WEDGE HYBRID (2x2 / Circle Face, Scaled Arc Date & Inset Gap Hands)
+fun generateArcDateWedgeClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val size = minOf(w, h).toFloat()
+    val cx = w / 2f
+    val cy = h / 2f
+    val circleRadius = size / 2f
+
+    // 1. CIRCULAR BOUNDARY & CANVAS CLIPPING
+    val circlePath = Path().apply {
+        addCircle(cx, cy, circleRadius, Path.Direction.CW)
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(circlePath, bgPaint)
+
+    canvas.save()
+    canvas.clipPath(circlePath)
+
+    val timeState = HybridClockTimeState.now()
+
+    // 2. INNER BOUNDARY RING & SCALED ARC DATE
+    val ringRadius = circleRadius * 0.74f
+
+    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(45, 0, 0, 0) else Color.argb(60, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.005f
+    }
+    canvas.drawCircle(cx, cy, ringRadius, ringPaint)
+
+    // Date formatting
+    val cal = java.util.Calendar.getInstance()
+    val fullDayStr = java.text.SimpleDateFormat("EEEE", java.util.Locale.ENGLISH).format(cal.time).uppercase()
+    val fullMonthStr = java.text.SimpleDateFormat("MMMM", java.util.Locale.ENGLISH).format(cal.time).uppercase()
+    val dateArcText = "$fullDayStr  ·  ${timeState.dayOfMonth} $fullMonthStr"
+
+    val arcRadius = ringRadius + (size * 0.042f)
+    val arcBounds = RectF(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
+
+    val textArcPath = Path().apply {
+        addArc(arcBounds, -165f, 150f)
+    }
+
+    // Increased Text Size
+    val arcTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = size * 0.052f
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.06f
+    }
+
+    canvas.drawTextOnPath(dateArcText, textArcPath, 0f, 0f, arcTextPaint)
+
+    // 3. REFINED HANDS DESIGN (INSET WITH CLEAR GAP FROM RING)
+    val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
+    val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
+    val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
+
+    // HOUR HAND: Tapered Sword
+    val hourHandLen = ringRadius * 0.55f
+    val hourBaseWidth = circleRadius * 0.075f
+    val hourTipWidth = circleRadius * 0.012f
+
+    val perpAngle = hourAngleRad + Math.PI / 2
+    val cosP = Math.cos(perpAngle).toFloat()
+    val sinP = Math.sin(perpAngle).toFloat()
+
+    val cosH = Math.cos(hourAngleRad).toFloat()
+    val sinH = Math.sin(hourAngleRad).toFloat()
+
+    val hourPath = Path().apply {
+        moveTo(cx - (cosP * hourBaseWidth / 2f), cy - (sinP * hourBaseWidth / 2f))
+        lineTo(cx + (cosP * hourBaseWidth / 2f), cy + (sinP * hourBaseWidth / 2f))
+        lineTo(cx + (cosH * hourHandLen) + (cosP * hourTipWidth / 2f), cy + (sinH * hourHandLen) + (sinP * hourTipWidth / 2f))
+        lineTo(cx + (cosH * hourHandLen) - (cosP * hourTipWidth / 2f), cy + (sinH * hourHandLen) - (sinP * hourTipWidth / 2f))
+        close()
+    }
+
+    val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(hourPath, hourHandPaint)
+
+    // MINUTE HAND: Inset Solid Needle (0.82f of ring radius leaves a clean gap)
+    val minHandLen = ringRadius * 0.82f
+    val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.018f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val minStopX = cx + (Math.cos(minAngleRad) * minHandLen).toFloat()
+    val minStopY = cy + (Math.sin(minAngleRad) * minHandLen).toFloat()
+    canvas.drawLine(cx, cy, minStopX, minStopY, minHandPaint)
+
+    // SECOND HAND: Inset Accent Needle
+    val secHandLen = ringRadius * 0.86f
+    val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.008f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val secStopX = cx + (Math.cos(secAngleRad) * secHandLen).toFloat()
+    val secStopY = cy + (Math.sin(secAngleRad) * secHandLen).toFloat()
+    canvas.drawLine(cx, cy, secStopX, secStopY, secHandPaint)
+
+    // CENTER HUB CAP
+    val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, size * 0.024f, hubOuterPaint)
+
+    val hubInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, size * 0.010f, hubInnerPaint)
+
+    canvas.restore()
+
+    return bitmap
+}

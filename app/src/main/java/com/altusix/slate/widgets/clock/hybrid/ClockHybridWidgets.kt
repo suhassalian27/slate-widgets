@@ -26,7 +26,8 @@ fun getClockHybridWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Pill Capsule Hybrid", sizeText = "1x2", category = "Clock – Hybrid", receiverClass = ClockHybridPillCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Overlapping Typography Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridOverlappingTypographyReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Giant Hour Typographic Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridGiantHourReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Squircle Perimeter Tick Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridSquircleTickReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Squircle Perimeter Tick Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridSquircleTickReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Arc Date Wedge Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridArcDateWedgeReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -46,7 +47,8 @@ fun updateAllClockHybridWidgets(context: Context) {
         ClockHybridPillCapsuleReceiver::class.java,
         ClockHybridOverlappingTypographyReceiver::class.java,
         ClockHybridGiantHourReceiver::class.java,
-        ClockHybridSquircleTickReceiver::class.java
+        ClockHybridSquircleTickReceiver::class.java,
+        ClockHybridArcDateWedgeReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -189,4 +191,15 @@ class ClockHybridSquircleTickReceiver : BaseDigitalClockReceiver() {
         wDp: Int,
         hDp: Int
     ): Bitmap = generateSquircleTickDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 15. ARC DATE WEDGE HYBRID (2x2 / Arc Date & Triangular Wedge Hour Hand)
+class ClockHybridArcDateWedgeReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateArcDateWedgeClockBitmap(context, config, isResponsive, wDp, hDp)
 }

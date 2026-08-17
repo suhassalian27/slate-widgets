@@ -91,6 +91,7 @@ import com.altusix.slate.widgets.clock.hybrid.ClockHybridBoldTypographicReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridLcdSevenSegmentReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridGradientTallReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridAnalogDigitalSplitReceiver
+import com.altusix.slate.widgets.clock.hybrid.ClockHybridArcDateWedgeReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridGiantHourReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridMinimalDialReceiver
 import com.altusix.slate.widgets.clock.hybrid.ClockHybridOverlappingTypographyReceiver
@@ -188,7 +189,8 @@ class SlateClockTickerService : Service() {
             ClockHybridMinimalDialReceiver::class.java,
             ClockHybridOverlappingTypographyReceiver::class.java,
             ClockHybridGiantHourReceiver::class.java,
-            ClockHybridSquircleTickReceiver::class.java
+            ClockHybridSquircleTickReceiver::class.java,
+            ClockHybridArcDateWedgeReceiver::class.java
         ).associateWith { clazz ->
             try { clazz.getDeclaredConstructor().newInstance() } catch (e: Exception) { e.printStackTrace() }
         }
