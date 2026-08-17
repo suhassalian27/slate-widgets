@@ -25,7 +25,8 @@ fun getClockHybridWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Vertical Capsule Hybrid", "1x2", "Clock – Hybrid", ClockHybridVerticalCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Pill Capsule Hybrid", sizeText = "1x2", category = "Clock – Hybrid", receiverClass = ClockHybridPillCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Overlapping Typography Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridOverlappingTypographyReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Giant Hour Typographic Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridGiantHourReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Giant Hour Typographic Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridGiantHourReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Squircle Perimeter Tick Hybrid", sizeText = "2x2", category = "Clock – Hybrid", receiverClass = ClockHybridSquircleTickReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -44,7 +45,8 @@ fun updateAllClockHybridWidgets(context: Context) {
         ClockHybridVerticalCapsuleReceiver::class.java,
         ClockHybridPillCapsuleReceiver::class.java,
         ClockHybridOverlappingTypographyReceiver::class.java,
-        ClockHybridGiantHourReceiver::class.java
+        ClockHybridGiantHourReceiver::class.java,
+        ClockHybridSquircleTickReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -176,4 +178,15 @@ class ClockHybridGiantHourReceiver : BaseDigitalClockReceiver() {
         wDp: Int,
         hDp: Int
     ): Bitmap = generateGiantHourTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+}
+
+// 14. SQUIRCLE PERIMETER TICK HYBRID (2x2 / Contour Ticks & Bold Time)
+class ClockHybridSquircleTickReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateSquircleTickDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }

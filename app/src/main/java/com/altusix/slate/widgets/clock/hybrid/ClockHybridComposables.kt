@@ -137,6 +137,41 @@ private fun drawAngled7SegmentDigit(
     }
 }
 
+private data class SquirclePoint(val x: Float, val y: Float)
+
+private fun getSquircleBoundaryPoint(
+    angleRad: Double,
+    halfW: Float,
+    halfH: Float,
+    cornerRadius: Float
+): SquirclePoint {
+    val u = Math.cos(angleRad).toFloat()
+    val v = Math.sin(angleRad).toFloat()
+    val absU = Math.abs(u).coerceAtLeast(0.0001f)
+    val absV = Math.abs(v).coerceAtLeast(0.0001f)
+
+    val tBox = minOf(halfW / absU, halfH / absV)
+    val boxX = tBox * u
+    val boxY = tBox * v
+
+    val innerW = halfW - cornerRadius
+    val innerH = halfH - cornerRadius
+
+    return if (Math.abs(boxX) <= innerW || Math.abs(boxY) <= innerH) {
+        SquirclePoint(boxX, boxY)
+    } else {
+        val cx = if (u >= 0) innerW else -innerW
+        val cy = if (v >= 0) innerH else -innerH
+
+        val b = u * cx + v * cy
+        val k = cx * cx + cy * cy - cornerRadius * cornerRadius
+        val discriminant = Math.max(0f, b * b - k)
+        val t = b + Math.sqrt(discriminant.toDouble()).toFloat()
+
+        SquirclePoint(t * u, t * v)
+    }
+}
+
 // 1. ANALOG DIGITAL SPLIT HYBRID (4x2 / Adaptive Horizontal or Vertical Layout)
 fun generateAnalogDigitalSplitHybridClockBitmap(
     context: Context,
@@ -2345,6 +2380,117 @@ fun generateGiantHourTypographicHybridClockBitmap(
     canvas.drawCircle(cx, cy, circleRadius * 0.020f, capInner)
 
     canvas.restore()
+
+    return bitmap
+}
+
+// 14. SQUIRCLE PERIMETER TICK HYBRID (2x2 Square / Uniform Contour Ticks & Bold Center Time)
+fun generateSquircleTickDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    // Strict Binary Lit vs. Unlit Colors
+    val unlitColor = if (isLight) Color.argb(40, 0, 0, 0) else Color.argb(50, 255, 255, 255)
+    val litColor = accentColorInt
+
+    // 1. Base Card Container
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val cardRadius = size * 0.18f
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+
+    val clockCx = cardRect.centerX()
+    val clockCy = cardRect.centerY()
+
+    val margin = size * 0.08f
+    val halfW = (size / 2f) - margin
+    val halfH = (size / 2f) - margin
+    val squircleRadius = cardRadius * 0.70f
+
+    val timeState = HybridClockTimeState.now()
+    val currentSecond = timeState.second
+
+    // 2. Render 60 Uniform Radial Ticks
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = size * 0.012f // Fixed uniform width for all ticks
+    }
+
+    val uniformTickLen = size * 0.050f // Fixed uniform length for all ticks
+
+    for (i in 0 until 60) {
+        val angleRad = Math.toRadians(i * 6.0 - 90.0)
+        val sqPoint = getSquircleBoundaryPoint(angleRad, halfW, halfH, squircleRadius)
+
+        val x2 = clockCx + sqPoint.x
+        val y2 = clockCy + sqPoint.y
+
+        val rOuter = Math.hypot(sqPoint.x.toDouble(), sqPoint.y.toDouble()).toFloat()
+        val rInner = (rOuter - uniformTickLen).coerceAtLeast(0f)
+
+        val cosA = Math.cos(angleRad).toFloat()
+        val sinA = Math.sin(angleRad).toFloat()
+
+        val x1 = clockCx + rInner * cosA
+        val y1 = clockCy + rInner * sinA
+
+        val isPassed = i <= currentSecond
+        tickPaint.color = if (isPassed) litColor else unlitColor
+
+        canvas.drawLine(x1, y1, x2, y2, tickPaint)
+    }
+
+    // 3. Centered Bold Digital Clock
+    val hourStr = timeState.hour24.toString().padStart(2, '0')
+    val minStr = timeState.minute.toString().padStart(2, '0')
+    val timeStr = "$hourStr:$minStr"
+
+    val maxTimeW = cardRect.width() * 0.65f
+    val refTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 800)
+        textSize = 100f
+    }
+    val refTimeW = refTimePaint.measureText(timeStr)
+    val timeTextSize = minOf(size * 0.30f, 100f * (maxTimeW / refTimeW))
+
+    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = timeTextSize
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val timeBounds = Rect()
+    timePaint.getTextBounds(timeStr, 0, timeStr.length, timeBounds)
+    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * scaleFactor)
+
+    canvas.drawText(timeStr, cardRect.centerX(), timeY, timePaint)
 
     return bitmap
 }
