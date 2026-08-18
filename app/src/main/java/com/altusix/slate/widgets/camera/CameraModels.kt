@@ -4,25 +4,30 @@ import android.content.Context
 import android.content.SharedPreferences
 
 enum class PhotoClickAction(val label: String) {
-    OPEN_GALLERY("Open Gallery / Photos"),
+    OPEN_GALLERY("Open Gallery"),
     OPEN_CAMERA("Open Camera App"),
-    OPEN_SETTINGS("Open Widget Settings"),
+    OPEN_SETTINGS("Open Settings"),
     NOTHING("Do Nothing")
 }
 
 enum class PhotoFilterStyle(val label: String) {
     NONE("Original"),
-    GRAYSCALE("Black & White"),
+    GRAYSCALE("Monochrome"),
     SEPIA("Warm Sepia"),
-    VINTAGE_GRAIN("Vintage Film"),
-    DARK_DIM("Moody Dark")
+    DARK_DIM("Moody Dark"),
+    VINTAGE("Retro Film"),
+    COOL_BLUE("Cool Cyber"),
+    WARM_GOLD("Golden Hour"),
+    HIGH_CONTRAST("Pop Contrast")
 }
 
 enum class PhotoFrameBorder(val label: String) {
     NONE("Clean Edge"),
     THIN_BORDER("Minimal Border"),
     POLAROID("Polaroid Frame"),
-    VIGNETTE("Soft Vignette")
+    VIGNETTE("Soft Vignette"),
+    INNER_OUTLINE("Inner Line"),
+    FILM_STRIP("Film Strip")
 }
 
 data class CameraWidgetConfig(
@@ -76,4 +81,24 @@ object CameraWidgetPreferences {
 
         return CameraWidgetConfig(uri, clickAction, filter, border, caption, showDateTaken, isResponsive)
     }
+}
+
+fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+
+    if (widgetPrefs.contains("widget_${widgetId}_mode")) {
+        val modeStr = widgetPrefs.getString("widget_${widgetId}_mode", "FIXED")
+        val isResp = modeStr.equals("RESPONSIVE", ignoreCase = true)
+        widgetPrefs.edit().putBoolean("widget_${widgetId}_is_responsive", isResp).apply()
+        return isResp
+    }
+
+    if (widgetPrefs.contains("widget_${widgetId}_is_responsive")) {
+        return widgetPrefs.getBoolean("widget_${widgetId}_is_responsive", false)
+    }
+
+    val defaultResp = launcherPrefs.getBoolean("default_is_responsive", false)
+    widgetPrefs.edit().putBoolean("widget_${widgetId}_is_responsive", defaultResp).apply()
+    return defaultResp
 }
