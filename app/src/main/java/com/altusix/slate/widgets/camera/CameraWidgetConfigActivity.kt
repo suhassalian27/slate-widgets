@@ -137,7 +137,7 @@ class CameraWidgetConfigActivity : ComponentActivity() {
     private fun saveAndFinish() {
         CameraWidgetPreferences.saveConfig(this, widgetId, currentConfig)
         val appWidgetManager = AppWidgetManager.getInstance(this)
-        CameraPhotoFrameReceiver.updatePhotoWidget(this, appWidgetManager, widgetId)
+        updateCameraWidget(this, appWidgetManager, widgetId)
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
         finish()
     }

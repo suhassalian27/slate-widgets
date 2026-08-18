@@ -890,7 +890,6 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
-
         <!-- 1. Camera Widget Receiver -->
         <receiver
             android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameReceiver"
@@ -902,6 +901,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_camera_2x2" />
+        </receiver>
+        <!-- 2. Camera Photo Frame Widget (4x2 Fixed Wide Frame) -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrame4x2Receiver"
+            android:exported="true"
+            android:label="Slate Photo Frame (4x2)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_camera_4x2" />
         </receiver>
 
 
