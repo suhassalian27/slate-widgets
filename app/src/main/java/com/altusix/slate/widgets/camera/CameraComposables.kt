@@ -34,7 +34,157 @@ private fun loadAndCropImage(context: Context, uriStr: String?, targetW: Int, ta
     }
 }
 
-// 1. PHOTO FRAME & GALLERY (2x2 / Responsive & Fixed Aspect Photo Display)
+// 1. FIXED 4x2 WIDE PHOTO FRAME SHOWCASE
+fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(800)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(400)
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val bgColor = getSafeBgColor(config)
+
+    // Locked 2:1 Aspect Ratio Box
+    val targetRatio = 2.0f
+    var cardH = h.toFloat()
+    var cardW = cardH * targetRatio
+
+    if (cardW > w.toFloat()) {
+        cardW = w.toFloat()
+        cardH = cardW / targetRatio
+    }
+
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val clipPath = Path().apply {
+        addRoundRect(cardRect, cornerRadius, cornerRadius, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(clipPath)
+
+    if (cameraConfig.photoUri.isNullOrEmpty()) {
+        drawConfigurePlaceholderState(canvas, context, cardRect, config, scaleFactor)
+        canvas.restore()
+        return bitmap
+    }
+
+    val loadedBitmap = loadAndCropImage(context, cameraConfig.photoUri, cardRect.width().toInt(), cardRect.height().toInt())
+
+    if (loadedBitmap != null) {
+        val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        when (cameraConfig.filterStyle) {
+            PhotoFilterStyle.GRAYSCALE -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+            PhotoFilterStyle.SEPIA -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(0.393f, 0.769f, 0.189f, 0f, 0f, 0.349f, 0.686f, 0.168f, 0f, 0f, 0.272f, 0.534f, 0.131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f)))
+            PhotoFilterStyle.DARK_DIM -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setScale(0.7f, 0.7f, 0.7f, 1f) })
+            PhotoFilterStyle.VINTAGE -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(0.9f, 0.1f, 0.1f, 0f, 20f, 0.1f, 0.8f, 0.1f, 0f, 15f, 0.1f, 0.1f, 0.6f, 0f, 10f, 0f, 0f, 0f, 1f, 0f)))
+            PhotoFilterStyle.COOL_BLUE -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(0.7f, 0f, 0.2f, 0f, 0f, 0f, 0.9f, 0.2f, 0f, 0f, 0f, 0.2f, 1.2f, 0f, 20f, 0f, 0f, 0f, 1f, 0f)))
+            PhotoFilterStyle.WARM_GOLD -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(1.2f, 0.1f, 0f, 0f, 15f, 0.1f, 1.1f, 0f, 0f, 10f, 0f, 0f, 0.8f, 0f, -10f, 0f, 0f, 0f, 1f, 0f)))
+            PhotoFilterStyle.HIGH_CONTRAST -> imagePaint.colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(1.4f, -0.1f, -0.1f, 0f, -20f, -0.1f, 1.4f, -0.1f, 0f, -20f, -0.1f, -0.1f, 1.4f, 0f, -20f, 0f, 0f, 0f, 1f, 0f)))
+            else -> {}
+        }
+
+        canvas.drawBitmap(loadedBitmap, null, cardRect, imagePaint)
+
+        var polaroidRect: RectF? = null
+
+        when (cameraConfig.borderStyle) {
+            PhotoFrameBorder.POLAROID -> {
+                val polaroidBottomH = cardRect.height() * 0.26f
+                polaroidRect = RectF(cardRect.left, cardRect.bottom - polaroidBottomH, cardRect.right, cardRect.bottom)
+                canvas.drawRect(polaroidRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL })
+            }
+            PhotoFrameBorder.VIGNETTE -> {
+                val vigGradient = RadialGradient(cardRect.centerX(), cardRect.centerY(), cardRect.width() * 0.65f, intArrayOf(Color.TRANSPARENT, Color.argb(190, 0, 0, 0)), floatArrayOf(0.55f, 1.0f), Shader.TileMode.CLAMP)
+                canvas.drawRect(cardRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = vigGradient })
+            }
+            PhotoFrameBorder.THIN_BORDER -> {
+                val strokeW = scaleFactor * 3.5f
+                val inset = strokeW / 2f
+                val insetRect = RectF(cardRect.left + inset, cardRect.top + inset, cardRect.right - inset, cardRect.bottom - inset)
+                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = strokeW }
+                canvas.drawRoundRect(insetRect, (cornerRadius - inset).coerceAtLeast(4f), (cornerRadius - inset).coerceAtLeast(4f), borderPaint)
+            }
+            PhotoFrameBorder.INNER_OUTLINE -> {
+                val gap = scaleFactor * 8f
+                val strokeW = scaleFactor * 2f
+                val outlineRect = RectF(cardRect.left + gap, cardRect.top + gap, cardRect.right - gap, cardRect.bottom - gap)
+                val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 255, 255, 255); style = Paint.Style.STROKE; strokeWidth = strokeW }
+                canvas.drawRoundRect(outlineRect, (cornerRadius - gap).coerceAtLeast(6f), (cornerRadius - gap).coerceAtLeast(6f), outlinePaint)
+            }
+            PhotoFrameBorder.FILM_STRIP -> {
+                val barH = cardRect.height() * 0.12f
+                val stripPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; style = Paint.Style.FILL }
+                canvas.drawRect(cardRect.left, cardRect.top, cardRect.right, cardRect.top + barH, stripPaint)
+                canvas.drawRect(cardRect.left, cardRect.bottom - barH, cardRect.right, cardRect.bottom, stripPaint)
+
+                val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+                val numHoles = 9
+                val holeW = cardRect.width() * 0.04f
+                val holeH = barH * 0.5f
+                val step = cardRect.width() / numHoles
+
+                for (i in 0 until numHoles) {
+                    val hLeft = cardRect.left + (i * step) + (step - holeW) / 2f
+                    val topHole = RectF(hLeft, cardRect.top + (barH - holeH) / 2f, hLeft + holeW, cardRect.top + (barH + holeH) / 2f)
+                    val botHole = RectF(hLeft, cardRect.bottom - barH + (barH - holeH) / 2f, hLeft + holeW, cardRect.bottom - (barH - holeH) / 2f)
+                    canvas.drawRoundRect(topHole, scaleFactor * 2f, scaleFactor * 2f, holePaint)
+                    canvas.drawRoundRect(botHole, scaleFactor * 2f, scaleFactor * 2f, holePaint)
+                }
+            }
+            else -> {}
+        }
+
+        if (cameraConfig.customCaption.isNotEmpty()) {
+            val captionText = cameraConfig.customCaption
+            val isPolaroid = cameraConfig.borderStyle == PhotoFrameBorder.POLAROID
+            val captionColor = if (isPolaroid) Color.parseColor("#121214") else Color.WHITE
+
+            val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
+            val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
+            val maxCapW = cardRect.width() * 0.85f
+            val maxCapH = if (isPolaroid) polaroidRect!!.height() * 0.5f else cardRect.height() * 0.12f
+            val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(18f)
+
+            val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = captionColor
+                textSize = captionFontSize
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = if (isPolaroid) Paint.Align.CENTER else Paint.Align.LEFT
+                if (!isPolaroid) setShadowLayer(6f, 0f, 2f, Color.BLACK)
+            }
+
+            if (isPolaroid && polaroidRect != null) {
+                val captionX = polaroidRect.centerX()
+                val captionY = polaroidRect.centerY() + (captionFontSize * 0.35f)
+                canvas.drawText(captionText, captionX, captionY, captionPaint)
+            } else {
+                val captionX = cardRect.left + (cardRect.width() * 0.05f)
+                val captionY = cardRect.bottom - (cardRect.height() * 0.08f)
+                canvas.drawText(captionText, captionX, captionY, captionPaint)
+            }
+        }
+    }
+
+    canvas.restore()
+    return bitmap
+}
+
+// 2. PHOTO FRAME & GALLERY (2x2 / Responsive & Fixed Aspect Photo Display)
 fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int)
 : Bitmap {
     val displayDensity = context.resources.displayMetrics.density
@@ -296,45 +446,32 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
     return bitmap
 }
 
-// 2. FIXED 4x2 WIDE PHOTO FRAME SHOWCASE
-fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 3. CIRCULAR PHOTO FRAME SHOWCASE
+fun generatePhotoFrameCircleBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
     val displayDensity = context.resources.displayMetrics.density
     val scaleFactor = maxOf(displayDensity, 3.5f)
 
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(800)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(400)
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
 
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
     val bgColor = getSafeBgColor(config)
 
-    // Locked 2:1 Aspect Ratio Box
-    val targetRatio = 2.0f
-    var cardH = h.toFloat()
-    var cardW = cardH * targetRatio
+    val size = minOf(w, h).toFloat()
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    if (cardW > w.toFloat()) {
-        cardW = w.toFloat()
-        cardH = cardW / targetRatio
-    }
-
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
-    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
-
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawOval(cardRect, bgPaint)
 
-    val clipPath = Path().apply {
-        addRoundRect(cardRect, cornerRadius, cornerRadius, Path.Direction.CW)
-    }
+    val clipPath = Path().apply { addOval(cardRect, Path.Direction.CW) }
     canvas.save()
     canvas.clipPath(clipPath)
 
@@ -366,47 +503,28 @@ fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cam
 
         when (cameraConfig.borderStyle) {
             PhotoFrameBorder.POLAROID -> {
-                val polaroidBottomH = cardRect.height() * 0.26f
+                val polaroidBottomH = cardRect.height() * 0.25f
                 polaroidRect = RectF(cardRect.left, cardRect.bottom - polaroidBottomH, cardRect.right, cardRect.bottom)
-                canvas.drawRect(polaroidRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL })
+                val polPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+                canvas.drawRect(polaroidRect, polPaint)
             }
             PhotoFrameBorder.VIGNETTE -> {
-                val vigGradient = RadialGradient(cardRect.centerX(), cardRect.centerY(), cardRect.width() * 0.65f, intArrayOf(Color.TRANSPARENT, Color.argb(190, 0, 0, 0)), floatArrayOf(0.55f, 1.0f), Shader.TileMode.CLAMP)
-                canvas.drawRect(cardRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = vigGradient })
+                val vigGradient = RadialGradient(cardRect.centerX(), cardRect.centerY(), cardRect.width() * 0.5f, intArrayOf(Color.TRANSPARENT, Color.argb(200, 0, 0, 0)), floatArrayOf(0.6f, 1.0f), Shader.TileMode.CLAMP)
+                canvas.drawOval(cardRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = vigGradient })
             }
             PhotoFrameBorder.THIN_BORDER -> {
                 val strokeW = scaleFactor * 3.5f
                 val inset = strokeW / 2f
                 val insetRect = RectF(cardRect.left + inset, cardRect.top + inset, cardRect.right - inset, cardRect.bottom - inset)
                 val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = strokeW }
-                canvas.drawRoundRect(insetRect, (cornerRadius - inset).coerceAtLeast(4f), (cornerRadius - inset).coerceAtLeast(4f), borderPaint)
+                canvas.drawOval(insetRect, borderPaint)
             }
             PhotoFrameBorder.INNER_OUTLINE -> {
-                val gap = scaleFactor * 8f
+                val gap = scaleFactor * 10f
                 val strokeW = scaleFactor * 2f
                 val outlineRect = RectF(cardRect.left + gap, cardRect.top + gap, cardRect.right - gap, cardRect.bottom - gap)
                 val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 255, 255, 255); style = Paint.Style.STROKE; strokeWidth = strokeW }
-                canvas.drawRoundRect(outlineRect, (cornerRadius - gap).coerceAtLeast(6f), (cornerRadius - gap).coerceAtLeast(6f), outlinePaint)
-            }
-            PhotoFrameBorder.FILM_STRIP -> {
-                val barH = cardRect.height() * 0.12f
-                val stripPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; style = Paint.Style.FILL }
-                canvas.drawRect(cardRect.left, cardRect.top, cardRect.right, cardRect.top + barH, stripPaint)
-                canvas.drawRect(cardRect.left, cardRect.bottom - barH, cardRect.right, cardRect.bottom, stripPaint)
-
-                val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
-                val numHoles = 9
-                val holeW = cardRect.width() * 0.04f
-                val holeH = barH * 0.5f
-                val step = cardRect.width() / numHoles
-
-                for (i in 0 until numHoles) {
-                    val hLeft = cardRect.left + (i * step) + (step - holeW) / 2f
-                    val topHole = RectF(hLeft, cardRect.top + (barH - holeH) / 2f, hLeft + holeW, cardRect.top + (barH + holeH) / 2f)
-                    val botHole = RectF(hLeft, cardRect.bottom - barH + (barH - holeH) / 2f, hLeft + holeW, cardRect.bottom - (barH - holeH) / 2f)
-                    canvas.drawRoundRect(topHole, scaleFactor * 2f, scaleFactor * 2f, holePaint)
-                    canvas.drawRoundRect(botHole, scaleFactor * 2f, scaleFactor * 2f, holePaint)
-                }
+                canvas.drawOval(outlineRect, outlinePaint)
             }
             else -> {}
         }
@@ -418,15 +536,15 @@ fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cam
 
             val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
             val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
-            val maxCapW = cardRect.width() * 0.85f
-            val maxCapH = if (isPolaroid) polaroidRect!!.height() * 0.5f else cardRect.height() * 0.12f
-            val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(18f)
+            val maxCapW = cardRect.width() * 0.65f
+            val maxCapH = if (isPolaroid) polaroidRect!!.height() * 0.45f else cardRect.height() * 0.10f
+            val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(16f)
 
             val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = captionColor
                 textSize = captionFontSize
                 typeface = getSlateFont(context, weight = 700)
-                textAlign = if (isPolaroid) Paint.Align.CENTER else Paint.Align.LEFT
+                textAlign = Paint.Align.CENTER
                 if (!isPolaroid) setShadowLayer(6f, 0f, 2f, Color.BLACK)
             }
 
@@ -435,8 +553,8 @@ fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cam
                 val captionY = polaroidRect.centerY() + (captionFontSize * 0.35f)
                 canvas.drawText(captionText, captionX, captionY, captionPaint)
             } else {
-                val captionX = cardRect.left + (cardRect.width() * 0.05f)
-                val captionY = cardRect.bottom - (cardRect.height() * 0.08f)
+                val captionX = cardRect.centerX()
+                val captionY = cardRect.bottom - (cardRect.height() * 0.12f)
                 canvas.drawText(captionText, captionX, captionY, captionPaint)
             }
         }
