@@ -11,16 +11,7 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 import java.util.Calendar
 import androidx.core.content.res.ResourcesCompat
 import com.altusix.slate.R
-
-
-
-private fun getSafeBgColor(config: SlateWidgetConfig): Int {
-    return try {
-        config.backgroundColorHex.toInt() or 0xFF000000.toInt()
-    } catch (_: Exception) {
-        if (config.themeMode == "LIGHT") Color.WHITE else Color.parseColor("#161618")
-    }
-}
+import com.altusix.slate.utils.getSafeBgColor
 
 private data class SquirclePoint(
     val x: Float,

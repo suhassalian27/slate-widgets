@@ -14,20 +14,9 @@ import com.altusix.slate.R
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.clock.digital.DigitalClockTimeState
 import com.altusix.slate.widgets.clock.digital.drawAutoFitText
-import com.altusix.slate.widgets.clock.digital.getSlateFont
-
-// --- SHARED GEOMETRY & THEMING HELPERS ---
-
-private fun getSafeBgColor(config: SlateWidgetConfig): Int {
-    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-    val rawHex = config.backgroundColorHex.toInt()
-    val r = (rawHex shr 16) and 0xFF
-    val g = (rawHex shr 8) and 0xFF
-    val b = rawHex and 0xFF
-    return Color.argb(alphaInt, r, g, b)
-}
-
-private fun getStandardCornerRadius(density: Float): Float = 22f * density
+import com.altusix.slate.utils.getSafeBgColor
+import com.altusix.slate.utils.getSlateFont
+import com.altusix.slate.utils.getStandardCornerRadius
 
 // --- AUTHENTIC 6-SIDED 7-SEGMENT LCD RENDERER ---
 private fun drawAngled7SegmentDigit(

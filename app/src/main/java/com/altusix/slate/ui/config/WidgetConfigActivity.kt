@@ -55,7 +55,15 @@ import com.altusix.slate.widgets.bluetooth.getBluetoothWidgetsCatalog
 import com.altusix.slate.widgets.bluetooth.updateAllBluetoothWidgets
 import com.altusix.slate.widgets.calendar.getCalendarWidgetsCatalog
 import com.altusix.slate.widgets.calendar.updateAllCalendarWidgets
+import com.altusix.slate.widgets.calculator.getCalculatorWidgetsCatalog
+import com.altusix.slate.widgets.calculator.updateAllCalculatorWidgets
+import com.altusix.slate.widgets.camera.getCameraWidgetsCatalog
+import com.altusix.slate.widgets.clock.analog.getClockAnalogWidgetsCatalog
+import com.altusix.slate.widgets.clock.analog.updateAllClockAnalogWidgets
 import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
+import com.altusix.slate.widgets.clock.digital.updateAllClockDigitalWidgets
+import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
+import com.altusix.slate.widgets.clock.hybrid.updateAllClockHybridWidgets
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
@@ -87,11 +95,15 @@ class WidgetConfigActivity : ComponentActivity() {
             SlateConfigTheme {
                 val defaultWidgetOpacity = remember(widgetClassName) {
                     val allWidgets = getClockDigitalWidgetsCatalog() +
+                            getClockAnalogWidgetsCatalog() +
+                            getClockHybridWidgetsCatalog() +
                             getBatteryWidgetsCatalog() +
                             getAiWidgetsCatalog() +
                             getBluetoothWidgetsCatalog() +
                             getAppLauncherWidgetsCatalog() +
-                            getCalendarWidgetsCatalog()
+                            getCalendarWidgetsCatalog() +
+                            getCalculatorWidgetsCatalog() +
+                            getCameraWidgetsCatalog()
 
                     allWidgets.find { it.receiverClass.name == widgetClassName }?.defaultOpacity ?: 1.0f
                 }
@@ -100,7 +112,6 @@ class WidgetConfigActivity : ComponentActivity() {
                 var opacity by remember { mutableFloatStateOf(1.0f) }
                 var activePickerTarget by remember { mutableStateOf<ColorPickerTarget?>(null) }
 
-                // Load existing configuration from SharedPreferences
                 LaunchedEffect(appWidgetId) {
                     val prefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
 
@@ -112,18 +123,15 @@ class WidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
-                // Determine contrast mode dynamically based on background luminance
                 val isLightBg = remember(selectedBgHex) { calculateLuminance(selectedBgHex) > 0.5f }
                 val textColor = if (isLightBg) Color.Black else Color.White
 
-                // Background Presets
                 val bgPresets = listOf(
                     0xFF161618L to "Dark",
                     0xFF000000L to "AMOLED",
                     0xFFFFFFFFL to "Light"
                 )
 
-                // Accent Presets
                 val accentPresets = if (isLightBg) {
                     listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
                 } else {
@@ -144,7 +152,6 @@ class WidgetConfigActivity : ComponentActivity() {
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                     )
 
-                    // 1. STUDIO LIVE PREVIEW CARD
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -221,7 +228,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // 2. BACKGROUND COLOR SECTION
                     SectionTitle(title = "Background", subtitle = "Presets & custom tint")
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -247,7 +253,6 @@ class WidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // Custom BG Rainbow Chip
                         val isCustomBg = bgPresets.none { it.first == selectedBgHex }
                         RainbowPickerChip(
                             isSelected = isCustomBg,
@@ -260,7 +265,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // 3. ACCENT COLOR SECTION
                     SectionTitle(title = "Accent Color", subtitle = "Primary highlight & controls")
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -278,7 +282,6 @@ class WidgetConfigActivity : ComponentActivity() {
                             )
                         }
 
-                        // Custom Accent Rainbow Button
                         val isCustomAccent = accentPresets.none { it == selectedAccentHex }
                         RainbowCustomCircle(
                             isSelected = isCustomAccent,
@@ -289,7 +292,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // 4. OPACITY SLIDER SECTION
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -318,7 +320,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // 5. CTA APPLY BUTTON
                     Button(
                         onClick = {
                             saveAndFinish(
@@ -338,7 +339,6 @@ class WidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
-                // Custom Color Picker Dialog for both Background and Accent
                 activePickerTarget?.let { target ->
                     val initialColor = if (target == ColorPickerTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
                     CustomColorPickerDialog(
@@ -393,6 +393,10 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllBluetoothWidgets(this)
         updateAllAppLauncherWidgets(this)
         updateAllCalendarWidgets(this)
+        updateAllCalculatorWidgets(this)
+        updateAllClockDigitalWidgets(this)
+        updateAllClockAnalogWidgets(this)
+        updateAllClockHybridWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
@@ -423,10 +427,6 @@ class WidgetConfigActivity : ComponentActivity() {
         return bitmap
     }
 }
-
-// ============================================================================
-// SLEEK RE-IMAGINED UI COMPONENTS
-// ============================================================================
 
 @Composable
 private fun SectionTitle(title: String, subtitle: String) {
@@ -611,10 +611,6 @@ private fun RainbowCustomCircle(
     }
 }
 
-// ============================================================================
-// CUSTOM COLOR PICKER DIALOG (SWATCHES & SPECTRUM TABS)
-// ============================================================================
-
 @Composable
 fun CustomColorPickerDialog(
     initialColor: Color,
@@ -622,7 +618,7 @@ fun CustomColorPickerDialog(
     onDismiss: () -> Unit,
     onColorSelected: (Color) -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Swatches, 1: Spectrum
+    var selectedTab by remember { mutableIntStateOf(0) }
     var currentColor by remember { mutableStateOf(initialColor) }
 
     val initialHsv = FloatArray(3)

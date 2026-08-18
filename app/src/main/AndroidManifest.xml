@@ -875,6 +875,34 @@
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
 
+
+        <!-- ================================================================= -->
+        <!-- CAMERA WIDGETS                                                    -->
+        <!-- ================================================================= -->
+        <!-- Camera Widget Configuration Activity -->
+        <activity
+            android:name="com.altusix.slate.widgets.camera.CameraWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <!-- Camera Widget 1 Receiver -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameReceiver"
+            android:exported="true"
+            android:label="Slate Photo Frame Widget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+
+
         <!-- ================================================================= -->
         <!-- CLOCK WIDGETS                                                     -->
         <!-- ================================================================= -->

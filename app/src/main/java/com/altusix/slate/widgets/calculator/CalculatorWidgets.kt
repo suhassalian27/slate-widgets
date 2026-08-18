@@ -3,6 +3,7 @@ package com.altusix.slate.widgets.calculator
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
@@ -17,6 +18,26 @@ fun getCalculatorWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Studio Express Calc", "4x2", "Calculator", StudioCalc4x2Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Circular Stage Calc", "2x2", "Calculator", CircleCalc2x2Receiver::class.java, hasModeOption = false)
     )
+}
+
+fun updateAllCalculatorWidgets(context: Context) {
+    val manager = AppWidgetManager.getInstance(context)
+    val receivers = listOf(
+        StandardCalc2x2Receiver::class.java,
+        SplitCalc2x2Receiver::class.java,
+        StudioCalc4x2Receiver::class.java,
+        CircleCalc2x2Receiver::class.java
+    )
+    for (receiverClass in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
+        if (ids.isNotEmpty()) {
+            val intent = Intent(context, receiverClass).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            context.sendBroadcast(intent)
+        }
+    }
 }
 
 abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvider() {

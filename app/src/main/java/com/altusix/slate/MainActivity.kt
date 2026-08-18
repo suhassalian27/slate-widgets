@@ -43,6 +43,7 @@ import com.altusix.slate.widgets.calendar.getCalendarWidgetsCatalog
 import com.altusix.slate.widgets.clock.analog.getClockAnalogWidgetsCatalog
 import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
 import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
+import com.altusix.slate.widgets.camera.getCameraWidgetsCatalog
 
 import android.content.Intent
 import android.net.Uri
@@ -62,8 +63,9 @@ class MainActivity : ComponentActivity() {
         val clockWidgets = getClockAnalogWidgetsCatalog()
         val clockDigitalWidgets = getClockDigitalWidgetsCatalog()
         val clockHybridWidgets = getClockHybridWidgetsCatalog()
+        val cameraWidgets = getCameraWidgetsCatalog()
 
-        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Analog Clock", "Digital Clock", "Hybrid Clock")
+        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital", "Clock - Hybrid")
 
         setContent {
             MaterialTheme(
@@ -82,10 +84,11 @@ class MainActivity : ComponentActivity() {
                     4 -> bluetoothWidgets
                     5 -> calculatorWidgets
                     6 -> calendarWidgets
-                    7 -> clockWidgets
-                    8 -> clockDigitalWidgets
-                    9 -> clockHybridWidgets
-                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + clockWidgets + clockDigitalWidgets + clockHybridWidgets
+                    7 -> cameraWidgets
+                    8 -> clockWidgets
+                    9 -> clockDigitalWidgets
+                    10 -> clockHybridWidgets
+                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets + clockDigitalWidgets + clockHybridWidgets
                 }
 
                 Column(
