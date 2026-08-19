@@ -948,6 +948,38 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
         </receiver>
+        <!-- 7. TAPED POLAROID PHOTO FRAME -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameTapedReceiver" android:exported="true" android:label="Slate Taped Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
+        </receiver>
+        <!-- 8. PUSH PIN POLAROID PHOTO FRAME -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFramePushPinReceiver" android:exported="true" android:label="Slate Push Pin Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
+        </receiver>
+        <!-- 9. CAMERA SHUTTER LAUNCHER -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraShutterLauncherReceiver" android:exported="true" android:label="Slate Camera Shutter">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 10. APERTURE LENS CAPSULE -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraAperturePillReceiver" android:exported="true" android:label="Slate Aperture Lens Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
 
 
         <!-- ================================================================= -->
