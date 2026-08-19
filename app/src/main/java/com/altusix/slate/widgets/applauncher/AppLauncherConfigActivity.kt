@@ -7,13 +7,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,8 +22,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -38,13 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.PathParser
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.config.SlateConfigTheme
 import kotlinx.coroutines.Dispatchers
@@ -70,9 +69,11 @@ class AppLauncherConfigActivity : ComponentActivity() {
         finish()
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
+        window.setBackgroundDrawableResource(android.R.color.transparent)
 
         appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -89,10 +90,21 @@ class AppLauncherConfigActivity : ComponentActivity() {
 
         setContent {
             SlateConfigTheme {
+                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+
                 var config by remember { mutableStateOf(AppLauncherWidgetConfig.load(this, appWidgetId)) }
                 var installedApps by remember { mutableStateOf<List<InstalledAppItem>>(emptyList()) }
                 var showAppPickerSheet by remember { mutableStateOf(false) }
-                var selectedIconTab by remember { mutableIntStateOf(0) }
+                var selectedIconTab by remember {
+                    mutableIntStateOf(
+                        when (config.iconType) {
+                            LauncherIconType.APP_ICON -> 0
+                            LauncherIconType.EMOJI -> 1
+                            LauncherIconType.VECTOR_ICON -> 2
+                            LauncherIconType.CUSTOM_TEXT -> 3
+                        }
+                    )
+                }
 
                 LaunchedEffect(appWidgetId) {
                     val prefs = getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
@@ -128,313 +140,38 @@ class AppLauncherConfigActivity : ComponentActivity() {
                     }
                 }
 
-                val selectedApp = installedApps.find { it.packageName == config.packageName }
-
-                val emojis = listOf(
-                    "😂", "❤️", "😍", "🤣", "😊",
-                    "🙏", "😭", "🥰", "😘", "👍",
-                    "💕", "😁", "🔥", "🥺", "😅",
-                    "🤔", "😎", "😢", "👏", "🙌",
-                    "✨", "🚀", "🎧", "🎮", "⚡"
-                )
-
-                val vectorIcons = AppLauncherVectorIcons.icons
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF0D0D0E))
-                        .padding(20.dp)
+                ModalBottomSheet(
+                    onDismissRequest = { finish() },
+                    sheetState = sheetState,
+                    containerColor = Color(0xFF0A0A0C),
+                    contentColor = Color.White,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF2C2C30)) },
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                 ) {
-                    Text(
-                        text = "App Launcher Setup",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(vertical = 12.dp)
+                    AppLauncherConfigSheetContent(
+                        config = config,
+                        installedApps = installedApps,
+                        widgetClassName = widgetClassName,
+                        selectedIconTab = selectedIconTab,
+                        onConfigChanged = { config = it },
+                        onIconTabChanged = { index ->
+                            selectedIconTab = index
+                            config = when (index) {
+                                0 -> config.copy(iconType = LauncherIconType.APP_ICON)
+                                1 -> config.copy(iconType = LauncherIconType.EMOJI)
+                                2 -> config.copy(iconType = LauncherIconType.VECTOR_ICON)
+                                else -> config.copy(iconType = LauncherIconType.CUSTOM_TEXT)
+                            }
+                        },
+                        onOpenAppPicker = { showAppPickerSheet = true },
+                        onDismiss = { finish() },
+                        onSaveClicked = {
+                            AppLauncherWidgetConfig.save(this@AppLauncherConfigActivity, appWidgetId, config)
+                            updateAllAppLauncherWidgets(this@AppLauncherConfigActivity)
+                            setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+                            navigateToHomeScreenAndFinish()
+                        }
                     )
-
-                    // LIVE PREVIEW CARD
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Color(0xFF161618)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val previewBitmap = remember(config) {
-                            val slateConfig = SlateWidgetConfig(
-                                themeMode = config.themeMode,
-                                backgroundColorHex = if (config.themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L,
-                                opacity = config.opacity,
-                                accentColorHex = config.accentColorHex
-                            )
-                            if (widgetClassName.contains("CustomText", ignoreCase = true) || widgetClassName.contains("Rectangle", ignoreCase = true)) {
-                                generateRectangleLauncherBitmap(
-                                    context = this@AppLauncherConfigActivity,
-                                    slateConfig = slateConfig,
-                                    launcherConfig = config,
-                                    wDp = 200,
-                                    hDp = 100
-                                )
-                            } else {
-                                generateAdaptiveLauncherBitmap(
-                                    context = this@AppLauncherConfigActivity,
-                                    slateConfig = slateConfig,
-                                    launcherConfig = config,
-                                    wDp = 120,
-                                    hDp = 120
-                                )
-                            }
-                        }
-                        Image(
-                            bitmap = previewBitmap.asImageBitmap(),
-                            contentDescription = "Preview",
-                            modifier = Modifier.size(120.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // APP SELECTOR CARD
-                    Text(text = "Target Application", color = Color.Gray, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF161618))
-                            .border(1.dp, Color(0xFF242428), RoundedCornerShape(16.dp))
-                            .clickable { showAppPickerSheet = true }
-                            .padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (selectedApp?.icon != null) {
-                                    Image(
-                                        bitmap = selectedApp.icon.toImageBitmap(),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF2C2C30)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Search,
-                                            contentDescription = null,
-                                            tint = Color.Gray,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                }
-
-                                Text(
-                                    text = selectedApp?.label ?: "Select Application...",
-                                    color = if (selectedApp != null) Color.White else Color.Gray,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = Color.Gray
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // ICON TYPE TABS
-                    Text(text = "Icon Style", color = Color.Gray, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF161618))
-                            .padding(3.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        listOf("App Icon", "Emoji", "Icons", "Text").forEachIndexed { index, label ->
-                            val isSelected = selectedIconTab == index
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                                    .clickable {
-                                        selectedIconTab = index
-                                        config = when (index) {
-                                            0 -> config.copy(iconType = LauncherIconType.APP_ICON)
-                                            1 -> config.copy(iconType = LauncherIconType.EMOJI)
-                                            2 -> config.copy(iconType = LauncherIconType.VECTOR_ICON)
-                                            else -> config.copy(iconType = LauncherIconType.CUSTOM_TEXT)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) Color.White else Color.Gray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // DYNAMIC PICKER AREA
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    ) {
-                        when (selectedIconTab) {
-                            1 -> {
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(5),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(emojis) { emoji ->
-                                        val isSelected = config.selectedEmoji == emoji
-                                        Box(
-                                            modifier = Modifier
-                                                .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF161618))
-                                                .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
-                                                .clickable { config = config.copy(selectedEmoji = emoji) },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(text = emoji, fontSize = 22.sp)
-                                        }
-                                    }
-                                }
-                            }
-                            2 -> {
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(5),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(vectorIcons) { iconItem ->
-                                        val isSelected = config.selectedVectorResName.equals(iconItem.name, ignoreCase = true)
-
-                                        Box(
-                                            modifier = Modifier
-                                                .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF161618))
-                                                .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
-                                                .clickable { config = config.copy(selectedVectorResName = iconItem.name) },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = iconItem.imageVector,
-                                                contentDescription = iconItem.name,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            3 -> {
-                                OutlinedTextField(
-                                    value = config.customText,
-                                    onValueChange = { config = config.copy(customText = it) },
-                                    placeholder = { Text("Badge Text (Max 4 chars)", color = Color.Gray) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Color.White,
-                                        unfocusedBorderColor = Color(0xFF242428),
-                                        focusedContainerColor = Color(0xFF161618),
-                                        unfocusedContainerColor = Color(0xFF161618),
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White
-                                    )
-                                )
-                            }
-                            else -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 12.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Displays the standard icon of the target application.",
-                                        color = Color.Gray,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Button(
-                            onClick = {
-                                navigateToHomeScreenAndFinish()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            shape = RoundedCornerShape(26.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161618))
-                        ) {
-                            Text(text = "Cancel", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Button(
-                            onClick = {
-                                AppLauncherWidgetConfig.save(this@AppLauncherConfigActivity, appWidgetId, config)
-                                updateAllAppLauncherWidgets(this@AppLauncherConfigActivity)
-                                setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
-                                navigateToHomeScreenAndFinish()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            shape = RoundedCornerShape(26.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                        ) {
-                            Text(text = "Save Widget", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                    }
                 }
 
                 if (showAppPickerSheet) {
@@ -454,6 +191,320 @@ class AppLauncherConfigActivity : ComponentActivity() {
             }
         }
     }
+}
+
+@Composable
+private fun AppLauncherConfigSheetContent(
+    config: AppLauncherWidgetConfig,
+    installedApps: List<AppLauncherConfigActivity.InstalledAppItem>,
+    widgetClassName: String,
+    selectedIconTab: Int,
+    onConfigChanged: (AppLauncherWidgetConfig) -> Unit,
+    onIconTabChanged: (Int) -> Unit,
+    onOpenAppPicker: () -> Unit,
+    onDismiss: () -> Unit,
+    onSaveClicked: () -> Unit
+) {
+    val context = LocalContext.current
+    val selectedApp = installedApps.find { it.packageName == config.packageName }
+
+    val emojis = remember {
+        listOf(
+            "😂", "❤️", "😍", "🤣", "😊",
+            "🙏", "😭", "🥰", "😘", "👍",
+            "💕", "😁", "🔥", "🥺", "😅",
+            "🤔", "😎", "😢", "👏", "🙌",
+            "✨", "🚀", "🎧", "🎮", "⚡"
+        )
+    }
+
+    val vectorIcons = AppLauncherVectorIcons.icons
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.88f)
+            .padding(horizontal = 22.dp)
+            .padding(bottom = 24.dp)
+    ) {
+        // Action Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Cancel",
+                color = Color.Gray,
+                fontSize = 15.sp,
+                modifier = Modifier.clickable { onDismiss() }.padding(vertical = 8.dp)
+            )
+            Text(
+                text = "App Launcher Setup",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = "Apply",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier.clickable { onSaveClicked() }.padding(vertical = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Live Preview Hero Container
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFF141416))
+                .border(1.dp, Color(0xFF242428), RoundedCornerShape(24.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            val previewBitmap = remember(config) {
+                val slateConfig = SlateWidgetConfig(
+                    themeMode = config.themeMode,
+                    backgroundColorHex = if (config.themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L,
+                    opacity = config.opacity,
+                    accentColorHex = config.accentColorHex
+                )
+                if (widgetClassName.contains("CustomText", ignoreCase = true) || widgetClassName.contains("Rectangle", ignoreCase = true)) {
+                    generateRectangleLauncherBitmap(
+                        context = context,
+                        slateConfig = slateConfig,
+                        launcherConfig = config,
+                        wDp = 200,
+                        hDp = 100
+                    )
+                } else {
+                    generateAdaptiveLauncherBitmap(
+                        context = context,
+                        slateConfig = slateConfig,
+                        launcherConfig = config,
+                        wDp = 120,
+                        hDp = 120
+                    )
+                }
+            }
+            Image(
+                bitmap = previewBitmap.asImageBitmap(),
+                contentDescription = "Preview",
+                modifier = Modifier.size(120.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Scrollable Options Area
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            SectionTitle(title = "Target Application")
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF141416))
+                    .border(1.dp, Color(0xFF242428), RoundedCornerShape(16.dp))
+                    .clickable { onOpenAppPicker() }
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (selectedApp?.icon != null) {
+                            Image(
+                                bitmap = selectedApp.icon.toImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2C2C30)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+
+                        Text(
+                            text = selectedApp?.label ?: "Select Application...",
+                            color = if (selectedApp != null) Color.White else Color.Gray,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = Color.Gray
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            SectionTitle(title = "Icon Style")
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF141416))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf("App Icon", "Emoji", "Icons", "Text").forEachIndexed { index, label ->
+                    val isSelected = selectedIconTab == index
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                            .clickable { onIconTabChanged(index) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Dynamic Picker Grid / Input Area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 220.dp)
+            ) {
+                when (selectedIconTab) {
+                    1 -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(5),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(emojis) { emoji ->
+                                val isSelected = config.selectedEmoji == emoji
+                                Box(
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF141416))
+                                        .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
+                                        .clickable { onConfigChanged(config.copy(selectedEmoji = emoji)) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = emoji, fontSize = 22.sp)
+                                }
+                            }
+                        }
+                    }
+                    2 -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(5),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(vectorIcons) { iconItem ->
+                                val isSelected = config.selectedVectorResName.equals(iconItem.name, ignoreCase = true)
+
+                                Box(
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF141416))
+                                        .border(1.dp, if (isSelected) Color.White else Color(0xFF242428), RoundedCornerShape(14.dp))
+                                        .clickable { onConfigChanged(config.copy(selectedVectorResName = iconItem.name)) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = iconItem.imageVector,
+                                        contentDescription = iconItem.name,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    3 -> {
+                        OutlinedTextField(
+                            value = config.customText,
+                            onValueChange = { onConfigChanged(config.copy(customText = it)) },
+                            placeholder = { Text("Badge Text (Max 4 chars)", color = Color.Gray) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.White,
+                                unfocusedBorderColor = Color(0xFF242428),
+                                focusedContainerColor = Color(0xFF141416),
+                                unfocusedContainerColor = Color(0xFF141416),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                    }
+                    else -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Displays the standard icon of the target application.",
+                                color = Color.Gray,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
 }
 
 private fun Drawable.toImageBitmap(): ImageBitmap {
