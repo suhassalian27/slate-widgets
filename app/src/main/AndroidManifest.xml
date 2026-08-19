@@ -914,11 +914,35 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_camera_2x2" />
         </receiver>
-        <!-- 3. CIRCULAR PHOTO FRAME SHOWCASE                    -->
+        <!-- 3. CIRCULAR PHOTO FRAME SHOWCASE -->
         <receiver
             android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameCircleReceiver"
             android:exported="true"
             android:label="Slate Circle Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
+        </receiver>
+        <!-- 4. ORGANIC BLOB PHOTO FRAME -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameBlobReceiver" android:exported="true" android:label="Slate Blob Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
+        </receiver>
+        <!-- 5. FLUID BLOB PHOTO FRAME -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameFluidBlobReceiver" android:exported="true" android:label="Slate Fluid Blob Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
+        </receiver>
+        <!-- 6. STACKED PHOTO FRAME -->
+        <receiver
+            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameStackedReceiver" android:exported="true" android:label="Slate Stacked Photo Frame">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -1111,7 +1135,6 @@
         </receiver>
 
         <!-- 2. DIGITAL CLOCK WIDGETS                                          -->
-
         <!-- 2. Minimal Divider Digital (2x2) -->
         <receiver
             android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalMinimalDividerReceiver"
@@ -1124,7 +1147,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 5. Compact Block Digital (2x2) -->
         <receiver
             android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalCompactBlockReceiver"
@@ -1137,7 +1159,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 7. Typographic Word Digital (2x2) -->
         <receiver
             android:name="com.altusix.slate.widgets.clock.digital.ClockDigitalTextWordReceiver"
