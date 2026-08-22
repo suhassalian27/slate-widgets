@@ -66,6 +66,17 @@
                 android:value="Real-time home screen clock widget ticker update loop" />
         </service>
 
+        <!-- Compass Sensor Foreground Service -->
+        <service
+            android:name=".widgets.compass.SlateCompassSensorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Real-time home screen compass orientation sensor loop" />
+        </service>
+
         <!-- ================================================================= -->
         <!-- AI WIDGETS                                                        -->
         <!-- ================================================================= -->
@@ -1851,6 +1862,56 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+
+        <!-- ================================================================= -->
+        <!-- COMPASS WIDGETS                                                   -->
+        <!-- ================================================================= -->
+        <!-- 1. Dot Matrix Compass (2x2) -->
+        <receiver android:name=".widgets.compass.CompassDotMatrixReceiver" android:exported="true" android:label="Slate Dot Matrix Compass">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 2. Tactical Radar Compass (2x2) -->
+        <receiver android:name=".widgets.compass.CompassTacticalRadarReceiver" android:exported="true" android:label="Slate Tactical Radar Compass">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 3. Minimalist Bezel Compass (2x2) -->
+        <receiver android:name=".widgets.compass.CompassMinimalistBezelReceiver" android:exported="true" android:label="Slate Minimalist Bezel Compass">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 4. Horizontal Pill Compass (2x1) -->
+        <receiver android:name=".widgets.compass.CompassHorizontalPillReceiver" android:exported="true" android:label="Slate Horizontal Pill Compass">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 5. Pure Circle Compass (2x2) -->
+        <receiver android:name=".widgets.compass.CompassPureCircleReceiver" android:exported="true" android:label="Slate Pure Circle Compass">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
         </receiver>
 
     </application>
