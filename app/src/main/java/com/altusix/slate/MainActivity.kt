@@ -45,6 +45,7 @@ import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
 import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
 import com.altusix.slate.widgets.camera.getCameraWidgetsCatalog
 import com.altusix.slate.widgets.compass.getCompassWidgetsCatalog
+import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
 
 import android.content.Intent
 import android.net.Uri
@@ -66,8 +67,9 @@ class MainActivity : ComponentActivity() {
         val clockHybridWidgets = getClockHybridWidgetsCatalog()
         val cameraWidgets = getCameraWidgetsCatalog()
         val compassWidgets = getCompassWidgetsCatalog()
+        val contactsWidgets = getContactsWidgetsCatalog()
 
-        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital", "Clock - Hybrid", "Compass")
+        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital", "Clock - Hybrid", "Compass", "Contacts")
 
         setContent {
             MaterialTheme(
@@ -91,7 +93,8 @@ class MainActivity : ComponentActivity() {
                     9 -> clockDigitalWidgets
                     10 -> clockHybridWidgets
                     11 -> compassWidgets
-                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets + clockDigitalWidgets + clockHybridWidgets + compassWidgets
+                    12 -> contactsWidgets
+                    else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets + clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets
                 }
 
                 Column(

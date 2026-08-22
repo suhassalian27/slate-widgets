@@ -48,7 +48,7 @@ fun getSlateFont(
 
 /**
  * Standardized configuration placeholder state used across all Slate widgets.
- * Renders a subtle gear icon watermark in the background with centered "Tap to Configure" overlay text.
+ * Renders a responsive, mathematically centered gear icon and auto-wrapping "Tap to Configure" text stack.
  */
 fun drawConfigurePlaceholderState(
     canvas: Canvas,
@@ -57,89 +57,100 @@ fun drawConfigurePlaceholderState(
     config: SlateWidgetConfig,
     scaleFactor: Float
 ) {
-    val isLight = config.themeMode == "LIGHT"
-    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
 
-    // 1. SUBTLE BACKGROUND GEAR WATERMARK (Centered & Low Opacity)
-    val gearRadius = minOf(cardRect.width(), cardRect.height()) * 0.28f
-    val innerRadius = gearRadius * 0.45f
-    val toothDepth = gearRadius * 0.28f
+    val isLight = config.themeMode == "LIGHT"
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#60FFFFFF")
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val gearAlpha = if (isLight) 22 else 18 // Low opacity watermark (~7-8% alpha)
+    val availableW = cardRect.width() * 0.82f
+    val isNarrow = (cardRect.width() / cardRect.height()) < 0.65f
+
+    // 1. Proportional Gear Icon Sizing
+    val gearRadius = (cardRect.width() * 0.20f).coerceIn(scaleFactor * 20f, scaleFactor * 48f)
+    val gearInnerR = gearRadius * 0.75f
+    val holeR = gearRadius * 0.32f
+
+    // 2. Responsive Text Sizing & Multi-Line Wrapping
+    val testPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 600)
+    }
+
+    val singleLineText = "Tap to Configure"
+    var targetTextSize = (cardRect.width() * 0.10f).coerceIn(scaleFactor * 10f, scaleFactor * 20f)
+    testPaint.textSize = targetTextSize
+
+    val lines = if (isNarrow || testPaint.measureText(singleLineText) > availableW) {
+        targetTextSize = (cardRect.width() * 0.12f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
+        listOf("Tap to", "Configure")
+    } else {
+        listOf(singleLineText)
+    }
+
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = targetTextSize
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val fontMetrics = textPaint.fontMetrics
+    val lineHeight = (fontMetrics.bottom - fontMetrics.top) * 0.95f
+    val totalTextHeight = lines.size * lineHeight
+
+    val gap = scaleFactor * 4f
+    val gearDiameter = gearRadius * 2f
+    val totalStackHeight = gearDiameter + gap + totalTextHeight
+
+    // 3. Unified Center Alignment Calculation
+    val startTop = cy - (totalStackHeight / 2f)
+    val gearCenterY = startTop + gearRadius
+
+    // 4. Render 8-Tooth Custom Gear
     val gearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(
-            gearAlpha,
-            if (isLight) 0 else 255,
-            if (isLight) 0 else 255,
-            if (isLight) 0 else 255
-        )
+        color = Color.argb(28, Color.red(secondaryText), Color.green(secondaryText), Color.blue(secondaryText))
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 5.5f
+        strokeWidth = scaleFactor * 2.5f
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
 
-    // Outer Gear Rim Path (8 Teeth)
-    val numTeeth = 8
     val gearPath = Path()
-    val angleStep = Math.PI * 2 / numTeeth
+    val teeth = 8
+    val anglePerTooth = (2 * Math.PI / teeth).toFloat()
+    val toothWidth = anglePerTooth * 0.28f
 
-    for (i in 0 until numTeeth) {
-        val angle = i * angleStep
-        val outerAngle1 = angle - (angleStep * 0.18)
-        val outerAngle2 = angle + (angleStep * 0.18)
-        val innerAngle = angle + (angleStep * 0.5)
+    for (i in 0 until teeth) {
+        val angle = i * anglePerTooth
+        val a1 = angle - toothWidth
+        val a2 = angle - toothWidth * 0.5f
+        val a3 = angle + toothWidth * 0.5f
+        val a4 = angle + toothWidth
 
-        val rOuter = gearRadius + toothDepth
-        val rInner = gearRadius
+        val x1 = cx + gearInnerR * Math.cos(a1.toDouble()).toFloat()
+        val y1 = gearCenterY + gearInnerR * Math.sin(a1.toDouble()).toFloat()
+        val x2 = cx + gearRadius * Math.cos(a2.toDouble()).toFloat()
+        val y2 = gearCenterY + gearRadius * Math.sin(a2.toDouble()).toFloat()
+        val x3 = cx + gearRadius * Math.cos(a3.toDouble()).toFloat()
+        val y3 = gearCenterY + gearRadius * Math.sin(a3.toDouble()).toFloat()
+        val x4 = cx + gearInnerR * Math.cos(a4.toDouble()).toFloat()
+        val y4 = gearCenterY + gearInnerR * Math.sin(a4.toDouble()).toFloat()
 
-        val x1 = (cx + Math.cos(outerAngle1) * rOuter).toFloat()
-        val y1 = (cy + Math.sin(outerAngle1) * rOuter).toFloat()
-
-        val x2 = (cx + Math.cos(outerAngle2) * rOuter).toFloat()
-        val y2 = (cy + Math.sin(outerAngle2) * rOuter).toFloat()
-
-        val x3 = (cx + Math.cos(innerAngle) * rInner).toFloat()
-        val y3 = (cy + Math.sin(innerAngle) * rInner).toFloat()
-
-        if (i == 0) {
-            gearPath.moveTo(x1, y1)
-        } else {
-            gearPath.lineTo(x1, y1)
-        }
+        if (i == 0) gearPath.moveTo(x1, y1) else gearPath.lineTo(x1, y1)
         gearPath.lineTo(x2, y2)
         gearPath.lineTo(x3, y3)
+        gearPath.lineTo(x4, y4)
     }
     gearPath.close()
 
     canvas.drawPath(gearPath, gearPaint)
-    canvas.drawCircle(cx, cy, innerRadius, gearPaint)
+    canvas.drawCircle(cx, gearCenterY, holeR, gearPaint)
 
-    // 2. PERFECTLY CENTERED OVERLAY TEXT
-    val titleText = "Tap to Configure"
-
-    val refTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 500)
-        textSize = 100f
+    // 5. Render Centered Text Stack
+    var currentTextY = startTop + gearDiameter + gap - fontMetrics.top
+    for (line in lines) {
+        canvas.drawText(line, cx, currentTextY, textPaint)
+        currentTextY += lineHeight
     }
-    val measuredTitleW = refTitlePaint.measureText(titleText).coerceAtLeast(1f)
-    val maxTitleW = cardRect.width() * 0.82f
-    val maxTitleH = cardRect.height() * 0.10f
-    val titleSize = minOf(maxTitleH, 100f * (maxTitleW / measuredTitleW)).coerceAtLeast(16f)
-
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = titleSize
-        typeface = getSlateFont(context, weight = 500)
-        textAlign = Paint.Align.CENTER
-        letterSpacing = 0.02f
-    }
-
-    // Precise mathematical vertical centering
-    val textBaselineY = cy - ((titlePaint.descent() + titlePaint.ascent()) / 2f)
-
-    canvas.drawText(titleText, cx, textBaselineY, titlePaint)
 }

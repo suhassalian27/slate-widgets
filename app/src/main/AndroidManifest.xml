@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
         android:allowBackup="true"
@@ -1912,6 +1913,40 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+
+        <!-- ================================================================= -->
+        <!-- CONTACTS WIDGETS                                                  -->
+        <!-- ================================================================= -->
+
+        <!-- Contacts Configuration Activity -->
+        <activity
+            android:name=".widgets.contacts.ContactsWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- 1. Single Avatar Capsule (1x2) -->
+        <receiver android:name=".widgets.contacts.ContactsSingleAvatarCapsuleReceiver" android:exported="true" android:label="Slate Single Avatar Capsule">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
+        <!-- 2. Horizontal Speed Dial (2x1) -->
+        <receiver android:name=".widgets.contacts.ContactsHorizontalSpeedDialReceiver" android:exported="true" android:label="Slate Horizontal Speed Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
         </receiver>
 
     </application>
