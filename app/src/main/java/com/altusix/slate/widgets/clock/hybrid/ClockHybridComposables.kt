@@ -161,7 +161,7 @@ private fun getSquircleBoundaryPoint(
     }
 }
 
-// 1. ANALOG DIGITAL SPLIT HYBRID (4x2 / Adaptive Horizontal or Vertical Layout)
+// 1. ANALOG DIGITAL SPLIT HYBRID (4x2 / Analog / Adaptive Horizontal or Vertical Layout)
 fun generateAnalogDigitalSplitHybridClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -394,7 +394,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
     return bitmap
 }
 
-// 2. MINIMAL DIAL HYBRID (2x2 Square / Full Dial, Stacked HH/MM Top Right, Accent Day)
+// 2. MINIMAL DIAL HYBRID (2x2 Square / Analog / Full Dial, Stacked HH/MM Top Right, Accent Day)
 fun generateMinimalDialHybridClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1605,11 +1605,11 @@ fun generateVerticalCapsuleDigitalClockBitmap(
     return bitmap
 }
 
-// 11. PILL CAPSULE HYBRID (1x2 Fixed / Bold Arc-Matched Dial, Digital Time, Date Badge & Vintage Motif)
+// 11. PILL CAPSULE HYBRID (1x2 Fixed / Analog Dial, Digital Time, Date Badge & Swinging Pendulum)
 fun generatePillCapsuleHybridClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
-    isResponsive: Boolean, // Kept for signature compatibility
+    isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -1640,10 +1640,11 @@ fun generatePillCapsuleHybridClockBitmap(
     val topY = (h - cardH) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    // Outer Pill Capsule Radius
+    // Outer Pill Capsule
     val cardRadius = cardRect.width() / 2f
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
@@ -1709,7 +1710,7 @@ fun generatePillCapsuleHybridClockBitmap(
         }
     }
 
-    // Hands
+    // Dial Hands
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
 
@@ -1748,7 +1749,7 @@ fun generatePillCapsuleHybridClockBitmap(
     canvas.drawCircle(dialCenterX, dialCenterY, 3.0f * density, capPaint)
 
     // =========================================================================
-    // 2. MIDDLE SECTION: DIGITAL TIME & DATE BADGE
+    // 2. MIDDLE SECTION: DIGITAL TIME & DATE BADGE CALCULATIONS
     // =========================================================================
     val timeMaxW = cardW * 0.82f
     val refTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1783,9 +1784,57 @@ fun generatePillCapsuleHybridClockBitmap(
     // Draw Digital Time
     canvas.drawText(digitalTimeStr, cardRect.centerX(), digitalTimeY, timePaint)
 
-    // Draw Date Badge
     val badgeRect = RectF(cardRect.centerX() - (badgeW / 2f), badgeTop, cardRect.centerX() + (badgeW / 2f), badgeTop + badgeH)
 
+    // =========================================================================
+    // 3. BOTTOM SECTION: SWINGING PENDULUM (DRAWN BEHIND DATE BADGE)
+    // =========================================================================
+    val pivotX = cardRect.centerX()
+    val pivotY = badgeRect.centerY()
+
+    // Smooth sine-wave pendulum swing
+    val currentTimeMs = System.currentTimeMillis()
+    val swingProgress = Math.sin((currentTimeMs % 2000L) / 2000.0 * 2.0 * Math.PI)
+    val maxSwingAngleRad = Math.toRadians(18.0) // ±18 degrees angle
+    val currentAngleRad = swingProgress * maxSwingAngleRad
+
+    val pendulumLen = (cardRect.bottom - pivotY - (cardW * 0.22f)).coerceAtLeast(10f)
+
+    val bobX = pivotX + (Math.sin(currentAngleRad) * pendulumLen).toFloat()
+    val bobY = pivotY + (Math.cos(currentAngleRad) * pendulumLen).toFloat()
+
+    // Pendulum Rod
+    val rodPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#50000000") else Color.parseColor("#70FFFFFF")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.8f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(pivotX, pivotY, bobX, bobY, rodPaint)
+
+    // Pendulum Weighted Bob
+    val bobRadius = cardW * 0.055f
+    val bobOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val bobInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    val bobBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * density
+    }
+
+    canvas.drawCircle(bobX, bobY, bobRadius, bobOuterPaint)
+    canvas.drawCircle(bobX, bobY, bobRadius, bobBorderPaint)
+    canvas.drawCircle(bobX, bobY, bobRadius * 0.40f, bobInnerPaint)
+
+    // =========================================================================
+    // 4. DATE BADGE FOREGROUND (OVERLAYED TO HIDE TOP OF PENDULUM ROD)
+    // =========================================================================
     val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
@@ -1818,80 +1867,10 @@ fun generatePillCapsuleHybridClockBitmap(
 
     canvas.drawText(dateStr, badgeRect.centerX(), badgeTextY, badgeTextPaint)
 
-    // =========================================================================
-    // 3. BOTTOM SECTION: SYMMETRICAL VINTAGE LINE MOTIF
-    // =========================================================================
-    val motifCenterY = badgeTop + badgeH + ((cardRect.bottom - (badgeTop + badgeH)) / 2f)
-    val motifW = cardW * 0.52f
-    val motifH = motifW * 0.32f
-    val cx = cardRect.centerX()
-
-    val motifStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.parseColor("#35000000") else Color.parseColor("#40FFFFFF")
-        style = Paint.Style.STROKE
-        strokeWidth = 1.2f * density
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    val motifFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.parseColor("#35000000") else Color.parseColor("#40FFFFFF")
-        style = Paint.Style.FILL
-    }
-
-    // Central Diamond Emblem
-    val diamondSize = 4f * density
-    val diamondPath = Path().apply {
-        moveTo(cx, motifCenterY - diamondSize)
-        lineTo(cx + diamondSize, motifCenterY)
-        lineTo(cx, motifCenterY + diamondSize)
-        lineTo(cx - diamondSize, motifCenterY)
-        close()
-    }
-    canvas.drawPath(diamondPath, motifFillPaint)
-
-    // Top & Bottom Vertical Accent Dots
-    canvas.drawCircle(cx, motifCenterY - (8f * density), 1.2f * density, motifFillPaint)
-    canvas.drawCircle(cx, motifCenterY + (8f * density), 1.2f * density, motifFillPaint)
-
-    // Symmetrical Curlicue Scrollwork Wings
-    val leftWing = Path().apply {
-        moveTo(cx - (6f * density), motifCenterY)
-        cubicTo(
-            cx - (motifW * 0.22f), motifCenterY - (motifH * 0.45f),
-            cx - (motifW * 0.38f), motifCenterY + (motifH * 0.50f),
-            cx - (motifW * 0.48f), motifCenterY - (motifH * 0.15f)
-        )
-    }
-
-    val rightWing = Path().apply {
-        moveTo(cx + (6f * density), motifCenterY)
-        cubicTo(
-            cx + (motifW * 0.22f), motifCenterY - (motifH * 0.45f),
-            cx + (motifW * 0.38f), motifCenterY + (motifH * 0.50f),
-            cx + (motifW * 0.48f), motifCenterY - (motifH * 0.15f)
-        )
-    }
-
-    canvas.drawPath(leftWing, motifStrokePaint)
-    canvas.drawPath(rightWing, motifStrokePaint)
-
-    // Wing Terminal Dots
-    canvas.drawCircle(cx - (motifW * 0.48f), motifCenterY - (motifH * 0.15f), 1.4f * density, motifFillPaint)
-    canvas.drawCircle(cx + (motifW * 0.48f), motifCenterY - (motifH * 0.15f), 1.4f * density, motifFillPaint)
-
-    // Subymmetrical Bottom Parallel Arc
-    val arcBounds = RectF(
-        cx - (motifW * 0.30f),
-        motifCenterY + (2f * density),
-        cx + (motifW * 0.30f),
-        motifCenterY + (motifH * 0.65f)
-    )
-    canvas.drawArc(arcBounds, 25f, 130f, false, motifStrokePaint)
-
     return bitmap
 }
 
-// 12. OVERLAPPING TYPOGRAPHIC HYBRID (2x2 Square / Circular Watch Face with Custom Controls)
+// 12. OVERLAPPING TYPOGRAPHIC HYBRID (2x2 Square / Analog / Circular Watch Face with Custom Controls)
 fun generateOverlappingTypographicHybridClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -2122,7 +2101,7 @@ fun generateOverlappingTypographicHybridClockBitmap(
     return bitmap
 }
 
-// 13. GIANT HOUR TYPOGRAPHIC HYBRID (2x2 Square / Circular Watch Face with Bottom Giant Hour & Mid-Right Digital Stack)
+// 13. GIANT HOUR TYPOGRAPHIC HYBRID (2x2 Square / Analog / Circular Watch Face with Bottom Giant Hour & Mid-Right Digital Stack)
 fun generateGiantHourTypographicHybridClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -2373,7 +2352,7 @@ fun generateGiantHourTypographicHybridClockBitmap(
     return bitmap
 }
 
-// 14. SQUIRCLE PERIMETER TICK HYBRID (2x2 Square / Uniform Contour Ticks & Bold Center Time)
+// 14. SQUIRCLE PERIMETER TICK HYBRID (2x2 Square / Analog / Uniform Contour Ticks & Bold Center Time)
 fun generateSquircleTickDigitalClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -2484,7 +2463,7 @@ fun generateSquircleTickDigitalClockBitmap(
     return bitmap
 }
 
-// 15. ARC DATE WEDGE HYBRID (2x2 / Circle Face, Scaled Arc Date & Inset Gap Hands)
+// 15. ARC DATE WEDGE HYBRID (2x2 / Analog / Circle Face, Scaled Arc Date & Inset Gap Hands)
 fun generateArcDateWedgeClockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -2636,7 +2615,7 @@ fun generateArcDateWedgeClockBitmap(
     return bitmap
 }
 
-// 16. HORIZONTAL PILL HYBRID (2x1 Horizontal Pill / Inset Left Analog Dial & Right Digital Time)
+// 16. HORIZONTAL PILL HYBRID (2x1 Horizontal Pill / Analog / Inset Left Analog Dial & Right Digital Time)
 fun generateHorizontalPillHybridClockBitmap(
     context: Context,
     config: SlateWidgetConfig,

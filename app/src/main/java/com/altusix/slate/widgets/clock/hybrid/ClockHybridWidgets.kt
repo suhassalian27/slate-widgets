@@ -68,164 +68,274 @@ fun updateAllClockHybridWidgets(context: Context) {
 
 // --- WIDGET RECEIVERS ---
 
-// 1. ANALOG DIGITAL SPLIT HYBRID (4x2 / Minimal Dial Left, Digital Time & Date Right)
+// 1. ANALOG DIGITAL SPLIT HYBRID (4x2)
 class ClockHybridAnalogDigitalSplitReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateAnalogDigitalSplitHybridClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 2. MINIMAL DIAL HYBRID (2x2 / Clean Analog Center, Stacked HH/MM Top-Right, Accent Day)
-class ClockHybridMinimalDialReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateMinimalDialHybridClockBitmap(context, config, isResponsive, wDp, hDp)
-}
-
-// 3. BOLD TYPOGRAPHIC HYBRID (2x2 Square / Stacked Giant Hour & Minute Display)
-class ClockHybridBoldTypographicReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateBoldTypographicDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateAnalogDigitalSplitHybridClockBitmap(context, config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
-// 4. LCD SEVEN SEGMENT HYBRID (2x2 / Stacked 7-Segment LCD with Vertical Date)
+// 2. MINIMAL DIAL HYBRID (2x2)
+class ClockHybridMinimalDialReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateMinimalDialHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+}
+
+// 3. BOLD TYPOGRAPHIC HYBRID (2x2)
+class ClockHybridBoldTypographicReceiver : BaseDigitalClockReceiver() {
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateBoldTypographicDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+}
+
+// 4. LCD SEVEN SEGMENT HYBRID (2x2)
 class ClockHybridLcdSevenSegmentReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateLcdSevenSegmentDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 5. ASYMMETRIC SLANTED HYBRID (2x2 / Minimal Bottom-Weighted Layout)
+// 5. ASYMMETRIC SLANTED HYBRID (2x2)
 class ClockHybridAsymmetricSlantedReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateAsymmetricSlantedDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 6. ASYMMETRIC OVERLAY HYBRID (2x2 / Translucent Giant Right Time with Bottom-Left Date)
+// 6. ASYMMETRIC OVERLAY HYBRID (2x2)
 class ClockHybridAsymmetricOverlayReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateAsymmetricOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 7. GRADIENT TALL HYBRID (4x2 / Responsive Tall Time with Gradient)
+// 7. GRADIENT TALL HYBRID (4x2)
 class ClockHybridGradientTallReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateGradientTallDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 8. SCRIPT OVERLAY HYBRID (4x2 / Giant Pastel Time with Cursive Day & Uppercase Date)
+// 8. SCRIPT OVERLAY HYBRID (4x2)
 class ClockHybridScriptOverlayReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateScriptOverlayDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 9. SPLIT FLAP HYBRID (4x2 / Dual Flip Card Time with Centered Date)
+// 9. SPLIT FLAP HYBRID (4x2)
 class ClockHybridSplitFlapReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateSplitFlapDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 10. VERTICAL CAPSULE HYBRID (1x2 / Pill Capsule Monolith with Center Date Badge)
+// 10. VERTICAL CAPSULE HYBRID (1x2)
 class ClockHybridVerticalCapsuleReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateVerticalCapsuleDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 11. PILL CAPSULE HYBRID (1x2 / Top Digital Time, Bottom Analog Dial & Accent Date Badge)
+// 11. PILL CAPSULE HYBRID (1x2)
 class ClockHybridPillCapsuleReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generatePillCapsuleHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generatePillCapsuleHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 12. OVERLAPPING TYPOGRAPHY HYBRID (2x2 / Dual-Tone Giant Numbers & Skeleton Hands)
+// 12. OVERLAPPING TYPOGRAPHY HYBRID (2x2)
 class ClockHybridOverlappingTypographyReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateOverlappingTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateOverlappingTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 13. GIANT HOUR TYPOGRAPHIC HYBRID (2x2 / Circular Watch Face with Bottom Giant Hour & Mid-Right Stack)
+// 13. GIANT HOUR TYPOGRAPHIC HYBRID (2x2)
 class ClockHybridGiantHourReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateGiantHourTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateGiantHourTypographicHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 14. SQUIRCLE PERIMETER TICK HYBRID (2x2 / Contour Ticks & Bold Time)
+// 14. SQUIRCLE PERIMETER TICK HYBRID (2x2)
 class ClockHybridSquircleTickReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateSquircleTickDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateSquircleTickDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 15. ARC DATE WEDGE HYBRID (2x2 / Arc Date & Triangular Wedge Hour Hand)
+// 15. ARC DATE WEDGE HYBRID (2x2)
 class ClockHybridArcDateWedgeReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateArcDateWedgeClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateArcDateWedgeClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 16. HORIZONTAL PILL HYBRID (2x1 / Left Dial & Right Digital Time)
+// 16. HORIZONTAL PILL HYBRID (2x1)
 class ClockHybridHorizontalPillReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateHorizontalPillHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateHorizontalPillHybridClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }
 
-// 17. MINIMAL CAPSULE PILL (2x1 / Inset Date Badge & Clean Digital Time)
+// 17. MINIMAL CAPSULE PILL (2x1)
 class ClockHybridMinimalCapsulePillReceiver : BaseDigitalClockReceiver() {
-    override fun renderBitmap(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap = generateMinimalCapsulePillClockBitmap(context, config, isResponsive, wDp, hDp)
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+        generateMinimalCapsulePillClockBitmap(context, config, isResponsive, wDp, hDp)
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        SlateClockTickerService.ensureServiceStarted(context)
+    }
 }

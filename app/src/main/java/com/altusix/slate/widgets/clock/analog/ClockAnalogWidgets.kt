@@ -67,17 +67,12 @@ class ClockAnalogPrecisionReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -88,17 +83,12 @@ class ClockBauhausReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -109,17 +99,12 @@ class ClockCyberSkeletonReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -130,17 +115,12 @@ class ClockSculptedPillReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -151,17 +131,12 @@ class ClockBoldTypographyReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -172,17 +147,12 @@ class ClockCyberCondensedReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -193,17 +163,12 @@ class ClockCapsuleSkeletonReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -214,17 +179,12 @@ class ClockApexArrowheadReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -235,17 +195,12 @@ class ClockConcentricOrbitalReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -256,17 +211,12 @@ class ClockTripleOrbitalDotsReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -277,17 +227,12 @@ class ClockSectorSweepReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -298,17 +243,12 @@ class ClockRotatingRingReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -319,17 +259,12 @@ class ClockHourglassReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -340,17 +275,12 @@ class ClockMinimalDotsReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }
 
@@ -361,16 +291,11 @@ class ClockRadarScopeReceiver : BaseClockReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        SlateClockTickerService.ensureServiceStarted(context)
     }
 }

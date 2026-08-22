@@ -145,6 +145,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 ) {
                     SlateWidgetConfigSheetContent(
                         widgetClassName = widgetClassName,
+                        widgetName = catalogItem?.name ?: "",
                         selectedBgHex = selectedBgHex,
                         selectedAccentHex = selectedAccentHex,
                         opacity = opacity,
@@ -238,6 +239,7 @@ class WidgetConfigActivity : ComponentActivity() {
 @Composable
 private fun SlateWidgetConfigSheetContent(
     widgetClassName: String,
+    widgetName: String,
     selectedBgHex: Long,
     selectedAccentHex: Long,
     opacity: Float,
@@ -284,12 +286,24 @@ private fun SlateWidgetConfigSheetContent(
                 fontSize = 15.sp,
                 modifier = Modifier.clickable { onDismiss() }.padding(vertical = 8.dp)
             )
-            Text(
-                text = "Customize Widget",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Customize Widget",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                if (widgetName.isNotEmpty()) {
+                    Text(
+                        text = widgetName,
+                        fontSize = 11.sp,
+                        color = Color(0xFF8E8E93),
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            }
+
             Text(
                 text = "Apply",
                 color = Color.White,
