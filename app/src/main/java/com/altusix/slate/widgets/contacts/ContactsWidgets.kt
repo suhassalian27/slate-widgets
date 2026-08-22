@@ -17,6 +17,7 @@ fun getContactsWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Single Avatar Capsule", sizeText = "1x2", category = "Contacts", receiverClass = ContactsSingleAvatarCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Horizontal Speed Dial", sizeText = "2x1", category = "Contacts", receiverClass = ContactsHorizontalSpeedDialReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "3-Section Bento Contact", sizeText = "4x2", category = "Contacts", receiverClass = ContactsEditorialBentoReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -59,7 +60,7 @@ abstract class BaseContactsReceiver : android.appwidget.AppWidgetProvider() {
         super.onAppWidgetOptionsChanged(context, appWidgetManager, widgetId, newOptions)
     }
 
-    private fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
+    open fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
         val options = appWidgetManager.getAppWidgetOptions(widgetId)
         val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -87,7 +88,6 @@ abstract class BaseContactsReceiver : android.appwidget.AppWidgetProvider() {
             )
         } else {
             val phoneDigits = contactConfig.phoneNumber.replace("[^0-9]".toRegex(), "")
-
             val actionIntent = when (contactConfig.actionType) {
                 ContactActionType.CALL -> Intent(Intent.ACTION_DIAL).apply {
                     data = Uri.parse("tel:${contactConfig.phoneNumber}")
@@ -130,6 +130,7 @@ fun updateAllContactsWidgets(context: Context) {
     val receivers = listOf(
         ContactsSingleAvatarCapsuleReceiver::class.java,
         ContactsHorizontalSpeedDialReceiver::class.java,
+        ContactsEditorialBentoReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -153,4 +154,80 @@ class ContactsSingleAvatarCapsuleReceiver : BaseContactsReceiver() {
 class ContactsHorizontalSpeedDialReceiver : BaseContactsReceiver() {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateHorizontalSpeedDialBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+// 3. EDITORIAL BENTO CONTACTS (4x2 / 3-Section Bento Widget)
+class ContactsEditorialBentoReceiver : BaseContactsReceiver() {
+
+    override fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
+        val options = appWidgetManager.getAppWidgetOptions(widgetId)
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+        val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+        val contactConfig = ContactsWidgetPreferences.loadConfig(context, widgetId)
+
+        val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_contacts_bento_layout)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        if (!contactConfig.isConfigured) {
+            val configIntent = Intent(context, ContactsWidgetConfigActivity::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pi = PendingIntent.getActivity(
+                context, widgetId, configIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            // Bind configuration intent to the entire root view & all touch targets when unconfigured
+            views.setOnClickPendingIntent(R.id.widget_bento_root, pi)
+            views.setOnClickPendingIntent(R.id.touch_hero, pi)
+            views.setOnClickPendingIntent(R.id.touch_call, pi)
+            views.setOnClickPendingIntent(R.id.touch_message, pi)
+        } else {
+            // 1. Left Hero Touch Target -> Re-open Setup Config Sheet
+            val configIntent = Intent(context, ContactsWidgetConfigActivity::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val heroPendingIntent = PendingIntent.getActivity(
+                context, widgetId * 10 + 1, configIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.touch_hero, heroPendingIntent)
+
+            // 2. Top Right Call Touch Target -> Direct Phone Dialer
+            val callIntent = Intent(Intent.ACTION_DIAL).apply {
+                data = Uri.parse("tel:${contactConfig.phoneNumber}")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val callPendingIntent = PendingIntent.getActivity(
+                context, widgetId * 10 + 2, callIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.touch_call, callPendingIntent)
+
+            // 3. Bottom Right Message Touch Target -> SMS Messages App
+            val msgIntent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("smsto:${contactConfig.phoneNumber}")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val msgPendingIntent = PendingIntent.getActivity(
+                context, widgetId * 10 + 3, msgIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.touch_message, msgPendingIntent)
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateEditorialBentoContactsBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }

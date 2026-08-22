@@ -37,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -81,6 +80,10 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
 
         currentConfig = ContactsWidgetPreferences.loadConfig(this, widgetId)
 
+        // Check if current widget is the 3-Section Bento Widget
+        val appWidgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)
+        val is3SectionWidget = appWidgetInfo?.provider?.className?.contains("EditorialBento") == true
+
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color.Transparent, surface = Color(0xFF0A0A0C))) {
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -113,7 +116,7 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                                 modifier = Modifier.clickable { finish() }.padding(vertical = 8.dp)
                             )
                             Text(
-                                text = "Setup Contact",
+                                text = "Select Contact",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -190,63 +193,64 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        // Show Tap Action selector ONLY for Single Action Widgets
+                        if (!is3SectionWidget) {
+                            Spacer(modifier = Modifier.height(24.dp))
 
-                        // Action Selector Title
-                        Text(
-                            text = "Tap Action",
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.align(Alignment.Start)
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Action Options Stack
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val actionItems = listOf(
-                                Triple(ContactActionType.CALL, Icons.Default.Call, ContactActionType.CALL.description),
-                                Triple(ContactActionType.SMS, Icons.Default.Email, ContactActionType.SMS.description),
-                                Triple(ContactActionType.WHATSAPP, Icons.Default.Send, ContactActionType.WHATSAPP.description),
-                                Triple(ContactActionType.TELEGRAM, Icons.Default.Send, ContactActionType.TELEGRAM.description)
+                            Text(
+                                text = "Tap Action",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.align(Alignment.Start)
                             )
 
-                            actionItems.forEach { (action, icon, desc) ->
-                                val isSelected = currentConfig.actionType == action
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(if (isSelected) Color(0xFF1C1C1E) else Color(0xFF141416))
-                                        .border(
-                                            1.dp,
-                                            if (isSelected) Color(0xFF3A3A3C) else Color.Transparent,
-                                            RoundedCornerShape(16.dp)
-                                        )
-                                        .clickable { currentConfig = currentConfig.copy(actionType = action) }
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                val actionItems = listOf(
+                                    Triple(ContactActionType.CALL, Icons.Default.Call, ContactActionType.CALL.description),
+                                    Triple(ContactActionType.SMS, Icons.Default.Email, ContactActionType.SMS.description),
+                                    Triple(ContactActionType.WHATSAPP, Icons.Default.Send, ContactActionType.WHATSAPP.description),
+                                    Triple(ContactActionType.TELEGRAM, Icons.Default.Send, ContactActionType.TELEGRAM.description)
+                                )
+
+                                actionItems.forEach { (action, icon, desc) ->
+                                    val isSelected = currentConfig.actionType == action
+                                    Row(
                                         modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF2C2C30)),
-                                        contentAlignment = Alignment.Center
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(if (isSelected) Color(0xFF1C1C1E) else Color(0xFF141416))
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) Color(0xFF3A3A3C) else Color.Transparent,
+                                                RoundedCornerShape(16.dp)
+                                            )
+                                            .clickable { currentConfig = currentConfig.copy(actionType = action) }
+                                            .padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                                    }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF2C2C30)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                        }
 
-                                    Spacer(modifier = Modifier.width(16.dp))
+                                        Spacer(modifier = Modifier.width(16.dp))
 
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(action.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                        Text(desc, color = Color.Gray, fontSize = 12.sp)
-                                    }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(action.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(desc, color = Color.Gray, fontSize = 12.sp)
+                                        }
 
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.White)
+                                        if (isSelected) {
+                                            Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.White)
+                                        }
                                     }
                                 }
                             }

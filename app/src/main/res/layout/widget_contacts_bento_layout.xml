@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_bento_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Rendered Canvas Bitmap -->
+    <ImageView
+        android:id="@+id/widget_image_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter" />
+
+    <!-- Transparent Touch Overlay Container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <!-- 1. Hero Touch Target (52% width) -->
+        <FrameLayout
+            android:id="@+id/touch_hero"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.52"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Right Side Action Column (48% width) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.48"
+            android:orientation="vertical">
+
+            <!-- 2. Call Touch Target -->
+            <FrameLayout
+                android:id="@+id/touch_call"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- 3. Message Touch Target -->
+            <FrameLayout
+                android:id="@+id/touch_message"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>
