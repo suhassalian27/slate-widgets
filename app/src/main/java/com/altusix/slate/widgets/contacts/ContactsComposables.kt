@@ -453,7 +453,6 @@ private fun formatSmartName(name: String, paint: Paint, maxW: Float): String {
     return name.substring(0, end).trim() + "…"
 }
 
-
 // 3. EDITORIAL BENTO CONTACTS (4x2 / 3-Section Bento Widget)
 fun generateEditorialBentoContactsBitmap(
     context: Context,
@@ -477,7 +476,6 @@ fun generateEditorialBentoContactsBitmap(
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    // Compute luminance once at function scope for contrast checks
     val r = Color.red(accentColorInt) / 255f
     val g = Color.green(accentColorInt) / 255f
     val b = Color.blue(accentColorInt) / 255f
@@ -498,7 +496,6 @@ fun generateEditorialBentoContactsBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    // 1. Strict Fixed Outer Corner Radius
     val outerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
@@ -514,7 +511,6 @@ fun generateEditorialBentoContactsBitmap(
         return bitmap
     }
 
-    // 2. Strict Fixed DP Padding & Gap
     val pad = scaleFactor * 8f
     val gap = scaleFactor * 8f
 
@@ -546,7 +542,6 @@ fun generateEditorialBentoContactsBitmap(
         cardRect.bottom - pad
     )
 
-    // Concentric Inner Corner Radius
     val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -555,7 +550,7 @@ fun generateEditorialBentoContactsBitmap(
     }
 
     // =========================================================================
-    // SECTION 1: HERO CONTACT CARD (Left - Full-Bleed Image / Avatar)
+    // SECTION 1: HERO CONTACT CARD
     // =========================================================================
     val photoBitmap = loadContactPhoto(context, contactConfig.photoUri)
 
@@ -598,7 +593,6 @@ fun generateEditorialBentoContactsBitmap(
         val heroCx = heroRect.centerX()
         val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
         val avatarCy = heroRect.centerY() - (scaleFactor * 8f)
-
         val avatarTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
         drawAvatarNode(
@@ -609,7 +603,6 @@ fun generateEditorialBentoContactsBitmap(
     }
     canvas.restore()
 
-    // Overlay Name Text at Bottom-Left of Hero Block
     val textPaddingX = scaleFactor * 10f
     val textPaddingBottom = scaleFactor * 10f
     val maxHeroTextW = heroRect.width() - (textPaddingX * 2f)
@@ -635,74 +628,833 @@ fun generateEditorialBentoContactsBitmap(
     canvas.drawText(displayName, textX, textY, namePaint)
 
     // =========================================================================
-    // SECTION 2: CALL CARD (Top Right)
+    // SECTIONS 2 & 3: CALL AND MESSAGE CARDS (SYNCHRONIZED VISIBILITY)
     // =========================================================================
     val accentCardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
+    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
 
     val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
-    val callIconSize = (callRect.height() * 0.42f).coerceAtLeast(scaleFactor * 12f)
+
+    val baseIconSize = minOf(
+        callRect.height() * 0.44f,
+        callRect.width() * 0.28f,
+        scaleFactor * 34f
+    ).coerceAtLeast(scaleFactor * 14f)
 
     val callTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = callTextColor
-        textSize = (callRect.height() * 0.30f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        textSize = (callRect.height() * 0.32f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.LEFT
     }
-
-    val callTextWidth = callTextPaint.measureText("Call")
-    val callGap = scaleFactor * 6f
-    val totalCallContentW = callIconSize + callGap + callTextWidth
-    val availableCallW = callRect.width() * 0.85f
-
-    if (totalCallContentW <= availableCallW) {
-        val startX = callRect.centerX() - (totalCallContentW / 2f)
-        val iconCx = startX + (callIconSize / 2f)
-        val textX = startX + callIconSize + callGap
-
-        drawVectorIcon(canvas, context, R.drawable.ic_phone, iconCx, callRect.centerY(), callIconSize, callTextColor)
-
-        val callBounds = Rect()
-        callTextPaint.getTextBounds("Call", 0, 4, callBounds)
-        canvas.drawText("Call", textX, callRect.centerY() + (callBounds.height() / 2f), callTextPaint)
-    } else {
-        drawVectorIcon(canvas, context, R.drawable.ic_phone, callRect.centerX(), callRect.centerY(), callIconSize * 1.1f, callTextColor)
-    }
-
-    // =========================================================================
-    // SECTION 3: MESSAGE CARD (Bottom Right)
-    // =========================================================================
-    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
-
-    val msgIconSize = (msgRect.height() * 0.42f).coerceAtLeast(scaleFactor * 12f)
 
     val msgTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = (msgRect.height() * 0.30f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        textSize = (msgRect.height() * 0.32f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.LEFT
     }
 
+    val contentGap = scaleFactor * 6f
+    val callTextWidth = callTextPaint.measureText("Call")
     val msgTextWidth = msgTextPaint.measureText("Message")
-    val msgGap = scaleFactor * 6f
-    val totalMsgContentW = msgIconSize + msgGap + msgTextWidth
-    val availableMsgW = msgRect.width() * 0.85f
 
-    if (totalMsgContentW <= availableMsgW) {
-        val startX = msgRect.centerX() - (totalMsgContentW / 2f)
-        val iconCx = startX + (msgIconSize / 2f)
-        val textX = startX + msgIconSize + msgGap
+    val totalCallContentW = baseIconSize + contentGap + callTextWidth
+    val totalMsgContentW = baseIconSize + contentGap + msgTextWidth
 
-        drawVectorIcon(canvas, context, R.drawable.ic_message, iconCx, msgRect.centerY(), msgIconSize, primaryText)
+    val availableCallW = callRect.width() * 0.88f
+    val availableMsgW = msgRect.width() * 0.88f
 
-        val msgBounds = Rect()
-        msgTextPaint.getTextBounds("Message", 0, 7, msgBounds)
-        canvas.drawText("Message", textX, msgRect.centerY() + (msgBounds.height() / 2f), msgTextPaint)
+    // Synchronized check: Both must fit to display text
+    val showLabels = (totalCallContentW <= availableCallW) && (totalMsgContentW <= availableMsgW)
+
+    if (showLabels) {
+        // --- CALL BUTTON (Icon + Text) ---
+        val callStartX = callRect.centerX() - (totalCallContentW / 2f)
+        val callIconCx = callStartX + (baseIconSize / 2f)
+        val callTextX = callStartX + baseIconSize + contentGap
+        val callTextY = callRect.centerY() - ((callTextPaint.descent() + callTextPaint.ascent()) / 2f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callIconCx, callRect.centerY(), baseIconSize, callTextColor)
+        canvas.drawText("Call", callTextX, callTextY, callTextPaint)
+
+        // --- MESSAGE BUTTON (Icon + Text) ---
+        val msgStartX = msgRect.centerX() - (totalMsgContentW / 2f)
+        val msgIconCx = msgStartX + (baseIconSize / 2f)
+        val msgTextX = msgStartX + baseIconSize + contentGap
+        val msgTextY = msgRect.centerY() - ((msgTextPaint.descent() + msgTextPaint.ascent()) / 2f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgIconCx, msgRect.centerY(), baseIconSize, primaryText)
+        canvas.drawText("Message", msgTextX, msgTextY, msgTextPaint)
     } else {
-        drawVectorIcon(canvas, context, R.drawable.ic_message, msgRect.centerX(), msgRect.centerY(), msgIconSize * 1.1f, primaryText)
+        // --- ICON-ONLY MODE (BOTH BUTTONS) ---
+        val iconOnlySize = minOf(
+            callRect.height() * 0.50f,
+            callRect.width() * 0.50f,
+            scaleFactor * 36f
+        ).coerceAtLeast(scaleFactor * 14f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callRect.centerX(), callRect.centerY(), iconOnlySize, callTextColor)
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgRect.centerX(), msgRect.centerY(), iconOnlySize, primaryText)
+    }
+
+    return bitmap
+}
+
+// 4. STACKED BENTO CONTACTS (2x2 / Top Hero, Bottom Actions)
+fun generateStackedBentoContactsBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast((180 * scaleFactor).toInt())
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast((180 * scaleFactor).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val r = Color.red(accentColorInt) / 255f
+    val g = Color.green(accentColorInt) / 255f
+    val b = Color.blue(accentColorInt) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val size = minOf(w, h).toFloat()
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val contactConfig = ContactsWidgetPreferences.loadConfig(context, widgetId)
+    if (!contactConfig.isConfigured) {
+        drawConfigurePlaceholderState(canvas, context, cardRect, config, scaleFactor)
+        return bitmap
+    }
+
+    val pad = scaleFactor * 8f
+    val gap = scaleFactor * 8f
+
+    val innerW = cardRect.width() - (pad * 2f)
+    val innerH = cardRect.height() - (pad * 2f) - gap
+
+    val heroH = innerH * 0.54f
+    val bottomH = innerH - heroH
+    val bottomW = (innerW - gap) / 2f
+
+    val heroRect = RectF(
+        cardRect.left + pad,
+        cardRect.top + pad,
+        cardRect.right - pad,
+        cardRect.top + pad + heroH
+    )
+
+    val callRect = RectF(
+        cardRect.left + pad,
+        heroRect.bottom + gap,
+        cardRect.left + pad + bottomW,
+        cardRect.bottom - pad
+    )
+
+    val msgRect = RectF(
+        callRect.right + gap,
+        heroRect.bottom + gap,
+        cardRect.right - pad,
+        cardRect.bottom - pad
+    )
+
+    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
+
+    // =========================================================================
+    // SECTION 1: TOP HERO CARD
+    // =========================================================================
+    val photoBitmap = loadContactPhoto(context, contactConfig.photoUri)
+
+    canvas.save()
+    val heroClipPath = Path().apply {
+        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(heroClipPath)
+
+    if (photoBitmap != null) {
+        val targetRatio = heroRect.width() / heroRect.height()
+        val imgW = photoBitmap.width.toFloat()
+        val imgH = photoBitmap.height.toFloat()
+        val imgRatio = imgW / imgH
+
+        val srcRect = if (imgRatio > targetRatio) {
+            val cropW = imgH * targetRatio
+            val left = (imgW - cropW) / 2f
+            Rect(left.toInt(), 0, (left + cropW).toInt(), photoBitmap.height)
+        } else {
+            val cropH = imgW / targetRatio
+            val top = (imgH - cropH) / 2f
+            Rect(0, top.toInt(), photoBitmap.width, (top + cropH).toInt())
+        }
+
+        val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(photoBitmap, srcRect, heroRect, imagePaint)
+
+        val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.LinearGradient(
+                0f, heroRect.centerY(), 0f, heroRect.bottom,
+                Color.TRANSPARENT, Color.argb(190, 0, 0, 0),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(heroRect, gradientPaint)
+    } else {
+        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+
+        val heroCx = heroRect.centerX()
+        val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
+        val avatarCy = heroRect.centerY() - (scaleFactor * 8f)
+        val avatarTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+        drawAvatarNode(
+            canvas, context, heroCx, avatarCy, avatarRadius,
+            null, contactConfig.initials,
+            accentColorInt, avatarTextColor
+        )
+    }
+    canvas.restore()
+
+    val textPaddingX = scaleFactor * 10f
+    val textPaddingBottom = scaleFactor * 8f
+    val maxHeroTextW = heroRect.width() - (textPaddingX * 2f)
+
+    val nameTextColor = if (photoBitmap != null) Color.WHITE else primaryText
+    val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = nameTextColor
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    var fontSize = (heroRect.height() * 0.22f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
+    namePaint.textSize = fontSize
+    while (namePaint.measureText(contactConfig.contactName) > maxHeroTextW && fontSize > scaleFactor * 9f) {
+        fontSize -= scaleFactor * 0.8f
+        namePaint.textSize = fontSize
+    }
+
+    val displayName = formatSmartName(contactConfig.contactName, namePaint, maxHeroTextW)
+    val textX = heroRect.left + textPaddingX
+    val textY = heroRect.bottom - textPaddingBottom
+
+    canvas.drawText(displayName, textX, textY, namePaint)
+
+    // =========================================================================
+    // SECTIONS 2 & 3: BOTTOM CALL AND MESSAGE CARDS (SYNCHRONIZED VISIBILITY)
+    // =========================================================================
+    val accentCardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
+    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val baseIconSize = minOf(
+        callRect.height() * 0.44f,
+        callRect.width() * 0.28f,
+        scaleFactor * 34f
+    ).coerceAtLeast(scaleFactor * 14f)
+
+    val callTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = callTextColor
+        textSize = (callRect.height() * 0.32f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val msgTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = (msgRect.height() * 0.32f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val contentGap = scaleFactor * 6f
+    val callTextWidth = callTextPaint.measureText("Call")
+    val msgTextWidth = msgTextPaint.measureText("Message")
+
+    val totalCallContentW = baseIconSize + contentGap + callTextWidth
+    val totalMsgContentW = baseIconSize + contentGap + msgTextWidth
+
+    val availableCallW = callRect.width() * 0.88f
+    val availableMsgW = msgRect.width() * 0.88f
+
+    // Synchronized check: Both must fit to display text
+    val showLabels = (totalCallContentW <= availableCallW) && (totalMsgContentW <= availableMsgW)
+
+    if (showLabels) {
+        // --- CALL BUTTON (Icon + Text) ---
+        val callStartX = callRect.centerX() - (totalCallContentW / 2f)
+        val callIconCx = callStartX + (baseIconSize / 2f)
+        val callTextX = callStartX + baseIconSize + contentGap
+        val callTextY = callRect.centerY() - ((callTextPaint.descent() + callTextPaint.ascent()) / 2f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callIconCx, callRect.centerY(), baseIconSize, callTextColor)
+        canvas.drawText("Call", callTextX, callTextY, callTextPaint)
+
+        // --- MESSAGE BUTTON (Icon + Text) ---
+        val msgStartX = msgRect.centerX() - (totalMsgContentW / 2f)
+        val msgIconCx = msgStartX + (baseIconSize / 2f)
+        val msgTextX = msgStartX + baseIconSize + contentGap
+        val msgTextY = msgRect.centerY() - ((msgTextPaint.descent() + msgTextPaint.ascent()) / 2f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgIconCx, msgRect.centerY(), baseIconSize, primaryText)
+        canvas.drawText("Message", msgTextX, msgTextY, msgTextPaint)
+    } else {
+        // --- ICON-ONLY MODE (BOTH BUTTONS) ---
+        val iconOnlySize = minOf(
+            callRect.height() * 0.50f,
+            callRect.width() * 0.50f,
+            scaleFactor * 36f
+        ).coerceAtLeast(scaleFactor * 14f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callRect.centerX(), callRect.centerY(), iconOnlySize, callTextColor)
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgRect.centerX(), msgRect.centerY(), iconOnlySize, primaryText)
+    }
+
+    return bitmap
+}
+
+// 5. EDITORIAL 3-ACTION BENTO CONTACTS (4x2 / Hero Left, 3 Actions Right)
+fun generateEditorial3ActionBentoContactsBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast((240 * scaleFactor).toInt())
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast((140 * scaleFactor).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val r = Color.red(accentColorInt) / 255f
+    val g = Color.green(accentColorInt) / 255f
+    val b = Color.blue(accentColorInt) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val contactConfig = ContactsWidgetPreferences.loadConfig(context, widgetId)
+    if (!contactConfig.isConfigured) {
+        drawConfigurePlaceholderState(canvas, context, cardRect, config, scaleFactor)
+        return bitmap
+    }
+
+    val pad = scaleFactor * 8f
+    val gap = scaleFactor * 6f
+
+    val innerW = cardRect.width() - (pad * 2f) - gap
+    val innerH = cardRect.height() - (pad * 2f)
+
+    val heroW = innerW * 0.50f
+    val rightH = (innerH - (gap * 2f)) / 3f
+
+    val heroRect = RectF(
+        cardRect.left + pad,
+        cardRect.top + pad,
+        cardRect.left + pad + heroW,
+        cardRect.bottom - pad
+    )
+
+    val callRect = RectF(
+        heroRect.right + gap,
+        cardRect.top + pad,
+        cardRect.right - pad,
+        cardRect.top + pad + rightH
+    )
+
+    val msgRect = RectF(
+        heroRect.right + gap,
+        callRect.bottom + gap,
+        cardRect.right - pad,
+        callRect.bottom + gap + rightH
+    )
+
+    val waRect = RectF(
+        heroRect.right + gap,
+        msgRect.bottom + gap,
+        cardRect.right - pad,
+        cardRect.bottom - pad
+    )
+
+    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
+
+    // --- HERO CONTACT CARD ---
+    val photoBitmap = loadContactPhoto(context, contactConfig.photoUri)
+
+    canvas.save()
+    val heroClipPath = Path().apply {
+        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(heroClipPath)
+
+    if (photoBitmap != null) {
+        val targetRatio = heroRect.width() / heroRect.height()
+        val imgW = photoBitmap.width.toFloat()
+        val imgH = photoBitmap.height.toFloat()
+        val imgRatio = imgW / imgH
+
+        val srcRect = if (imgRatio > targetRatio) {
+            val cropW = imgH * targetRatio
+            val left = (imgW - cropW) / 2f
+            Rect(left.toInt(), 0, (left + cropW).toInt(), photoBitmap.height)
+        } else {
+            val cropH = imgW / targetRatio
+            val top = (imgH - cropH) / 2f
+            Rect(0, top.toInt(), photoBitmap.width, (top + cropH).toInt())
+        }
+
+        val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(photoBitmap, srcRect, heroRect, imagePaint)
+
+        val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.LinearGradient(
+                0f, heroRect.centerY(), 0f, heroRect.bottom,
+                Color.TRANSPARENT, Color.argb(190, 0, 0, 0),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(heroRect, gradientPaint)
+    } else {
+        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+
+        val heroCx = heroRect.centerX()
+        val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
+        val avatarCy = heroRect.centerY() - (scaleFactor * 8f)
+        val avatarTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+        drawAvatarNode(
+            canvas, context, heroCx, avatarCy, avatarRadius,
+            null, contactConfig.initials,
+            accentColorInt, avatarTextColor
+        )
+    }
+    canvas.restore()
+
+    val textPaddingX = scaleFactor * 10f
+    val textPaddingBottom = scaleFactor * 10f
+    val maxHeroTextW = heroRect.width() - (textPaddingX * 2f)
+
+    val nameTextColor = if (photoBitmap != null) Color.WHITE else primaryText
+    val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = nameTextColor
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    var fontSize = (heroRect.height() * 0.16f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
+    namePaint.textSize = fontSize
+    while (namePaint.measureText(contactConfig.contactName) > maxHeroTextW && fontSize > scaleFactor * 9f) {
+        fontSize -= scaleFactor * 0.8f
+        namePaint.textSize = fontSize
+    }
+
+    val displayName = formatSmartName(contactConfig.contactName, namePaint, maxHeroTextW)
+    val textX = heroRect.left + textPaddingX
+    val textY = heroRect.bottom - textPaddingBottom
+
+    canvas.drawText(displayName, textX, textY, namePaint)
+
+    // --- SECTIONS 2, 3 & 4: ACTION BUTTONS ---
+    val accentCardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
+    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
+    canvas.drawRoundRect(waRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val baseIconSize = minOf(
+        callRect.height() * 0.46f,
+        callRect.width() * 0.26f,
+        scaleFactor * 28f
+    ).coerceAtLeast(scaleFactor * 12f)
+
+    val btnTextSize = (callRect.height() * 0.34f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+
+    val callTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = callTextColor
+        textSize = btnTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val msgTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = btnTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val contentGap = scaleFactor * 6f
+    val callTextWidth = callTextPaint.measureText("Call")
+    val msgTextWidth = msgTextPaint.measureText("Message")
+    val waTextWidth = msgTextPaint.measureText("WhatsApp")
+
+    val availableW = callRect.width() * 0.88f
+    val showLabels = (baseIconSize + contentGap + callTextWidth <= availableW) &&
+            (baseIconSize + contentGap + msgTextWidth <= availableW) &&
+            (baseIconSize + contentGap + waTextWidth <= availableW)
+
+    if (showLabels) {
+        // Render Call
+        val callW = baseIconSize + contentGap + callTextWidth
+        val callStartX = callRect.centerX() - (callW / 2f)
+        val callTextY = callRect.centerY() - ((callTextPaint.descent() + callTextPaint.ascent()) / 2f)
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callStartX + (baseIconSize / 2f), callRect.centerY(), baseIconSize, callTextColor)
+        canvas.drawText("Call", callStartX + baseIconSize + contentGap, callTextY, callTextPaint)
+
+        // Render Message
+        val msgW = baseIconSize + contentGap + msgTextWidth
+        val msgStartX = msgRect.centerX() - (msgW / 2f)
+        val msgTextY = msgRect.centerY() - ((msgTextPaint.descent() + msgTextPaint.ascent()) / 2f)
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgStartX + (baseIconSize / 2f), msgRect.centerY(), baseIconSize, primaryText)
+        canvas.drawText("Message", msgStartX + baseIconSize + contentGap, msgTextY, msgTextPaint)
+
+        // Render WhatsApp
+        val waW = baseIconSize + contentGap + waTextWidth
+        val waStartX = waRect.centerX() - (waW / 2f)
+        val waTextY = waRect.centerY() - ((msgTextPaint.descent() + msgTextPaint.ascent()) / 2f)
+        drawVectorIcon(canvas, context, R.drawable.ic_whatsapp, waStartX + (baseIconSize / 2f), waRect.centerY(), baseIconSize, primaryText)
+        canvas.drawText("WhatsApp", waStartX + baseIconSize + contentGap, waTextY, msgTextPaint)
+    } else {
+        val iconOnlySize = minOf(
+            callRect.height() * 0.52f,
+            callRect.width() * 0.48f,
+            scaleFactor * 32f
+        ).coerceAtLeast(scaleFactor * 12f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callRect.centerX(), callRect.centerY(), iconOnlySize, callTextColor)
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgRect.centerX(), msgRect.centerY(), iconOnlySize, primaryText)
+        drawVectorIcon(canvas, context, R.drawable.ic_whatsapp, waRect.centerX(), waRect.centerY(), iconOnlySize, primaryText)
+    }
+
+    return bitmap
+}
+
+// 6. STACKED 3-ACTION BENTO CONTACTS (2x2 / Hero Top, 3 Actions Bottom)
+fun generateStacked3ActionBentoContactsBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val displayDensity = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(displayDensity, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast((180 * scaleFactor).toInt())
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast((180 * scaleFactor).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val r = Color.red(accentColorInt) / 255f
+    val g = Color.green(accentColorInt) / 255f
+    val b = Color.blue(accentColorInt) / 255f
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        val size = minOf(w, h).toFloat()
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val contactConfig = ContactsWidgetPreferences.loadConfig(context, widgetId)
+    if (!contactConfig.isConfigured) {
+        drawConfigurePlaceholderState(canvas, context, cardRect, config, scaleFactor)
+        return bitmap
+    }
+
+    val pad = scaleFactor * 8f
+    val gap = scaleFactor * 6f
+
+    val innerW = cardRect.width() - (pad * 2f) - (gap * 2f)
+    val innerH = cardRect.height() - (pad * 2f) - gap
+
+    val heroH = innerH * 0.54f
+    val bottomH = innerH - heroH
+    val bottomW = innerW / 3f
+
+    val heroRect = RectF(
+        cardRect.left + pad,
+        cardRect.top + pad,
+        cardRect.right - pad,
+        cardRect.top + pad + heroH
+    )
+
+    val callRect = RectF(
+        cardRect.left + pad,
+        heroRect.bottom + gap,
+        cardRect.left + pad + bottomW,
+        cardRect.bottom - pad
+    )
+
+    val msgRect = RectF(
+        callRect.right + gap,
+        heroRect.bottom + gap,
+        callRect.right + gap + bottomW,
+        cardRect.bottom - pad
+    )
+
+    val waRect = RectF(
+        msgRect.right + gap,
+        heroRect.bottom + gap,
+        cardRect.right - pad,
+        cardRect.bottom - pad
+    )
+
+    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
+
+    // --- TOP HERO CARD ---
+    val photoBitmap = loadContactPhoto(context, contactConfig.photoUri)
+
+    canvas.save()
+    val heroClipPath = Path().apply {
+        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(heroClipPath)
+
+    if (photoBitmap != null) {
+        val targetRatio = heroRect.width() / heroRect.height()
+        val imgW = photoBitmap.width.toFloat()
+        val imgH = photoBitmap.height.toFloat()
+        val imgRatio = imgW / imgH
+
+        val srcRect = if (imgRatio > targetRatio) {
+            val cropW = imgH * targetRatio
+            val left = (imgW - cropW) / 2f
+            Rect(left.toInt(), 0, (left + cropW).toInt(), photoBitmap.height)
+        } else {
+            val cropH = imgW / targetRatio
+            val top = (imgH - cropH) / 2f
+            Rect(0, top.toInt(), photoBitmap.width, (top + cropH).toInt())
+        }
+
+        val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(photoBitmap, srcRect, heroRect, imagePaint)
+
+        val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.LinearGradient(
+                0f, heroRect.centerY(), 0f, heroRect.bottom,
+                Color.TRANSPARENT, Color.argb(190, 0, 0, 0),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(heroRect, gradientPaint)
+    } else {
+        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+
+        val heroCx = heroRect.centerX()
+        val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
+        val avatarCy = heroRect.centerY() - (scaleFactor * 8f)
+        val avatarTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+        drawAvatarNode(
+            canvas, context, heroCx, avatarCy, avatarRadius,
+            null, contactConfig.initials,
+            accentColorInt, avatarTextColor
+        )
+    }
+    canvas.restore()
+
+    val textPaddingX = scaleFactor * 10f
+    val textPaddingBottom = scaleFactor * 8f
+    val maxHeroTextW = heroRect.width() - (textPaddingX * 2f)
+
+    val nameTextColor = if (photoBitmap != null) Color.WHITE else primaryText
+    val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = nameTextColor
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    var fontSize = (heroRect.height() * 0.22f).coerceIn(scaleFactor * 11f, scaleFactor * 22f)
+    namePaint.textSize = fontSize
+    while (namePaint.measureText(contactConfig.contactName) > maxHeroTextW && fontSize > scaleFactor * 9f) {
+        fontSize -= scaleFactor * 0.8f
+        namePaint.textSize = fontSize
+    }
+
+    val displayName = formatSmartName(contactConfig.contactName, namePaint, maxHeroTextW)
+    val textX = heroRect.left + textPaddingX
+    val textY = heroRect.bottom - textPaddingBottom
+
+    canvas.drawText(displayName, textX, textY, namePaint)
+
+    // --- BOTTOM 3 ACTIONS ---
+    val accentCardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
+    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
+    canvas.drawRoundRect(waRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+
+    val baseIconSize = minOf(
+        callRect.height() * 0.44f,
+        callRect.width() * 0.28f,
+        scaleFactor * 30f
+    ).coerceAtLeast(scaleFactor * 12f)
+
+    val btnTextSize = (callRect.height() * 0.32f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+
+    val callTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = callTextColor
+        textSize = btnTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val msgTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = btnTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
+    }
+
+    val contentGap = scaleFactor * 4f
+    val callTextWidth = callTextPaint.measureText("Call")
+    val msgTextWidth = msgTextPaint.measureText("Msg") // Compact label for 3-col bottom row
+    val waTextWidth = msgTextPaint.measureText("WA")
+
+    val availableW = callRect.width() * 0.90f
+    val showLabels = (baseIconSize + contentGap + callTextWidth <= availableW) &&
+            (baseIconSize + contentGap + msgTextWidth <= availableW) &&
+            (baseIconSize + contentGap + waTextWidth <= availableW)
+
+    if (showLabels) {
+        // Render Call
+        val callW = baseIconSize + contentGap + callTextWidth
+        val callStartX = callRect.centerX() - (callW / 2f)
+        val callTextY = callRect.centerY() - ((callTextPaint.descent() + callTextPaint.ascent()) / 2f)
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callStartX + (baseIconSize / 2f), callRect.centerY(), baseIconSize, callTextColor)
+        canvas.drawText("Call", callStartX + baseIconSize + contentGap, callTextY, callTextPaint)
+
+        // Render Message
+        val msgW = baseIconSize + contentGap + msgTextWidth
+        val msgStartX = msgRect.centerX() - (msgW / 2f)
+        val msgTextY = msgRect.centerY() - ((msgTextPaint.descent() + msgTextPaint.ascent()) / 2f)
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgStartX + (baseIconSize / 2f), msgRect.centerY(), baseIconSize, primaryText)
+        canvas.drawText("Msg", msgStartX + baseIconSize + contentGap, msgTextY, msgTextPaint)
+
+        // Render WhatsApp
+        val waW = baseIconSize + contentGap + waTextWidth
+        val waStartX = waRect.centerX() - (waW / 2f)
+        val waTextY = waRect.centerY() - ((msgTextPaint.descent() + msgTextPaint.ascent()) / 2f)
+        drawVectorIcon(canvas, context, R.drawable.ic_whatsapp, waStartX + (baseIconSize / 2f), waRect.centerY(), baseIconSize, primaryText)
+        canvas.drawText("WA", waStartX + baseIconSize + contentGap, waTextY, msgTextPaint)
+    } else {
+        val iconOnlySize = minOf(
+            callRect.height() * 0.52f,
+            callRect.width() * 0.52f,
+            scaleFactor * 32f
+        ).coerceAtLeast(scaleFactor * 12f)
+
+        drawVectorIcon(canvas, context, R.drawable.ic_phone, callRect.centerX(), callRect.centerY(), iconOnlySize, callTextColor)
+        drawVectorIcon(canvas, context, R.drawable.ic_message, msgRect.centerX(), msgRect.centerY(), iconOnlySize, primaryText)
+        drawVectorIcon(canvas, context, R.drawable.ic_whatsapp, waRect.centerX(), waRect.centerY(), iconOnlySize, primaryText)
     }
 
     return bitmap

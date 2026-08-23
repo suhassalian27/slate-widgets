@@ -1957,6 +1957,39 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2_min" />
         </receiver>
+        <!-- 4. STACKED BENTO CONTACTS (2x2) -->
+        <receiver android:name=".widgets.contacts.ContactsStackedBentoReceiver" android:exported="true" android:label="Slate Stacked Bento Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 5. Editorial 3-Action Bento (4x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsEditorial3ActionBentoReceiver"
+            android:exported="true"
+            android:label="Slate Editorial 3-Action Bento">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+        <!-- 6. Stacked 3-Action Bento (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsStacked3ActionBentoReceiver"
+            android:exported="true"
+            android:label="Slate Stacked 3-Action Bento">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>

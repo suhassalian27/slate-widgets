@@ -80,9 +80,11 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
 
         currentConfig = ContactsWidgetPreferences.loadConfig(this, widgetId)
 
-        // Check if current widget is the 3-Section Bento Widget
+        // Check if current widget is the 3-Section Bento WidgetisMultiActionWidget
         val appWidgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)
-        val is3SectionWidget = appWidgetInfo?.provider?.className?.contains("EditorialBento") == true
+        val isMultiActionWidget = appWidgetInfo?.provider?.className?.let { className ->
+            className.contains("EditorialBento") || className.contains("StackedBento") || className.contains("3Action")
+        } ?: false
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color.Transparent, surface = Color(0xFF0A0A0C))) {
@@ -194,7 +196,7 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                         }
 
                         // Show Tap Action selector ONLY for Single Action Widgets
-                        if (!is3SectionWidget) {
+                        if (!isMultiActionWidget) {
                             Spacer(modifier = Modifier.height(24.dp))
 
                             Text(
