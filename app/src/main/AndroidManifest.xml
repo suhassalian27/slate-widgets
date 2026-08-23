@@ -1990,6 +1990,237 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 7. Full Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsFullPhotoReceiver"
+            android:exported="true"
+            android:label="Slate Full Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 8. Squircle Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsSquircleReceiver"
+            android:exported="true"
+            android:label="Slate Squircle Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 9. Circle Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsCircleReceiver"
+            android:exported="true"
+            android:label="Slate Circle Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 10. Pentagon Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsPentagonReceiver"
+            android:exported="true"
+            android:label="Slate Pentagon Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 11. Octagon Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsOctagonReceiver"
+            android:exported="true"
+            android:label="Slate Octagon Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 12. Diamond Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsDiamondReceiver"
+            android:exported="true"
+            android:label="Slate Diamond Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 13. Flower Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsFlowerReceiver"
+            android:exported="true"
+            android:label="Slate Flower Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 14. Clover Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsCloverReceiver"
+            android:exported="true"
+            android:label="Slate Clover Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 15. Blob Bottom Right Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsBlobBottomRightReceiver"
+            android:exported="true"
+            android:label="Slate Blob Bottom Right Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 16. Blob Bottom Left Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsBlobBottomLeftReceiver"
+            android:exported="true"
+            android:label="Slate Blob Bottom Left Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 17. Blob Top Right Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsBlobTopRightReceiver"
+            android:exported="true"
+            android:label="Slate Blob Top Right Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 18. Blob Top Left Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsBlobTopLeftReceiver"
+            android:exported="true"
+            android:label="Slate Blob Top Left Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 19. Pixel Star Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsPixelStarReceiver"
+            android:exported="true"
+            android:label="Slate Pixel Star Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 20. Star 5 Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsStar5Receiver"
+            android:exported="true"
+            android:label="Slate Star 5 Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 21. Heart Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsHeartReceiver"
+            android:exported="true"
+            android:label="Slate Heart Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 22. Triangle Contact (2x2) -->
+        <receiver
+            android:name=".widgets.contacts.ContactsTriangleReceiver"
+            android:exported="true"
+            android:label="Slate Triangle Contact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 23. 2 Contact Grid -->
+        <receiver android:name=".widgets.contacts.ContactsGrid2Receiver" android:exported="true" android:label="Slate 2 Contact Speed Dial">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 24. 3 Contact Grid -->
+        <receiver android:name=".widgets.contacts.ContactsGrid3Receiver" android:exported="true" android:label="Slate 3 Contact Speed Dial">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x1" />
+        </receiver>
+        <!-- 25. 4 Contact Grid -->
+        <receiver android:name=".widgets.contacts.ContactsGrid4Receiver" android:exported="true" android:label="Slate 4 Contact Speed Dial">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 26. 6 Contact Grid -->
+        <receiver android:name=".widgets.contacts.ContactsGrid6Receiver" android:exported="true" android:label="Slate 6 Contact Speed Dial">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x2" />
+        </receiver>
+        <!-- 27. 8 Contact Grid -->
+        <receiver android:name=".widgets.contacts.ContactsGrid8Receiver" android:exported="true" android:label="Slate 8 Contact Speed Dial">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
 
     </application>
 </manifest>

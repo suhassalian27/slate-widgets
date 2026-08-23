@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +46,7 @@ import java.io.FileOutputStream
 class ContactsWidgetConfigActivity : ComponentActivity() {
 
     private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    private var slotIndex = 0
     private var currentConfig by mutableStateOf(ContactWidgetConfig())
 
     private val contactPickerLauncher = registerForActivityResult(
@@ -78,9 +77,10 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        currentConfig = ContactsWidgetPreferences.loadConfig(this, widgetId)
+        // Extract slot index passed from the receiver
+        slotIndex = intent?.extras?.getInt("extra_slot_index", 0) ?: 0
+        currentConfig = loadSlotConfig(this, widgetId, slotIndex)
 
-        // Check if current widget is the 3-Section Bento WidgetisMultiActionWidget
         val appWidgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)
         val isMultiActionWidget = appWidgetInfo?.provider?.className?.let { className ->
             className.contains("EditorialBento") || className.contains("StackedBento") || className.contains("3Action")
@@ -118,7 +118,7 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                                 modifier = Modifier.clickable { finish() }.padding(vertical = 8.dp)
                             )
                             Text(
-                                text = "Select Contact",
+                                text = if (slotIndex > 0) "Slot ${slotIndex + 1} Contact" else "Select Contact",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -136,7 +136,6 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // Selected Contact Preview Card
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -195,7 +194,6 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // Show Tap Action selector ONLY for Single Action Widgets
                         if (!isMultiActionWidget) {
                             Spacer(modifier = Modifier.height(24.dp))
 
@@ -309,9 +307,7 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                         ContactsContract.Contacts.openContactPhotoInputStream(contentResolver, contactUri, true)?.use { stream ->
                             bitmap = BitmapFactory.decodeStream(stream)
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    } catch (_: Exception) {}
 
                     if (bitmap == null) {
                         val photoUriStr = if (photoUriIndex != -1) cursor.getString(photoUriIndex) else null
@@ -323,9 +319,7 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                                 contentResolver.openInputStream(Uri.parse(targetUriStr))?.use { stream ->
                                     bitmap = BitmapFactory.decodeStream(stream)
                                 }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+                            } catch (_: Exception) {}
                         }
                     }
 
@@ -343,13 +337,11 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                             ContactsContract.Contacts.openContactPhotoInputStream(contentResolver, contactLookupUri, true)?.use { stream ->
                                 bitmap = BitmapFactory.decodeStream(stream)
                             }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+                        } catch (_: Exception) {}
                     }
 
                     if (bitmap != null) {
-                        val photoFile = File(filesDir, "contact_photo_$widgetId.jpg")
+                        val photoFile = File(filesDir, "contact_photo_${widgetId}_slot_${slotIndex}.jpg")
                         FileOutputStream(photoFile).use { out ->
                             bitmap?.compress(Bitmap.CompressFormat.JPEG, 92, out)
                         }
@@ -372,7 +364,15 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
 
     private fun saveAndFinish() {
         if (!currentConfig.isConfigured) return
-        ContactsWidgetPreferences.saveConfig(this, widgetId, currentConfig)
+
+        // Save to specific slot preference key
+        saveSlotConfig(this, widgetId, slotIndex, currentConfig)
+
+        // Keep slot 0 synchronized for single-contact widget fallback
+        if (slotIndex == 0) {
+            ContactsWidgetPreferences.saveConfig(this, widgetId, currentConfig)
+        }
+
         updateAllContactsWidgets(this)
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
         finish()
