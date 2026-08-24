@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.ui.config.AppLauncherConfigActivity
 
 abstract class BaseAppLauncherReceiver : BaseCanvasWidgetProvider() {
 

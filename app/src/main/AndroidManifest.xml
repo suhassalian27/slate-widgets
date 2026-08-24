@@ -161,16 +161,32 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x2" />
         </receiver>
 
+        <!-- ================================================================= -->
+        <!-- APP FOLDER RECEIVERS                                              -->
+        <!-- ================================================================= -->
+        <!-- AppFolder  Widget Configuration Activity -->
+        <activity android:name=".ui.config.AppFolderWidgetConfigActivity" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- 1. 4-App Folder (2x2) -->
+        <receiver android:name=".widgets.appfolder.AppFolder4Receiver" android:exported="true" android:label="Slate 4-App Folder">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 2. 8-App Folder (4x2) -->
+        <receiver android:name=".widgets.appfolder.AppFolder8Receiver" android:exported="true" android:label="Slate 8-App Folder">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2_min" />
+        </receiver>
+
 
         <!-- ================================================================= -->
         <!-- APP LAUNCHER RECEIVERS                                            -->
         <!-- ================================================================= -->
         <!-- AppLauncher  Widget Configuration Activity -->
         <activity
-            android:name=".widgets.applauncher.AppLauncherConfigActivity"
+            android:name=".ui.config.AppLauncherConfigActivity"
             android:exported="true"
-            android:taskAffinity=""
-            android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
@@ -2014,7 +2030,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 9. Circle Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsCircleReceiver"
@@ -2027,7 +2042,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 10. Pentagon Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsPentagonReceiver"
@@ -2040,7 +2054,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 11. Octagon Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsOctagonReceiver"
@@ -2053,7 +2066,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 12. Diamond Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsDiamondReceiver"
@@ -2066,7 +2078,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 13. Flower Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsFlowerReceiver"
@@ -2079,7 +2090,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 14. Clover Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsCloverReceiver"
@@ -2092,7 +2102,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 15. Blob Bottom Right Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsBlobBottomRightReceiver"
@@ -2105,7 +2114,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 16. Blob Bottom Left Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsBlobBottomLeftReceiver"
@@ -2118,7 +2126,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 17. Blob Top Right Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsBlobTopRightReceiver"
@@ -2131,7 +2138,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 18. Blob Top Left Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsBlobTopLeftReceiver"
@@ -2144,7 +2150,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 19. Pixel Star Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsPixelStarReceiver"
@@ -2157,7 +2162,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 20. Star 5 Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsStar5Receiver"
@@ -2170,7 +2174,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 21. Heart Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsHeartReceiver"
@@ -2183,7 +2186,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 22. Triangle Contact (2x2) -->
         <receiver
             android:name=".widgets.contacts.ContactsTriangleReceiver"

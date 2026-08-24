@@ -46,11 +46,14 @@ import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
 import com.altusix.slate.widgets.camera.getCameraWidgetsCatalog
 import com.altusix.slate.widgets.compass.getCompassWidgetsCatalog
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
+import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
 
 import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
         val aiWidgets = getAiWidgetsCatalog()
         val batteryWidgets = getBatteryWidgetsCatalog()
+        val appFolderWidgets = getAppFolderWidgetsCatalog()
         val appLauncherWidgets = getAppLauncherWidgetsCatalog()
         val bluetoothWidgets = getBluetoothWidgetsCatalog()
         val calculatorWidgets = getCalculatorWidgetsCatalog()
@@ -69,7 +73,7 @@ class MainActivity : ComponentActivity() {
         val compassWidgets = getCompassWidgetsCatalog()
         val contactsWidgets = getContactsWidgetsCatalog()
 
-        val categories = listOf("All", "AI", "Battery", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital", "Clock - Hybrid", "Compass", "Contacts")
+        val categories = listOf("All", "AI", "Battery", "App Folder", "App Launcher", "Bluetooth", "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital", "Clock - Hybrid", "Compass", "Contacts")
 
         setContent {
             MaterialTheme(
@@ -84,16 +88,17 @@ class MainActivity : ComponentActivity() {
                 val displayedWidgets = when (selectedCategoryIndex) {
                     1 -> aiWidgets
                     2 -> batteryWidgets
-                    3 -> appLauncherWidgets
-                    4 -> bluetoothWidgets
-                    5 -> calculatorWidgets
-                    6 -> calendarWidgets
-                    7 -> cameraWidgets
-                    8 -> clockWidgets
-                    9 -> clockDigitalWidgets
-                    10 -> clockHybridWidgets
-                    11 -> compassWidgets
-                    12 -> contactsWidgets
+                    3 -> appFolderWidgets
+                    4 -> appLauncherWidgets
+                    5 -> bluetoothWidgets
+                    6 -> calculatorWidgets
+                    7 -> calendarWidgets
+                    8 -> cameraWidgets
+                    9 -> clockWidgets
+                    10 -> clockDigitalWidgets
+                    11 -> clockHybridWidgets
+                    12 -> compassWidgets
+                    13 -> contactsWidgets
                     else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets + calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets + clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets
                 }
 

@@ -66,7 +66,10 @@ import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
 import com.altusix.slate.widgets.clock.digital.updateAllClockDigitalWidgets
 import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
 import com.altusix.slate.widgets.clock.hybrid.updateAllClockHybridWidgets
-
+import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
+import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
+import com.altusix.slate.ui.config.AppFolderWidgetConfigActivity
+import com.altusix.slate.ui.config.AppLauncherConfigActivity
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
 }
@@ -94,6 +97,30 @@ class WidgetConfigActivity : ComponentActivity() {
 
         val widgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
         widgetClassName = widgetInfo?.provider?.className ?: ""
+
+        // Catalog-based routing: Matches all 19 shape launchers and app folders cleanly
+        val isAppFolder = getAppFolderWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        val isAppLauncher = getAppLauncherWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+
+        if (isAppFolder) {
+            val forwardIntent = Intent(this, com.altusix.slate.ui.config.AppFolderWidgetConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
+        if (isAppLauncher) {
+            val forwardIntent = Intent(this, com.altusix.slate.ui.config.AppLauncherConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
 
         setContent {
             SlateConfigTheme {
@@ -556,12 +583,12 @@ private fun generateArcGaugeBitmapPreview(percentage: Int, accentColor: Color, t
 }
 
 @Composable
-private fun SectionTitle(title: String) {
+fun SectionTitle(title: String) {
     Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
 }
 
 @Composable
-private fun SelectableChip(
+fun SelectableChip(
     label: String,
     isSelected: Boolean,
     colorPreview: Color,
@@ -600,7 +627,7 @@ private fun SelectableChip(
 }
 
 @Composable
-private fun RainbowPickerChip(
+fun RainbowPickerChip(
     isSelected: Boolean,
     activeColor: Color?,
     modifier: Modifier = Modifier,
@@ -645,7 +672,7 @@ private fun RainbowPickerChip(
 }
 
 @Composable
-private fun ProfessionalSwatchCircle(
+fun ProfessionalSwatchCircle(
     color: Color,
     isSelected: Boolean,
     onClick: () -> Unit
@@ -696,7 +723,7 @@ private fun ProfessionalSwatchCircle(
 }
 
 @Composable
-private fun RainbowCustomCircle(
+fun RainbowCustomCircle(
     isSelected: Boolean,
     activeColor: Color?,
     onClick: () -> Unit
@@ -758,7 +785,7 @@ private fun RainbowCustomCircle(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ModernOpacitySlider(
+fun ModernOpacitySlider(
     value: Float,
     onValueChange: (Float) -> Unit
 ) {
