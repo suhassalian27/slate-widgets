@@ -544,7 +544,7 @@ fun generateStorageBarCapsule2x1Bitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    val targetRatio = 2.0f
+    val targetRatio = 2.4f
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w.toFloat(), h.toFloat())
     } else {
@@ -776,101 +776,449 @@ fun generateDeviceInfoDashboard4x2Bitmap(
     return bitmap
 }
 
+
+
+// TRUE MINIMAL CAPSULE PILL RENDERER (Full Stadium Rounded, Centered Accent Value)
+private fun generateMinimalCapsulePillBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    displayValue: String,
+    accentOverride: Int? = null
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(density, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val wasRefreshed = isJustRefreshed(context, widgetId)
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = accentOverride ?: (config.accentColorHex.toInt() or 0xFF000000.toInt())
+
+    val targetRatio = 2.4f
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val pillRadius = cardRect.height() / 2f
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.12f
+    val availWidth = cardRect.width() - (padX * 2f)
+
+    val valueSize = (cardRect.height() * 0.42f).coerceIn(scaleFactor * 14f, scaleFactor * 32f)
+    val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = valueSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val bounds = Rect()
+    valuePaint.getTextBounds(displayValue, 0, displayValue.length, bounds)
+    val textY = cardRect.centerY() + (bounds.height() / 2f) - (scaleFactor * 0.5f)
+
+    drawAutoFitText(canvas, displayValue, cardRect.centerX(), textY, availWidth, valuePaint, scaleFactor * 8f)
+
+    if (wasRefreshed) {
+        drawRefreshBadge(canvas, context, cardRect, scaleFactor, accentColorInt)
+    }
+
+    return bitmap
+}
+
+// STRUCTURED INFO CARD RENDERER (Standard Corner Radius, Header + Value + Subtext)
+private fun generateSingleCard2x1Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    label: String,
+    primaryValue: String,
+    subValue: String? = null,
+    accentOverride: Int? = null
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(density, 3.5f)
+
+    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
+    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val wasRefreshed = isJustRefreshed(context, widgetId)
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = accentOverride ?: (config.accentColorHex.toInt() or 0xFF000000.toInt())
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+
+    val targetRatio = 2.4f
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w.toFloat(), h.toFloat())
+    } else {
+        var cardH = h.toFloat()
+        var cardW = cardH * targetRatio
+        if (cardW > w.toFloat()) {
+            cardW = w.toFloat()
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cornerRadius = getStandardCornerRadius(density)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val padX = cardRect.width() * 0.08f
+    val availWidth = cardRect.width() - (padX * 2f)
+
+    val labelSize = (cardRect.height() * 0.13f).coerceIn(scaleFactor * 6f, scaleFactor * 11f)
+    val valueSize = (cardRect.height() * 0.30f).coerceIn(scaleFactor * 11f, scaleFactor * 24f)
+    val subSize = (cardRect.height() * 0.12f).coerceIn(scaleFactor * 6f, scaleFactor * 10.5f)
+
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = labelSize
+        typeface = getSlateFont(context, weight = 700)
+        letterSpacing = 0.05f
+    }
+
+    val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (wasRefreshed) accentColorInt else primaryText
+        textSize = valueSize
+        typeface = getSlateFont(context, weight = 800)
+    }
+
+    val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = subSize
+        typeface = getSlateFont(context, weight = 500)
+        letterSpacing = 0.03f
+    }
+
+    val hasSub = !subValue.isNullOrBlank()
+    val gap = (cardRect.height() * 0.055f).coerceIn(scaleFactor * 5f, scaleFactor * 9f)
+
+    val totalTextH = if (hasSub) (labelSize + gap + valueSize + gap + subSize) else (labelSize + gap + valueSize)
+    val startY = cardRect.centerY() - (totalTextH / 2f)
+
+    val line1Y = startY + labelSize
+    val line2Y = line1Y + gap + valueSize
+
+    drawAutoFitText(canvas, label.uppercase(), cardRect.left + padX, line1Y, availWidth, labelPaint, scaleFactor * 4f)
+    drawAutoFitText(canvas, primaryValue, cardRect.left + padX, line2Y, availWidth, valuePaint, scaleFactor * 6f)
+
+    if (hasSub) {
+        val line3Y = line2Y + gap + subSize
+        drawAutoFitText(canvas, subValue!!, cardRect.left + padX, line3Y, availWidth, subPaint, scaleFactor * 4f)
+    }
+
+    if (wasRefreshed) {
+        drawRefreshBadge(canvas, context, cardRect, scaleFactor, accentColorInt)
+    }
+
+    return bitmap
+}
+
+fun runQuickSpeedBenchmark(context: Context): String {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+    val activeNet = cm?.activeNetwork
+    val caps = cm?.getNetworkCapabilities(activeNet)
+
+    // 1. Verify device is connected to an active network
+    if (caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+        return "Offline"
+    }
+
+    // 2. Try HTTP latency ping
+    var isHttpSuccess = false
+    try {
+        val url = java.net.URL("https://www.google.com/generate_204")
+        val connection = url.openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = 2500
+        connection.readTimeout = 2500
+        connection.instanceFollowRedirects = true
+        connection.connect()
+        val responseCode = connection.responseCode
+        connection.disconnect()
+        if (responseCode == 204 || responseCode == 200) {
+            isHttpSuccess = true
+        }
+    } catch (_: Exception) {}
+
+    // 3. Measure downstream link speed from active hardware interface
+    val downKbps = caps.linkDownstreamBandwidthKbps
+    if (downKbps > 0) {
+        val speedMbps = downKbps / 1000f
+        return if (speedMbps >= 1f) "${String.format("%.1f", speedMbps)} Mbps" else "${downKbps} Kbps"
+    }
+
+    return if (isHttpSuccess) "Connected" else "Offline"
+}
+
 // 4. BATTERY TEMP PILL (2x1)
 fun generateBatteryTempPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    val tempStr = "${String.format("%.1f", info.batteryTempC)}°C"
-    val subStr = if (info.batteryTempC > 40f) "Thermal Warning" else "Normal Temp"
     val accent = if (info.batteryTempC > 40f) Color.parseColor("#FF3B30") else null
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Thermal Status", tempStr, subStr, accent)
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${String.format("%.1f", info.batteryTempC)}°C", accent)
 }
 
 // 5. RAM LOAD PILL (2x1)
 fun generateRamLoadPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    val ramStr = "${String.format("%.1f", info.usedRamGb)} / ${info.totalRamGb.toInt()} GB"
-    val subStr = "${info.ramPct}% Memory Active"
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Memory Load", ramStr, subStr)
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${String.format("%.1f", info.usedRamGb)} / ${info.totalRamGb.toInt()} GB RAM")
 }
 
 // 6. FREE STORAGE PILL (2x1)
 fun generateFreeStoragePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    val freeStr = "${String.format("%.1f", info.freeStorageGb)} GB"
-    val subStr = "Free of ${info.totalStorageGb.toInt()} GB Total"
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Available Storage", freeStr, subStr)
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${String.format("%.1f", info.freeStorageGb)} GB Free")
 }
 
 // 7. SYSTEM UPTIME PILL (2x1)
 fun generateUptimePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "System Runtime", info.uptimeFormatted, "Active Since Last Boot")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${info.uptimeFormatted} Uptime")
 }
 
-// 8. DEVICE IP PILL (2x1) - RENAMED FROM LOCAL IP
+// 8. DEVICE IP PILL (2x1)
 fun generateDeviceIpPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Device IP", info.localIpAddress, "Local Network IPv4")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, info.localIpAddress)
 }
 
 // 9. NETWORK STATUS PILL (2x1)
 fun generateNetworkPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Active Transport", info.networkType, "System Data Route")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, info.networkType)
 }
 
 // 10. REFRESH RATE PILL (2x1)
 fun generateRefreshRatePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Display Mode", "${info.refreshRateHz} Hz", "Adaptive Panel Rate")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${info.refreshRateHz} Hz")
 }
 
 // 11. RESOLUTION PILL (2x1)
 fun generateResolutionPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Panel Resolution", info.resolutionPx, "Native Display Bounds")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, info.resolutionPx)
 }
 
 // 12. ANDROID VERSION PILL (2x1)
 fun generateAndroidVersionPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Operating System", info.androidVersion, "Platform Kernel")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, info.androidVersion)
 }
 
 // 13. DEVICE NAME PILL (2x1)
 fun generateDeviceNamePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Hardware Identity", info.deviceModel, "Device Signature")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, info.deviceModel)
 }
 
 // 14. BATTERY VOLTAGE PILL (2x1)
 fun generateBatteryVoltagePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    val vStr = "${String.format("%.2f", info.batteryVoltageV)} V"
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Battery Voltage", vStr, "Cell Terminal Potential")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${String.format("%.2f", info.batteryVoltageV)} V")
 }
 
 // 15. TIME TO CHARGE PILL (2x1)
 fun generateTimeToChargePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    val subStr = if (info.isCharging) "Power Source Connected" else "Discharging"
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Time To Charge", info.timeToChargeFormatted, subStr)
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, info.timeToChargeFormatted)
 }
 
 // 16. DATA USAGE PILL (2x1)
 fun generateDataUsagePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Data Usage", info.todayMobileDataMb, "Mobile Network Today")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${info.todayMobileDataMb} Mobile")
 }
 
 // 17. WI-FI USAGE PILL (2x1)
 fun generateWifiUsagePill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Wi-Fi Usage", info.todayWifiDataGb, "Wireless Network Today")
+    return generateMinimalCapsulePillBitmap(context, config, isResponsive, wDp, hDp, widgetId, "${info.todayWifiDataGb} Wi-Fi")
 }
 
 // 18. INTERNET SPEED TEST PILL (2x1)
-fun generateSpeedTestPill2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+fun generateSpeedTestPill2x1Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val prefs = context.getSharedPreferences("slate_deviceinfo_prefs", Context.MODE_PRIVATE)
+    val state = prefs.getString("widget_${widgetId}_speed_state", "Speed Test") ?: "Speed Test"
+    val accent = if (state == "Testing...") Color.parseColor("#FF9500") else null
+
+    return generateMinimalCapsulePillBitmap(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        displayValue = state,
+        accentOverride = accent
+    )
+}
+
+// 19. BATTERY TEMP CARD (2x1)
+fun generateBatteryTempCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val info = fetchDeviceInfoData(context)
-    return generateSinglePill2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Internet Speed", info.networkSpeedMbps, "Active Bandwidth")
+    val tempStr = "${String.format("%.1f", info.batteryTempC)}°C"
+    val subStr = if (info.batteryTempC > 40f) "Thermal Warning" else "Normal Temp"
+    val accent = if (info.batteryTempC > 40f) Color.parseColor("#FF3B30") else null
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Thermal Status", tempStr, subStr, accent)
+}
+
+// 20. RAM LOAD CARD (2x1)
+fun generateRamLoadCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    val ramStr = "${String.format("%.1f", info.usedRamGb)} / ${info.totalRamGb.toInt()} GB"
+    val subStr = "${info.ramPct}% Memory Active"
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Memory Load", ramStr, subStr)
+}
+
+// 21. FREE STORAGE CARD (2x1)
+fun generateFreeStorageCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    val freeStr = "${String.format("%.1f", info.freeStorageGb)} GB"
+    val subStr = "Free of ${info.totalStorageGb.toInt()} GB Total"
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Available Storage", freeStr, subStr)
+}
+
+// 22. SYSTEM UPTIME CARD (2x1)
+fun generateUptimeCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "System Runtime", info.uptimeFormatted, "Active Since Last Boot")
+}
+
+// 23. DEVICE IP CARD (2x1)
+fun generateDeviceIpCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Device IP", info.localIpAddress, "Local Network IPv4")
+}
+
+// 24. NETWORK STATUS CARD (2x1)
+fun generateNetworkCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Active Transport", info.networkType, "System Data Route")
+}
+
+// 25. REFRESH RATE CARD (2x1)
+fun generateRefreshRateCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Display Mode", "${info.refreshRateHz} Hz", "Adaptive Panel Rate")
+}
+
+// 26. RESOLUTION CARD (2x1)
+fun generateResolutionCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Panel Resolution", info.resolutionPx, "Native Display Bounds")
+}
+
+// 27. ANDROID VERSION CARD (2x1)
+fun generateAndroidVersionCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Operating System", info.androidVersion, "Platform Kernel")
+}
+
+// 28. DEVICE NAME CARD (2x1)
+fun generateDeviceNameCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Hardware Identity", info.deviceModel, "Device Signature")
+}
+
+// 29. BATTERY VOLTAGE CARD (2x1)
+fun generateBatteryVoltageCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    val vStr = "${String.format("%.2f", info.batteryVoltageV)} V"
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Battery Voltage", vStr, "Cell Terminal Potential")
+}
+
+// 30. TIME TO CHARGE CARD (2x1)
+fun generateTimeToChargeCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    val subStr = if (info.isCharging) "Power Source Connected" else "Discharging"
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Time To Charge", info.timeToChargeFormatted, subStr)
+}
+
+// 31. DATA USAGE CARD (2x1)
+fun generateDataUsageCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Data Usage", info.todayMobileDataMb, "Mobile Network Today")
+}
+
+// 32. WI-FI USAGE CARD (2x1)
+fun generateWifiUsageCard2x1Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val info = fetchDeviceInfoData(context)
+    return generateSingleCard2x1Bitmap(context, config, isResponsive, wDp, hDp, widgetId, "Wi-Fi Usage", info.todayWifiDataGb, "Wireless Network Today")
+}
+
+// 33. INTERNET SPEED TEST CARD (2x1)
+fun generateSpeedTestCard2x1Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val prefs = context.getSharedPreferences("slate_deviceinfo_prefs", Context.MODE_PRIVATE)
+    val state = prefs.getString("widget_${widgetId}_speed_state", "Speed Test") ?: "Speed Test"
+    val subText = when (state) {
+        "Speed Test" -> "Tap to start test"
+        "Testing..." -> "Measuring latency & bandwidth"
+        else -> "Live Download Speed"
+    }
+
+    return generateSingleCard2x1Bitmap(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        label = "Internet Speed",
+        primaryValue = state,
+        subValue = subText
+    )
 }

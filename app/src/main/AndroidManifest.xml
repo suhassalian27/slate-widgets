@@ -2422,6 +2422,141 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+                <action android:name="com.altusix.slate.ACTION_RUN_SPEED_TEST" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 19. Battery Temp Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoBatteryTempCard2x1Receiver" android:exported="true" android:label="Battery Temp Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 20. RAM Load Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoRamLoadCard2x1Receiver" android:exported="true" android:label="RAM Load Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 21. Free Storage Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoFreeStorageCard2x1Receiver" android:exported="true" android:label="Free Storage Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 22. System Uptime Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoUptimeCard2x1Receiver" android:exported="true" android:label="System Uptime Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 23. Device IP Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDeviceIpCard2x1Receiver" android:exported="true" android:label="Device IP Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 24. Network Status Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoNetworkCard2x1Receiver" android:exported="true" android:label="Network Status Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 25. Refresh Rate Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoRefreshRateCard2x1Receiver" android:exported="true" android:label="Refresh Rate Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 26. Resolution Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoResolutionCard2x1Receiver" android:exported="true" android:label="Resolution Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 27. Android Version Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoAndroidVersionCard2x1Receiver" android:exported="true" android:label="Android Version Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 28. Device Name Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDeviceNameCard2x1Receiver" android:exported="true" android:label="Device Name Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 29. Battery Voltage Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoBatteryVoltageCard2x1Receiver" android:exported="true" android:label="Battery Voltage Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 30. Time To Charge Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoTimeToChargeCard2x1Receiver" android:exported="true" android:label="Time To Charge Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 31. Data Usage Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDataUsageCard2x1Receiver" android:exported="true" android:label="Data Usage Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 32. Wi-Fi Usage Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoWifiUsageCard2x1Receiver" android:exported="true" android:label="Wi-Fi Usage Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 33. Internet Speed Test Card (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoSpeedTestCard2x1Receiver" android:exported="true" android:label="Internet Speed Test Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
