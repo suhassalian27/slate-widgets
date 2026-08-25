@@ -2289,7 +2289,6 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 2. Storage & RAM Bars (2x1) -->
         <receiver android:name=".widgets.deviceinfo.DeviceInfoStorageBarCapsule2x1Receiver" android:exported="true" android:label="Slate Storage &amp; RAM Bars">
             <intent-filter>
@@ -2298,7 +2297,6 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
-
         <!-- 3. Device Info Dashboard (4x2) -->
         <receiver android:name=".widgets.deviceinfo.DeviceInfoDashboard4x2Receiver" android:exported="true" android:label="Slate Device Info Dashboard">
             <intent-filter>
@@ -2306,6 +2304,126 @@
                 <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
+        </receiver>
+        <!-- 4. Battery Temp Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoBatteryTemp2x1Receiver" android:exported="true" android:label="Battery Temp Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 5. RAM Load Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoRamLoad2x1Receiver" android:exported="true" android:label="RAM Load Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 6. Free Storage Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoFreeStorage2x1Receiver" android:exported="true" android:label="Free Storage Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 7. System Uptime Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoUptime2x1Receiver" android:exported="true" android:label="System Uptime Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 8. Device IP Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDeviceIp2x1Receiver" android:exported="true" android:label="Device IP Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 9. Network Status Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoNetwork2x1Receiver" android:exported="true" android:label="Network Status Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 10. Refresh Rate Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoRefreshRate2x1Receiver" android:exported="true" android:label="Refresh Rate Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+         <!-- 11. Resolution Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoResolution2x1Receiver" android:exported="true" android:label="Resolution Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 12. Android Version Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoAndroidVersion2x1Receiver" android:exported="true" android:label="Android Version Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 13. Device Name Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDeviceName2x1Receiver" android:exported="true" android:label="Device Name Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 14. Battery Voltage Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoBatteryVoltage2x1Receiver" android:exported="true" android:label="Battery Voltage Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 15. Time To Charge Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoTimeToCharge2x1Receiver" android:exported="true" android:label="Time To Charge Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 16. Data Usage Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDataUsage2x1Receiver" android:exported="true" android:label="Data Usage Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 17. Wi-Fi Usage Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoWifiUsage2x1Receiver" android:exported="true" android:label="Wi-Fi Usage Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+        <!-- 18. Internet Speed Test Pill (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoSpeedTest2x1Receiver" android:exported="true" android:label="Internet Speed Test Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
 
     </application>

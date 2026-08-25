@@ -5,14 +5,26 @@ import android.content.Context
 data class DeviceInfoData(
     val batteryPct: Int = 0,
     val isCharging: Boolean = false,
+    val batteryTempC: Float = 0f,
     val usedStorageGb: Double = 0.0,
     val totalStorageGb: Double = 0.0,
+    val freeStorageGb: Double = 0.0,
     val storagePct: Int = 0,
     val usedRamGb: Double = 0.0,
     val totalRamGb: Double = 0.0,
     val ramPct: Int = 0,
     val deviceModel: String = "",
-    val androidVersion: String = ""
+    val androidVersion: String = "",
+    val uptimeFormatted: String = "",
+    val localIpAddress: String = "",
+    val refreshRateHz: Int = 60,
+    val resolutionPx: String = "",
+    val networkType: String = "",
+    val batteryVoltageV: Float = 0f,
+    val timeToChargeFormatted: String = "Not Charging",
+    val todayMobileDataMb: String = "0 MB",
+    val todayWifiDataGb: String = "0 GB",
+    val networkSpeedMbps: String = "0 Mbps"
 )
 
 data class DeviceInfoWidgetConfig(
