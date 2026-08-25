@@ -176,9 +176,62 @@
         <!-- 2. 8-App Folder (4x2) -->
         <receiver android:name=".widgets.appfolder.AppFolder8Receiver" android:exported="true" android:label="Slate 8-App Folder">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2_min" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
         </receiver>
 
+        <!-- 3. 3-App Horizontal Folder (3x1) -->
+        <receiver android:name=".widgets.appfolder.AppFolderHorizontal3Receiver" android:exported="true" android:label="Slate 3-App Horizontal">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x1" />
+        </receiver>
+
+        <!-- 4. 3-App Vertical Folder (1x3) -->
+        <receiver android:name=".widgets.appfolder.AppFolderVertical3Receiver" android:exported="true" android:label="Slate 3-App Vertical">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_1x3" />
+        </receiver>
+
+        <!-- 5. 4-App Row Folder (4x1) -->
+        <receiver android:name=".widgets.appfolder.AppFolderRow4Receiver" android:exported="true" android:label="Slate 4-App Row">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 6. 5-App Row Folder (5x1) -->
+        <receiver android:name=".widgets.appfolder.AppFolderRow5Receiver" android:exported="true" android:label="Slate 5-App Row">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_5x1" />
+        </receiver>
+
+        <!-- 7. 6-App Circle Dial Folder (2x2) -->
+        <receiver android:name=".widgets.appfolder.AppFolderCircle6Receiver" android:exported="true" android:label="Slate 6-App Circle Dial">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. 7-App Bento Folder (2x2) -->
+        <receiver android:name=".widgets.appfolder.AppFolderBento7Receiver" android:exported="true" android:label="Slate 7-App Bento Folder">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 9. 9-App Grid Folder (3x3) -->
+        <receiver android:name=".widgets.appfolder.AppFolderGrid9Receiver" android:exported="true" android:label="Slate 9-App Grid Folder">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_3x3" />
+        </receiver>
+
+        <!-- 10. 10-App Bento Left Big Folder (4x2) -->
+        <receiver android:name=".widgets.appfolder.AppFolderBento10LeftReceiver" android:exported="true" android:label="Slate 10-App Bento Left">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 11. 10-App Bento Top Big Folder (4x2) -->
+        <receiver android:name=".widgets.appfolder.AppFolderBento10TopReceiver" android:exported="true" android:label="Slate 10-App Bento Top">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
+        </receiver>
 
         <!-- ================================================================= -->
         <!-- APP LAUNCHER RECEIVERS                                            -->
@@ -1938,7 +1991,7 @@
 
         <!-- Contacts Configuration Activity -->
         <activity
-            android:name=".widgets.contacts.ContactsWidgetConfigActivity"
+            android:name=".ui.config.ContactsWidgetConfigActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>

@@ -10,14 +10,14 @@ data class AppSlotConfig(
 
 data class AppFolderWidgetConfig(
     val slotCount: Int = 4,
-    val showAppNames: Boolean = true,
+    val showAppNames: Boolean = false,
     val showTileBackground: Boolean = true,
     val slots: List<AppSlotConfig> = List(8) { AppSlotConfig() }
 ) {
     companion object {
         fun load(context: Context, widgetId: Int, slotCount: Int): AppFolderWidgetConfig {
             val prefs = context.getSharedPreferences("slate_appfolder_prefs", Context.MODE_PRIVATE)
-            val showNames = prefs.getBoolean("widget_${widgetId}_show_names", true)
+            val showNames = prefs.getBoolean("widget_${widgetId}_show_names", false)
             val showTiles = prefs.getBoolean("widget_${widgetId}_show_tiles", true)
 
             val loadedSlots = mutableListOf<AppSlotConfig>()

@@ -12,6 +12,7 @@ import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.ui.config.ContactsWidgetConfigActivity
 
 fun getContactsWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(

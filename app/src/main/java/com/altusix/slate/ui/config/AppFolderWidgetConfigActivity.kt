@@ -44,11 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.widgets.appfolder.AppFolderWidgetConfig
-import com.altusix.slate.widgets.appfolder.AppSlotConfig
-import com.altusix.slate.widgets.appfolder.generateAppFolderGridBitmap
-import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
-import com.altusix.slate.widgets.appfolder.updateAllAppFolderWidgets
+import com.altusix.slate.widgets.appfolder.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -75,7 +71,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
 
         val appWidgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)
         widgetClassName = appWidgetInfo?.provider?.className ?: ""
-        slotCount = if (widgetClassName.contains("Folder8")) 8 else 4
+        slotCount = determineSlotCount(widgetClassName)
 
         setContent {
             SlateConfigTheme {
@@ -139,6 +135,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                         folderConfig = folderConfig,
                         slateConfig = currentSlateConfig,
                         widgetName = widgetName,
+                        widgetClassName = widgetClassName,
                         hasModeOption = hasModeOption,
                         selectedBgHex = selectedBgHex,
                         selectedAccentHex = selectedAccentHex,
@@ -183,6 +180,19 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
         }
     }
 
+    private fun determineSlotCount(className: String): Int {
+        return when {
+            className.contains("10") -> 10
+            className.contains("9") -> 9
+            className.contains("8") -> 8
+            className.contains("7") -> 7
+            className.contains("6") -> 6
+            className.contains("5") -> 5
+            className.contains("3") -> 3
+            else -> 4
+        }
+    }
+
     private fun calculateLuminance(hex: Long): Float {
         val r = ((hex shr 16) and 0xFFL) / 255f
         val g = ((hex shr 8) and 0xFFL) / 255f
@@ -209,6 +219,7 @@ private fun AppFolderConfigSheetContent(
     folderConfig: AppFolderWidgetConfig,
     slateConfig: SlateWidgetConfig,
     widgetName: String,
+    widgetClassName: String,
     hasModeOption: Boolean,
     selectedBgHex: Long,
     selectedAccentHex: Long,
@@ -278,19 +289,22 @@ private fun AppFolderConfigSheetContent(
                 .border(1.dp, Color(0xFF242428), RoundedCornerShape(24.dp)),
             contentAlignment = Alignment.Center
         ) {
-            val previewBitmap = remember(folderConfig, slateConfig, isResponsive) {
-                val previewW = if (slotCount == 8) 220 else 140
-                generateAppFolderGridBitmap(
-                    context,
-                    slateConfig,
-                    folderConfig,
-                    isResponsive,
-                    previewW,
-                    140,
-                    0
-                )
+            val previewBitmap = remember(folderConfig, slateConfig, isResponsive, widgetClassName) {
+                when {
+                    widgetClassName.contains("Horizontal3") -> generateAppFolderHorizontal3Bitmap(context, slateConfig, folderConfig, isResponsive, 180, 80, 0)
+                    widgetClassName.contains("Vertical3") -> generateAppFolderVertical3Bitmap(context, slateConfig, folderConfig, isResponsive, 80, 180, 0)
+                    widgetClassName.contains("Row4") -> generateAppFolderRow4Bitmap(context, slateConfig, folderConfig, isResponsive, 220, 80, 0)
+                    widgetClassName.contains("Row5") -> generateAppFolderRow5Bitmap(context, slateConfig, folderConfig, isResponsive, 240, 80, 0)
+                    widgetClassName.contains("Circle6") -> generateAppFolderCircle6Bitmap(context, slateConfig, folderConfig, isResponsive, 140, 140, 0)
+                    widgetClassName.contains("Bento7") -> generateAppFolderBento7Bitmap(context, slateConfig, folderConfig, isResponsive, 140, 140, 0)
+                    widgetClassName.contains("Grid9") -> generateAppFolderGrid9Bitmap(context, slateConfig, folderConfig, isResponsive, 140, 140, 0)
+                    widgetClassName.contains("Bento10Left") -> generateAppFolderBento10LeftBitmap(context, slateConfig, folderConfig, isResponsive, 220, 120, 0)
+                    widgetClassName.contains("Bento10Top") -> generateAppFolderBento10TopBitmap(context, slateConfig, folderConfig, isResponsive, 220, 120, 0)
+                    widgetClassName.contains("Folder8") -> generateAppFolder8Bitmap(context, slateConfig, folderConfig, isResponsive, 220, 120, 0)
+                    else -> generateAppFolder4Bitmap(context, slateConfig, folderConfig, isResponsive, 130, 130, 0)
+                }
             }
-            Image(bitmap = previewBitmap.asImageBitmap(), contentDescription = "Folder Preview", modifier = Modifier.size(if (slotCount == 8) 190.dp else 120.dp))
+            Image(bitmap = previewBitmap.asImageBitmap(), contentDescription = "Folder Preview", modifier = Modifier.size(if (slotCount >= 8) 190.dp else 130.dp))
         }
 
         Spacer(modifier = Modifier.height(14.dp))

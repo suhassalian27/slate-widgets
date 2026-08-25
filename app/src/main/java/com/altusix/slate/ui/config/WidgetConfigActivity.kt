@@ -70,6 +70,8 @@ import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
 import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
 import com.altusix.slate.ui.config.AppFolderWidgetConfigActivity
 import com.altusix.slate.ui.config.AppLauncherConfigActivity
+import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
+import com.altusix.slate.ui.config.ContactsWidgetConfigActivity
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
 }
@@ -101,6 +103,7 @@ class WidgetConfigActivity : ComponentActivity() {
         // Catalog-based routing: Matches all 19 shape launchers and app folders cleanly
         val isAppFolder = getAppFolderWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         val isAppLauncher = getAppLauncherWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        val isContacts = getContactsWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
 
         if (isAppFolder) {
             val forwardIntent = Intent(this, com.altusix.slate.ui.config.AppFolderWidgetConfigActivity::class.java).apply {
@@ -116,6 +119,15 @@ class WidgetConfigActivity : ComponentActivity() {
             val forwardIntent = Intent(this, com.altusix.slate.ui.config.AppLauncherConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }
                 addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
+        if (isContacts) {
+            val forwardIntent = Intent(this, ContactsWidgetConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
             }
             startActivity(forwardIntent)
             finish()
