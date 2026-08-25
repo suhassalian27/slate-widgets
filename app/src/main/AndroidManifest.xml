@@ -2277,5 +2277,36 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2_min" />
         </receiver>
 
+        <!-- ================================================================= -->
+        <!-- DEVICE INFO WIDGETS                                               SS-->
+        <!-- ================================================================= -->
+
+        <!-- 1. Device Info Mini Bento (2x2) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoMiniBento2x2Receiver" android:exported="true" android:label="Slate Device Info Mini Bento">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 2. Storage & RAM Bars (2x1) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoStorageBarCapsule2x1Receiver" android:exported="true" android:label="Slate Storage &amp; RAM Bars">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 3. Device Info Dashboard (4x2) -->
+        <receiver android:name=".widgets.deviceinfo.DeviceInfoDashboard4x2Receiver" android:exported="true" android:label="Slate Device Info Dashboard">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_REFRESH_DEVICE_INFO" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
     </application>
 </manifest>

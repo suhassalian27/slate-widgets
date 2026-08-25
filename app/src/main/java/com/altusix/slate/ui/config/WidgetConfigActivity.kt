@@ -72,6 +72,8 @@ import com.altusix.slate.ui.config.AppFolderWidgetConfigActivity
 import com.altusix.slate.ui.config.AppLauncherConfigActivity
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
 import com.altusix.slate.ui.config.ContactsWidgetConfigActivity
+import com.altusix.slate.widgets.deviceinfo.updateAllDeviceInfoWidgets
+
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
 }
@@ -269,6 +271,7 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllClockDigitalWidgets(this)
         updateAllClockAnalogWidgets(this)
         updateAllClockHybridWidgets(this)
+        updateAllDeviceInfoWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
