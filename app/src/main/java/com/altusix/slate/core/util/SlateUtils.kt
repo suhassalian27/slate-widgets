@@ -15,7 +15,7 @@ fun getSafeBgColor(config: SlateWidgetConfig): Int {
     return Color.argb(alphaInt, r, g, b)
 }
 
-fun getStandardCornerRadius(density: Float): Float = 22f * density
+fun getStandardCornerRadius(multiplier: Float): Float = 22f * multiplier
 
 fun getSlateFont(
     context: Context,

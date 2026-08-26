@@ -6,7 +6,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
 
 // ============================================================================
@@ -29,56 +28,40 @@ fun getAiAppLaunchPendingIntent(context: Context, packageName: String, requestCo
 // BARS (4x1)
 // ============================================================================
 
-class AiBarPrimaryReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiBarHeroPrimaryBitmap(context, config, wPx, hPx)
-    }
+class AiBarPrimaryReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarHeroPrimaryBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
-            ?: getAiAppLaunchPendingIntent(context, "com.google.android.googlequicksearchbox", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
+            ?: getAiAppLaunchPendingIntent(context, "com.google.android.googlequicksearchbox", widgetId)
     }
 }
 
-class AiBarDock5Receiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiBarDock5Bitmap(context, config, wPx, hPx)
-    }
+class AiBarDock5Receiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarDock5Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
     }
 }
 
-class AiBarCapsuleReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiBarCapsuleBitmap(context, config, wPx, hPx)
-    }
+class AiBarCapsuleReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarCapsuleBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", widgetId)
     }
 }
 
-class AiBarDualFlagshipReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiBarDualFlagshipBitmap(context, config, wPx, hPx)
-    }
+class AiBarDualFlagshipReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarDualFlagshipBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", widgetId)
     }
 }
 
@@ -86,81 +69,57 @@ class AiBarDualFlagshipReceiver : BaseCanvasWidgetProvider() {
 // FOLDERS (2x2 / 4x2)
 // ============================================================================
 
-class AiFolder4ClassicReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiFolder4ClassicBitmap(context, config, wPx, hPx)
-    }
+class AiFolder4ClassicReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder4ClassicBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
     }
 }
 
-class AiFolder6BentoHeroReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiFolder6BentoHeroBitmap(context, config, wPx, hPx)
-    }
+class AiFolder6BentoHeroReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder6BentoHeroBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
     }
 }
 
-class AiFolder8BentoSideReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiFolder8BentoSideBitmap(context, config, wPx, hPx)
-    }
+class AiFolder8BentoSideReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder8BentoSideBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
     }
 }
 
-class AiFolder9GridReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiFolder9GridBitmap(context, config, wPx, hPx)
-    }
+class AiFolder9GridReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder9GridBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
     }
 }
 
-class AiFolder10MegaReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiFolder10MegaBitmap(context, config, wPx, hPx)
-    }
+class AiFolder10MegaReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder10MegaBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
     }
 }
 
-class AiFolder7AsymmetricReceiver : BaseCanvasWidgetProvider() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        return generateAiFolder7AsymmetricBitmap(context, config, wPx, hPx)
-    }
+class AiFolder7AsymmetricReceiver : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder7AsymmetricBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", appWidgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
+        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", widgetId)
     }
 }
 

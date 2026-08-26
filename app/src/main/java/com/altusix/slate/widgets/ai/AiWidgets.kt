@@ -2,104 +2,112 @@
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import androidx.compose.ui.graphics.Color
-import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
-import com.altusix.slate.data.local.SlateWidgetConfig
+import android.os.Bundle
+import android.widget.RemoteViews
+import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
+import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Gemini", "2x2", "AI", GeminiTextReceiver::class.java),
-        SlateWidgetInfo("ChatGPT Text", "2x2", "AI", ChatGptTextReceiver::class.java),
-        SlateWidgetInfo("ChatGPT Voice", "2x2", "AI", ChatGptVoiceReceiver::class.java),
-        SlateWidgetInfo("Claude", "2x2", "AI", ClaudeReceiver::class.java),
-        SlateWidgetInfo("Grok", "2x2", "AI", GrokReceiver::class.java),
-        SlateWidgetInfo("Perplexity", "2x2", "AI", PerplexityReceiver::class.java),
-        SlateWidgetInfo("DeepSeek", "2x2", "AI", DeepSeekReceiver::class.java),
-        SlateWidgetInfo("Copilot", "2x2", "AI", CopilotReceiver::class.java),
-        SlateWidgetInfo("Meta AI", "2x2", "AI", MetaAiReceiver::class.java),
-        SlateWidgetInfo("AI Primary Bar", "4x1", "AI", AiBarPrimaryReceiver::class.java),
-        SlateWidgetInfo("AI Dock Bar", "4x1", "AI", AiBarDock5Receiver::class.java),
-        SlateWidgetInfo("AI Capsule Bar", "4x1", "AI", AiBarCapsuleReceiver::class.java),
-        SlateWidgetInfo("AI Dual Flagship Bar", "4x1", "AI", AiBarDualFlagshipReceiver::class.java),
-        SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java),
-        SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java),
-        SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java),
-        SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java),
-        SlateWidgetInfo("AI Mega Folder", "4x2", "AI", AiFolder10MegaReceiver::class.java),
-        SlateWidgetInfo("AI Asymmetric Bento", "3x2", "AI", AiFolder7AsymmetricReceiver::class.java)
+        SlateWidgetInfo("Gemini", "2x2", "AI", GeminiTextReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("ChatGPT Text", "2x2", "AI", ChatGptTextReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("ChatGPT Voice", "2x2", "AI", ChatGptVoiceReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Claude", "2x2", "AI", ClaudeReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Grok", "2x2", "AI", GrokReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Perplexity", "2x2", "AI", PerplexityReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("DeepSeek", "2x2", "AI", DeepSeekReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Copilot", "2x2", "AI", CopilotReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Meta AI", "2x2", "AI", MetaAiReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Primary Bar", "4x1", "AI", AiBarPrimaryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Dock Bar", "4x1", "AI", AiBarDock5Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Capsule Bar", "4x1", "AI", AiBarCapsuleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Dual Flagship Bar", "4x1", "AI", AiBarDualFlagshipReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("AI Mega Folder", "4x2", "AI", AiFolder10MegaReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Asymmetric Bento", "3x2", "AI", AiFolder7AsymmetricReceiver::class.java, hasModeOption = true)
     )
 }
 
-abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseCanvasWidgetProvider() {
-
-    override fun renderWidgetBitmap(
-        context: Context,
-        appWidgetId: Int,
-        config: SlateWidgetConfig,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val wPx = (wDp * density).toInt()
-        val hPx = (hDp * density).toInt()
-        val isLight = config.themeMode == "LIGHT"
-        val bgColor = Color(config.backgroundColorHex).copy(alpha = config.opacity)
-        val accentColor = Color(config.accentColorHex)
-
-        return generateTileBitmap(
-            context = context,
-            target = target,
-            bgColor = bgColor,
-            accentColor = accentColor,
-            isLight = isLight,
-            shapeStyle = AiShapeStyle.SQUIRCLE,
-            forceSquare = true, // Guarantees 1:1 square ratio for single 1x1 widgets
-            widthPx = wPx,
-            heightPx = hPx
-        )
+abstract class BaseAiReceiver : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        for (widgetId in appWidgetIds) updateWidget(context, appWidgetManager, widgetId)
     }
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
-        val intent = AiLauncherUtils.getLaunchIntent(context, target)
-        return PendingIntent.getActivity(
-            context,
-            appWidgetId,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
+        updateWidget(context, appWidgetManager, appWidgetId)
     }
+
+    fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
+        val options = appWidgetManager.getAppWidgetOptions(widgetId)
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+        val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+        val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_image_container)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pi = getClickPendingIntent(context, widgetId)
+        if (pi != null) views.setOnClickPendingIntent(R.id.widget_image_view, pi)
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+
+    private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
+        val prefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val themeMode = prefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
+        val bgColor = prefs.getLong("widget_${widgetId}_bg_color", 0xFF161618L)
+        val opacity = prefs.getFloat("widget_${widgetId}_opacity", 1.0f)
+        val accentColor = prefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
+        return SlateWidgetConfig(themeMode = themeMode, backgroundColorHex = bgColor, opacity = opacity, accentColorHex = accentColor)
+    }
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        val isResponsiveKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(modeKey)) return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        if (widgetPrefs.contains(isResponsiveKey)) return widgetPrefs.getBoolean(isResponsiveKey, true)
+
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
+        return defaultResponsive
+    }
+
+    abstract fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap
+    open fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? = null
 }
 
-// 1. Gemini Text
+abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseAiReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateSingleAiIconBitmap(context, target, config, isResponsive, wDp, hDp, widgetId)
+    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? =
+        PendingIntent.getActivity(context, widgetId, AiLauncherUtils.getLaunchIntent(context, target), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+}
+
 class GeminiTextReceiver : BaseSingleAiReceiver(AiTarget.GEMINI_TEXT)
-
-// 2. ChatGPT Text
 class ChatGptTextReceiver : BaseSingleAiReceiver(AiTarget.CHATGPT_TEXT)
-
-// 3. ChatGPT Voice
 class ChatGptVoiceReceiver : BaseSingleAiReceiver(AiTarget.CHATGPT_VOICE)
-
-// 4. Claude
 class ClaudeReceiver : BaseSingleAiReceiver(AiTarget.CLAUDE)
-
-// 5. Grok
 class GrokReceiver : BaseSingleAiReceiver(AiTarget.GROK)
-
-// 6. Perplexity
 class PerplexityReceiver : BaseSingleAiReceiver(AiTarget.PERPLEXITY)
-
-// 7. DeepSeek
 class DeepSeekReceiver : BaseSingleAiReceiver(AiTarget.DEEPSEEK)
-
-// 8. Copilot
 class CopilotReceiver : BaseSingleAiReceiver(AiTarget.COPILOT)
-
-// 9. Meta AI
 class MetaAiReceiver : BaseSingleAiReceiver(AiTarget.META_AI)
 
 fun updateAllAiWidgets(context: Context) {
