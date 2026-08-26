@@ -65,7 +65,7 @@ fun WidgetListScreen(
 
     val categories = remember {
         listOf(
-            "All", "AI", "Battery", "App Folder", "App Launcher", "Bluetooth",
+            "All", "AI", "App Folder", "App Launcher", "Battery", "Bluetooth",
             "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital",
             "Clock - Hybrid", "Compass", "Contacts", "Device"
         )
@@ -75,9 +75,9 @@ fun WidgetListScreen(
 
     val displayedWidgets = when (selectedCategoryIndex) {
         1 -> aiWidgets
-        2 -> batteryWidgets
-        3 -> appFolderWidgets
-        4 -> appLauncherWidgets
+        2 -> appFolderWidgets
+        3 -> appLauncherWidgets
+        4 -> batteryWidgets
         5 -> bluetoothWidgets
         6 -> calculatorWidgets
         7 -> calendarWidgets
@@ -88,7 +88,7 @@ fun WidgetListScreen(
         12 -> compassWidgets
         13 -> contactsWidgets
         14 -> deviceInfoWidgets
-        else -> aiWidgets + batteryWidgets + appLauncherWidgets + bluetoothWidgets +
+        else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
                 calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
                 clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets + deviceInfoWidgets
     }
