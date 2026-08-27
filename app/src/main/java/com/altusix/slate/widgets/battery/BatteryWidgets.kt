@@ -14,6 +14,8 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.utils.getSafeBgColor
+import androidx.core.content.ContextCompat
+import com.altusix.slate.core.service.BatteryWidgetService
 
 fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -158,19 +160,39 @@ fun updateAllBatteryWidgets(context: Context) {
 }
 
 abstract class BaseBatteryReceiver : BaseCanvasWidgetProvider() {
+
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        BatteryUpdateWorker.schedule(context)
+        // Start the real-time service when the first widget is placed
+        val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+        ContextCompat.startForegroundService(context, serviceIntent)
+    }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // Ensure the service restarts if the phone reboots or app updates
+        val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+        ContextCompat.startForegroundService(context, serviceIntent)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        BatteryUpdateWorker.cancel(context)
+        // Stop the service when the last widget is removed to save battery
+        val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+        context.stopService(serviceIntent)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         val action = intent.action
+
+        // Failsafe restart of service
+        if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+            ContextCompat.startForegroundService(context, serviceIntent)
+        }
+
+        // Standard system power fallbacks
         if (action == Intent.ACTION_POWER_CONNECTED ||
             action == Intent.ACTION_POWER_DISCONNECTED ||
             action == Intent.ACTION_BATTERY_LOW ||

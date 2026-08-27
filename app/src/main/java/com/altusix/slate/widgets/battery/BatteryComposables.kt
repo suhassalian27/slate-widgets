@@ -1319,25 +1319,29 @@ fun generateWavyLightningBoltBitmap(
     }
     canvas.clipPath(cardClipPath)
 
-    // 2. Proportional scaling and vertical/horizontal centering
-    val scale = if (isWideLayout) {
-        minOf((cardW * 0.45f) / 290f, (cardH * 0.85f) / 372f)
+    // 2. Base scale (Height-driven) to maintain bounds
+    val scaleY = if (isWideLayout) {
+        (cardH * 0.85f) / 372f
     } else {
         minOf((cardW * 0.85f) / 290f, (cardH * 0.85f) / 372f)
     }
 
-    val centerX = if (isWideLayout) cardRect.left + (cardW * 0.75f) else cardRect.centerX()
+    // 3. Subtle widening of the bolt geometry (+15%)
+    val scaleX = scaleY * 1.15f
+
+    // 4. Pin to the right side if wide, otherwise center normally
+    val centerX = if (isWideLayout) cardRect.right - (cardH / 2f) else cardRect.centerX()
     val centerY = cardRect.centerY()
 
-    // 3. Bolt path centered around (centerX, centerY)
+    // 5. Bolt path centered around (centerX, centerY) using independent X/Y scales
     val boltPath = Path().apply {
-        moveTo(centerX - (48f * scale), centerY - (186f * scale))
-        lineTo(centerX + (115f * scale), centerY - (186f * scale))
-        lineTo(centerX - (12f * scale), centerY - (24f * scale))
-        lineTo(centerX + (145f * scale), centerY - (24f * scale))
-        lineTo(centerX - (125f * scale), centerY + (186f * scale))
-        lineTo(centerX - (42f * scale), centerY + (12f * scale))
-        lineTo(centerX - (145f * scale), centerY + (12f * scale))
+        moveTo(centerX - (48f * scaleX), centerY - (186f * scaleY))
+        lineTo(centerX + (115f * scaleX), centerY - (186f * scaleY))
+        lineTo(centerX - (12f * scaleX), centerY - (24f * scaleY))
+        lineTo(centerX + (145f * scaleX), centerY - (24f * scaleY))
+        lineTo(centerX - (125f * scaleX), centerY + (186f * scaleY))
+        lineTo(centerX - (42f * scaleX), centerY + (12f * scaleY))
+        lineTo(centerX - (145f * scaleX), centerY + (12f * scaleY))
         close()
     }
 
@@ -1353,22 +1357,22 @@ fun generateWavyLightningBoltBitmap(
 
     canvas.drawPath(boltPath, dimPaint)
 
-    // 4. Liquid Wave Fill scaled to current center
+    // 6. Liquid Wave Fill scaled to current center
     val fillProgress = data.percentage.coerceIn(0, 100) / 100f
-    val minFillY = centerY + (186f * scale)
-    val maxFillY = centerY - (186f * scale)
+    val minFillY = centerY + (186f * scaleY)
+    val maxFillY = centerY - (186f * scaleY)
     val fillY = minFillY - ((minFillY - maxFillY) * fillProgress)
 
     if (fillProgress > 0f) {
         val wavePath = Path().apply {
-            val waveAmplitude = 10f * scale
-            val waveLength = 250f * scale
+            val waveAmplitude = 10f * scaleY
+            val waveLength = 250f * scaleX
 
-            moveTo(cardRect.left - (100f * scale), fillY)
+            moveTo(cardRect.left - (100f * scaleX), fillY)
 
-            var x = cardRect.left - (100f * scale)
+            var x = cardRect.left - (100f * scaleX)
             var isUp = true
-            while (x < cardRect.right + (100f * scale)) {
+            while (x < cardRect.right + (100f * scaleX)) {
                 val nextX = x + (waveLength / 2f)
                 val midX = x + ((nextX - x) / 2f)
                 val controlY = if (isUp) fillY - waveAmplitude else fillY + waveAmplitude
@@ -1378,8 +1382,8 @@ fun generateWavyLightningBoltBitmap(
                 isUp = !isUp
             }
 
-            lineTo(cardRect.right + (100f * scale), cardRect.bottom + (100f * scale))
-            lineTo(cardRect.left - (100f * scale), cardRect.bottom + (100f * scale))
+            lineTo(cardRect.right + (100f * scaleX), cardRect.bottom + (100f * scaleY))
+            lineTo(cardRect.left - (100f * scaleX), cardRect.bottom + (100f * scaleY))
             close()
         }
 
@@ -1389,7 +1393,7 @@ fun generateWavyLightningBoltBitmap(
         canvas.restore()
     }
 
-    // 5. Wide layout text rendering
+    // 7. Wide layout text rendering
     if (isWideLayout) {
         val padX = leftX + (cardH * 0.12f)
         val padY = topY + (cardH * 0.12f)
