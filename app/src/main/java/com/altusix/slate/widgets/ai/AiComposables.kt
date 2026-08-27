@@ -12,9 +12,9 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import com.altusix.slate.utils.createSupersampledCanvas
 import kotlin.math.cos
 import kotlin.math.sin
-
 
 enum class AiShapeStyle {
     SQUIRCLE,

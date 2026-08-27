@@ -610,7 +610,6 @@ fun generateEarbudsVolumeControlBitmap(
     val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
 
-    // Scale corner radius using scaleFactor to match DeviceInfo perfectly
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
     val rect = if (isResponsive) {
@@ -742,7 +741,7 @@ fun generateEarbudsVolumeControlBitmap(
 
     // Draw Tracking Bar
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (slateConfig.themeMode == "LIGHT") Color(0xFFE5E5EA).toArgb() else Color(0x22FFFFFF).toArgb()
+        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x22FFFFFF).toArgb()
         style = Paint.Style.FILL
     }
     safeCanvas.drawRoundRect(barRect, barH / 2f, barH / 2f, trackPaint)
@@ -758,7 +757,10 @@ fun generateEarbudsVolumeControlBitmap(
         safeCanvas.drawRoundRect(activeBarRect, barH / 2f, barH / 2f, activePaint)
     }
 
-    // Right Rect: Volume Capsule
+    // =========================================================================
+    // RIGHT RECT: VOLUME CAPSULE
+    // =========================================================================
+
     val volCapsuleRadius = rightRect.width() / 2f
     val volBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF222226).toArgb()
@@ -766,7 +768,9 @@ fun generateEarbudsVolumeControlBitmap(
     }
     safeCanvas.drawRoundRect(rightRect, volCapsuleRadius, volCapsuleRadius, volBgPaint)
 
-    val volPct = (deviceData.volumeLevel.coerceIn(0, 100) / 100f)
+    // Fallback: If device volume is 0 or unreadable, default visually to 35% for clean preview
+    val rawVol = deviceData.volumeLevel
+    val volPct = if (rawVol <= 0) 0.35f else (rawVol.coerceIn(0, 100) / 100f)
     val fillHeight = rightRect.height() * volPct
     val fillTop = rightRect.bottom - fillHeight
 
@@ -813,6 +817,7 @@ fun generateEarbudsVolumeControlBitmap(
         }
     }
 
+    // Plus Icon (+)
     val plusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = getIconColor(plusCy)
         strokeWidth = strokeW
@@ -820,8 +825,9 @@ fun generateEarbudsVolumeControlBitmap(
         strokeCap = Paint.Cap.ROUND
     }
     safeCanvas.drawLine(plusCx - iconLen, plusCy, plusCx + iconLen, plusCy, plusPaint)
-    safeCanvas.drawLine(plusCx, plusCy - iconLen, plusCx, plusCx + iconLen, plusPaint)
+    safeCanvas.drawLine(plusCx, plusCy - iconLen, plusCx, plusCy + iconLen, plusPaint)
 
+    // Minus Icon (-)
     val minusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = getIconColor(minusCy)
         strokeWidth = strokeW
