@@ -153,6 +153,30 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
         const val ACTION_VOLUME_DOWN = "com.altusix.slate.ACTION_BT_VOLUME_DOWN"
     }
 
+    // Expose this method for preview generation reflection
+    fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val prefs = context.getSharedPreferences("slate_bluetooth_prefs", Context.MODE_PRIVATE)
+        val prefix = "bluetooth_${appWidgetId}_"
+        val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+            .getBoolean("default_is_responsive", true)
+
+        val isResponsive = if (prefs.contains("${prefix}is_responsive")) {
+            prefs.getBoolean("${prefix}is_responsive", defaultResponsive)
+        } else {
+            prefs.edit().putBoolean("${prefix}is_responsive", defaultResponsive).apply()
+            defaultResponsive
+        }
+
+        val deviceData = BluetoothDataReader.readCurrentDeviceStatus(context)
+        return generateEarbudsVolumeControlBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         when (intent.action) {

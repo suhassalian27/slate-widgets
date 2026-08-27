@@ -342,8 +342,10 @@ fun generateBluetoothCircularDialBitmap(
             gapPctToStatus + statusOpticalH +
             (if (hasLine2) lineSpacing else 0f)
 
+    val blockOffsetY = cardSize * 0.025f
+
     // Center the entire block perfectly to the canvas center (cy)
-    val blockTop = cy - (totalBlockH / 2f)
+    val blockTop = cy - (totalBlockH / 2f) + blockOffsetY
 
     // Component Y placements (Calculated sequentially from top to bottom)
     val earbudCy = blockTop + earbudTopExtent
@@ -530,8 +532,10 @@ fun generateBluetoothRingBitmap(
             elementGap + statusOpticalH +
             (if (hasLine2) lineSpacing else 0f)
 
+    val blockOffsetY = cardSize * 0.025f
+
     // Center the entire block perfectly to the canvas center (cy)
-    val blockTop = cy - (totalBlockH / 2f)
+    val blockTop = cy - (totalBlockH / 2f) + blockOffsetY
 
     // Component Y placements (Calculated sequentially from top to bottom)
     val earbudCy = blockTop + earbudTopExtent
@@ -645,14 +649,14 @@ fun generateEarbudsVolumeControlBitmap(
     // 1. Size Controls
     val baseScale = (leftRect.width() / (64f * density)).coerceAtLeast(0.40f)
     val statusTextSize = leftRect.width() * 0.17f
-    val nameTextSize = leftRect.width() * 0.085f
-    val barH = leftRect.height() * 0.078f
+    val nameTextSize = leftRect.width() * 0.1f
+    val barH = leftRect.height() * 0.09f
     val barW = leftRect.width() * 0.85f
 
     // 2. Gap Controls (Relative to the height of the left section)
-    val gapBudsToStatus = leftRect.height() * 0.03f // Space under the earbud stems
-    val gapStatusToName = leftRect.height() * 0.005f // Space between the texts
-    val gapNameToBar = leftRect.height() * 0.045f // Space above the battery bar
+    val gapBudsToStatus = leftRect.height() * 0.02f // Space under the earbud stems
+    val gapStatusToName = leftRect.height() * 0.002f // Space between the texts
+    val gapNameToBar = leftRect.height() * 0.04f // Space above the battery bar
 
     // =========================================================================
 
@@ -686,8 +690,10 @@ fun generateEarbudsVolumeControlBitmap(
     val totalBlockH = earbudTopExtent + earbudBottomExtent + gapBudsToStatus +
             statusTextHeight + gapStatusToName + nameTextHeight + gapNameToBar + barH
 
+    val blockOffsetY = leftRect.height() * 0.025f
+
     // Center the unified block vertically within the bounds of the left section
-    val blockTop = leftRect.top + (leftRect.height() - totalBlockH) / 2f
+    val blockTop = leftRect.top + (leftRect.height() - totalBlockH) / 2f + blockOffsetY
     val earbudCy = blockTop + earbudTopExtent
 
     val statusTopY = earbudCy + earbudBottomExtent + gapBudsToStatus
@@ -705,7 +711,7 @@ fun generateEarbudsVolumeControlBitmap(
         canvas = canvas,
         cx = leftCx - earbudSpacing,
         cy = earbudCy,
-        angleDeg = -20f,
+        angleDeg = -25f,
         scale = baseScale,
         accentColor = accentColor,
         isLightMode = isLight,
@@ -715,7 +721,7 @@ fun generateEarbudsVolumeControlBitmap(
         canvas = canvas,
         cx = leftCx + earbudSpacing,
         cy = earbudCy,
-        angleDeg = 20f,
+        angleDeg = 25f,
         scale = baseScale,
         accentColor = accentColor,
         isLightMode = isLight,
