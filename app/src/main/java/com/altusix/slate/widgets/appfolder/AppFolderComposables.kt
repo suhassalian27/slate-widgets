@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
@@ -45,15 +46,14 @@ private fun drawSlotContent(
 ) {
     val tileW = tileRect.width()
     val tileH = tileRect.height()
+    val minDim = minOf(tileW, tileH)
     val showText = showAppNames && !isMicro && tileH >= scaleFactor * 32f
 
     val iconRatio = if (showText) 0.46f else 0.58f
-    val iconSize = (minOf(tileW, tileH) * iconRatio).coerceAtLeast(scaleFactor * 12f)
+    val iconSize = (minDim * iconRatio).coerceAtLeast(scaleFactor * 12f)
 
-    // Shift icon slightly up when text is enabled so the icon+text group stays vertically centered
+    // Shift icon slightly up when text is enabled so the group stays vertically centered
     val iconCy = if (showText) tileRect.centerY() - (scaleFactor * 5f) else tileRect.centerY()
-
-    // Place text baseline tightly below the icon bottom
     val gap = scaleFactor * 6f
     val textY = iconCy + (iconSize / 2f) + gap + (scaleFactor * 8f)
 
@@ -81,7 +81,7 @@ private fun drawSlotContent(
                 typeface = getSlateFont(context, weight = 600)
                 textAlign = Paint.Align.CENTER
             }
-            var fontSize = (tileH * 0.11f).coerceIn(scaleFactor * 7f, scaleFactor * 11f)
+            val fontSize = (minDim * 0.11f).coerceIn(scaleFactor * 7f, scaleFactor * 11f)
             textPaint.textSize = fontSize
             canvas.drawText("Add App", tileRect.centerX(), textY, textPaint)
         }
@@ -104,7 +104,7 @@ private fun drawSlotContent(
                 textAlign = Paint.Align.CENTER
             }
             val maxTextWidth = tileW * 0.88f
-            var fontSize = (tileH * 0.12f).coerceIn(scaleFactor * 7f, scaleFactor * 11.5f)
+            var fontSize = (minDim * 0.12f).coerceIn(scaleFactor * 7f, scaleFactor * 11.5f)
             namePaint.textSize = fontSize
             while (namePaint.measureText(slotConfig.appName) > maxTextWidth && fontSize > scaleFactor * 6f) {
                 fontSize -= scaleFactor * 0.5f
@@ -141,31 +141,26 @@ fun generateAppFolderGridBitmap(
         else -> 2
     }
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val slotCount = cols * rows
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
+    val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -173,8 +168,7 @@ fun generateAppFolderGridBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val maxOuterRadius = minOf(cardRect.width(), cardRect.height()) * 0.22f
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxOuterRadius)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -191,8 +185,10 @@ fun generateAppFolderGridBitmap(
     val tileH = availableH / rows
 
     val maxInnerRadius = minOf(tileW, tileH) * 0.22f
-    val calculatedInnerRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 4f)
-    val innerCardRadius = calculatedInnerRadius.coerceAtMost(maxInnerRadius)
+    val innerCardRadius = (outerRadius - pad)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(maxInnerRadius)
+        .coerceAtLeast(0f)
 
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -275,20 +271,28 @@ fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, isR
 fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
     generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 5, rows = 1)
 
-// 7. 6-APP CIRCLE DIAL (2x2)
+// 7. 6-APP CIRCLE DIAL (2x2 - Custom Shape Auto-Lock 1:1)
 fun generateAppFolderCircle6Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w.toFloat(), h.toFloat()) else RectF((w - minOf(w, h)) / 2f, (h - minOf(w, h)) / 2f, (w + minOf(w, h)) / 2f, (h + minOf(w, h)) / 2f)
-    val outerRadius = minOf(cardRect.width(), cardRect.height()) / 2f
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor)); style = Paint.Style.FILL }
+
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+
+    val outerRadius = cardSize / 2f
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
     canvas.drawCircle(cardRect.centerX(), cardRect.centerY(), outerRadius, bgPaint)
+
     val orbitRadius = outerRadius * 0.58f
     val slotRadius = outerRadius * 0.26f
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
@@ -301,7 +305,10 @@ fun generateAppFolderCircle6Bitmap(context: Context, config: SlateWidgetConfig, 
         val tileConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
 
         if (folderConfig.showTileBackground) {
-            val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E"); style = Paint.Style.FILL }
+            val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+                style = Paint.Style.FILL
+            }
             canvas.drawCircle(cx, cy, slotRadius, tilePaint)
         }
 
@@ -325,28 +332,45 @@ fun generateAppFolderBento7Bitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w.toFloat(), h.toFloat()) else RectF((w - minOf(w, h)) / 2f, (h - minOf(w, h)) / 2f, (w + minOf(w, h)) / 2f, (h + minOf(w, h)) / 2f)
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardRect.width(), cardRect.height()) * 0.22f)
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor)); style = Paint.Style.FILL }
+    val margin = scaleFactor * 1.5f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
+
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val pad = scaleFactor * 8f
     val gap = scaleFactor * 8f
     val halfW = (cardRect.width() - (pad * 2f) - gap) / 2f
     val halfH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E"); style = Paint.Style.FILL }
-    val bigRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 4f).coerceAtMost(minOf(halfW, halfH) * 0.22f)
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val bigRadius = (outerRadius - pad)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(halfW, halfH) * 0.22f)
+        .coerceAtLeast(0f)
 
     val bigRects = listOf(
         RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.top + pad + halfH),
@@ -364,7 +388,7 @@ fun generateAppFolderBento7Bitmap(
     val q4Rect = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
     val subW = (q4Rect.width() - gap) / 2f
     val subH = (q4Rect.height() - gap) / 2f
-    val microRadius = (bigRadius * 0.6f).coerceAtLeast(scaleFactor * 3f)
+    val microRadius = (bigRadius * 0.6f).coerceAtLeast(scaleFactor * 4f)
 
     for (i in 0..3) {
         val col = i % 2
@@ -408,25 +432,24 @@ fun generateAppFolderBento10LeftBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
+    val margin = scaleFactor * 1.5f
     val targetRatio = 2.0f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -434,17 +457,26 @@ fun generateAppFolderBento10LeftBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardRect.width(), cardRect.height()) * 0.22f)
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor)); style = Paint.Style.FILL }
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val pad = scaleFactor * 8f
     val gap = scaleFactor * 8f
-    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E"); style = Paint.Style.FILL }
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
 
     val leftW = (cardRect.width() - (pad * 2f) - gap) / 2f
     val bigH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val bigRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 4f).coerceAtMost(minOf(leftW, bigH) * 0.22f)
+    val bigRadius = (outerRadius - pad)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(leftW, bigH) * 0.22f)
+        .coerceAtLeast(0f)
 
     for (i in 0..1) {
         val rect = RectF(cardRect.left + pad, cardRect.top + pad + i * (bigH + gap), cardRect.left + pad + leftW, cardRect.top + pad + i * (bigH + gap) + bigH)
@@ -457,7 +489,7 @@ fun generateAppFolderBento10LeftBitmap(
     val rightW = cardRect.right - pad - rightLeft
     val microW = (rightW - gap) / 2f
     val microH = (cardRect.height() - (pad * 2f) - (gap * 3f)) / 4f
-    val microRadius = (bigRadius * 0.6f).coerceAtLeast(scaleFactor * 3f)
+    val microRadius = (bigRadius * 0.6f).coerceAtLeast(scaleFactor * 4f)
 
     for (i in 0..7) {
         val col = i % 2
@@ -485,25 +517,24 @@ fun generateAppFolderBento10TopBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
+    val margin = scaleFactor * 1.5f
     val targetRatio = 2.0f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -511,17 +542,26 @@ fun generateAppFolderBento10TopBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardRect.width(), cardRect.height()) * 0.22f)
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor)); style = Paint.Style.FILL }
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val pad = scaleFactor * 8f
     val gap = scaleFactor * 8f
-    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E"); style = Paint.Style.FILL }
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
 
     val topH = (cardRect.height() - (pad * 2f) - gap) / 2f
     val bigW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val bigRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 4f).coerceAtMost(minOf(bigW, topH) * 0.22f)
+    val bigRadius = (outerRadius - pad)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(bigW, topH) * 0.22f)
+        .coerceAtLeast(0f)
 
     for (i in 0..1) {
         val rect = RectF(cardRect.left + pad + i * (bigW + gap), cardRect.top + pad, cardRect.left + pad + i * (bigW + gap) + bigW, cardRect.top + pad + topH)
@@ -533,7 +573,7 @@ fun generateAppFolderBento10TopBitmap(
     val bottomTop = cardRect.top + pad + topH + gap
     val microW = (cardRect.width() - (pad * 2f) - (gap * 3f)) / 4f
     val microH = (cardRect.bottom - pad - bottomTop - gap) / 2f
-    val microRadius = (bigRadius * 0.6f).coerceAtLeast(scaleFactor * 3f)
+    val microRadius = (bigRadius * 0.6f).coerceAtLeast(scaleFactor * 4f)
 
     for (i in 0..7) {
         val col = i % 4

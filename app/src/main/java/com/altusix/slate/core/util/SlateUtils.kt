@@ -15,7 +15,7 @@ fun getSafeBgColor(config: SlateWidgetConfig): Int {
     return Color.argb(alphaInt, r, g, b)
 }
 
-fun getStandardCornerRadius(multiplier: Float): Float = 14f * multiplier
+fun getStandardCornerRadius(multiplier: Float): Float = 22f * multiplier
 data class SupersampledCanvas(
     val bitmap: Bitmap,
     val canvas: Canvas,
