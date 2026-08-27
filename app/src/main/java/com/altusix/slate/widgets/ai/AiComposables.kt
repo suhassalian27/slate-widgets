@@ -68,10 +68,19 @@ fun generateTileBitmap(
         val cy = h / 2f
         val halfTile = (minDim / 2f) - margin
 
+        // Rule 4: Outer container corner radius uses scaleFactor
         val outerRadius = getStandardCornerRadius(scaleFactor)
-        val concentricRadius = (outerRadius - margin).coerceAtLeast(minDim * 0.20f)
-        val squircleRadius = outerRadius.coerceAtMost(minDim * 0.26f)
-        val fullCapRadius = (h - (margin * 2f)) / 2f
+
+        // Concentric inner tile radius: (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+        val concentricRadius = (outerRadius - margin)
+            .coerceAtLeast(scaleFactor * 6f)
+            .coerceAtLeast(0f)
+
+        val squircleRadius = outerRadius
+            .coerceAtMost(minDim * 0.26f)
+            .coerceAtLeast(0f)
+
+        val fullCapRadius = ((h - (margin * 2f)) / 2f).coerceAtLeast(0f)
 
         val squareRect = RectF(cx - halfTile, cy - halfTile, cx + halfTile, cy + halfTile)
         val fullRect = RectF(margin, margin, w - margin, h - margin)
@@ -83,7 +92,7 @@ fun generateTileBitmap(
             }
             AiShapeStyle.CIRCLE -> {
                 if (forceSquare) {
-                    val radius = (minDim / 2f) - margin
+                    val radius = ((minDim / 2f) - margin).coerceAtLeast(0f)
                     canvas.drawCircle(cx, cy, radius, bgPaint)
                 } else {
                     canvas.drawRoundRect(fullRect, fullCapRadius, fullCapRadius, bgPaint)
@@ -91,7 +100,7 @@ fun generateTileBitmap(
             }
             AiShapeStyle.HEXAGON -> {
                 val hexPath = Path()
-                val radius = (minDim / 2f) - margin
+                val radius = ((minDim / 2f) - margin).coerceAtLeast(0f)
                 for (i in 0 until 6) {
                     val angle = Math.toRadians((60 * i - 30).toDouble())
                     val x = cx + (radius * cos(angle)).toFloat()
@@ -178,8 +187,9 @@ fun generateTileBitmap(
         val textY = (h / 2f) - (fontMetrics.ascent + fontMetrics.descent) / 2f
         canvas.drawText(customText, w / 2f, textY, textPaint)
     } else if (resId != 0) {
-        val drawable = ContextCompat.getDrawable(context, resId)
-        if (drawable != null) {
+        val rawDrawable = ContextCompat.getDrawable(context, resId)
+        if (rawDrawable != null) {
+            val drawable = androidx.core.graphics.drawable.DrawableCompat.wrap(rawDrawable).mutate()
             val maxLogoSize = minDim * 0.52f
             val actualLogoSize = if (isPrimaryAccent) minDim * 0.58f else maxLogoSize
 
@@ -191,7 +201,11 @@ fun generateTileBitmap(
 
             if (intrinsicW > 0f && intrinsicH > 0f) {
                 val aspectRatio = intrinsicW / intrinsicH
-                if (aspectRatio > 1f) drawH = actualLogoSize / aspectRatio else drawW = actualLogoSize * aspectRatio
+                if (aspectRatio > 1f) {
+                    drawH = actualLogoSize / aspectRatio
+                } else {
+                    drawW = actualLogoSize * aspectRatio
+                }
             }
 
             val left = ((w / 2f) - (drawW / 2f)).toInt()
@@ -200,15 +214,13 @@ fun generateTileBitmap(
             val bottom = ((h / 2f) + (drawH / 2f)).toInt()
 
             drawable.setBounds(left, top, right, bottom)
-            drawable.setTint(logoColor)
+            androidx.core.graphics.drawable.DrawableCompat.setTint(drawable, logoColor)
             drawable.draw(canvas)
         }
     }
 
     return bitmap
 }
-
-
 
 // 1-9 SINGLE AI ICON (2x2)
 fun generateSingleAiIconBitmap(
@@ -220,10 +232,8 @@ fun generateSingleAiIconBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
+    // Standard supersampled canvas destructuring
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -237,182 +247,12 @@ fun generateSingleAiIconBitmap(
         isLight = isLight,
         shapeStyle = AiShapeStyle.SQUIRCLE,
         forceSquare = !isResponsive,
-        widthPx = w,
-        heightPx = h
+        widthPx = canvas.width,
+        heightPx = canvas.height
     )
 }
 
-// 10. AI PRIMARY BAR (4x1)
-fun generateAiBarHeroPrimaryBitmap(
-    context: Context,
-    config: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
-    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-
-    val margin = scaleFactor * 1.5f
-    val targetRatio = 4.0f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        var cardH = h.toFloat() - (margin * 2f)
-        var cardW = cardH * targetRatio
-        if (cardW > w.toFloat() - (margin * 2f)) {
-            cardW = w.toFloat() - (margin * 2f)
-            cardH = cardW / targetRatio
-        }
-        val leftX = (w - cardW) / 2f
-        val topY = (h - cardH) / 2f
-        RectF(leftX, topY, leftX + cardW, topY + cardH)
-    }
-
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val aspectRatio = cardW / cardH
-
-    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        style = Paint.Style.FILL
-    }
-
-    val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
-    val iconTint = if (isLight) Color.BLACK else Color.WHITE
-
-    if (aspectRatio >= 2.0f) {
-        // ================================================================
-        // 1. HORIZONTAL CAPSULE BAR MODE
-        // ================================================================
-        val cornerRadius = cardH / 2f
-        canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
-
-        val pad = cardH * 0.12f
-        val innerH = cardH - (pad * 2f)
-        val innerTopY = cardRect.top + pad
-
-        val gap = innerH * 0.06f
-        val divSpacing = innerH * 0.12f
-
-        val availContentW = cardW - (pad * 2f)
-        val rightTileCount = 3
-        val rightTilesTotalW = (innerH * rightTileCount) + (gap * (rightTileCount - 1))
-
-        val heroW = (availContentW - (divSpacing * 2f) - rightTilesTotalW).toInt().coerceAtLeast((innerH * 1.2f).toInt())
-        val startX = cardRect.left + pad
-
-        // A. Draw Gemini Text-Only Pill
-        val heroBitmap = drawTextOnlyPillBitmap(
-            context = context,
-            labelText = "Gemini",
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            widthPx = heroW,
-            heightPx = innerH.toInt()
-        )
-        canvas.drawBitmap(heroBitmap, startX, innerTopY, null)
-
-        // B. Draw Vertical Divider
-        val divX = startX + heroW + divSpacing
-        val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) Color.parseColor("#26000000") else Color.parseColor("#26FFFFFF")
-            strokeWidth = scaleFactor * 0.8f
-        }
-        canvas.drawLine(divX, cardRect.centerY() - (innerH * 0.28f), divX, cardRect.centerY() + (innerH * 0.28f), divPaint)
-
-        // C. Draw Right Icons (ChatGPT, Claude, Grok)
-        val rightStartX = divX + divSpacing
-        val targets = listOf(
-            Triple(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE, 0),
-            Triple(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE, 1),
-            Triple(AiTarget.GROK, AiShapeStyle.CAPSULE_RIGHT, 2)
-        )
-
-        for ((target, shape, index) in targets) {
-            val tileX = rightStartX + index * (innerH + gap)
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = iconTint,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = innerH.toInt(),
-                heightPx = innerH.toInt()
-            )
-            canvas.drawBitmap(tile, tileX, innerTopY, null)
-        }
-
-    } else {
-        // ================================================================
-        // 2. TALL / SQUARE RESPONSIVE BENTO MODE
-        // ================================================================
-        val cornerRadius = getStandardCornerRadius(scaleFactor)
-        canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
-
-        val pad = minOf(cardW, cardH) * 0.06f
-        val gap = minOf(cardW, cardH) * 0.035f
-
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
-
-        val topH = ((availH - gap) * 0.48f).toInt().coerceAtLeast(1)
-        val botH = (availH - gap - topH).toInt().coerceAtLeast(1)
-
-        val startX = cardRect.left + pad
-        val startY = cardRect.top + pad
-
-        // Row 1: Gemini Text-Only Pill
-        val heroBitmap = drawTextOnlyPillBitmap(
-            context = context,
-            labelText = "Gemini",
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            widthPx = availW.toInt(),
-            heightPx = topH
-        )
-        canvas.drawBitmap(heroBitmap, startX, startY, null)
-
-        // Row 2: ChatGPT, Claude, Grok Icons (Concentric corner shape mapping)
-        val botTileW = ((availW - (gap * 2f)) / 3f).toInt().coerceAtLeast(1)
-        val botY = startY + topH + gap
-
-        val bottomTargets = listOf(
-            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.CORNER_BOTTOM_LEFT),
-            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.GROK, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-        )
-
-        bottomTargets.forEachIndexed { i, (target, shape) ->
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = iconTint,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = botTileW,
-                heightPx = botH
-            )
-            val bx = startX + i * (botTileW + gap)
-            canvas.drawBitmap(tile, bx, botY, null)
-        }
-    }
-
-    return bitmap
-}
 
 private fun drawTextOnlyPillBitmap(
     context: Context,
@@ -446,11 +286,19 @@ private fun drawTextOnlyPillBitmap(
     }
     canvas.drawRoundRect(rect, capsuleRadius, capsuleRadius, bgPaint)
 
+    var textSize = h * 0.38f
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = contentColor
-        textSize = h * 0.38f
+        this.textSize = textSize
         typeface = getSlateFont(context, weight = 600)
         textAlign = Paint.Align.CENTER
+    }
+
+    // Auto-fit guard to prevent text clipping in narrow pills
+    val maxTextW = w - (capsuleRadius * 1.2f)
+    val measuredW = textPaint.measureText(labelText)
+    if (measuredW > maxTextW && maxTextW > 0f) {
+        textPaint.textSize = textSize * (maxTextW / measuredW)
     }
 
     val fontMetrics = textPaint.fontMetrics
@@ -546,36 +394,182 @@ private fun drawPillBaseBitmap(
     return bitmap
 }
 
-// 11. AI DOCK BAR (4x1)
-fun generateAiBarDock5Bitmap(
-    context: Context,
-    config: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+// 10. AI PRIMARY BAR (4x1)
+fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = 4.0f
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat() - (margin * 2f)
+        val targetRatio = 4.0f
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat() - (margin * 2f)) {
-            cardW = w.toFloat() - (margin * 2f)
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspectRatio = cardW / cardH
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+
+    val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
+    val iconTint = if (isLight) Color.BLACK else Color.WHITE
+
+    if (aspectRatio >= 2.0f) {
+        val cornerRadius = cardH / 2f
+        canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+        val pad = cardH * 0.08f
+        val baseInnerH = cardH - (pad * 2f)
+        val availW = cardW - (pad * 2f)
+
+        // Mathematical width guard: Clamp innerH so total horizontal elements fit inside availW
+        val maxInnerHFromWidth = availW / 5.1f
+        val innerH = minOf(baseInnerH, maxInnerHFromWidth)
+
+        val heroW = innerH * 1.6f
+        val divSpacing = innerH * 0.12f
+        val gap = innerH * 0.06f
+        val rightTileW = innerH
+
+        val totalGroupW = heroW + (divSpacing * 2f) + (rightTileW * 3f) + (gap * 2f)
+
+        // Center group both horizontally and vertically inside cardRect
+        val startX = cardRect.left + (cardW - totalGroupW) / 2f
+        val innerTopY = cardRect.top + (cardH - innerH) / 2f
+
+        // A. Gemini Hero Pill
+        val heroBitmap = drawTextOnlyPillBitmap(
+            context = context,
+            labelText = "Gemini",
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            widthPx = heroW.toInt(),
+            heightPx = innerH.toInt()
+        )
+        canvas.drawBitmap(heroBitmap, startX, innerTopY, null)
+
+        // B. Vertical Divider
+        val divX = startX + heroW + divSpacing
+        val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.parseColor("#26000000") else Color.parseColor("#26FFFFFF")
+            strokeWidth = scaleFactor * 0.8f
+        }
+        canvas.drawLine(divX, cardRect.centerY() - (innerH * 0.28f), divX, cardRect.centerY() + (innerH * 0.28f), divPaint)
+
+        // C. Right Icon Tiles
+        val rightStartX = divX + divSpacing
+        val targets = listOf(
+            Triple(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE, 0),
+            Triple(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE, 1),
+            Triple(AiTarget.GROK, AiShapeStyle.CAPSULE_RIGHT, 2)
+        )
+
+        for ((target, shape, index) in targets) {
+            val tileX = rightStartX + index * (rightTileW + gap)
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = iconTint,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = rightTileW.toInt(),
+                heightPx = innerH.toInt()
+            )
+            canvas.drawBitmap(tile, tileX, innerTopY, null)
+        }
+    } else {
+        val cornerRadius = getStandardCornerRadius(scaleFactor)
+        canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+        val pad = minOf(cardW, cardH) * 0.06f
+        val gap = minOf(cardW, cardH) * 0.035f
+
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
+
+        val topH = ((availH - gap) * 0.48f).toInt().coerceAtLeast(1)
+        val botH = (availH - gap - topH).toInt().coerceAtLeast(1)
+
+        val startX = cardRect.left + pad
+        val startY = cardRect.top + pad
+
+        val heroBitmap = drawTextOnlyPillBitmap(
+            context = context,
+            labelText = "Gemini",
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            widthPx = availW.toInt(),
+            heightPx = topH
+        )
+        canvas.drawBitmap(heroBitmap, startX, startY, null)
+
+        val botTileW = ((availW - (gap * 2f)) / 3f).toInt().coerceAtLeast(1)
+        val botY = startY + topH + gap
+
+        val bottomTargets = listOf(
+            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.CORNER_BOTTOM_LEFT),
+            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.GROK, AiShapeStyle.CORNER_BOTTOM_RIGHT)
+        )
+
+        bottomTargets.forEachIndexed { i, (target, shape) ->
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = iconTint,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = botTileW,
+                heightPx = botH
+            )
+            val bx = startX + i * (botTileW + gap)
+            canvas.drawBitmap(tile, bx, botY, null)
+        }
+    }
+
+    return bitmap
+}
+
+// 11. AI DOCK BAR (4x1)
+fun generateAiBarDock5Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val margin = scaleFactor * 1.5f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 4.0f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -597,14 +591,16 @@ fun generateAiBarDock5Bitmap(
     val iconTint = accentColorInt
 
     if (aspectRatio >= 2.0f) {
-        // ================================================================
-        // 1. HORIZONTAL CAPSULE BAR MODE
-        // ================================================================
         val cornerRadius = cardH / 2f
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-        val pad = cardH * 0.12f
-        val baseInnerH = cardH - (pad * 2f)
+        // Equal padding on all 4 sides
+        val pad = cardH * 0.08f
+        val innerH = cardH - (pad * 2f)
+        val availW = cardW - (pad * 2f)
+
+        val startX = cardRect.left + pad
+        val innerTopY = cardRect.top + pad
 
         val list = listOf(
             AiTarget.GEMINI_TEXT,
@@ -614,27 +610,8 @@ fun generateAiBarDock5Bitmap(
             AiTarget.PERPLEXITY
         )
 
-        val availContentW = cardW - (pad * 2f)
-        val gapRatio = 0.08f
-        val minGap = baseInnerH * gapRatio
-        val requiredW = 5 * baseInnerH + 4 * minGap
-
-        val innerH = if (requiredW > availContentW) {
-            (availContentW / (5f + 4 * gapRatio)).coerceAtLeast(scaleFactor * 12f)
-        } else {
-            baseInnerH
-        }
-
-        val gap = innerH * gapRatio
-        val tileW = if (requiredW > availContentW) {
-            innerH
-        } else {
-            (availContentW - 4 * gap) / 5f
-        }
-
-        val innerTopY = cardRect.centerY() - (innerH / 2f)
-        val totalGroupW = 5 * tileW + 4 * gap
-        val startX = cardRect.left + (cardW - totalGroupW) / 2f
+        val gap = innerH * 0.06f
+        val tileW = (availW - (gap * 4f)) / 5f
 
         list.forEachIndexed { index, target ->
             val tileShape = when (index) {
@@ -656,9 +633,6 @@ fun generateAiBarDock5Bitmap(
             canvas.drawBitmap(tile, xPos, innerTopY, null)
         }
     } else {
-        // ================================================================
-        // 2. TALL / SQUARE RESPONSIVE BENTO MODE
-        // ================================================================
         val cornerRadius = getStandardCornerRadius(scaleFactor)
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
@@ -674,7 +648,6 @@ fun generateAiBarDock5Bitmap(
         val startX = cardRect.left + pad
         val startY = cardRect.top + pad
 
-        // Row 1: Gemini & ChatGPT (Concentric outer corner shapes)
         val topTileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
         val topTargets = listOf(
             Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
@@ -695,7 +668,6 @@ fun generateAiBarDock5Bitmap(
             canvas.drawBitmap(tile, bx, startY, null)
         }
 
-        // Row 2: Claude, Grok, Perplexity (Concentric outer corner shapes)
         val botTileW = ((availW - (gap * 2f)) / 3f).toInt().coerceAtLeast(1)
         val botY = startY + topH + gap
         val botTargets = listOf(
@@ -723,35 +695,24 @@ fun generateAiBarDock5Bitmap(
 }
 
 // 12. AI CAPSULE BAR (4x1)
-fun generateAiBarCapsuleBitmap(
-    context: Context,
-    config: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateAiBarCapsuleBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = 4.0f
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat() - (margin * 2f)
+        val targetRatio = 4.0f
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat() - (margin * 2f)) {
-            cardW = w.toFloat() - (margin * 2f)
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -772,14 +733,16 @@ fun generateAiBarCapsuleBitmap(
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
 
     if (aspectRatio >= 2.0f) {
-        // ================================================================
-        // 1. HORIZONTAL CAPSULE BAR MODE
-        // ================================================================
         val cornerRadius = cardH / 2f
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-        val pad = cardH * 0.12f
-        val baseInnerH = cardH - (pad * 2f)
+        // Equal padding on all 4 sides
+        val pad = cardH * 0.08f
+        val innerH = cardH - (pad * 2f)
+        val availW = cardW - (pad * 2f)
+
+        val startX = cardRect.left + pad
+        val innerTopY = cardRect.top + pad
 
         val items = listOf(
             Triple(AiTarget.CHATGPT_VOICE, AiShapeStyle.CAPSULE_LEFT, true),
@@ -788,27 +751,8 @@ fun generateAiBarCapsuleBitmap(
             Triple(AiTarget.GEMINI_TEXT, AiShapeStyle.CAPSULE_RIGHT, true)
         )
 
-        val availContentW = cardW - (pad * 2f)
-        val gapRatio = 0.08f
-        val minGap = baseInnerH * gapRatio
-        val requiredW = 4 * baseInnerH + 3 * minGap
-
-        val innerH = if (requiredW > availContentW) {
-            (availContentW / (4f + 3 * gapRatio)).coerceAtLeast(scaleFactor * 12f)
-        } else {
-            baseInnerH
-        }
-
-        val gap = innerH * gapRatio
-        val tileW = if (requiredW > availContentW) {
-            innerH
-        } else {
-            (availContentW - 3 * gap) / 4f
-        }
-
-        val innerTopY = cardRect.centerY() - (innerH / 2f)
-        val totalGroupW = 4 * tileW + 3 * gap
-        val startX = cardRect.left + (cardW - totalGroupW) / 2f
+        val gap = innerH * 0.06f
+        val tileW = (availW - (gap * 3f)) / 4f
 
         items.forEachIndexed { index, (target, shape, isAccent) ->
             val tile = generateTileBitmap(
@@ -826,9 +770,6 @@ fun generateAiBarCapsuleBitmap(
             canvas.drawBitmap(tile, xPos, innerTopY, null)
         }
     } else {
-        // ================================================================
-        // 2. TALL / SQUARE RESPONSIVE BENTO MODE
-        // ================================================================
         val cornerRadius = getStandardCornerRadius(scaleFactor)
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
@@ -844,7 +785,6 @@ fun generateAiBarCapsuleBitmap(
         val startX = cardRect.left + pad
         val startY = cardRect.top + pad
 
-        // Row 1: Primary Accents (ChatGPT Voice & Gemini) - Concentric outer corner shapes
         val tileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
         val topItems = listOf(
             Triple(AiTarget.CHATGPT_VOICE, AiShapeStyle.CORNER_TOP_LEFT, true),
@@ -866,7 +806,6 @@ fun generateAiBarCapsuleBitmap(
             canvas.drawBitmap(tile, bx, startY, null)
         }
 
-        // Row 2: Secondary Tiles (Perplexity & Claude) - Concentric outer corner shapes
         val botY = startY + topH + gap
         val botItems = listOf(
             Triple(AiTarget.PERPLEXITY, AiShapeStyle.CORNER_BOTTOM_LEFT, false),
@@ -893,35 +832,24 @@ fun generateAiBarCapsuleBitmap(
 }
 
 // 13. AI DUAL FLAGSHIP BAR (4x1)
-fun generateAiBarDualFlagshipBitmap(
-    context: Context,
-    config: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateAiBarDualFlagshipBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = 4.0f
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat() - (margin * 2f)
+        val targetRatio = 4.0f
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat() - (margin * 2f)) {
-            cardW = w.toFloat() - (margin * 2f)
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -940,21 +868,19 @@ fun generateAiBarDualFlagshipBitmap(
     }
 
     if (aspectRatio >= 2.0f) {
-        // ================================================================
-        // 1. HORIZONTAL CAPSULE BAR MODE
-        // ================================================================
         val cornerRadius = cardH / 2f
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-        val pad = cardH * 0.12f
+        // Equal padding on all 4 sides
+        val pad = cardH * 0.08f
         val innerH = cardH - (pad * 2f)
-        val innerTopY = cardRect.centerY() - (innerH / 2f)
+        val availW = cardW - (pad * 2f)
 
-        val availContentW = cardW - (pad * 2f)
-        val gap = innerH * 0.10f
-        val pillW = ((availContentW - gap) / 2f).toInt().coerceAtLeast(1)
-
+        val innerTopY = cardRect.top + pad
         val startX = cardRect.left + pad
+
+        val gap = innerH * 0.08f
+        val pillW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
 
         // GPT Pill
         val leftPill = drawPillBaseBitmap(
@@ -982,9 +908,6 @@ fun generateAiBarDualFlagshipBitmap(
         )
         canvas.drawBitmap(rightPill, startX + pillW + gap, innerTopY, null)
     } else {
-        // ================================================================
-        // 2. TALL / SQUARE RESPONSIVE BENTO MODE
-        // ================================================================
         val cornerRadius = getStandardCornerRadius(scaleFactor)
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
@@ -1036,13 +959,9 @@ fun generateAiFolder4ClassicBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1052,7 +971,7 @@ fun generateAiFolder4ClassicBitmap(
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        val size = minOf(w, h).toFloat() - (margin * 2f)
+        val size = minOf(w, h) - (margin * 2f)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
@@ -1122,13 +1041,9 @@ fun generateAiFolder6BentoHeroBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1138,10 +1053,10 @@ fun generateAiFolder6BentoHeroBitmap(
     val targetRatio = 2.0f
 
     // Always enforce fixed 2:1 aspect ratio container to prevent vertical clipping
-    var cardH = h.toFloat() - (margin * 2f)
+    var cardH = h - (margin * 2f)
     var cardW = cardH * targetRatio
-    if (cardW > w.toFloat() - (margin * 2f)) {
-        cardW = w.toFloat() - (margin * 2f)
+    if (cardW > w - (margin * 2f)) {
+        cardW = w - (margin * 2f)
         cardH = cardW / targetRatio
     }
     val leftX = (w - cardW) / 2f
@@ -1233,13 +1148,9 @@ fun generateAiFolder8BentoSideBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1249,10 +1160,10 @@ fun generateAiFolder8BentoSideBitmap(
     val targetRatio = 2.0f
 
     // Enforce fixed 2:1 aspect ratio container to eliminate empty black space
-    var cardH = h.toFloat() - (margin * 2f)
+    var cardH = h - (margin * 2f)
     var cardW = cardH * targetRatio
-    if (cardW > w.toFloat() - (margin * 2f)) {
-        cardW = w.toFloat() - (margin * 2f)
+    if (cardW > w - (margin * 2f)) {
+        cardW = w - (margin * 2f)
         cardH = cardW / targetRatio
     }
     val leftX = (w - cardW) / 2f
@@ -1354,13 +1265,9 @@ fun generateAiFolder9GridBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1370,7 +1277,7 @@ fun generateAiFolder9GridBitmap(
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        val size = minOf(w, h).toFloat() - (margin * 2f)
+        val size = minOf(w, h) - (margin * 2f)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
@@ -1407,7 +1314,7 @@ fun generateAiFolder9GridBitmap(
     return bitmap
 }
 
-// 18. AI MEGA FOLDER (4x2 / Fixed 2:1)
+// 18. AI MEGA FOLDER (4x2 / Adaptive Aspect Ratio)
 fun generateAiFolder10MegaBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1416,30 +1323,33 @@ fun generateAiFolder10MegaBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = 2.0f
-
-    var cardH = h.toFloat() - (margin * 2f)
-    var cardW = cardH * targetRatio
-    if (cardW > w.toFloat() - (margin * 2f)) {
-        cardW = w.toFloat() - (margin * 2f)
-        cardH = cardW / targetRatio
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
-    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspectRatio = cardW / cardH
 
     val cornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
@@ -1449,72 +1359,122 @@ fun generateAiFolder10MegaBitmap(
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-    // Lock padding and gap relative to cardH so top/bottom/left/right paddings and gaps are identical
-    val pad = cardH * 0.05f
-    val gap = cardH * 0.02f
-
-    val availW = cardW - (pad * 2f)
-    val availH = cardH - (pad * 2f)
-
-    // Expand tile dimensions to fill 100% of the remaining container
-    val tileW = ((availW - (gap * 4f)) / 5f).toInt().coerceAtLeast(1)
-    val tileH = ((availH - gap) / 2f).toInt().coerceAtLeast(1)
-
-    val startX = cardRect.left + pad
-    val startY = cardRect.top + pad
-
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
 
-    val row1 = listOf(
-        Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
-        Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.GROK, AiShapeStyle.CORNER_TOP_RIGHT)
-    )
-    val row2 = listOf(
-        Pair(AiTarget.PERPLEXITY, AiShapeStyle.CORNER_BOTTOM_LEFT),
-        Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.META_AI, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.POE, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.PI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-    )
+    if (aspectRatio >= 1.1f) {
+        // ================================================================
+        // 1. WIDE MODE (5 Columns x 2 Rows)
+        // ================================================================
+        val pad = cardH * 0.05f
+        val gap = cardH * 0.02f
 
-    row1.forEachIndexed { i, (target, shape) ->
-        val tile = generateTileBitmap(
-            context = context,
-            target = target,
-            bgColorInt = tileBgColor,
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            shapeStyle = shape,
-            widthPx = tileW,
-            heightPx = tileH
-        )
-        val x = startX + i * (tileW + gap)
-        canvas.drawBitmap(tile, x, startY, null)
-    }
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
 
-    val row2Y = startY + tileH + gap
-    row2.forEachIndexed { i, (target, shape) ->
-        val tile = generateTileBitmap(
-            context = context,
-            target = target,
-            bgColorInt = tileBgColor,
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            shapeStyle = shape,
-            widthPx = tileW,
-            heightPx = tileH
+        val tileW = ((availW - (gap * 4f)) / 5f).toInt().coerceAtLeast(1)
+        val tileH = ((availH - gap) / 2f).toInt().coerceAtLeast(1)
+
+        val startX = cardRect.left + pad
+        val startY = cardRect.top + pad
+
+        val row1 = listOf(
+            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
+            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.GROK, AiShapeStyle.CORNER_TOP_RIGHT)
         )
-        val x = startX + i * (tileW + gap)
-        canvas.drawBitmap(tile, x, row2Y, null)
+        val row2 = listOf(
+            Pair(AiTarget.PERPLEXITY, AiShapeStyle.CORNER_BOTTOM_LEFT),
+            Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.META_AI, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.POE, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.PI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
+        )
+
+        row1.forEachIndexed { i, (target, shape) ->
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = accentColorInt,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = tileW,
+                heightPx = tileH
+            )
+            val x = startX + i * (tileW + gap)
+            canvas.drawBitmap(tile, x, startY, null)
+        }
+
+        val row2Y = startY + tileH + gap
+        row2.forEachIndexed { i, (target, shape) ->
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = accentColorInt,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = tileW,
+                heightPx = tileH
+            )
+            val x = startX + i * (tileW + gap)
+            canvas.drawBitmap(tile, x, row2Y, null)
+        }
+    } else {
+        // ================================================================
+        // 2. TALL / VERTICAL MODE (2 Columns x 5 Rows)
+        // ================================================================
+        val pad = cardW * 0.06f
+        val gap = cardW * 0.035f
+
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
+
+        val tileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
+        val tileH = ((availH - (gap * 4f)) / 5f).toInt().coerceAtLeast(1)
+
+        val startX = cardRect.left + pad
+        val startY = cardRect.top + pad
+
+        val items = listOf(
+            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
+            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.CORNER_TOP_RIGHT),
+            Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.GROK, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.META_AI, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.POE, AiShapeStyle.CORNER_BOTTOM_LEFT),
+            Pair(AiTarget.PI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
+        )
+
+        items.forEachIndexed { i, (target, shape) ->
+            val r = i / 2
+            val c = i % 2
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = accentColorInt,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = tileW,
+                heightPx = tileH
+            )
+            val x = startX + c * (tileW + gap)
+            val y = startY + r * (tileH + gap)
+            canvas.drawBitmap(tile, x, y, null)
+        }
     }
 
     return bitmap
 }
 
-// 19. AI ASYMMETRIC BENTO (3x2 / Fixed 1.5:1)
+
+// 19. AI ASYMMETRIC BENTO (3x2 / Adaptive Aspect Ratio)
 fun generateAiFolder7AsymmetricBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1523,31 +1483,33 @@ fun generateAiFolder7AsymmetricBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = 1.5f
-
-    // Enforce fixed 1.5:1 aspect ratio container to eliminate empty black space
-    var cardH = h.toFloat() - (margin * 2f)
-    var cardW = cardH * targetRatio
-    if (cardW > w.toFloat() - (margin * 2f)) {
-        cardW = w.toFloat() - (margin * 2f)
-        cardH = cardW / targetRatio
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 1.5f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
-    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspectRatio = cardW / cardH
 
     val cornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
@@ -1557,92 +1519,150 @@ fun generateAiFolder7AsymmetricBitmap(
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-    // Inner padding and gap calculations
-    val pad = minOf(cardW, cardH) * 0.08f
-    val gap = minOf(cardW, cardH) * 0.035f
-
-    val availW = cardW - (pad * 2f)
-    val availH = cardH - (pad * 2f)
-
-    // Vertical distribution: 64% height for top bento area, 36% for bottom row
-    val topH = ((availH - gap) * 0.64f).toInt().coerceAtLeast(1)
-    val botH = (availH - gap - topH).toInt().coerceAtLeast(1)
-
-    // Horizontal distribution for top section: Hero tile + 1 column of 2 stacked small tiles
-    val rightColW = (availW * 0.34f).toInt().coerceAtLeast(1)
-    val heroW = (availW - gap - rightColW).toInt().coerceAtLeast(1)
-    val rightTileH = ((topH - gap) / 2f).toInt().coerceAtLeast(1)
-
-    // Bottom section: 4 small tiles spanning 100% of horizontal space
-    val botTileW = ((availW - (gap * 3f)) / 4f).toInt().coerceAtLeast(1)
-
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
 
-    val startX = cardRect.left + pad
-    val startY = cardRect.top + pad
+    if (aspectRatio >= 1.1f) {
+        // ================================================================
+        // 1. WIDE MODE (Side Hero + Stacked Column + 4-Column Bottom Row)
+        // ================================================================
+        val pad = minOf(cardW, cardH) * 0.08f
+        val gap = minOf(cardW, cardH) * 0.035f
 
-    // 1. Large Hero Tile (ChatGPT) - Top-Left Concentric Corner
-    val bigTile = generateTileBitmap(
-        context = context,
-        target = AiTarget.CHATGPT_TEXT,
-        bgColorInt = tileBgColor,
-        accentColorInt = accentColorInt,
-        isLight = isLight,
-        shapeStyle = AiShapeStyle.CORNER_TOP_LEFT,
-        isPrimaryAccent = true,
-        widthPx = heroW,
-        heightPx = topH
-    )
-    canvas.drawBitmap(bigTile, startX, startY, null)
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
 
-    // 2. Right Stacked Tiles (Grok & Copilot)
-    val rightX = startX + heroW + gap
-    val topRightTile = generateTileBitmap(
-        context = context,
-        target = AiTarget.GROK,
-        bgColorInt = tileBgColor,
-        accentColorInt = accentColorInt,
-        isLight = isLight,
-        shapeStyle = AiShapeStyle.CORNER_TOP_RIGHT,
-        widthPx = rightColW,
-        heightPx = rightTileH
-    )
-    canvas.drawBitmap(topRightTile, rightX, startY, null)
+        val topH = ((availH - gap) * 0.64f).toInt().coerceAtLeast(1)
+        val botH = (availH - gap - topH).toInt().coerceAtLeast(1)
 
-    val midRightTile = generateTileBitmap(
-        context = context,
-        target = AiTarget.COPILOT,
-        bgColorInt = tileBgColor,
-        accentColorInt = accentColorInt,
-        isLight = isLight,
-        shapeStyle = AiShapeStyle.SQUIRCLE,
-        widthPx = rightColW,
-        heightPx = rightTileH
-    )
-    canvas.drawBitmap(midRightTile, rightX, startY + rightTileH + gap, null)
+        val rightColW = (availW * 0.34f).toInt().coerceAtLeast(1)
+        val heroW = (availW - gap - rightColW).toInt().coerceAtLeast(1)
+        val rightTileH = ((topH - gap) / 2f).toInt().coerceAtLeast(1)
 
-    // 3. Bottom Row (Gemini, Claude, Perplexity, Meta AI)
-    val botY = startY + topH + gap
-    val bottomItems = listOf(
-        Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_BOTTOM_LEFT),
-        Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-    )
+        val botTileW = ((availW - (gap * 3f)) / 4f).toInt().coerceAtLeast(1)
 
-    bottomItems.forEachIndexed { i, (target, shape) ->
-        val tile = generateTileBitmap(
+        val startX = cardRect.left + pad
+        val startY = cardRect.top + pad
+
+        val bigTile = generateTileBitmap(
             context = context,
-            target = target,
+            target = AiTarget.CHATGPT_TEXT,
             bgColorInt = tileBgColor,
             accentColorInt = accentColorInt,
             isLight = isLight,
-            shapeStyle = shape,
-            widthPx = botTileW,
-            heightPx = botH
+            shapeStyle = AiShapeStyle.CORNER_TOP_LEFT,
+            isPrimaryAccent = true,
+            widthPx = heroW,
+            heightPx = topH
         )
-        val bx = startX + i * (botTileW + gap)
-        canvas.drawBitmap(tile, bx, botY, null)
+        canvas.drawBitmap(bigTile, startX, startY, null)
+
+        val rightX = startX + heroW + gap
+        val topRightTile = generateTileBitmap(
+            context = context,
+            target = AiTarget.GROK,
+            bgColorInt = tileBgColor,
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            shapeStyle = AiShapeStyle.CORNER_TOP_RIGHT,
+            widthPx = rightColW,
+            heightPx = rightTileH
+        )
+        canvas.drawBitmap(topRightTile, rightX, startY, null)
+
+        val midRightTile = generateTileBitmap(
+            context = context,
+            target = AiTarget.COPILOT,
+            bgColorInt = tileBgColor,
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            shapeStyle = AiShapeStyle.SQUIRCLE,
+            widthPx = rightColW,
+            heightPx = rightTileH
+        )
+        canvas.drawBitmap(midRightTile, rightX, startY + rightTileH + gap, null)
+
+        val botY = startY + topH + gap
+        val bottomItems = listOf(
+            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_BOTTOM_LEFT),
+            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
+        )
+
+        bottomItems.forEachIndexed { i, (target, shape) ->
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = accentColorInt,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = botTileW,
+                heightPx = botH
+            )
+            val bx = startX + i * (botTileW + gap)
+            canvas.drawBitmap(tile, bx, botY, null)
+        }
+    } else {
+        // ================================================================
+        // 2. TALL / VERTICAL MODE (Top Hero Banner + 2 Columns x 3 Rows Grid)
+        // ================================================================
+        val pad = cardW * 0.06f
+        val gap = cardW * 0.035f
+
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
+
+        val heroH = (availH * 0.26f).toInt().coerceAtLeast(1)
+        val remainingH = availH - gap - heroH
+        val tileH = ((remainingH - (gap * 2f)) / 3f).toInt().coerceAtLeast(1)
+        val tileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
+
+        val startX = cardRect.left + pad
+        val startY = cardRect.top + pad
+
+        // Hero Banner spanning full width
+        val heroTile = generateTileBitmap(
+            context = context,
+            target = AiTarget.CHATGPT_TEXT,
+            bgColorInt = tileBgColor,
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            shapeStyle = AiShapeStyle.SQUIRCLE,
+            isPrimaryAccent = true,
+            widthPx = availW.toInt(),
+            heightPx = heroH
+        )
+        canvas.drawBitmap(heroTile, startX, startY, null)
+
+        // 3 Rows x 2 Columns
+        val gridStartY = startY + heroH + gap
+        val gridItems = listOf(
+            Pair(AiTarget.GROK, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
+            Pair(AiTarget.PERPLEXITY, AiShapeStyle.CORNER_BOTTOM_LEFT),
+            Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
+        )
+
+        gridItems.forEachIndexed { i, (target, shape) ->
+            val r = i / 2
+            val c = i % 2
+            val tile = generateTileBitmap(
+                context = context,
+                target = target,
+                bgColorInt = tileBgColor,
+                accentColorInt = accentColorInt,
+                isLight = isLight,
+                shapeStyle = shape,
+                widthPx = tileW,
+                heightPx = tileH
+            )
+            val bx = startX + c * (tileW + gap)
+            val by = gridStartY + r * (tileH + gap)
+            canvas.drawBitmap(tile, bx, by, null)
+        }
     }
 
     return bitmap

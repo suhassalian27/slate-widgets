@@ -16,8 +16,12 @@ fun getSafeBgColor(config: SlateWidgetConfig): Int {
 }
 
 fun getStandardCornerRadius(multiplier: Float): Float = 14f * multiplier
-
-fun createSupersampledCanvas(wDp: Int, hDp: Int, context: Context): Pair<Canvas, Float> {
+data class SupersampledCanvas(
+    val bitmap: Bitmap,
+    val canvas: Canvas,
+    val scaleFactor: Float
+)
+fun createSupersampledCanvas(wDp: Int, hDp: Int, context: Context): SupersampledCanvas {
     val density = context.resources.displayMetrics.density
     val scaleFactor = maxOf(density, 3.5f)
     val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
@@ -25,7 +29,7 @@ fun createSupersampledCanvas(wDp: Int, hDp: Int, context: Context): Pair<Canvas,
 
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    return Pair(canvas, scaleFactor)
+    return SupersampledCanvas(bitmap, canvas, scaleFactor)
 }
 
 fun getSlateFont(
