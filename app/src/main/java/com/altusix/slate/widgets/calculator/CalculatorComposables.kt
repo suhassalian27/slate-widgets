@@ -1,56 +1,57 @@
 package com.altusix.slate.widgets.calculator
 
 import android.content.Context
-import android.graphics.*
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
+import com.altusix.slate.utils.getSafeBgColor
+import com.altusix.slate.utils.getSlateFont
+import com.altusix.slate.utils.getStandardCornerRadius
 
 // =========================================================================
 // GEOMETRY & CONTRAST UTILITIES
 // =========================================================================
-
-private fun getStandardCornerRadius(density: Float): Float = 22f * density
 
 private fun getOpTextColor(bg: Int): Int {
     val r = ((bg shr 16) and 0xFF) / 255f
     val g = ((bg shr 8) and 0xFF) / 255f
     val b = (bg and 0xFF) / 255f
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
-    return if (luminance > 0.5f) Color(0xFF121214).toArgb() else Color.White.toArgb()
+    return if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 }
 
 // =========================================================================
 // SMART MULTI-LINE DISPLAY RENDERER
 // =========================================================================
 
-/**
- * Renders expression and result text inside [displayRect].
- * Automatically scales down long results, wraps onto new lines, moves upward,
- * and keeps the expression text positioned directly above the result.
- */
 private fun drawCalculatorDisplay(
     canvas: Canvas,
+    context: Context,
     displayRect: RectF,
     exprText: String,
     resultText: String,
     primaryTextColor: Int,
     secondaryTextColor: Int,
-    density: Float,
+    scaleFactor: Float,
     isCenterAligned: Boolean = false
 ) {
-    val margin = 10f * density
-    val topBottomMargin = 6f * density
+    val margin = 10f * scaleFactor
+    val topBottomMargin = 6f * scaleFactor
     val maxWidth = (displayRect.width() - (margin * 2f)).coerceAtLeast(10f)
 
     canvas.save()
-    canvas.clipRect(displayRect) // Strict clipping inside display container
+    canvas.clipRect(displayRect)
 
     var resultTextSize = displayRect.height() * 0.42f
     val resultPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
         textSize = resultTextSize
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = getSlateFont(context, weight = 700)
         textAlign = if (isCenterAligned) Paint.Align.CENTER else Paint.Align.RIGHT
     }
 
@@ -58,7 +59,7 @@ private fun drawCalculatorDisplay(
     var textWidth = resultPaint.measureText(resultText)
     val minTextSize = displayRect.height() * 0.20f
     while (textWidth > maxWidth && resultTextSize > minTextSize) {
-        resultTextSize -= 1f * density
+        resultTextSize -= 1f * scaleFactor
         resultPaint.textSize = resultTextSize
         textWidth = resultPaint.measureText(resultText)
     }
@@ -102,12 +103,12 @@ private fun drawCalculatorDisplay(
     val exprPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
         textSize = minOf(displayRect.height() * 0.18f, resultTextSize * 0.55f)
-        typeface = Typeface.DEFAULT
+        typeface = getSlateFont(context, weight = 400)
         textAlign = if (isCenterAligned) Paint.Align.CENTER else Paint.Align.RIGHT
     }
 
     val fmExpr = exprPaint.fontMetrics
-    val exprY = topResultLineY - (2f * density) - fmExpr.descent
+    val exprY = topResultLineY - (2f * scaleFactor) - fmExpr.descent
 
     var trimmedExpr = cleanExpr
     while (trimmedExpr.length > 1 && exprPaint.measureText(trimmedExpr) > maxWidth) {
@@ -122,67 +123,63 @@ private fun drawCalculatorDisplay(
 // =========================================================================
 // CANVAS BITMAP GENERATORS
 // =========================================================================
-
 /**
  * 1. Standard 2x2 Calculator
  */
-fun generateCalculator2x2Bitmap(
-    context: Context,
-    calcState: CalculatorState,
-    slateConfig: SlateWidgetConfig,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateCalculator2x2Bitmap(context: Context, calcState: CalculatorState, slateConfig: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
-    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
+    val accentColor = slateConfig.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    val cardCornerRadius = getStandardCornerRadius(density)
-    val rect = RectF(0f, 0f, w.toFloat(), h.toFloat())
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
-    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = 8f * density
-    val innerRect = RectF(rect.left + pad, rect.top + pad, rect.right - pad, rect.bottom - pad)
+    val pad = 8f * scaleFactor
+    val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
     val displayHeight = innerRect.height() * 0.28f
     val displayRect = RectF(innerRect.left, innerRect.top, innerRect.right, innerRect.top + displayHeight)
 
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0x99FFFFFF).toArgb()
+    val primaryTextColor = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryTextColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    // Smart Display Render
-    drawCalculatorDisplay(
-        canvas, displayRect,
-        calcState.expression, calcState.resultText,
-        primaryTextColor, secondaryTextColor, density
-    )
+    drawCalculatorDisplay(canvas, context, displayRect, calcState.expression, calcState.resultText, primaryTextColor, secondaryTextColor, scaleFactor)
 
-    // Keypad Grid
-    val keypadTop = displayRect.bottom + (4f * density)
+    val keypadTop = displayRect.bottom + (4f * scaleFactor)
     val keypadH = innerRect.bottom - keypadTop
 
-    val btnBgColor = if (isLight) Color(0xFFEFEFF4).toArgb() else Color(0xFF1E1E22).toArgb()
-    val keyGrid = listOf(
-        listOf("AC", "DEL", "%", "÷"),
-        listOf("7", "8", "9", "×"),
-        listOf("4", "5", "6", "-"),
-        listOf("1", "2", "3", "+"),
-        listOf("0", ".", "=")
-    )
+    val btnBgColor = if (isLight) Color.parseColor("#EFEFF4") else Color.parseColor("#1E1E22")
+    val keyGrid = listOf(listOf("AC", "DEL", "%", "÷"), listOf("7", "8", "9", "×"), listOf("4", "5", "6", "-"), listOf("1", "2", "3", "+"), listOf("0", ".", "="))
 
     val rowCount = 5
     val rowH = keypadH / rowCount
     val singleColW = innerRect.width() / 4f
-    val gap = 2f * density
+    val gap = 2f * scaleFactor
 
     for (r in 0 until rowCount) {
         val rowKeys = keyGrid[r]
@@ -198,8 +195,8 @@ fun generateCalculator2x2Bitmap(
             val isOp = key in listOf("÷", "×", "-", "+", "=")
             val btnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (isOp) accentColor else btnBgColor }
 
-            val defaultBtnRadius = 10f * density
-            val bottomNestedRadius = (cardCornerRadius - pad).coerceAtLeast(8f * density)
+            val defaultBtnRadius = 10f * scaleFactor
+            val bottomNestedRadius = (cardCornerRadius - pad).coerceAtLeast(6f * scaleFactor)
 
             val radii = FloatArray(8) { defaultBtnRadius }
             if (r == 4 && c == 0) {
@@ -215,7 +212,7 @@ fun generateCalculator2x2Bitmap(
             val keyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = if (isOp) getOpTextColor(accentColor) else primaryTextColor
                 textSize = labelSize
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = getSlateFont(context, weight = 700)
                 textAlign = Paint.Align.CENTER
             }
             val fontMetrics = keyTextPaint.fontMetrics
@@ -223,9 +220,10 @@ fun generateCalculator2x2Bitmap(
             canvas.drawText(key, btnRect.centerX(), baseline, keyTextPaint)
         }
     }
-
     return bitmap
 }
+
+fun generateCalculator2x2Bitmap(context: Context, calcState: CalculatorState, slateConfig: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateCalculator2x2Bitmap(context, calcState, slateConfig, isResponsive = true, wDp = wDp, hDp = hDp)
 
 /**
  * 2. Split Capsule Calculator (2x2)
@@ -234,53 +232,72 @@ fun generateSplitCalculatorBitmap(
     context: Context,
     calcState: CalculatorState,
     slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    widgetId: Int = 0
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
-    val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val bgColor = getSafeBgColor(slateConfig)
+    val accentColor = slateConfig.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    val rect = RectF(0f, 0f, w.toFloat(), h.toFloat())
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
-    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
+    val margin = scaleFactor * 1.5f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 1.0f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
 
-    val pad = 8f * density
-    val innerRect = RectF(rect.left + pad, rect.top + pad, rect.right - pad, rect.bottom - pad)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = 8f * scaleFactor
+    val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
     val displayHeight = innerRect.height() * 0.28f
     val displayRect = RectF(innerRect.left, innerRect.top, innerRect.right, innerRect.top + displayHeight)
 
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0x99FFFFFF).toArgb()
+    val primaryTextColor = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryTextColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     drawCalculatorDisplay(
-        canvas, displayRect,
+        canvas, context, displayRect,
         calcState.expression, calcState.resultText,
-        primaryTextColor, secondaryTextColor, density
+        primaryTextColor, secondaryTextColor, scaleFactor
     )
 
-    val keypadTop = displayRect.bottom + (4f * density)
+    val keypadTop = displayRect.bottom + (4f * scaleFactor)
     val keypadH = innerRect.bottom - keypadTop
 
-    val maxCapsuleWidth = 72f * density
+    val maxCapsuleWidth = 72f * scaleFactor
     val rightW = (innerRect.width() * 0.22f).coerceAtMost(maxCapsuleWidth)
     val leftW = innerRect.width() - rightW
 
-    val btnBgColor = if (isLight) Color(0xFFEFEFF4).toArgb() else Color(0xFF1E1E22).toArgb()
-    val gap = 2.5f * density
+    val btnBgColor = if (isLight) Color.parseColor("#EFEFF4") else Color.parseColor("#1E1E22")
+    val gap = 2f * scaleFactor // SYNCHRONIZED EXACTLY WITH STANDARD CALCULATOR
 
     val rightCapsuleRect = RectF(innerRect.right - rightW + gap, keypadTop + gap, innerRect.right - gap, innerRect.bottom - gap)
     val capsulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor }
-    canvas.drawRoundRect(rightCapsuleRect, rightW / 2f, rightW / 2f, capsulePaint)
+    val rightCapsuleRadius = rightCapsuleRect.width() / 2f
+    canvas.drawRoundRect(rightCapsuleRect, rightCapsuleRadius, rightCapsuleRadius, capsulePaint)
 
     val rowCount = 5
     val rowH = keypadH / rowCount
@@ -305,19 +322,20 @@ fun generateSplitCalculatorBitmap(
             val btnRect = RectF(keyX + gap, rowY + gap, keyX + keyW - gap, rowY + rowH - gap)
             val btnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = btnBgColor }
 
-            val radii = FloatArray(8) { 10f * density }
+            val radii = FloatArray(8) { 10f * scaleFactor }
             if (r == 4 && c == 0) {
-                val bottomNestedRadius = (cardCornerRadius - pad).coerceAtLeast(8f * density)
+                val bottomNestedRadius = (cardCornerRadius - pad).coerceAtLeast(6f * scaleFactor)
                 radii[6] = bottomNestedRadius; radii[7] = bottomNestedRadius
             }
             val path = Path().apply { addRoundRect(btnRect, radii, Path.Direction.CW) }
             canvas.drawPath(path, btnPaint)
 
-            val labelSize = minOf(leftColW * 0.30f, rowH * 0.36f)
+            // SYNCHRONIZED FONT SCALING
+            val labelSize = minOf(leftColW * 0.34f, rowH * 0.38f)
             val keyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = primaryTextColor
                 textSize = labelSize
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = getSlateFont(context, weight = 700)
                 textAlign = Paint.Align.CENTER
             }
             val fm = keyTextPaint.fontMetrics
@@ -329,8 +347,8 @@ fun generateSplitCalculatorBitmap(
     val opRowH = rightCapsuleRect.height() / 5f
     val opTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = getOpTextColor(accentColor)
-        textSize = minOf(rightW * 0.40f, opRowH * 0.42f)
-        typeface = Typeface.DEFAULT_BOLD
+        textSize = minOf(rightCapsuleRect.width() * 0.40f, opRowH * 0.42f)
+        typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
 
@@ -343,6 +361,14 @@ fun generateSplitCalculatorBitmap(
     return bitmap
 }
 
+fun generateSplitCalculatorBitmap(
+    context: Context,
+    calcState: CalculatorState,
+    slateConfig: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap = generateSplitCalculatorBitmap(context, calcState, slateConfig, isResponsive = true, wDp = wDp, hDp = hDp)
+
 /**
  * 3. Studio 4x2 Calculator
  */
@@ -350,32 +376,50 @@ fun generateStudioCalculator4x2Bitmap(
     context: Context,
     calcState: CalculatorState,
     slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    widgetId: Int = 0
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
-    val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val bgColor = getSafeBgColor(slateConfig)
+    val accentColor = slateConfig.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    val rect = RectF(0f, 0f, w.toFloat(), h.toFloat())
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
-    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 2.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
 
-    val pad = 8f * density
-    val innerRect = RectF(rect.left + pad, rect.top + pad, rect.right - pad, rect.bottom - pad)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val gap = 3f * density
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0x99FFFFFF).toArgb()
-    val btnBgColor = if (isLight) Color(0xFFEFEFF4).toArgb() else Color(0xFF1E1E22).toArgb()
+    val pad = 8f * scaleFactor
+    val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+
+    val gap = 3f * scaleFactor
+    val primaryTextColor = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryTextColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val btnBgColor = if (isLight) Color.parseColor("#EFEFF4") else Color.parseColor("#1E1E22")
 
     val leftWidth = innerRect.width() * 0.56f
     val leftRect = RectF(innerRect.left, innerRect.top, innerRect.left + leftWidth, innerRect.bottom)
@@ -383,9 +427,8 @@ fun generateStudioCalculator4x2Bitmap(
 
     val numRows = 4
     val rowH = leftRect.height() / numRows
-    val btnCornerR = 10f * density
+    val btnCornerR = 10f * scaleFactor
 
-    // Left Numpad
     val keyGrid = listOf(
         listOf("7", "8", "9", "÷"),
         listOf("4", "5", "6", "×"),
@@ -418,7 +461,7 @@ fun generateStudioCalculator4x2Bitmap(
             val keyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = if (isOpColumn) getOpTextColor(accentColor) else primaryTextColor
                 textSize = labelSize
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = getSlateFont(context, weight = 700)
                 textAlign = Paint.Align.CENTER
             }
 
@@ -428,7 +471,6 @@ fun generateStudioCalculator4x2Bitmap(
         }
     }
 
-    // Right Display Screen & Utility Row
     val displayCardRect = RectF(
         rightRect.left + gap,
         rightRect.top + gap,
@@ -436,25 +478,23 @@ fun generateStudioCalculator4x2Bitmap(
         rightRect.top + (3 * rowH) - gap
     )
 
-    val screenBgColor = if (isLight) Color(0xFFE8E8ED).toArgb() else Color(0xFF121215).toArgb()
+    val screenBgColor = if (isLight) Color.parseColor("#E8E8ED") else Color.parseColor("#121215")
     val screenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = screenBgColor }
-    val screenRadius = 14f * density
+    val screenRadius = 14f * scaleFactor
     canvas.drawRoundRect(displayCardRect, screenRadius, screenRadius, screenPaint)
 
-    // Smart Display Render
     drawCalculatorDisplay(
-        canvas, displayCardRect,
+        canvas, context, displayCardRect,
         calcState.expression, calcState.resultText,
-        primaryTextColor, secondaryTextColor, density
+        primaryTextColor, secondaryTextColor, scaleFactor
     )
 
-    // AC / DEL Row
     val utilRowY1 = rightRect.top + (3 * rowH)
     val utilRowY2 = rightRect.bottom
 
     val utilityKeys = listOf("AC", "DEL")
     val utilColW = rightRect.width() / 2f
-    val utilBtnBgColor = if (isLight) Color(0xFFE2E2E8).toArgb() else Color(0xFF28282E).toArgb()
+    val utilBtnBgColor = if (isLight) Color.parseColor("#E2E2E8") else Color.parseColor("#28282E")
 
     for (i in utilityKeys.indices) {
         val key = utilityKeys[i]
@@ -470,7 +510,7 @@ fun generateStudioCalculator4x2Bitmap(
         val keyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryTextColor
             textSize = labelSize
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = getSlateFont(context, weight = 700)
             textAlign = Paint.Align.CENTER
         }
         val fm = keyTextPaint.fontMetrics
@@ -481,37 +521,53 @@ fun generateStudioCalculator4x2Bitmap(
     return bitmap
 }
 
-/**
- * 4. Circular Stage Calculator (2x2 Circle)
- */
-fun generateCircleCalculatorBitmap(
+fun generateStudioCalculator4x2Bitmap(
     context: Context,
     calcState: CalculatorState,
     slateConfig: SlateWidgetConfig,
     wDp: Int,
     hDp: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
+): Bitmap = generateStudioCalculator4x2Bitmap(context, calcState, slateConfig, isResponsive = true, wDp, hDp)
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+/**
+ * 4. Circular Stage Calculator (2x2 Circle - Custom Shape Auto-Lock 1:1)
+ */
+fun generateCircleCalculatorBitmap(
+    context: Context,
+    calcState: CalculatorState,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int = 0
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
-    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
+    val accentColor = slateConfig.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    val cardSize = minOf(w, h).toFloat()
-    val cx = w / 2f
-    val cy = h / 2f
-    val radius = (cardSize / 2f) - (2f * density)
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
+    val radius = cardSize / 2f
+
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
     canvas.drawCircle(cx, cy, radius, bgPaint)
 
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0x99FFFFFF).toArgb()
+    val primaryTextColor = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val secondaryTextColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     val totalHeight = 2f * radius
     val circleTop = cy - radius
@@ -520,17 +576,17 @@ fun generateCircleCalculatorBitmap(
     val circleRight = cx + radius
 
     val displayHeight = totalHeight * 0.28f
-    val displayRect = RectF(cx - (radius * 0.7f), circleTop + (4f * density), cx + (radius * 0.7f), circleTop + displayHeight)
+    val displayRect = RectF(cx - (radius * 0.7f), circleTop + (4f * scaleFactor), cx + (radius * 0.7f), circleTop + displayHeight)
 
     drawCalculatorDisplay(
-        canvas, displayRect,
+        canvas, context, displayRect,
         calcState.expression, calcState.resultText,
-        primaryTextColor, secondaryTextColor, density,
+        primaryTextColor, secondaryTextColor, scaleFactor,
         isCenterAligned = true
     )
 
     val circleClipPath = Path().apply {
-        addCircle(cx, cy, radius - (1.5f * density), Path.Direction.CW)
+        addCircle(cx, cy, radius - (1.5f * scaleFactor), Path.Direction.CW)
     }
 
     canvas.save()
@@ -543,10 +599,10 @@ fun generateCircleCalculatorBitmap(
 
     val rowH = keypadHeight / numRows
     val colW = (2f * radius) / numCols
-    val gap = 2.5f * density
+    val gap = 2.5f * scaleFactor
 
-    val btnBgColor = if (isLight) Color(0xFFEFEFF4).toArgb() else Color(0xFF1E1E22).toArgb()
-    val innerBtnRadius = 6f * density
+    val btnBgColor = if (isLight) Color.parseColor("#EFEFF4") else Color.parseColor("#1E1E22")
+    val innerBtnRadius = 6f * scaleFactor
 
     val keyGrid = listOf(
         listOf("AC", "DEL", "%", "÷"),
@@ -565,8 +621,8 @@ fun generateCircleCalculatorBitmap(
             val colX1 = circleLeft + (c * colW)
             val colX2 = circleLeft + ((c + 1) * colW)
 
-            val drawX1 = if (c == 0) circleLeft - (20f * density) else colX1 + (gap / 2f)
-            val drawX2 = if (c == numCols - 1) circleRight + (20f * density) else colX2 - (gap / 2f)
+            val drawX1 = if (c == 0) circleLeft - (20f * scaleFactor) else colX1 + (gap / 2f)
+            val drawX2 = if (c == numCols - 1) circleRight + (20f * scaleFactor) else colX2 - (gap / 2f)
             val drawY1 = rowY1 + (gap / 2f)
             val drawY2 = rowY2 - (gap / 2f)
 
@@ -591,7 +647,7 @@ fun generateCircleCalculatorBitmap(
             val keyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = if (isOp) getOpTextColor(accentColor) else primaryTextColor
                 textSize = labelSize
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = getSlateFont(context, weight = 700)
                 textAlign = alignMode
             }
 
@@ -607,13 +663,12 @@ fun generateCircleCalculatorBitmap(
         }
     }
 
-    // Row 5: Bottom Segment ("0" and ".")
     val r5Y1 = keypadTop + (4 * rowH) + (gap / 2f)
-    val r5Y2 = circleBottom + (20f * density)
+    val r5Y2 = circleBottom + (20f * scaleFactor)
 
     val row5Bounds = listOf(
-        Triple("0", circleLeft - (20f * density), cx - (gap / 2f)),
-        Triple(".", cx + (gap / 2f), circleRight + (20f * density))
+        Triple("0", circleLeft - (20f * scaleFactor), cx - (gap / 2f)),
+        Triple(".", cx + (gap / 2f), circleRight + (20f * scaleFactor))
     )
 
     for ((key, drawX1, drawX2) in row5Bounds) {
@@ -632,7 +687,7 @@ fun generateCircleCalculatorBitmap(
         val keyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryTextColor
             textSize = labelSize
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = getSlateFont(context, weight = 700)
             textAlign = alignMode
         }
 
@@ -648,11 +703,19 @@ fun generateCircleCalculatorBitmap(
     canvas.restore()
 
     val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x1A000000).toArgb() else Color(0x22FFFFFF).toArgb()
+        color = if (isLight) Color.parseColor("#1A000000") else Color.parseColor("#22FFFFFF")
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f * density
+        strokeWidth = 1.5f * scaleFactor
     }
-    canvas.drawCircle(cx, cy, radius - (1f * density), borderPaint)
+    canvas.drawCircle(cx, cy, radius - (1f * scaleFactor), borderPaint)
 
     return bitmap
 }
+
+fun generateCircleCalculatorBitmap(
+    context: Context,
+    calcState: CalculatorState,
+    slateConfig: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap = generateCircleCalculatorBitmap(context, calcState, slateConfig, isResponsive = true, wDp, hDp)
