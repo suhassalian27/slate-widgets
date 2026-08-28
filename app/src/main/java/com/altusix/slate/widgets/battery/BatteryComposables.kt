@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import com.altusix.slate.core.theme.SlateColors
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
@@ -47,16 +48,12 @@ fun generateDotLevelMeterWithHeaderBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -71,7 +68,7 @@ fun generateDotLevelMeterWithHeaderBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val pad = cardSize * 0.07f
@@ -155,16 +152,12 @@ fun generateDotLevelMeterPureBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -178,7 +171,7 @@ fun generateDotLevelMeterPureBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val pad = cardSize * 0.10f
@@ -226,16 +219,12 @@ fun generateBatteryMinimalLinearBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -251,7 +240,7 @@ fun generateBatteryMinimalLinearBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val pad = cardSize * 0.12f
@@ -313,16 +302,12 @@ fun generateBatteryMinimalRingBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -337,13 +322,12 @@ fun generateBatteryMinimalRingBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val strokeW = cardSize * 0.07f
     val arcRadius = cardSize * 0.36f
     val centerX = leftX + (cardSize / 2f)
-    // Shifted center down to balance top arc curve with bottom open arc tips padding
     val arcCenterY = topY + (cardSize * 0.53f)
 
     val arcRect = RectF(
@@ -387,7 +371,6 @@ fun generateBatteryMinimalRingBitmap(
     val textY = arcCenterY - textOffset - (fontMetricsPct.ascent + fontMetricsPct.descent) / 2f
     canvas.drawText("${data.percentage}%", centerX, textY, pctPaint)
 
-    // Render larger standalone bolt icon when charging
     if (data.isCharging) {
         val iconSize = cardSize * 0.10f
         val iconLeft = centerX - (iconSize / 2f)
@@ -407,16 +390,12 @@ fun generateArcGaugeTileBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -431,12 +410,11 @@ fun generateArcGaugeTileBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val pad = cardSize * 0.10f
 
-    // 1. TOP-RIGHT BOLT ICON OVERLAY (Icon only, zero layout impact)
     if (data.isCharging) {
         val iconSize = cardSize * 0.10f
         val iconLeft = leftX + cardSize - pad - iconSize
@@ -444,10 +422,8 @@ fun generateArcGaugeTileBitmap(
         drawBoltIcon(context, canvas, iconLeft, iconTop, iconSize, accentColorInt)
     }
 
-    // 2. ADJUST GAP HERE: Change this factor to tighten or expand spacing (-0.05f to 0.05f)
     val arcToTextGap = cardSize * -0.02f
 
-    // 3. Proportional Arc Gauge dimensions
     val gaugeW = (cardSize * 0.82f).toInt()
     val gaugeH = (cardSize * 0.41f).toInt()
     val arcBitmap = generateArcGaugeBitmap(data.percentage, accentColorInt, trackColorInt, gaugeW, gaugeH)
@@ -461,7 +437,6 @@ fun generateArcGaugeTileBitmap(
     val fontMetricsPct = pctPaint.fontMetrics
     val textHeight = fontMetricsPct.descent - fontMetricsPct.ascent
 
-    // 4. Calculate centered vertical block (Arc + Gap + Text) for static placement
     val totalBlockH = gaugeH + arcToTextGap + textHeight
     val startY = topY + (cardSize - totalBlockH) / 2f
 
@@ -483,16 +458,12 @@ fun generateEditorialStatsBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -508,7 +479,7 @@ fun generateEditorialStatsBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val pad = cardSize * 0.12f
@@ -542,21 +513,11 @@ fun generateEditorialStatsBitmap(
     return bitmap
 }
 
-// 7. Multi-Device Stats Bento (4x2)
-fun generateMultiDeviceBatteryBitmap(
-    context: Context,
-    data: DetailedBatteryData,
-    config: SlateWidgetConfig,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+// 7. MULTI-DEVICE STATS BENTO (4x2 / Adaptive)
+fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -567,49 +528,99 @@ fun generateMultiDeviceBatteryBitmap(
     val tileBgColor = if (isLight) 0x0A000000 else 0x18FFFFFF
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = 2.0f
-
-    var cardH = h.toFloat() - (margin * 2f)
-    var cardW = cardH * targetRatio
-    if (cardW > w.toFloat() - (margin * 2f)) {
-        cardW = w.toFloat() - (margin * 2f)
-        cardH = cardW / targetRatio
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspectRatio = cardW / cardH
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
-    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardH * 0.08f
-    val gap = cardH * 0.06f
-
-    val availW = cardW - (pad * 2f)
-    val availH = cardH - (pad * 2f)
-
-    val heroW = availW * 0.40f
-    val heroH = availH
-
-    val rightX = leftX + pad + heroW + gap
-    val rightW = availW - heroW - gap
-    val statH = (availH - gap) / 2f
-
+    val pad = minOf(cardW, cardH) * 0.08f
+    val gap = minOf(cardW, cardH) * 0.06f
+    val concentricRadius = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val sq = (scaleFactor * 8f).coerceAtMost(minOf(cardW, cardH) * 0.22f)
     val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tileBgColor }
-    val tileCornerRadius = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 4f).coerceAtMost(minOf(heroW, heroH) * 0.22f)
+    val trackPaintObj = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = trackColor }
 
-    val heroRect = RectF(leftX + pad, topY + pad, leftX + pad + heroW, topY + pad + heroH)
-    canvas.drawRoundRect(heroRect, tileCornerRadius, tileCornerRadius, tileBgPaint)
+    fun drawTile(rect: RectF, radii: FloatArray) {
+        val path = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+        canvas.drawPath(path, tileBgPaint)
+    }
 
-    val heroPad = heroH * 0.12f
+    val heroRect: RectF
+    val tempRect: RectF
+    val voltRect: RectF
+    val heroRadii: FloatArray
+    val tempRadii: FloatArray
+    val voltRadii: FloatArray
+
+    if (aspectRatio >= 1.1f) {
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
+        val heroW = availW * 0.40f
+        val heroH = availH
+
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.top + pad + heroH)
+        heroRadii = floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, concentricRadius, concentricRadius)
+
+        val rightX = cardRect.left + pad + heroW + gap
+        val rightW = availW - heroW - gap
+        val statH = (availH - gap) / 2f
+
+        tempRect = RectF(rightX, cardRect.top + pad, rightX + rightW, cardRect.top + pad + statH)
+        tempRadii = floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq)
+
+        voltRect = RectF(rightX, cardRect.top + pad + statH + gap, rightX + rightW, cardRect.top + pad + availH)
+        voltRadii = floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, sq, sq)
+    } else {
+        val availW = cardW - (pad * 2f)
+        val availH = cardH - (pad * 2f)
+        val heroH = availH * 0.48f
+        val heroW = availW
+
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.top + pad + heroH)
+        heroRadii = floatArrayOf(concentricRadius, concentricRadius, concentricRadius, concentricRadius, sq, sq, sq, sq)
+
+        val botY = cardRect.top + pad + heroH + gap
+        val botH = availH - heroH - gap
+        val statW = (availW - gap) / 2f
+
+        tempRect = RectF(cardRect.left + pad, botY, cardRect.left + pad + statW, botY + botH)
+        tempRadii = floatArrayOf(sq, sq, sq, sq, sq, sq, concentricRadius, concentricRadius)
+
+        voltRect = RectF(cardRect.left + pad + statW + gap, botY, cardRect.right - pad, botY + botH)
+        voltRadii = floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, sq, sq)
+    }
+
+    // RENDER HERO TILE
+    drawTile(heroRect, heroRadii)
+    val heroH = heroRect.height()
+    val heroW = heroRect.width()
+    val heroPad = minOf(heroW, heroH) * 0.12f
 
     val heroTagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = heroH * 0.09f
+        textSize = (heroH * 0.09f).coerceAtLeast(scaleFactor * 7f)
         typeface = getSlateFont(context, weight = 700)
     }
     val fontMetricsHeroTag = heroTagPaint.fontMetrics
@@ -619,7 +630,7 @@ fun generateMultiDeviceBatteryBitmap(
     val statusColor = if (data.isCharging) accentColor else secondaryTextColor
     val heroStatusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = statusColor
-        textSize = heroH * 0.075f
+        textSize = (heroH * 0.075f).coerceAtLeast(scaleFactor * 6.5f)
         typeface = getSlateFont(context, weight = 700)
     }
     val fontMetricsHeroStatus = heroStatusPaint.fontMetrics
@@ -645,7 +656,6 @@ fun generateMultiDeviceBatteryBitmap(
         typeface = getSlateFont(context, weight = 700)
     }
 
-    // Smart Auto-Fit: Dynamically shrink the text if it overflows the hero cell width
     val maxHeroPctW = heroW - (heroPad * 2f)
     while (heroPctPaint.measureText(pctText) > maxHeroPctW && heroPctTextSize > scaleFactor * 8f) {
         heroPctTextSize -= scaleFactor * 0.5f
@@ -659,8 +669,7 @@ fun generateMultiDeviceBatteryBitmap(
     val barH = heroH * 0.07f
     val barTop = heroRect.bottom - heroPad - barH
     val heroTrackRect = RectF(heroRect.left + heroPad, barTop, heroRect.right - heroPad, barTop + barH)
-    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = trackColor }
-    canvas.drawRoundRect(heroTrackRect, barH / 2f, barH / 2f, trackPaint)
+    canvas.drawRoundRect(heroTrackRect, barH / 2f, barH / 2f, trackPaintObj)
 
     val fillW = (heroTrackRect.width()) * (data.percentage.coerceIn(0, 100) / 100f)
     if (fillW > 0f) {
@@ -669,83 +678,93 @@ fun generateMultiDeviceBatteryBitmap(
         canvas.drawRoundRect(heroFillRect, barH / 2f, barH / 2f, fillPaint)
     }
 
-    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = statH * 0.18f
-        typeface = getSlateFont(context, weight = 700)
+    // STAT CARD RENDERER (BALANCED LABEL & VALUE SIZE + VALUE ABOVE PROGRESS BAR)
+    fun renderStatCard(rect: RectF, radii: FloatArray, fullLabel: String, shortLabel: String, valText: String, fillRatio: Float) {
+        drawTile(rect, radii)
+        val cardTileH = rect.height()
+        val cardTileW = rect.width()
+
+        val statPadX = cardTileW * 0.10f
+        val statPadY = cardTileH * 0.12f
+        val availTileW = cardTileW - (statPadX * 2f)
+
+        // Progress bar at the bottom
+        val statBarH = (cardTileH * 0.10f).coerceAtLeast(scaleFactor * 3.5f)
+        val statBarTop = rect.bottom - statPadY - statBarH
+
+        // Label paint - Increased size to balance prominently with the value
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryTextColor
+            textSize = (cardTileH * 0.22f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
+            typeface = getSlateFont(context, weight = 700)
+        }
+
+        // Value paint - Prominent bold value text
+        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = (cardTileH * 0.24f).coerceIn(scaleFactor * 9f, scaleFactor * 18f)
+            typeface = getSlateFont(context, weight = 700)
+        }
+
+        val valW = valuePaint.measureText(valText)
+        val minGap = cardTileH * 0.08f
+
+        var displayLabel = fullLabel
+        if (labelPaint.measureText(displayLabel) + valW + minGap > availTileW) {
+            displayLabel = shortLabel
+        }
+
+        val fitsSideBySide = (labelPaint.measureText(displayLabel) + valW + minGap <= availTileW)
+
+        if (fitsSideBySide) {
+            // SIDE-BY-SIDE: Both label and value aligned at top with balanced sizes
+            valuePaint.textAlign = Paint.Align.RIGHT
+            val fontMetricsLabel = labelPaint.fontMetrics
+            val fontMetricsVal = valuePaint.fontMetrics
+
+            val labelY = rect.top + statPadY + (cardTileH * 0.10f) - (fontMetricsLabel.ascent + fontMetricsLabel.descent) / 2f
+            val valY = rect.top + statPadY + (cardTileH * 0.10f) - (fontMetricsVal.ascent + fontMetricsVal.descent) / 2f
+
+            canvas.drawText(displayLabel, rect.left + statPadX, labelY, labelPaint)
+            canvas.drawText(valText, rect.right - statPadX, valY, valuePaint)
+        } else {
+            // STACKED: Label at top, Value placed directly above the progress bar
+            labelPaint.textAlign = Paint.Align.LEFT
+            valuePaint.textAlign = Paint.Align.RIGHT
+
+            while (labelPaint.measureText(displayLabel) > availTileW && labelPaint.textSize > scaleFactor * 6f) {
+                labelPaint.textSize -= scaleFactor * 0.5f
+            }
+            while (valuePaint.measureText(valText) > availTileW && valuePaint.textSize > scaleFactor * 8f) {
+                valuePaint.textSize -= scaleFactor * 0.5f
+            }
+
+            val fontMetricsLabel = labelPaint.fontMetrics
+            val fontMetricsVal = valuePaint.fontMetrics
+
+            val labelY = rect.top + statPadY + (cardTileH * 0.04f) - fontMetricsLabel.ascent
+            canvas.drawText(displayLabel, rect.left + statPadX, labelY, labelPaint)
+
+            val valY = statBarTop - (cardTileH * 0.06f) - fontMetricsVal.descent
+            canvas.drawText(valText, rect.right - statPadX, valY, valuePaint)
+        }
+
+        val trackRect = RectF(rect.left + statPadX, statBarTop, rect.right - statPadX, statBarTop + statBarH)
+        canvas.drawRoundRect(trackRect, statBarH / 2f, statBarH / 2f, trackPaintObj)
+
+        val fillRect = RectF(trackRect.left, statBarTop, trackRect.left + (trackRect.width() * fillRatio), statBarTop + statBarH)
+        val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor }
+        canvas.drawRoundRect(fillRect, statBarH / 2f, statBarH / 2f, activePaint)
     }
 
-    // Applying scaling to the right bento tiles as well to ensure large temp/voltage values stay inside
-    val rightValueTextSizeBase = statH * 0.28f
-    val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = rightValueTextSizeBase
-        textAlign = Paint.Align.RIGHT
-        typeface = getSlateFont(context, weight = 700)
-    }
-    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor }
-
-    // Temperature Bento Card
-    val tempRect = RectF(rightX, topY + pad, rightX + rightW, topY + pad + statH)
-    canvas.drawRoundRect(tempRect, tileCornerRadius, tileCornerRadius, tileBgPaint)
-
-    val statPadX = rightW * 0.08f
-    val statPadY = statH * 0.22f
-    val maxRightValWidth = rightW - (statPadX * 2f) - labelPaint.measureText("TEMPERATURE") - (statH * 0.1f)
-
-    var tempValTextSize = rightValueTextSizeBase
-    valuePaint.textSize = tempValTextSize
-    while (valuePaint.measureText(data.tempText) > maxRightValWidth && tempValTextSize > scaleFactor * 6f) {
-        tempValTextSize -= scaleFactor * 0.5f
-        valuePaint.textSize = tempValTextSize
-    }
-
-    val fontMetricsLabel = labelPaint.fontMetrics
-    val fontMetricsTempVal = valuePaint.fontMetrics
-
-    val tempLabelY = tempRect.top + statPadY + (statH * 0.08f) - (fontMetricsLabel.ascent + fontMetricsLabel.descent) / 2f
-    val tempValY = tempRect.top + statPadY + (statH * 0.16f) - (fontMetricsTempVal.ascent + fontMetricsTempVal.descent) / 2f
-
-    canvas.drawText("TEMPERATURE", tempRect.left + statPadX, tempLabelY, labelPaint)
-    canvas.drawText(data.tempText, tempRect.right - statPadX, tempValY, valuePaint)
-
-    val tempBarH = statH * 0.12f
-    val tempBarTop = tempRect.bottom - statPadY - tempBarH
-    val tempTrackRect = RectF(tempRect.left + statPadX, tempBarTop, tempRect.right - statPadX, tempBarTop + tempBarH)
-    canvas.drawRoundRect(tempTrackRect, tempBarH / 2f, tempBarH / 2f, trackPaint)
-
+    // RENDER TEMP & VOLT TILES
     val tempVal = data.tempText.replace("°C", "").toFloatOrNull() ?: 35f
     val tempRatio = (tempVal / 50f).coerceIn(0.1f, 1f)
-    val tempFillRect = RectF(tempTrackRect.left, tempBarTop, tempTrackRect.left + (tempTrackRect.width() * tempRatio), tempBarTop + tempBarH)
-    canvas.drawRoundRect(tempFillRect, tempBarH / 2f, tempBarH / 2f, activePaint)
-
-    // Voltage Bento Card
-    val voltRect = RectF(rightX, topY + pad + statH + gap, rightX + rightW, topY + pad + availH)
-    canvas.drawRoundRect(voltRect, tileCornerRadius, tileCornerRadius, tileBgPaint)
-
-    var voltValTextSize = rightValueTextSizeBase
-    valuePaint.textSize = voltValTextSize
-    while (valuePaint.measureText(data.voltageText) > maxRightValWidth && voltValTextSize > scaleFactor * 6f) {
-        voltValTextSize -= scaleFactor * 0.5f
-        valuePaint.textSize = voltValTextSize
-    }
-
-    val fontMetricsVoltVal = valuePaint.fontMetrics
-    val voltLabelY = voltRect.top + statPadY + (statH * 0.08f) - (fontMetricsLabel.ascent + fontMetricsLabel.descent) / 2f
-    val voltValY = voltRect.top + statPadY + (statH * 0.16f) - (fontMetricsVoltVal.ascent + fontMetricsVoltVal.descent) / 2f
-
-    canvas.drawText("VOLTAGE", voltRect.left + statPadX, voltLabelY, labelPaint)
-    canvas.drawText(data.voltageText, voltRect.right - statPadX, voltValY, valuePaint)
-
-    val voltBarH = statH * 0.12f
-    val voltBarTop = voltRect.bottom - statPadY - voltBarH
-    val voltTrackRect = RectF(voltRect.left + statPadX, voltBarTop, voltRect.right - statPadX, voltBarTop + voltBarH)
-    canvas.drawRoundRect(voltTrackRect, voltBarH / 2f, voltBarH / 2f, trackPaint)
+    renderStatCard(tempRect, tempRadii, "TEMPERATURE", "TEMP", data.tempText, tempRatio)
 
     val voltVal = data.voltageText.replace("V", "").toFloatOrNull() ?: 3.8f
     val voltRatio = (voltVal / 4.4f).coerceIn(0.1f, 1f)
-    val voltFillRect = RectF(voltTrackRect.left, voltBarTop, voltTrackRect.left + (voltTrackRect.width() * voltRatio), voltBarTop + voltBarH)
-    canvas.drawRoundRect(voltFillRect, voltBarH / 2f, voltBarH / 2f, activePaint)
+    renderStatCard(voltRect, voltRadii, "VOLTAGE", "VOLT", data.voltageText, voltRatio)
 
     return bitmap
 }
@@ -760,7 +779,7 @@ fun generateDotMatrixLEDBitmap(
     targetWidthPx: Int,
     targetHeightPx: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
     val bitmap = Bitmap.createBitmap(targetWidthPx.coerceAtLeast(1), targetHeightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -778,7 +797,7 @@ fun generateDotMatrixLEDBitmap(
         color = bgColorInt
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val rows = 9
@@ -786,13 +805,9 @@ fun generateDotMatrixLEDBitmap(
     val glyphGap = 1
     val textWidthCols = text.length * glyphWidth + (text.length - 1) * glyphGap
 
-    // 1. Calculate cell size to leave exactly 1 dot padding on top and bottom (rows + 2)
     var cellSize = cardH / (rows + 2f)
-
-    // 2. Dynamically expand columns to fill available width leaving 1 dot padding on left and right
     var columns = ((cardW / cellSize) - 2f).toInt()
 
-    // 3. Fallback scaling: if the container is squished horizontally, scale down based on required text width
     if (columns < textWidthCols) {
         columns = textWidthCols
         cellSize = cardW / (columns + 2f)
@@ -815,7 +830,6 @@ fun generateDotMatrixLEDBitmap(
         style = Paint.Style.FILL
     }
 
-    // Draw background matrix
     for (r in 0 until rows) {
         for (c in 0 until columns) {
             val cx = startX + c * cellSize + cellSize / 2f
@@ -842,7 +856,6 @@ fun generateDotMatrixLEDBitmap(
     val startRow = (rows - glyphHeight) / 2
     var startCol = (columns - textWidthCols) / 2
 
-    // Draw active text
     text.forEach { char ->
         val glyph = fontMap[char]
         if (glyph != null && startCol + glyphWidth <= columns) {
@@ -877,7 +890,7 @@ fun generateCenteredLevelBitmap(
     targetWidthPx: Int,
     targetHeightPx: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
     val bitmap = Bitmap.createBitmap(targetWidthPx.coerceAtLeast(1), targetHeightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -895,15 +908,11 @@ fun generateCenteredLevelBitmap(
         color = bgColorInt
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val rows = 5
-
-    // 1. Calculate cell size to leave exactly 1 dot padding on top and bottom (rows + 2)
     val cellSize = cardH / (rows + 2f)
-
-    // 2. Dynamically expand columns to perfectly fill the horizontal space
     val columns = ((cardW / cellSize) - 2f).toInt().coerceAtLeast(5)
 
     val dotRadius = cellSize * 0.38f
@@ -923,7 +932,6 @@ fun generateCenteredLevelBitmap(
         style = Paint.Style.FILL
     }
 
-    // Distribute percentage perfectly across dynamically calculated total dots
     val totalDots = columns * rows
     val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
 
@@ -950,18 +958,14 @@ fun generateHorizontalStripBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardW = w.toFloat() - (margin * 2f)
+    val cardW = w - (margin * 2f)
     val maxCardH = cardW * 0.28f
-    val cardH = minOf(h.toFloat() - (margin * 2f), maxCardH)
+    val cardH = minOf(h - (margin * 2f), maxCardH)
 
     val leftX = (w - cardW) / 2f
     val topY = (h - cardH) / 2f
@@ -977,7 +981,7 @@ fun generateHorizontalStripBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val padX = cardW * 0.06f
@@ -1040,16 +1044,12 @@ fun generateSegmentedPillTileBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -1066,7 +1066,7 @@ fun generateSegmentedPillTileBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val pad = cardSize * 0.10f
@@ -1156,16 +1156,12 @@ fun generatePixelHeartBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w, h).toFloat() - (margin * 2f)
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
 
@@ -1179,7 +1175,7 @@ fun generatePixelHeartBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(RectF(leftX, topY, leftX + cardSize, topY + cardSize), cardCornerRadius, cardCornerRadius, bgPaint)
 
     val heartGrid = arrayOf(
@@ -1265,13 +1261,9 @@ fun generateWavyLightningBoltBitmap(
     hDp: Int,
     isWide: Boolean = false
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1283,14 +1275,13 @@ fun generateWavyLightningBoltBitmap(
     val margin = scaleFactor * 1.5f
     val targetRatio = if (isWide) 2.0f else 1.0f
 
-    // 1. Calculate container bounds based on layout mode
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h.toFloat() - (margin * 2f)
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat() - (margin * 2f)) {
-            cardW = w.toFloat() - (margin * 2f)
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -1310,7 +1301,7 @@ fun generateWavyLightningBoltBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     canvas.save()
@@ -1319,21 +1310,17 @@ fun generateWavyLightningBoltBitmap(
     }
     canvas.clipPath(cardClipPath)
 
-    // 2. Base scale (Height-driven) to maintain bounds
     val scaleY = if (isWideLayout) {
         (cardH * 0.85f) / 372f
     } else {
         minOf((cardW * 0.85f) / 290f, (cardH * 0.85f) / 372f)
     }
 
-    // 3. Subtle widening of the bolt geometry (+15%)
     val scaleX = scaleY * 1.15f
 
-    // 4. Pin to the right side if wide, otherwise center normally
     val centerX = if (isWideLayout) cardRect.right - (cardH / 2f) else cardRect.centerX()
     val centerY = cardRect.centerY()
 
-    // 5. Bolt path centered around (centerX, centerY) using independent X/Y scales
     val boltPath = Path().apply {
         moveTo(centerX - (48f * scaleX), centerY - (186f * scaleY))
         lineTo(centerX + (115f * scaleX), centerY - (186f * scaleY))
@@ -1357,7 +1344,6 @@ fun generateWavyLightningBoltBitmap(
 
     canvas.drawPath(boltPath, dimPaint)
 
-    // 6. Liquid Wave Fill scaled to current center
     val fillProgress = data.percentage.coerceIn(0, 100) / 100f
     val minFillY = centerY + (186f * scaleY)
     val maxFillY = centerY - (186f * scaleY)
@@ -1393,7 +1379,6 @@ fun generateWavyLightningBoltBitmap(
         canvas.restore()
     }
 
-    // 7. Wide layout text rendering
     if (isWideLayout) {
         val padX = leftX + (cardH * 0.12f)
         val padY = topY + (cardH * 0.12f)
@@ -1441,7 +1426,7 @@ fun generateCircularGaugeBitmap(
     widthPx: Int,
     heightPx: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
+    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
     val w = widthPx.toFloat()
     val h = heightPx.toFloat()
     val cardSize = minOf(w, h)
@@ -1620,6 +1605,7 @@ fun generateVerticalPillBitmap(
     widthPx: Int,
     heightPx: Int
 ): Bitmap {
+    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
     val bitmap = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -1753,6 +1739,7 @@ fun generateHorizontalPillBitmap(
     widthPx: Int,
     heightPx: Int
 ): Bitmap {
+    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
     val bitmap = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 

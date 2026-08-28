@@ -25,7 +25,7 @@ fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java),
         SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java),
         SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java),
-        SlateWidgetInfo("Multi-Device", "4x2", "Battery", MultiDeviceBatteryReceiver::class.java),
+        SlateWidgetInfo("Multi-Device", "4x2", "Battery", BatteryMultiDeviceStatsReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java),
         SlateWidgetInfo("Dot Level Meter Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java),
         SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java),
@@ -132,7 +132,7 @@ fun updateAllBatteryWidgets(context: Context) {
         DotLevelPureBatteryReceiver::class.java,
         MinimalLinearBatteryReceiver::class.java,
         MinimalRingBatteryReceiver::class.java,
-        MultiDeviceBatteryReceiver::class.java,
+        BatteryMultiDeviceStatsReceiver::class.java,
         HorizontalBatteryReceiver::class.java,
         ArcGaugeBatteryReceiver::class.java,
         EditorialStatsBatteryReceiver::class.java,
@@ -221,11 +221,31 @@ class MinimalRingBatteryReceiver : BaseBatteryReceiver() {
     }
 }
 
-// Multi-Device Card (4x2)
-class MultiDeviceBatteryReceiver : BaseBatteryReceiver() {
+// 7. MULTI-DEVICE STATS BENTO (4x2 / Adaptive)
+class BatteryMultiDeviceStatsReceiver : BaseBatteryReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        val isResponsiveKey = "widget_${widgetId}_is_responsive"
+
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        if (widgetPrefs.contains(isResponsiveKey)) {
+            return widgetPrefs.getBoolean(isResponsiveKey, true)
+        }
+
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
+        return defaultResponsive
+    }
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generateMultiDeviceBatteryBitmap(context, data, config, wDp, hDp)
+        val isResponsive = parseAndLockIsResponsive(context, appWidgetId)
+        return generateMultiDeviceBatteryBitmap(context, data, config, isResponsive, wDp, hDp, appWidgetId)
     }
 }
 
