@@ -2,27 +2,29 @@ package com.altusix.slate.widgets.applauncher
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PointF
+import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.content.ContextCompat
-import com.altusix.slate.data.local.SlateWidgetConfig
-import kotlin.math.cos
-import kotlin.math.sin
 import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.VectorGroup
 import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
+import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
+import com.altusix.slate.utils.getSlateFont
+import com.altusix.slate.utils.getStandardCornerRadius
+import kotlin.math.cos
+import kotlin.math.sin
 
-private fun renderImageVectorOnCanvas(
-    canvas: Canvas,
-    imageVector: ImageVector,
-    cx: Float,
-    cy: Float,
-    contentSize: Float,
-    tintColor: Int
-) {
+private fun renderImageVectorOnCanvas(canvas: Canvas, imageVector: ImageVector, cx: Float, cy: Float, contentSize: Float, tintColor: Int) {
     val scale = contentSize / imageVector.defaultWidth.value
     val left = cx - contentSize / 2f
     val top = cy - contentSize / 2f
@@ -35,14 +37,7 @@ private fun renderImageVectorOnCanvas(
     drawVectorGroupOnCanvas(canvas, imageVector.root, left, top, scale, paint)
 }
 
-private fun drawVectorGroupOnCanvas(
-    canvas: Canvas,
-    group: VectorGroup,
-    left: Float,
-    top: Float,
-    scale: Float,
-    paint: Paint
-) {
+private fun drawVectorGroupOnCanvas(canvas: Canvas, group: VectorGroup, left: Float, top: Float, scale: Float, paint: Paint) {
     for (node in group) {
         when (node) {
             is VectorPath -> {
@@ -63,8 +58,6 @@ private fun drawVectorGroupOnCanvas(
         }
     }
 }
-
-private fun getStandardCornerRadius(density: Float): Float = 22f * density
 
 private fun addSmoothVerticesPath(path: Path, vertices: List<PointF>, cornerRadius: Float) {
     if (vertices.size < 3) return
@@ -100,12 +93,12 @@ private fun addSmoothVerticesPath(path: Path, vertices: List<PointF>, cornerRadi
     path.close()
 }
 
-fun getShapePath(shape: LauncherShape, rect: RectF, density: Float): Path {
+fun getShapePath(shape: LauncherShape, rect: RectF, scaleFactor: Float): Path {
     val path = Path()
     val cx = rect.centerX()
     val cy = rect.centerY()
     val radius = minOf(rect.width(), rect.height()) / 2f
-    val cornerRadius = 14f * density
+    val cornerRadius = 14f * scaleFactor
 
     when (shape) {
         LauncherShape.SQUIRCLE -> {
@@ -145,10 +138,10 @@ fun getShapePath(shape: LauncherShape, rect: RectF, density: Float): Path {
         }
         LauncherShape.M3_DIAMOND -> {
             val pts = listOf(
-                PointF(cx, rect.top + 4f * density),
-                PointF(rect.right - 4f * density, cy),
-                PointF(cx, rect.bottom - 4f * density),
-                PointF(rect.left + 4f * density, cy)
+                PointF(cx, rect.top + 4f * scaleFactor),
+                PointF(rect.right - 4f * scaleFactor, cy),
+                PointF(cx, rect.bottom - 4f * scaleFactor),
+                PointF(rect.left + 4f * scaleFactor, cy)
             )
             addSmoothVerticesPath(path, pts, cornerRadius * 1.2f)
         }
@@ -180,57 +173,19 @@ fun getShapePath(shape: LauncherShape, rect: RectF, density: Float): Path {
             addSmoothVerticesPath(path, pts, cornerRadius * 0.60f)
         }
         LauncherShape.HEART -> {
-            val cleftY      = cy - radius * 0.7085f   // dip between the two lobes
-            val lobePeakY   = cy - radius * 0.9175f   // height of the rounded lobe tops
-            val extremityY  = cy - radius * 0.3675f   // widest point, left/right
-            val tipY        = cy + radius * 0.9175f   // bottom point
-
-            val lobeX       = radius * 0.45f          // x of each lobe's peak
+            val cleftY = cy - radius * 0.7085f
+            val lobePeakY = cy - radius * 0.9175f
+            val extremityY = cy - radius * 0.3675f
+            val tipY = cy + radius * 0.9175f
+            val lobeX = radius * 0.45f
 
             path.moveTo(cx, cleftY)
-
-            // Segment A: cleft -> right lobe peak
-            path.cubicTo(
-                cx + radius * 0.109f, cy - radius * 0.8365f,
-                cx + radius * 0.276f, lobePeakY,
-                cx + lobeX, lobePeakY
-            )
-
-            // Segment B: right lobe peak -> right widest point
-            path.cubicTo(
-                cx + radius * 0.758f, lobePeakY,
-                cx + radius, cy - radius * 0.6755f,
-                cx + radius, extremityY
-            )
-
-            // Segment C: right widest point -> bottom tip
-            path.cubicTo(
-                cx + radius, cy + radius * 0.0105f,
-                cx + radius * 0.66f, cy + radius * 0.3185f,
-                cx, tipY
-            )
-
-            // Segment D: bottom tip -> left widest point (mirror of C)
-            path.cubicTo(
-                cx - radius * 0.66f, cy + radius * 0.3185f,
-                cx - radius, cy + radius * 0.0105f,
-                cx - radius, extremityY
-            )
-
-            // Segment E: left widest point -> left lobe peak (mirror of B)
-            path.cubicTo(
-                cx - radius, cy - radius * 0.6755f,
-                cx - radius * 0.758f, lobePeakY,
-                cx - lobeX, lobePeakY
-            )
-
-            // Segment F: left lobe peak -> back to cleft (mirror of A)
-            path.cubicTo(
-                cx - radius * 0.276f, lobePeakY,
-                cx - radius * 0.109f, cy - radius * 0.8365f,
-                cx, cleftY
-            )
-
+            path.cubicTo(cx + radius * 0.109f, cy - radius * 0.8365f, cx + radius * 0.276f, lobePeakY, cx + lobeX, lobePeakY)
+            path.cubicTo(cx + radius * 0.758f, lobePeakY, cx + radius, cy - radius * 0.6755f, cx + radius, extremityY)
+            path.cubicTo(cx + radius, cy + radius * 0.0105f, cx + radius * 0.66f, cy + radius * 0.3185f, cx, tipY)
+            path.cubicTo(cx - radius * 0.66f, cy + radius * 0.3185f, cx - radius, cy + radius * 0.0105f, cx - radius, extremityY)
+            path.cubicTo(cx - radius, cy - radius * 0.6755f, cx - radius * 0.758f, lobePeakY, cx - lobeX, lobePeakY)
+            path.cubicTo(cx - radius * 0.276f, lobePeakY, cx - radius * 0.109f, cy - radius * 0.8365f, cx, cleftY)
             path.close()
         }
         LauncherShape.M3_FLOWER -> {
@@ -253,74 +208,53 @@ fun getShapePath(shape: LauncherShape, rect: RectF, density: Float): Path {
         LauncherShape.BLOB_BOTTOM_RIGHT -> {
             val bigR = radius * 0.92f
             val smallR = radius * 0.32f
-            val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
-            val radii = floatArrayOf(
-                bigR, bigR,       // top-left
-                bigR, bigR,       // top-right
-                smallR, smallR,   // bottom-right — the pinched corner
-                bigR, bigR        // bottom-left
-            )
-            path.addRoundRect(rect, radii, Path.Direction.CW)
+            val rRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+            val radii = floatArrayOf(bigR, bigR, bigR, bigR, smallR, smallR, bigR, bigR)
+            path.addRoundRect(rRect, radii, Path.Direction.CW)
         }
-
         LauncherShape.BLOB_BOTTOM_LEFT -> {
             val bigR = radius * 0.92f
             val smallR = radius * 0.32f
-            val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
-            val radii = floatArrayOf(
-                bigR, bigR,       // top-left
-                bigR, bigR,       // top-right
-                bigR, bigR,       // bottom-right
-                smallR, smallR    // bottom-left — the pinched corner
-            )
-            path.addRoundRect(rect, radii, Path.Direction.CW)
+            val rRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+            val radii = floatArrayOf(bigR, bigR, bigR, bigR, bigR, bigR, smallR, smallR)
+            path.addRoundRect(rRect, radii, Path.Direction.CW)
         }
-
         LauncherShape.BLOB_TOP_RIGHT -> {
             val bigR = radius * 0.92f
             val smallR = radius * 0.32f
-            val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
-            val radii = floatArrayOf(
-                bigR, bigR,       // top-left
-                smallR, smallR,   // top-right — the pinched corner
-                bigR, bigR,       // bottom-right
-                bigR, bigR        // bottom-left
-            )
-            path.addRoundRect(rect, radii, Path.Direction.CW)
+            val rRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+            val radii = floatArrayOf(bigR, bigR, smallR, smallR, bigR, bigR, bigR, bigR)
+            path.addRoundRect(rRect, radii, Path.Direction.CW)
         }
-
         LauncherShape.BLOB_TOP_LEFT -> {
             val bigR = radius * 0.92f
             val smallR = radius * 0.32f
-            val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
-            val radii = floatArrayOf(
-                smallR, smallR,   // top-left — the pinched corner
-                bigR, bigR,       // top-right
-                bigR, bigR,       // bottom-right
-                bigR, bigR        // bottom-left
-            )
-            path.addRoundRect(rect, radii, Path.Direction.CW)
+            val rRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+            val radii = floatArrayOf(smallR, smallR, bigR, bigR, bigR, bigR, bigR, bigR)
+            path.addRoundRect(rRect, radii, Path.Direction.CW)
         }
-
+        else -> {
+            val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+            path.addRoundRect(rect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
+        }
     }
     return path
 }
 
-fun generateAdaptiveLauncherBitmap(    context: Context,    slateConfig: SlateWidgetConfig,    launcherConfig: AppLauncherWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+// 1. ADAPTIVE SHAPE LAUNCHER (1x1 Standard Square Base)
+fun generateAdaptiveLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val cardBg = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
 
+    val margin = scaleFactor * 1.5f
     val rect = if (launcherConfig.isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(margin, margin, w - margin, h - margin)
     } else {
-        val cardSize = minOf(w, h).toFloat()
+        val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
         val leftX = (w - cardSize) / 2f
         val topY = (h - cardSize) / 2f
         RectF(leftX, topY, leftX + cardSize, topY + cardSize)
@@ -331,34 +265,38 @@ fun generateAdaptiveLauncherBitmap(    context: Context,    slateConfig: SlateWi
         style = Paint.Style.FILL
     }
 
-    val path = getShapePath(launcherConfig.shape, rect, density)
-    canvas.drawPath(path, bgPaint)
+    if (launcherConfig.shape == LauncherShape.SQUIRCLE) {
+        val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+        canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
+    } else {
+        val path = getShapePath(launcherConfig.shape, rect, scaleFactor)
+        canvas.drawPath(path, bgPaint)
+    }
 
-    renderLauncherContent(context, canvas, rect, launcherConfig, accentColor, density)
+    renderLauncherContent(context, canvas, rect, launcherConfig, accentColor, scaleFactor)
     return bitmap
 }
 
-fun generateRectangleLauncherBitmap(    context: Context,    slateConfig: SlateWidgetConfig,    launcherConfig: AppLauncherWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+// 2. RECTANGLE LAUNCHER (2x1)
+fun generateRectangleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val cardCornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
+    val margin = scaleFactor * 1.5f
     val rect = if (launcherConfig.isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(margin, margin, w - margin, h - margin)
     } else {
         val targetRatio = 2.0f
-        var cardW = w.toFloat()
-        var cardH = cardW / targetRatio
-        if (cardH > h) {
-            cardH = h.toFloat()
-            cardW = cardH * targetRatio
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
         val topY = (h - cardH) / 2f
@@ -371,80 +309,88 @@ fun generateRectangleLauncherBitmap(    context: Context,    slateConfig: SlateW
     }
     canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    renderLauncherContent(context, canvas, rect, launcherConfig, accentColor, density)
+    renderLauncherContent(context, canvas, rect, launcherConfig, accentColor, scaleFactor)
     return bitmap
 }
 
+// SPECIFIC SQUIRCLE LAUNCHER (Strict Superellipse $n = 3.8$)
 fun generateSquircleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.SQUIRCLE, isResponsive = false), wDp, hDp)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val cardBg = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val rect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = cardBg
+        style = Paint.Style.FILL
+    }
+
+    val path = getShapePath(LauncherShape.SQUIRCLE, rect, scaleFactor)
+    canvas.drawPath(path, bgPaint)
+
+    renderLauncherContent(context, canvas, rect, launcherConfig, accentColor, scaleFactor)
+    return bitmap
 }
 
-fun generatePentagonLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_PENTAGON, isResponsive = false), wDp, hDp)
-}
+fun generatePentagonLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_PENTAGON, isResponsive = false), wDp, hDp)
 
-fun generateFlowerLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_FLOWER, isResponsive = false), wDp, hDp)
-}
+fun generateFlowerLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_FLOWER, isResponsive = false), wDp, hDp)
 
-fun generateCloverLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_CLOVER, isResponsive = false), wDp, hDp)
-}
+fun generateCloverLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_CLOVER, isResponsive = false), wDp, hDp)
 
-fun generateDiamondLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_DIAMOND, isResponsive = false), wDp, hDp)
-}
+fun generateDiamondLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_DIAMOND, isResponsive = false), wDp, hDp)
 
-fun generateOctagonLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_OCTAGON, isResponsive = false), wDp, hDp)
-}
+fun generateOctagonLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_OCTAGON, isResponsive = false), wDp, hDp)
 
-fun generateCircleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.CIRCLE, isResponsive = false), wDp, hDp)
-}
+fun generateCircleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.CIRCLE, isResponsive = false), wDp, hDp)
 
-fun generateBlobBottomRightLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_RIGHT, isResponsive = false), wDp, hDp)
-}
+fun generateBlobBottomRightLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_RIGHT, isResponsive = false), wDp, hDp)
 
-fun generateBlobBottomLeftLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_LEFT, isResponsive = false), wDp, hDp)
-}
+fun generateBlobBottomLeftLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_LEFT, isResponsive = false), wDp, hDp)
 
-fun generateBlobTopRightLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_RIGHT, isResponsive = false), wDp, hDp)
-}
+fun generateBlobTopRightLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_RIGHT, isResponsive = false), wDp, hDp)
 
-fun generateBlobTopLeftLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_LEFT, isResponsive = false), wDp, hDp)
-}
+fun generateBlobTopLeftLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_LEFT, isResponsive = false), wDp, hDp)
 
-fun generatePixelStarLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.PIXEL_STAR, isResponsive = false), wDp, hDp)
-}
+fun generatePixelStarLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.PIXEL_STAR, isResponsive = false), wDp, hDp)
 
-fun generateStar5LauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.STAR_5, isResponsive = false), wDp, hDp)
-}
+fun generateStar5LauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.STAR_5, isResponsive = false), wDp, hDp)
 
-fun generateHeartLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.HEART, isResponsive = false), wDp, hDp)
-}
+fun generateHeartLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.HEART, isResponsive = false), wDp, hDp)
 
-fun generateTriangleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    return generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.TRIANGLE, isResponsive = false), wDp, hDp)
-}
+fun generateTriangleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.TRIANGLE, isResponsive = false), wDp, hDp)
 
-fun generateGlitchTextLauncherBitmap(    context: Context,    slateConfig: SlateWidgetConfig,    launcherConfig: AppLauncherWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
+// 3. GLITCH TEXT LAUNCHER (2x2)
+fun generateGlitchTextLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val cardCornerRadius = getStandardCornerRadius(density)
-    val rect = RectF(0f, 0f, w.toFloat(), h.toFloat())
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val margin = scaleFactor * 1.5f
+    val rect = RectF(margin, margin, w - margin, h - margin)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
@@ -453,80 +399,83 @@ fun generateGlitchTextLauncherBitmap(    context: Context,    slateConfig: Slate
     canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val text = launcherConfig.customText.ifEmpty { "LAUNCH" }.uppercase()
-    val textSize = h * 0.28f
+    val textSize = minOf(rect.width(), rect.height()) * 0.28f
+    val font = getSlateFont(context, weight = 800)
 
     val cyanPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(0xFF00E5FF).toArgb()
         this.textSize = textSize
-        typeface = Typeface.MONOSPACE
+        typeface = font
         textAlign = Paint.Align.CENTER
     }
 
     val redPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(0xFFFF1744).toArgb()
         this.textSize = textSize
-        typeface = Typeface.MONOSPACE
+        typeface = font
         textAlign = Paint.Align.CENTER
     }
 
     val mainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(slateConfig.accentColorHex).toArgb()
         this.textSize = textSize
-        typeface = Typeface.MONOSPACE
+        typeface = font
         textAlign = Paint.Align.CENTER
     }
 
     val fontMetrics = mainPaint.fontMetrics
-    val textY = (h / 2f) - (fontMetrics.ascent + fontMetrics.descent) / 2f
+    val textY = rect.centerY() - (fontMetrics.ascent + fontMetrics.descent) / 2f
+    val cx = rect.centerX()
 
-    canvas.drawText(text, (w / 2f) - 3f * density, textY - 2f * density, cyanPaint)
-    canvas.drawText(text, (w / 2f) + 3f * density, textY + 2f * density, redPaint)
-    canvas.drawText(text, w / 2f, textY, mainPaint)
+    canvas.drawText(text, cx - (3f * scaleFactor), textY - (2f * scaleFactor), cyanPaint)
+    canvas.drawText(text, cx + (3f * scaleFactor), textY + (2f * scaleFactor), redPaint)
+    canvas.drawText(text, cx, textY, mainPaint)
 
     return bitmap
 }
 
-fun generateNeonRingLauncherBitmap(    context: Context,    slateConfig: SlateWidgetConfig,    launcherConfig: AppLauncherWidgetConfig,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
+// 4. NEON RING LAUNCHER (1x1 Square)
+fun generateNeonRingLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val rect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
-    val cardSize = minOf(w, h).toFloat()
-    val cx = w / 2f
-    val cy = h / 2f
+    val cx = rect.centerX()
+    val cy = rect.centerY()
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(density)
-    canvas.drawRoundRect(RectF((w - cardSize) / 2f, (h - cardSize) / 2f, (w + cardSize) / 2f, (h + cardSize) / 2f), cardCornerRadius, cardCornerRadius, bgPaint)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val ringR = (cardSize / 2f) - (14f * density)
+    val ringR = (cardSize / 2f) - (14f * scaleFactor)
     val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.STROKE
-        strokeWidth = 3f * density
+        strokeWidth = 3f * scaleFactor
     }
     canvas.drawCircle(cx, cy, ringR, ringPaint)
 
-    // Restrict content bounds inside the ring with breathing room
-    val innerRadius = ringR - (6f * density)
+    val innerRadius = ringR - (6f * scaleFactor)
     val contentRect = RectF(cx - innerRadius, cy - innerRadius, cx + innerRadius, cy + innerRadius)
-    renderLauncherContent(context, canvas, contentRect, launcherConfig, accentColor, density)
+    renderLauncherContent(context, canvas, contentRect, launcherConfig, accentColor, scaleFactor)
 
     return bitmap
 }
-private fun renderLauncherContent(    context: Context,    canvas: Canvas,    rect: RectF,    config: AppLauncherWidgetConfig,    tintColor: Int,    density: Float
-) {
+
+private fun renderLauncherContent(context: Context, canvas: Canvas, rect: RectF, config: AppLauncherWidgetConfig, tintColor: Int, scaleFactor: Float) {
     val baseSize = minOf(rect.width(), rect.height())
 
-    // Safe shape-aware scale & vertical offset factors so content stays inside shape bounds
-    val (scaleFactor, offsetYFactor) = when (config.shape) {
+    val (shapeScale, offsetYFactor) = when (config.shape) {
         LauncherShape.TRIANGLE -> 0.36f to 0.12f
         LauncherShape.STAR_5 -> 0.38f to 0.02f
         LauncherShape.PIXEL_STAR -> 0.40f to 0.0f
@@ -541,10 +490,10 @@ private fun renderLauncherContent(    context: Context,    canvas: Canvas,    re
 
     val cx = rect.centerX()
     val cy = rect.centerY() + (baseSize * offsetYFactor)
-    val contentSize = baseSize * scaleFactor
+    val contentSize = baseSize * shapeScale
 
     if (config.packageName.isEmpty() && config.iconType == LauncherIconType.APP_ICON) {
-        renderUnconfiguredPlaceholder(canvas, cx, cy, contentSize, tintColor)
+        renderUnconfiguredPlaceholder(context, canvas, cx, cy, contentSize, tintColor)
         return
     }
 
@@ -562,10 +511,10 @@ private fun renderLauncherContent(    context: Context,    canvas: Canvas,    re
                     )
                     iconDrawable.draw(canvas)
                 } catch (e: PackageManager.NameNotFoundException) {
-                    renderUnconfiguredPlaceholder(canvas, cx, cy, contentSize, tintColor)
+                    renderUnconfiguredPlaceholder(context, canvas, cx, cy, contentSize, tintColor)
                 }
             } else {
-                renderUnconfiguredPlaceholder(canvas, cx, cy, contentSize, tintColor)
+                renderUnconfiguredPlaceholder(context, canvas, cx, cy, contentSize, tintColor)
             }
         }
         LauncherIconType.EMOJI -> {
@@ -582,14 +531,14 @@ private fun renderLauncherContent(    context: Context,    canvas: Canvas,    re
             if (imageVector != null) {
                 renderImageVectorOnCanvas(canvas, imageVector, cx, cy, contentSize, tintColor)
             } else {
-                renderUnconfiguredPlaceholder(canvas, cx, cy, contentSize, tintColor)
+                renderUnconfiguredPlaceholder(context, canvas, cx, cy, contentSize, tintColor)
             }
         }
         LauncherIconType.CUSTOM_TEXT -> {
             val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = tintColor
                 textSize = contentSize * 0.55f
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = getSlateFont(context, weight = 700)
                 textAlign = Paint.Align.CENTER
             }
             val fontMetrics = textPaint.fontMetrics
@@ -599,11 +548,11 @@ private fun renderLauncherContent(    context: Context,    canvas: Canvas,    re
     }
 }
 
-private fun renderUnconfiguredPlaceholder(canvas: Canvas, cx: Float, cy: Float, contentSize: Float, tintColor: Int) {
+private fun renderUnconfiguredPlaceholder(context: Context, canvas: Canvas, cx: Float, cy: Float, contentSize: Float, tintColor: Int) {
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = tintColor
         textSize = contentSize * 0.48f
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
     val fontMetrics = textPaint.fontMetrics
