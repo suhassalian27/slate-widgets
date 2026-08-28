@@ -532,15 +532,7 @@ fun generateStudioCalculator4x2Bitmap(
 /**
  * 4. Circular Stage Calculator (2x2 Circle - Custom Shape Auto-Lock 1:1)
  */
-fun generateCircleCalculatorBitmap(
-    context: Context,
-    calcState: CalculatorState,
-    slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int = 0
-): Bitmap {
+fun generateCircleCalculatorBitmap(context: Context, calcState: CalculatorState, slateConfig: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -702,20 +694,8 @@ fun generateCircleCalculatorBitmap(
 
     canvas.restore()
 
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.parseColor("#1A000000") else Color.parseColor("#22FFFFFF")
-        style = Paint.Style.STROKE
-        strokeWidth = 1.5f * scaleFactor
-    }
-    canvas.drawCircle(cx, cy, radius - (1f * scaleFactor), borderPaint)
-
     return bitmap
 }
 
-fun generateCircleCalculatorBitmap(
-    context: Context,
-    calcState: CalculatorState,
-    slateConfig: SlateWidgetConfig,
-    wDp: Int,
-    hDp: Int
-): Bitmap = generateCircleCalculatorBitmap(context, calcState, slateConfig, isResponsive = true, wDp, hDp)
+fun generateCircleCalculatorBitmap(context: Context, calcState: CalculatorState, slateConfig: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateCircleCalculatorBitmap(context, calcState, slateConfig, isResponsive = true, wDp = wDp, hDp = hDp)
+
