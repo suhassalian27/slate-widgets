@@ -13,13 +13,33 @@ import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.core.service.SlateClockTickerService
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
+fun getCurrentCalendarPillState(): CalendarPillState {
+    val cal = Calendar.getInstance()
+    val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH).toString()
+    val monthShort = SimpleDateFormat("MMM", Locale.ENGLISH).format(cal.time)
+    val dayOfWeekFull = SimpleDateFormat("EEEE", Locale.ENGLISH).format(cal.time)
+    return CalendarPillState(dayOfMonth, monthShort, dayOfWeekFull)
+}
+
+fun getCurrentCalendarDateState(): CalendarDateState {
+    val cal = Calendar.getInstance()
+    val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH).toString()
+    val monthShort = SimpleDateFormat("MMM", Locale.ENGLISH).format(cal.time)
+    val dayOfWeekShort = SimpleDateFormat("EEE", Locale.ENGLISH).format(cal.time)
+    val year = cal.get(Calendar.YEAR).toString()
+    return CalendarDateState(dayOfMonth, monthShort, dayOfWeekShort, year)
+}
 
 fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Capsule Calendar", "2x1", "Calendar", CalendarPillReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Basic Calendar", "4x2", "Calendar", CalendarBasicReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Capsule Calendar", "2x1", "Calendar", CalendarPill2x1Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Basic Calendar", "4x2", "Calendar", CalendarBasicReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Big Date", "2x2", "Calendar", CalendarDate2x2Receiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Overlay Calendar", "4x2", "Calendar", CalendarWatermarkReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Overlay Calendar", "4x2", "Calendar", CalendarWatermarkReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Calendar Page", "2x2", "Calendar", CalendarPage2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Inline Header Date", "2x2", "Calendar", CalendarInlineHeaderReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Flip Calendar", "2x2", "Calendar", CalendarSplitFlapReceiver::class.java, hasModeOption = true),
@@ -52,7 +72,7 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
 fun updateAllCalendarWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
     val receivers = listOf(
-        CalendarPillReceiver::class.java,
+        CalendarPill2x1Receiver::class.java,
         CalendarBasicReceiver::class.java,
         CalendarDate2x2Receiver::class.java,
         CalendarWatermarkReceiver::class.java,
@@ -140,7 +160,6 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
 
             val config = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
 
-            // STRICT PER-INSTANCE ISOLATION BY WIDGET ID
             val keyCalResponsive = "calendar_${id}_is_responsive"
             val keyWMode = "widget_${id}_mode"
             val keyWResponsive = "widget_${id}_is_responsive"
@@ -156,7 +175,6 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
                     widgetPrefs.getBoolean(keyWResponsive, true)
                 }
                 else -> {
-                    // Fallback to launcher default ONLY on initial creation and permanently lock it
                     val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
                         .getBoolean("default_is_responsive", true)
                     calPrefs.edit().putBoolean(keyCalResponsive, defaultResponsive).apply()
@@ -195,25 +213,19 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
     }
 }
 
-class CalendarPillReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generatePillCalendarBitmap(context, CalendarEngine.getPillState(), config, wDp, hDp)
-}
+// 1. CAPSULE PILL (2x1)
+class CalendarPill2x1Receiver : BaseCalendarReceiver() { override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generatePillCalendarBitmap(context, getCurrentCalendarPillState(), config, isResponsive, wDp, hDp) }
 
-class CalendarBasicReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateBasicCalendarBitmap(context, CalendarEngine.getDateState(), config, wDp, hDp)
-}
+// 2. BASIC CALENDAR (4x2)
+class CalendarBasicReceiver : BaseCalendarReceiver() { override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateBasicCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
 
 class CalendarDate2x2Receiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateBigDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-class CalendarWatermarkReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateWatermarkCalendarBitmap(context, CalendarEngine.getDateState(), config, wDp, hDp)
-}
+// 4. MONTH OVERLAY CALENDAR (4x2)
+class CalendarWatermarkReceiver : BaseCalendarReceiver() { override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateWatermarkCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
 
 class CalendarPage2x2Receiver : BaseCalendarReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =

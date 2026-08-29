@@ -698,4 +698,3 @@ fun generateCircleCalculatorBitmap(context: Context, calcState: CalculatorState,
 }
 
 fun generateCircleCalculatorBitmap(context: Context, calcState: CalculatorState, slateConfig: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateCircleCalculatorBitmap(context, calcState, slateConfig, isResponsive = true, wDp = wDp, hDp = hDp)
-
