@@ -2,19 +2,16 @@ package com.altusix.slate.widgets.camera
 
 import android.content.Context
 import android.graphics.*
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.net.Uri
+import androidx.core.graphics.PathParser
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.utils.getSafeBgColor
-import com.altusix.slate.utils.getSlateFont
-import com.altusix.slate.utils.getStandardCornerRadius
-import android.graphics.*
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.drawConfigurePlaceholderState
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
-import androidx.core.graphics.PathParser
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
 
 private fun loadAndCropImage(context: Context, uriStr: String?, targetW: Int, targetH: Int): Bitmap? {
     if (uriStr == null) return null
@@ -38,25 +35,26 @@ private fun loadAndCropImage(context: Context, uriStr: String?, targetW: Int, ta
 }
 
 // 1. FIXED 4x2 WIDE PHOTO FRAME SHOWCASE
-fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(800)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(400)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrame4x2Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
 
     // Locked 2:1 Aspect Ratio Box
     val targetRatio = 2.0f
-    var cardH = h.toFloat()
+    var cardH = h
     var cardW = cardH * targetRatio
 
-    if (cardW > w.toFloat()) {
-        cardW = w.toFloat()
+    if (cardW > w) {
+        cardW = w
         cardH = cardW / targetRatio
     }
 
@@ -64,17 +62,17 @@ fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cam
     val topY = (h - cardH) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val clipPath = Path().apply {
-        addRoundRect(cardRect, cornerRadius, cornerRadius, Path.Direction.CW)
+        addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
     }
     canvas.save()
     canvas.clipPath(clipPath)
@@ -120,14 +118,16 @@ fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cam
                 val inset = strokeW / 2f
                 val insetRect = RectF(cardRect.left + inset, cardRect.top + inset, cardRect.right - inset, cardRect.bottom - inset)
                 val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = strokeW }
-                canvas.drawRoundRect(insetRect, (cornerRadius - inset).coerceAtLeast(4f), (cornerRadius - inset).coerceAtLeast(4f), borderPaint)
+                val innerRadius = (cardCornerRadius - inset).coerceAtLeast(scaleFactor * 4f)
+                canvas.drawRoundRect(insetRect, innerRadius, innerRadius, borderPaint)
             }
             PhotoFrameBorder.INNER_OUTLINE -> {
                 val gap = scaleFactor * 8f
                 val strokeW = scaleFactor * 2f
                 val outlineRect = RectF(cardRect.left + gap, cardRect.top + gap, cardRect.right - gap, cardRect.bottom - gap)
                 val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 255, 255, 255); style = Paint.Style.STROKE; strokeWidth = strokeW }
-                canvas.drawRoundRect(outlineRect, (cornerRadius - gap).coerceAtLeast(6f), (cornerRadius - gap).coerceAtLeast(6f), outlinePaint)
+                val innerRadius = (cardCornerRadius - gap).coerceAtLeast(scaleFactor * 6f)
+                canvas.drawRoundRect(outlineRect, innerRadius, innerRadius, outlinePaint)
             }
             PhotoFrameBorder.FILM_STRIP -> {
                 val barH = cardRect.height() * 0.12f
@@ -188,28 +188,29 @@ fun generatePhotoFrame4x2Bitmap(context: Context, config: SlateWidgetConfig, cam
 }
 
 // 2. PHOTO FRAME & GALLERY (2x2 / Responsive & Fixed Aspect Photo Display)
-fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int)
-: Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrameCameraBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 1.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -218,24 +219,21 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val clipPath = Path().apply {
-        addRoundRect(cardRect, cornerRadius, cornerRadius, Path.Direction.CW)
+        addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
     }
     canvas.save()
     canvas.clipPath(clipPath)
 
-    // =========================================================================
-    // STATE A: UNCONFIGURED EMPTY STATE ("Tap to Configure")
-    // =========================================================================
     if (cameraConfig.photoUri.isNullOrEmpty()) {
         drawConfigurePlaceholderState(
             canvas = canvas,
@@ -249,9 +247,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
         return bitmap
     }
 
-    // =========================================================================
-    // STATE B: PHOTO DISPLAYED WITH FILTERS & OVERLAYS
-    // =========================================================================
     val loadedBitmap = loadAndCropImage(
         context = context,
         uriStr = cameraConfig.photoUri,
@@ -262,7 +257,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
     if (loadedBitmap != null) {
         val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Expanded ColorMatrix Presets
         when (cameraConfig.filterStyle) {
             PhotoFilterStyle.GRAYSCALE -> {
                 val cm = ColorMatrix().apply { setSaturation(0f) }
@@ -332,7 +326,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
 
         canvas.drawBitmap(loadedBitmap, null, cardRect, imagePaint)
 
-        // Expanded Frame Border Options
         var polaroidRect: RectF? = null
 
         when (cameraConfig.borderStyle) {
@@ -356,7 +349,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
                 canvas.drawRect(cardRect, vigPaint)
             }
             PhotoFrameBorder.THIN_BORDER -> {
-                // Inset minimal border with 100% full opacity white line
                 val strokeW = scaleFactor * 3.5f
                 val inset = strokeW / 2f
                 val insetRect = RectF(cardRect.left + inset, cardRect.top + inset, cardRect.right - inset, cardRect.bottom - inset)
@@ -365,8 +357,8 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
                     style = Paint.Style.STROKE
                     strokeWidth = strokeW
                 }
-                val borderRadius = (cornerRadius - inset).coerceAtLeast(4f)
-                canvas.drawRoundRect(insetRect, borderRadius, borderRadius, borderPaint)
+                val innerRadius = (cardCornerRadius - inset).coerceAtLeast(scaleFactor * 4f)
+                canvas.drawRoundRect(insetRect, innerRadius, innerRadius, borderPaint)
             }
             PhotoFrameBorder.INNER_OUTLINE -> {
                 val gap = scaleFactor * 8f
@@ -377,8 +369,8 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
                     style = Paint.Style.STROKE
                     strokeWidth = strokeW
                 }
-                val outlineRadius = (cornerRadius - gap).coerceAtLeast(6f)
-                canvas.drawRoundRect(outlineRect, outlineRadius, outlineRadius, outlinePaint)
+                val innerRadius = (cardCornerRadius - gap).coerceAtLeast(scaleFactor * 6f)
+                canvas.drawRoundRect(outlineRect, innerRadius, innerRadius, outlinePaint)
             }
             PhotoFrameBorder.FILM_STRIP -> {
                 val barH = cardRect.height() * 0.08f
@@ -389,7 +381,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
                 canvas.drawRect(cardRect.left, cardRect.top, cardRect.right, cardRect.top + barH, stripPaint)
                 canvas.drawRect(cardRect.left, cardRect.bottom - barH, cardRect.right, cardRect.bottom, stripPaint)
 
-                // Hole punches
                 val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
                 val numHoles = 5
                 val holeW = cardRect.width() * 0.08f
@@ -407,7 +398,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
             else -> {}
         }
 
-        // Caption Overlay Handling
         if (cameraConfig.customCaption.isNotEmpty()) {
             val captionText = cameraConfig.customCaption
             val isPolaroid = cameraConfig.borderStyle == PhotoFrameBorder.POLAROID
@@ -433,7 +423,6 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
             }
 
             if (isPolaroid && polaroidRect != null) {
-                // Strictly centered horizontally and vertically inside the white bottom chin
                 val captionX = polaroidRect.centerX()
                 val captionY = polaroidRect.centerY() + (captionFontSize * 0.35f)
                 canvas.drawText(captionText, captionX, captionY, captionPaint)
@@ -450,19 +439,20 @@ fun generatePhotoFrameCameraBitmap(context: Context, config: SlateWidgetConfig, 
 }
 
 // 3. CIRCULAR PHOTO FRAME SHOWCASE
-fun generatePhotoFrameCircleBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrameCircleBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -568,24 +558,24 @@ fun generatePhotoFrameCircleBitmap(context: Context, config: SlateWidgetConfig, 
 }
 
 // 4. ORGANIC BLOB PHOTO FRAME (2x2 / Asymmetric Pebble Display)
-fun generatePhotoFrameBlobCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrameBlobCameraBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    // Parse SVG Path & Matrix scale directly to cardRect
     val svgPathData = "M26.2,15.8C14.3,35.9,-28.7,38.6,-38.3,19.9C-47.8,1.2,-23.9,-39,-2.4,-40.4C19.1,-41.8,38.2,-4.3,26.2,15.8Z"
     val rawPath = PathParser.createPathFromPathData(svgPathData)
 
@@ -693,24 +683,24 @@ fun generatePhotoFrameBlobCameraBitmap(context: Context, config: SlateWidgetConf
 }
 
 // 5. FLUID BLOB PHOTO FRAME (2x2 / Organic Wave Display)
-fun generatePhotoFrameFluidBlobCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrameFluidBlobCameraBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    // Parse SVG Path & Matrix scale directly to cardRect
     val svgPathData = "M59.2,-30.4C70,-15.5,67.4,11,55.3,31.2C43.2,51.4,21.6,65.4,3,63.7C-15.7,62,-31.3,44.6,-44.1,23.9C-57,3.3,-66.9,-20.5,-59.1,-33.7C-51.3,-46.9,-25.6,-49.5,-0.7,-49C24.2,-48.6,48.4,-45.3,59.2,-30.4Z"
     val rawPath = PathParser.createPathFromPathData(svgPathData)
 
@@ -818,26 +808,28 @@ fun generatePhotoFrameFluidBlobCameraBitmap(context: Context, config: SlateWidge
 }
 
 // 6. STACKED PHOTO FRAME (2x2 / Layered Polaroid Stack Display)
-fun generatePhotoFrameStackedCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrameStackedCameraBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val cx = w / 2f
     val cy = h / 2f
     val cardSize = minOf(w, h) * 0.84f
     val cardRect = RectF(cx - cardSize / 2f, cy - cardSize / 2f, cx + cardSize / 2f, cy + cardSize / 2f)
-    val cardRadius = scaleFactor * 14f
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
     val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(40, 0, 0, 0); style = Paint.Style.FILL }
     val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(45, 0, 0, 0) // Subtle outline to separate overlapping stacked cards
+        color = Color.argb(45, 0, 0, 0)
         style = Paint.Style.STROKE
         strokeWidth = scaleFactor * 1f
     }
@@ -845,30 +837,34 @@ fun generatePhotoFrameStackedCameraBitmap(context: Context, config: SlateWidgetC
     // Bottom Card (Rotated -6°)
     canvas.save()
     canvas.rotate(-6f, cx, cy)
-    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 2f) }, cardRadius, cardRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBgPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBorderPaint)
+    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 2f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
     canvas.restore()
 
     // Middle Card (Rotated +5°)
     canvas.save()
     canvas.rotate(5f, cx, cy)
-    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 2f) }, cardRadius, cardRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBgPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBorderPaint)
+    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 2f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
     canvas.restore()
 
     // Top Card (Front / Rotated 0°)
     canvas.save()
-    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardRadius, cardRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBgPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBorderPaint)
+    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
     // Inner Photo Bounds (Polaroid White Frame Padding)
     val borderPadding = cardSize * 0.05f
     val bottomChin = cardSize * 0.18f
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
-    val innerRadius = (cardRadius - borderPadding).coerceAtLeast(4f)
+
+    // Concentric Bento Tile Radius Formula
+    val innerRadius = (cardCornerRadius - borderPadding)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(innerPhotoRect.width(), innerPhotoRect.height()) * 0.22f)
 
     val innerClipPath = Path().apply { addRoundRect(innerPhotoRect, innerRadius, innerRadius, Path.Direction.CW) }
     canvas.save()
@@ -915,7 +911,6 @@ fun generatePhotoFrameStackedCameraBitmap(context: Context, config: SlateWidgetC
 
     canvas.restore()
 
-    // Caption Drawn Centered inside Bottom Polaroid Chin
     if (cameraConfig.customCaption.isNotEmpty()) {
         val captionText = cameraConfig.customCaption
         val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
@@ -943,21 +938,23 @@ fun generatePhotoFrameStackedCameraBitmap(context: Context, config: SlateWidgetC
 }
 
 // 7. TAPED POLAROID PHOTO FRAME (2x2 / Masking Tape Mounted Display)
-fun generatePhotoFrameTapedCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFrameTapedCameraBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val cx = w / 2f
     val cy = h / 2f
-    val cardSize = minOf(w, h) * 0.90f // Increased from 0.78f to fill more boundary space
+    val cardSize = minOf(w, h) * 0.90f
     val cardRect = RectF(cx - cardSize / 2f, cy - cardSize / 2f, cx + cardSize / 2f, cy + cardSize / 2f)
-    val cardRadius = scaleFactor * 12f
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
     val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 0, 0, 0); style = Paint.Style.FILL }
@@ -970,14 +967,17 @@ fun generatePhotoFrameTapedCameraBitmap(context: Context, config: SlateWidgetCon
     canvas.save()
     canvas.rotate(-3.5f, cx, cy)
 
-    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardRadius, cardRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBgPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBorderPaint)
+    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
     val borderPadding = cardSize * 0.05f
     val bottomChin = cardSize * 0.20f
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
-    val innerRadius = (cardRadius - borderPadding).coerceAtLeast(4f)
+
+    val innerRadius = (cardCornerRadius - borderPadding)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(innerPhotoRect.width(), innerPhotoRect.height()) * 0.22f)
 
     val innerClipPath = Path().apply { addRoundRect(innerPhotoRect, innerRadius, innerRadius, Path.Direction.CW) }
     canvas.save()
@@ -1052,12 +1052,12 @@ fun generatePhotoFrameTapedCameraBitmap(context: Context, config: SlateWidgetCon
     canvas.restore()
     return bitmap
 }
+
 private fun drawMaskingTape(canvas: Canvas, cardRect: RectF, scaleFactor: Float) {
     val tapeW = cardRect.width() * 0.38f
     val tapeH = cardRect.height() * 0.11f
 
-    // Position pulled down onto photo edge & slightly off-center to the left
-    val tapeX = cardRect.centerX() - tapeW / 2f - (cardRect.width() * 0.0f)
+    val tapeX = cardRect.centerX() - tapeW / 2f
     val tapeY = cardRect.top + (cardRect.height() * -0.034f)
     val left = tapeX
     val right = left + tapeW
@@ -1065,25 +1065,20 @@ private fun drawMaskingTape(canvas: Canvas, cardRect: RectF, scaleFactor: Float)
     val bottom = top + tapeH
 
     canvas.save()
-    // Counter-rotate relative to polaroid frame for an imperfect, realistic tilt
     canvas.rotate(2.8f, (left + right) / 2f, (top + bottom) / 2f)
 
     val tapePath = Path().apply {
-        // Top edge
         moveTo(left, top)
         lineTo(right, top)
 
-        // Right torn edge
         lineTo(right - scaleFactor * 1.5f, top + tapeH * 0.18f)
         lineTo(right + scaleFactor * 0.6f, top + tapeH * 0.38f)
         lineTo(right - scaleFactor * 2.0f, top + tapeH * 0.62f)
         lineTo(right + scaleFactor * 0.4f, top + tapeH * 0.82f)
         lineTo(right, bottom)
 
-        // Bottom edge
         lineTo(left, bottom)
 
-        // Left torn edge
         lineTo(left + scaleFactor * 1.8f, top + tapeH * 0.82f)
         lineTo(left - scaleFactor * 0.8f, top + tapeH * 0.58f)
         lineTo(left + scaleFactor * 1.2f, top + tapeH * 0.32f)
@@ -1107,21 +1102,23 @@ private fun drawMaskingTape(canvas: Canvas, cardRect: RectF, scaleFactor: Float)
 }
 
 // 8. PUSH PIN POLAROID PHOTO FRAME (2x2 / Red Thumbtack Mounted Display)
-fun generatePhotoFramePushPinCameraBitmap(context: Context, config: SlateWidgetConfig, cameraConfig: CameraWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generatePhotoFramePushPinCameraBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    cameraConfig: CameraWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val cx = w / 2f
-    val cy = (h / 2f) + (scaleFactor * 8f) // Offset down to provide top headroom for the pin
-    val cardSize = minOf(w, h) * 0.84f // Reduced slightly from 0.88f to prevent pin head clipping
+    val cy = (h / 2f) + (scaleFactor * 8f)
+    val cardSize = minOf(w, h) * 0.84f
     val cardRect = RectF(cx - cardSize / 2f, cy - cardSize / 2f, cx + cardSize / 2f, cy + cardSize / 2f)
-    val cardRadius = scaleFactor * 12f
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
     val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 0, 0, 0); style = Paint.Style.FILL }
@@ -1134,14 +1131,17 @@ fun generatePhotoFramePushPinCameraBitmap(context: Context, config: SlateWidgetC
     canvas.save()
     canvas.rotate(3.2f, cx, cy)
 
-    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardRadius, cardRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBgPaint)
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, cardBorderPaint)
+    canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
     val borderPadding = cardSize * 0.05f
     val bottomChin = cardSize * 0.20f
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
-    val innerRadius = (cardRadius - borderPadding).coerceAtLeast(4f)
+
+    val innerRadius = (cardCornerRadius - borderPadding)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(innerPhotoRect.width(), innerPhotoRect.height()) * 0.22f)
 
     val innerClipPath = Path().apply { addRoundRect(innerPhotoRect, innerRadius, innerRadius, Path.Direction.CW) }
     canvas.save()
@@ -1304,41 +1304,35 @@ fun generateCameraShutterLauncherBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
 
-    // Refined, ultra-sleek stroke parameters
     val strokeW = minDim * 0.012f
     val bracketMargin = minDim * 0.25f
     val bracketLength = minDim * 0.075f
@@ -1396,14 +1390,9 @@ fun generateCameraAperturePillBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(480)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(240)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
@@ -1412,14 +1401,14 @@ fun generateCameraAperturePillBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -1450,10 +1439,8 @@ fun generateCameraAperturePillBitmap(
     val cy = cardRect.centerY()
     val paddingX = pillH * 0.42f
 
-    // Fetch real device hardware specs
     val (mainText, subText) = getDeviceCameraSpecs(context)
 
-    // Sleek, refined primary text (600 SemiBold instead of 800 ExtraBold)
     val mainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         typeface = getSlateFont(context, weight = 600)
@@ -1462,7 +1449,6 @@ fun generateCameraAperturePillBitmap(
         letterSpacing = -0.01f
     }
 
-    // Secondary lens metadata text
     val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         typeface = getSlateFont(context, weight = 500)
@@ -1485,7 +1471,6 @@ fun generateCameraAperturePillBitmap(
     val mainY = startY + mainBounds.height()
     val subY = mainY + textGap + subBounds.height()
 
-    // Clean text drawing without overlapping dots
     canvas.drawText(mainText, textLeft, mainY, mainPaint)
     canvas.drawText(subText, textLeft, subY, subPaint)
 
@@ -1515,6 +1500,7 @@ fun generateCameraAperturePillBitmap(
 
     return bitmap
 }
+
 private fun getDeviceCameraSpecs(context: Context): Pair<String, String> {
     return try {
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
@@ -1531,7 +1517,6 @@ private fun getDeviceCameraSpecs(context: Context): Pair<String, String> {
 
             val apStr = if (aperture != null) "f/${aperture}" else "f/1.7"
 
-            // Converts physical sensor focal length into 35mm full-frame equivalent
             val fl35 = if (focalLength != null && sensorSize != null && sensorSize.width > 0) {
                 ((focalLength * 36f) / sensorSize.width).toInt()
             } else null
