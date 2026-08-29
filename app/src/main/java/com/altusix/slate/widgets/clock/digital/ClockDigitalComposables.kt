@@ -8,9 +8,10 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
-import com.altusix.slate.data.local.SlateWidgetConfig
 import androidx.core.content.res.ResourcesCompat
 import com.altusix.slate.R
+import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
@@ -29,7 +30,14 @@ fun getContrastColor(colorInt: Int): Int {
 /**
  * Auto-fits text width inside available bounds without clipping
  */
-fun drawAutoFitText(    canvas: Canvas,    text: String,    cx: Float,    cy: Float,    maxAllowedWidth: Float,    basePaint: Paint) {
+fun drawAutoFitText(
+    canvas: Canvas,
+    text: String,
+    cx: Float,
+    cy: Float,
+    maxAllowedWidth: Float,
+    basePaint: Paint
+) {
     val measuredWidth = basePaint.measureText(text)
     if (measuredWidth > maxAllowedWidth && maxAllowedWidth > 0f) {
         val originalSize = basePaint.textSize
@@ -177,7 +185,7 @@ private fun getFuzzyWordTimeState(hour24: Int, minute: Int): WordClockState {
         in 0..2 -> WordClockState(hourWords[currentHour12], "O'Clock", "")
         in 3..7 -> WordClockState("Five", "past", hourWords[currentHour12])
         in 8..12 -> WordClockState("Ten", "past", hourWords[currentHour12])
-        in 13..17 -> WordClockState("Quarter", "to", hourWords[nextHour12]) // Or "past"
+        in 13..17 -> WordClockState("Quarter", "to", hourWords[nextHour12])
         in 18..22 -> WordClockState("Twenty", "past", hourWords[currentHour12])
         in 23..27 -> WordClockState("Twenty Five", "past", hourWords[currentHour12])
         in 28..32 -> WordClockState("Half", "past", hourWords[currentHour12])
@@ -194,40 +202,39 @@ private fun getFuzzyWordTimeState(hour24: Int, minute: Int): WordClockState {
 // WIDGET BITMAP GENERATORS
 // ============================================================================
 
-
-
 // 1. MINIMAL DIVIDER DIGITAL (2x2 / Stacked Time with Accent Line Divider)
-fun generateMinimalDividerDigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateMinimalDividerDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    // 1. Card Container & Corner Radius Standard
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val clockCx = cardRect.centerX()
     val timeState = DigitalClockTimeState.now()
 
-    // 2. Stacked Typography (Hours & Minutes)
     val timeFont = getSlateFont(context, weight = 600, isItalic = false)
     val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -236,11 +243,9 @@ fun generateMinimalDividerDigitalClockBitmap(    context: Context,    config: Sl
         textAlign = Paint.Align.CENTER
     }
 
-    // Hour (Top)
     val hourY = topY + size * 0.36f
     drawAutoFitText(canvas, timeState.hour12, clockCx, hourY, size * 0.72f, timePaint)
 
-    // 3. Accent Line Divider
     val dividerW = size * 0.34f
     val dividerY = topY + size * 0.44f
     val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -251,11 +256,9 @@ fun generateMinimalDividerDigitalClockBitmap(    context: Context,    config: Sl
     }
     canvas.drawLine(clockCx - (dividerW / 2f), dividerY, clockCx + (dividerW / 2f), dividerY, dividerPaint)
 
-    // Minute (Bottom)
     val minY = topY + size * 0.73f
     drawAutoFitText(canvas, timeState.minute, clockCx, minY, size * 0.72f, timePaint)
 
-    // 4. Accent AM/PM Label
     val amPmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         typeface = getSlateFont(context, weight = 700, isItalic = false)
@@ -269,48 +272,45 @@ fun generateMinimalDividerDigitalClockBitmap(    context: Context,    config: Sl
 }
 
 // 2. COMPACT BLOCK DIGITAL (2x2 / Full-Card Centered 4-Digit Time)
-fun generateCompactBlockDigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateCompactBlockDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val bgColor = getSafeBgColor(config)
-    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = DigitalClockTimeState.now()
     val clockCx = cardRect.centerX()
 
-    // Custom Font Fallback Pipeline
     val customTypeface = try {
         ResourcesCompat.getFont(context, R.font.outward_block) ?: Typeface.DEFAULT_BOLD
     } catch (_: Exception) {
         Typeface.create("sans-serif-condensed", Typeface.BOLD)
     }
 
-    // 4-Digit 24-Hour Time Format (e.g. "1948")
     val timeString = "${timeState.hour24.padStart(2, '0')}${timeState.minute.padStart(2, '0')}"
 
-    // Full-Card Scaled Block Time Display
     val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         typeface = customTypeface
@@ -318,7 +318,6 @@ fun generateCompactBlockDigitalClockBitmap(    context: Context,    config: Slat
         textAlign = Paint.Align.CENTER
     }
 
-    // Exact Mathematical Vertical Centering
     val timeY = topY + (size * 0.955f)
     drawAutoFitText(canvas, timeString, clockCx, timeY, size * 0.86f, timePaint)
 
@@ -326,33 +325,34 @@ fun generateCompactBlockDigitalClockBitmap(    context: Context,    config: Slat
 }
 
 // 3. TYPOGRAPHIC WORD CLOCK (2x2 / Editorial Stacked Word Time)
-fun generateTextWordClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateTextWordClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = DigitalClockTimeState.now()
     val wordTime = getFuzzyWordTimeState(timeState.hour24.toIntOrNull() ?: 12, timeState.minute.toIntOrNull() ?: 0)
@@ -360,7 +360,6 @@ fun generateTextWordClockBitmap(    context: Context,    config: SlateWidgetConf
     val startX = leftX + size * 0.12f
     val maxTextWidth = size * 0.76f
 
-    // 1. Heavy Ultra-Bold Paint for Primary Time Words ("Quarter", "Nine")
     val mainWordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         typeface = getSlateFont(context, weight = 800, isItalic = false)
@@ -369,7 +368,6 @@ fun generateTextWordClockBitmap(    context: Context,    config: SlateWidgetConf
         letterSpacing = -0.02f
     }
 
-    // 2. Refined Light Italic Paint for Connector Words ("to", "past")
     val connectorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(215, Color.red(primaryText), Color.green(primaryText), Color.blue(primaryText))
         typeface = getSlateFont(context, weight = 200, isItalic = true)
@@ -378,7 +376,6 @@ fun generateTextWordClockBitmap(    context: Context,    config: SlateWidgetConf
         letterSpacing = 0.04f
     }
 
-    // 3. Compact Stack Layout Math
     if (wordTime.bottomWord.isEmpty()) {
         val line1Y = topY + size * 0.44f
         val line2Y = topY + size * 0.68f
@@ -398,38 +395,38 @@ fun generateTextWordClockBitmap(    context: Context,    config: SlateWidgetConf
 }
 
 // 8. GIANT HOUR CAPSULE DIGITAL (2x2 / Giant Hour with Accent Minute Pill)
-fun generateGiantHourCapsuleDigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateGiantHourCapsuleDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = DigitalClockTimeState.now()
     val clockCx = cardRect.centerX()
 
-    // 1. Giant Hour Text
     val hourStr = timeState.hour12
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -441,7 +438,6 @@ fun generateGiantHourCapsuleDigitalClockBitmap(    context: Context,    config: 
     val hourY = cardRect.centerY() - ((hourPaint.descent() + hourPaint.ascent()) / 2f) - (size * 0.035f)
     drawAutoFitText(canvas, hourStr, clockCx, hourY, size * 0.82f, hourPaint)
 
-    // 2. Bottom Right Accent Minute Pill
     val minStr = timeState.minute.padStart(2, '0')
     val minTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = getContrastColor(accentColorInt)
@@ -473,25 +469,33 @@ fun generateGiantHourCapsuleDigitalClockBitmap(    context: Context,    config: 
 }
 
 // 9. MODERN 3D LED HORIZONTAL DIGITAL (4x2 / Tightly Bounded Max Fit with Custom BG & Accent Minutes)
-fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
+fun generateModern3dLedHorizontalDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
-    // Create a tightly bound bitmap exactly matching the 2.4 aspect ratio
     val targetRatio = 2.4f
-    val rawH = hDp * density
-    val safeH = rawH.coerceIn(150f * density, 400f * density)
+    var cardH = h
+    var cardW = cardH * targetRatio
 
-    val bitmapHeight = safeH.toInt()
-    val bitmapWidth = (safeH * targetRatio).toInt()
+    if (cardW > w) {
+        cardW = w
+        cardH = cardW / targetRatio
+    }
 
-    val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
     val isLight = config.themeMode == "LIGHT"
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-
-    // --- THE FIX: Pull custom background color directly from user config ---
     val chassisBgColor = getSafeBgColor(config)
 
     val outerHighlightColor = if (isLight) Color.parseColor("#383437") else Color.parseColor("#FFFFFF")
@@ -505,14 +509,10 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
         style = Paint.Style.FILL
     }
     val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        // Transparent overlay creates realistic unlit segments automatically against any BG color
         color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(28, 255, 255, 255)
         style = Paint.Style.FILL
     }
 
-    val cardRect = RectF(0f, 0f, bitmapWidth.toFloat(), bitmapHeight.toFloat())
-
-    // 1. Mathematically Stable Pod Geometry
     val H = cardRect.height()
 
     val strokeW = H * 0.025f
@@ -541,7 +541,7 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
         }
     }
 
-    val p1L = inset
+    val p1L = cardRect.left + inset
     val p1R = p1L + iDw
     val p2L = p1R - iOv
     val p2R = p2L + iDw
@@ -568,7 +568,6 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
         op(pod4, Path.Op.UNION)
     }
 
-    // 2. Render 3D Scalloped Chassis Fill & Outer Outline
     val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = chassisBgColor
         style = Paint.Style.FILL
@@ -583,7 +582,6 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
     canvas.drawPath(chassisPath, fillPaint)
     canvas.drawPath(chassisPath, outerBorderPaint)
 
-    // 3. Centered 7-Segment Digits inside Pods
     val digitH = H * 0.82f
     val digitW = iDw * 0.68f
     val digitY = top + ((bottom - top - digitH) / 2f)
@@ -594,14 +592,12 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
 
     fun getPodCenterX(l: Float, r: Float): Float = l + ((r - l) / 2f)
 
-    // Hour Digits (Primary Color)
     val d1X = getPodCenterX(p1L, p1R) - (digitW / 2f)
     drawAngled7SegmentDigit(canvas, hourStr[0], d1X, digitY, digitW, digitH, activePaint, inactivePaint)
 
     val d2X = getPodCenterX(p2L, p2R) - (digitW / 2f)
     drawAngled7SegmentDigit(canvas, hourStr[1], d2X, digitY, digitW, digitH, activePaint, inactivePaint)
 
-    // Colon Dots (Primary Color)
     val colonCx = getPodCenterX(pCL, pCR)
     val colonRadius = digitW * 0.14f
     val dot1Y = digitY + (digitH * 0.28f)
@@ -609,7 +605,6 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
     canvas.drawCircle(colonCx, dot1Y, colonRadius, activePaint)
     canvas.drawCircle(colonCx, dot2Y, colonRadius, activePaint)
 
-    // Minute Digits (Accent Color)
     val d3X = getPodCenterX(p3L, p3R) - (digitW / 2f)
     drawAngled7SegmentDigit(canvas, minStr[0], d3X, digitY, digitW, digitH, accentActivePaint, inactivePaint)
 
@@ -620,29 +615,31 @@ fun generateModern3dLedHorizontalDigitalClockBitmap(    context: Context,    con
 }
 
 // 14. MINIMAL STACKED DIGITAL (1x2 / Clean Two-Tone Vertical Time with Accent Divider)
-fun generateMinimalStackedDigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((200 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateMinimalStackedDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    // 1. Calculate Card Bounds (1:2 Target Aspect Ratio for 1x2 Fixed Mode)
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 0.5f
-        var cardW = w.toFloat()
+        var cardW = w
         var cardH = cardW / targetRatio
 
-        if (cardH > h.toFloat()) {
-            cardH = h.toFloat()
+        if (cardH > h) {
+            cardH = h
             cardW = cardH * targetRatio
         }
 
@@ -651,18 +648,16 @@ fun generateMinimalStackedDigitalClockBitmap(    context: Context,    config: Sl
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    // Standard Card Radius (Not Pill Shaped)
-    val cardRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val padX = cardRect.width() * 0.12f
     val padY = cardRect.height() * 0.10f
 
-    // Time Data Only
     val timeState = DigitalClockTimeState.now()
     val hourStr = timeState.hour24.padStart(2, '0')
     val minStr = timeState.minute.padStart(2, '0')
@@ -670,14 +665,12 @@ fun generateMinimalStackedDigitalClockBitmap(    context: Context,    config: Sl
     val usableW = cardRect.width() - (padX * 2f)
     val usableH = cardRect.height() - (padY * 2f)
 
-    // Center Accent Divider Bar Specs
     val dividerW = usableW * 0.35f
-    val dividerH = (2.5f * density).coerceAtLeast(2f)
+    val dividerH = (2.5f * scaleFactor).coerceAtLeast(2f)
     val dividerGapY = cardRect.height() * 0.04f
 
     val maxDigitH = (usableH - dividerH - (dividerGapY * 2f)) / 2f
 
-    // 2. Uniform Font Sizing
     val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 700)
         textSize = 100f
@@ -703,7 +696,6 @@ fun generateMinimalStackedDigitalClockBitmap(    context: Context,    config: Sl
     hourPaint.getTextBounds("00", 0, 2, timeBounds)
     val digitH = timeBounds.height().toFloat()
 
-    // 3. Center Stack (Hour + Gap + Divider + Gap + Minute) Vertically
     val totalStackH = digitH + dividerGapY + dividerH + dividerGapY + digitH
     val stackTopY = cardRect.centerY() - (totalStackH / 2f)
 
@@ -711,10 +703,8 @@ fun generateMinimalStackedDigitalClockBitmap(    context: Context,    config: Sl
     val dividerCenterY = stackTopY + digitH + dividerGapY + (dividerH / 2f)
     val minY = dividerCenterY + (dividerH / 2f) + dividerGapY + digitH - timeBounds.bottom
 
-    // Draw Top Hour Digits (Primary Text)
     canvas.drawText(hourStr, cardRect.centerX(), hourY, hourPaint)
 
-    // Draw Minimal Accent Center Divider Line
     val dividerLeft = cardRect.centerX() - (dividerW / 2f)
     val dividerRect = RectF(
         dividerLeft,
@@ -728,104 +718,56 @@ fun generateMinimalStackedDigitalClockBitmap(    context: Context,    config: Sl
     }
     canvas.drawRoundRect(dividerRect, dividerH / 2f, dividerH / 2f, dividerPaint)
 
-    // Draw Bottom Minute Digits (Accent Text Color)
     canvas.drawText(minStr, cardRect.centerX(), minY, minPaint)
 
     return bitmap
 }
 
 // 15. TEXT DIGITAL FONT 1 (4x2 / Pure Typographic Giant 4-Digit Time)
-fun generateTextFont1DigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int,): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val bgColor = getSafeBgColor(config)
-    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-
-    // Fixed 2:1 Container Bounds
-    val targetRatio = 2.0f
-    var cardH = h.toFloat()
-    var cardW = cardH * targetRatio
-
-    if (cardW > w.toFloat()) {
-        cardW = w.toFloat()
-        cardH = cardW / targetRatio
-    }
-
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
-    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
-
-    val cardRadius = getStandardCornerRadius(density)
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
-
-    // Time Data (4-digit format without colon)
-    val timeState = DigitalClockTimeState.now()
-    val hourStr = timeState.hour24.padStart(2, '0')
-    val minStr = timeState.minute.padStart(2, '0')
-    val timeText = "$hourStr$minStr"
-
-    val padX = cardRect.width() * 0.05f
-    val padY = cardRect.height() * 0.06f
-    val maxW = cardRect.width() - (padX * 2f)
-    val maxH = cardRect.height() - (padY * 2f)
-
-    // Measure & scale text to fill maximal bounds cleanly
-    val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 700)
-        textSize = 100f
-    }
-    val refW = refPaint.measureText(timeText)
-    val timeTextSize = minOf(maxH * 0.96f, 100f * (maxW / refW))
-
-    // Text paint set to accent color
-    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColorInt
-        textSize = timeTextSize
-        typeface = getSlateFont(context, weight = 700)
-        textAlign = Paint.Align.CENTER
-    }
-
-    val timeBounds = android.graphics.Rect()
-    timePaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
-    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
-
-    canvas.drawText(timeText, cardRect.centerX(), timeY, timePaint)
-
-    return bitmap
+fun generateTextFont1DigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+): Bitmap {
+    return generateTextCustomFontDigitalClockBitmap(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        fontResId = null
+    )
 }
 
-fun generateTextCustomFontDigitalClockBitmap(    context: Context,    config: SlateWidgetConfig,    isResponsive: Boolean,    wDp: Int,    hDp: Int,    fontResId: Int): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+fun generateTextCustomFontDigitalClockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    fontResId: Int?
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    val customTypeface = androidx.core.content.res.ResourcesCompat.getFont(
-        context,
-        fontResId
-    ) ?: Typeface.DEFAULT_BOLD
+    val customTypeface = if (fontResId != null) {
+        ResourcesCompat.getFont(context, fontResId) ?: getSlateFont(context, weight = 700)
+    } else {
+        getSlateFont(context, weight = 700)
+    }
 
-    // Fixed 2:1 Container Bounds
     val targetRatio = 2.0f
-    var cardH = h.toFloat()
+    var cardH = h
     var cardW = cardH * targetRatio
 
-    if (cardW > w.toFloat()) {
-        cardW = w.toFloat()
+    if (cardW > w) {
+        cardW = w
         cardH = cardW / targetRatio
     }
 
@@ -833,14 +775,13 @@ fun generateTextCustomFontDigitalClockBitmap(    context: Context,    config: Sl
     val topY = (h - cardH) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val cardRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    // Time Data (4-digit format without colon)
     val timeState = DigitalClockTimeState.now()
     val hourStr = timeState.hour24.padStart(2, '0')
     val minStr = timeState.minute.padStart(2, '0')
@@ -855,7 +796,7 @@ fun generateTextCustomFontDigitalClockBitmap(    context: Context,    config: Sl
         typeface = customTypeface
         textSize = 100f
     }
-    val refW = refPaint.measureText(timeText)
+    val refW = refPaint.measureText(timeText).coerceAtLeast(1f)
     val timeTextSize = minOf(maxH * 0.96f, 100f * (maxW / refW))
 
     val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -867,14 +808,14 @@ fun generateTextCustomFontDigitalClockBitmap(    context: Context,    config: Sl
 
     val timeBounds = android.graphics.Rect()
     timePaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
-    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
+    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * scaleFactor)
 
     canvas.drawText(timeText, cardRect.centerX(), timeY, timePaint)
 
     return bitmap
 }
 
-// 16. TEXT DIGITAL FONT 2 (4x2 / Saint Regular)
+// 16. TEXT DIGITAL FONT 2 (4x2 / Basteleur Bold)
 fun generateTextFont2DigitalClockBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
     generateTextCustomFontDigitalClockBitmap(context, config, isResponsive, wDp, hDp, R.font.basteleur_bold)
 
