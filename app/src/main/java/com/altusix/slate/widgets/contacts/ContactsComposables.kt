@@ -16,6 +16,7 @@ import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import com.altusix.slate.R
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.drawConfigurePlaceholderState
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
@@ -127,15 +128,9 @@ fun generateSingleAvatarCapsuleBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -144,13 +139,13 @@ fun generateSingleAvatarCapsuleBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 0.5f
-        var cardW = w.toFloat()
+        var cardW = w
         var cardH = cardW / targetRatio
-        if (cardH > h.toFloat()) {
-            cardH = h.toFloat()
+        if (cardH > h) {
+            cardH = h
             cardW = cardH * targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -260,15 +255,9 @@ fun generateHorizontalSpeedDialBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -276,13 +265,13 @@ fun generateHorizontalSpeedDialBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -443,15 +432,9 @@ fun generateEditorialBentoContactsBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -463,14 +446,14 @@ fun generateEditorialBentoContactsBitmap(
     val b = Color.blue(accentColorInt) / 255f
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
+    val targetRatio = 2.0f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -497,34 +480,56 @@ fun generateEditorialBentoContactsBitmap(
     val gap = scaleFactor * 8f
 
     val innerW = (cardRect.width() - (pad * 2f) - gap).coerceAtLeast(1f)
-    val innerH = (cardRect.height() - (pad * 2f)).coerceAtLeast(1f)
+    val innerH = (cardRect.height() - (pad * 2f) - gap).coerceAtLeast(1f)
 
-    val heroW = innerW * 0.52f
-    val rightW = innerW - heroW
-    val rightH = (innerH - gap) / 2f
+    val aspectRatio = cardRect.width() / cardRect.height()
+    val isWide = if (isResponsive) aspectRatio >= 1.15f else true
 
-    val heroRect = RectF(
-        cardRect.left + pad,
-        cardRect.top + pad,
-        cardRect.left + pad + heroW,
-        cardRect.bottom - pad
-    )
+    val heroRect: RectF
+    val callRect: RectF
+    val msgRect: RectF
 
-    val callRect = RectF(
-        heroRect.right + gap,
-        cardRect.top + pad,
-        cardRect.right - pad,
-        cardRect.top + pad + rightH
-    )
+    if (isWide) {
+        val heroW = innerW * 0.52f
+        val rightH = (innerH - gap) / 2f
 
-    val msgRect = RectF(
-        heroRect.right + gap,
-        callRect.bottom + gap,
-        cardRect.right - pad,
-        cardRect.bottom - pad
-    )
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.bottom - pad)
+        callRect = RectF(heroRect.right + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + rightH)
+        msgRect = RectF(heroRect.right + gap, callRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    } else {
+        val heroH = innerH * 0.52f
+        val bottomH = innerH - heroH
+        val bottomW = (cardRect.width() - (pad * 2f) - gap) / 2f
 
-    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        callRect = RectF(cardRect.left + pad, heroRect.bottom + gap, cardRect.left + pad + bottomW, cardRect.bottom - pad)
+        msgRect = RectF(callRect.right + gap, heroRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    }
+
+    val minTileDim = minOf(heroRect.width(), heroRect.height())
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minTileDim * 0.20f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minTileDim * 0.48f)
+
+    fun getRadii(tl: Float, tr: Float, br: Float, bl: Float) = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+
+    val heroRadii = if (isWide) {
+        getRadii(outerCornerR, defaultInnerR, defaultInnerR, outerCornerR)
+    } else {
+        getRadii(outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
+    }
+
+    val callRadii = if (isWide) {
+        getRadii(defaultInnerR, outerCornerR, defaultInnerR, defaultInnerR)
+    } else {
+        getRadii(defaultInnerR, defaultInnerR, defaultInnerR, outerCornerR)
+    }
+
+    val msgRadii = if (isWide) {
+        getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    } else {
+        getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    }
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
@@ -536,7 +541,7 @@ fun generateEditorialBentoContactsBitmap(
 
     canvas.save()
     val heroClipPath = Path().apply {
-        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+        addRoundRect(heroRect, heroRadii, Path.Direction.CW)
     }
     canvas.clipPath(heroClipPath)
 
@@ -568,7 +573,7 @@ fun generateEditorialBentoContactsBitmap(
         }
         canvas.drawRect(heroRect, gradientPaint)
     } else {
-        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+        canvas.drawPath(heroClipPath, cardPaint)
 
         val heroCx = heroRect.centerX()
         val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
@@ -612,8 +617,12 @@ fun generateEditorialBentoContactsBitmap(
         color = accentColorInt
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
-    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callPath = Path().apply { addRoundRect(callRect, callRadii, Path.Direction.CW) }
+    val msgPath = Path().apply { addRoundRect(msgRect, msgRadii, Path.Direction.CW) }
+
+    canvas.drawPath(callPath, accentCardPaint)
+    canvas.drawPath(msgPath, cardPaint)
 
     val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
@@ -688,15 +697,9 @@ fun generateStackedBentoContactsBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -709,9 +712,9 @@ fun generateStackedBentoContactsBitmap(
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
@@ -738,32 +741,65 @@ fun generateStackedBentoContactsBitmap(
     val innerW = (cardRect.width() - (pad * 2f)).coerceAtLeast(1f)
     val innerH = (cardRect.height() - (pad * 2f) - gap).coerceAtLeast(1f)
 
-    val heroH = innerH * 0.54f
-    val bottomH = innerH - heroH
-    val bottomW = (innerW - gap) / 2f
+    val aspectRatio = cardRect.width() / cardRect.height()
 
-    val heroRect = RectF(
-        cardRect.left + pad,
-        cardRect.top + pad,
-        cardRect.right - pad,
-        cardRect.top + pad + heroH
-    )
+    // Mode 1: Wide (Hero Left, 2 Right Stacked)
+    // Mode 2: Tall (Hero Top, 2 Bottom Stacked)
+    // Mode 3: Default/Square (Hero Top, 2 Bottom Side-by-Side)
+    val isWide = isResponsive && aspectRatio >= 1.35f
+    val isTallStacked = isResponsive && aspectRatio <= 0.65f
 
-    val callRect = RectF(
-        cardRect.left + pad,
-        heroRect.bottom + gap,
-        cardRect.left + pad + bottomW,
-        cardRect.bottom - pad
-    )
+    val heroRect: RectF
+    val callRect: RectF
+    val msgRect: RectF
 
-    val msgRect = RectF(
-        callRect.right + gap,
-        heroRect.bottom + gap,
-        cardRect.right - pad,
-        cardRect.bottom - pad
-    )
+    if (isWide) {
+        val heroW = innerW * 0.52f
+        val rightW = innerW - heroW - gap
+        val rightH = (cardRect.height() - (pad * 2f) - gap) / 2f
 
-    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.bottom - pad)
+        callRect = RectF(heroRect.right + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + rightH)
+        msgRect = RectF(heroRect.right + gap, callRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    } else if (isTallStacked) {
+        val heroH = innerH * 0.50f
+        val rightH = (innerH - heroH - gap) / 2f
+
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        callRect = RectF(cardRect.left + pad, heroRect.bottom + gap, cardRect.right - pad, heroRect.bottom + gap + rightH)
+        msgRect = RectF(cardRect.left + pad, callRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    } else {
+        val heroH = innerH * 0.54f
+        val bottomW = (innerW - gap) / 2f
+
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        callRect = RectF(cardRect.left + pad, heroRect.bottom + gap, cardRect.left + pad + bottomW, cardRect.bottom - pad)
+        msgRect = RectF(callRect.right + gap, heroRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    }
+
+    val minTileDim = minOf(heroRect.width(), heroRect.height())
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minTileDim * 0.20f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minTileDim * 0.48f)
+
+    fun getRadii(tl: Float, tr: Float, br: Float, bl: Float) = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+
+    val heroRadii = when {
+        isWide -> getRadii(outerCornerR, defaultInnerR, defaultInnerR, outerCornerR)
+        else -> getRadii(outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
+    }
+
+    val callRadii = when {
+        isWide -> getRadii(defaultInnerR, outerCornerR, defaultInnerR, defaultInnerR)
+        isTallStacked -> getRadii(defaultInnerR, defaultInnerR, defaultInnerR, defaultInnerR)
+        else -> getRadii(defaultInnerR, defaultInnerR, defaultInnerR, outerCornerR)
+    }
+
+    val msgRadii = when {
+        isWide -> getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+        isTallStacked -> getRadii(defaultInnerR, defaultInnerR, outerCornerR, outerCornerR)
+        else -> getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    }
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
@@ -775,7 +811,7 @@ fun generateStackedBentoContactsBitmap(
 
     canvas.save()
     val heroClipPath = Path().apply {
-        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+        addRoundRect(heroRect, heroRadii, Path.Direction.CW)
     }
     canvas.clipPath(heroClipPath)
 
@@ -807,7 +843,7 @@ fun generateStackedBentoContactsBitmap(
         }
         canvas.drawRect(heroRect, gradientPaint)
     } else {
-        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+        canvas.drawPath(heroClipPath, cardPaint)
 
         val heroCx = heroRect.centerX()
         val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
@@ -851,8 +887,12 @@ fun generateStackedBentoContactsBitmap(
         color = accentColorInt
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
-    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callPath = Path().apply { addRoundRect(callRect, callRadii, Path.Direction.CW) }
+    val msgPath = Path().apply { addRoundRect(msgRect, msgRadii, Path.Direction.CW) }
+
+    canvas.drawPath(callPath, accentCardPaint)
+    canvas.drawPath(msgPath, cardPaint)
 
     val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
@@ -927,15 +967,9 @@ fun generateEditorial3ActionBentoContactsBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -947,14 +981,14 @@ fun generateEditorial3ActionBentoContactsBitmap(
     val b = Color.blue(accentColorInt) / 255f
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
+    val targetRatio = 2.0f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -981,40 +1015,60 @@ fun generateEditorial3ActionBentoContactsBitmap(
     val gap = scaleFactor * 6f
 
     val innerW = (cardRect.width() - (pad * 2f) - gap).coerceAtLeast(1f)
-    val innerH = (cardRect.height() - (pad * 2f)).coerceAtLeast(1f)
+    val innerH = (cardRect.height() - (pad * 2f) - (gap * 2f)).coerceAtLeast(1f)
 
-    val heroW = innerW * 0.50f
-    val rightH = (innerH - (gap * 2f)) / 3f
+    val aspectRatio = cardRect.width() / cardRect.height()
+    val isWide = if (isResponsive) aspectRatio >= 1.15f else true
 
-    val heroRect = RectF(
-        cardRect.left + pad,
-        cardRect.top + pad,
-        cardRect.left + pad + heroW,
-        cardRect.bottom - pad
-    )
+    val heroRect: RectF
+    val callRect: RectF
+    val msgRect: RectF
+    val waRect: RectF
 
-    val callRect = RectF(
-        heroRect.right + gap,
-        cardRect.top + pad,
-        cardRect.right - pad,
-        cardRect.top + pad + rightH
-    )
+    if (isWide) {
+        val heroW = innerW * 0.50f
+        val rightH = (cardRect.height() - (pad * 2f) - (gap * 2f)) / 3f
 
-    val msgRect = RectF(
-        heroRect.right + gap,
-        callRect.bottom + gap,
-        cardRect.right - pad,
-        callRect.bottom + gap + rightH
-    )
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.bottom - pad)
+        callRect = RectF(heroRect.right + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + rightH)
+        msgRect = RectF(heroRect.right + gap, callRect.bottom + gap, cardRect.right - pad, callRect.bottom + gap + rightH)
+        waRect = RectF(heroRect.right + gap, msgRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    } else {
+        val heroH = (cardRect.height() - (pad * 2f) - gap) * 0.50f
+        val bottomW = (cardRect.width() - (pad * 2f) - (gap * 2f)) / 3f
 
-    val waRect = RectF(
-        heroRect.right + gap,
-        msgRect.bottom + gap,
-        cardRect.right - pad,
-        cardRect.bottom - pad
-    )
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        callRect = RectF(cardRect.left + pad, heroRect.bottom + gap, cardRect.left + pad + bottomW, cardRect.bottom - pad)
+        msgRect = RectF(callRect.right + gap, heroRect.bottom + gap, callRect.right + gap + bottomW, cardRect.bottom - pad)
+        waRect = RectF(msgRect.right + gap, heroRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    }
 
-    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val minTileDim = minOf(heroRect.width(), heroRect.height())
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minTileDim * 0.20f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minTileDim * 0.48f)
+
+    fun getRadii(tl: Float, tr: Float, br: Float, bl: Float) = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+
+    val heroRadii = if (isWide) {
+        getRadii(outerCornerR, defaultInnerR, defaultInnerR, outerCornerR)
+    } else {
+        getRadii(outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
+    }
+
+    val callRadii = if (isWide) {
+        getRadii(defaultInnerR, outerCornerR, defaultInnerR, defaultInnerR)
+    } else {
+        getRadii(defaultInnerR, defaultInnerR, defaultInnerR, outerCornerR)
+    }
+
+    val msgRadii = getRadii(defaultInnerR, defaultInnerR, defaultInnerR, defaultInnerR)
+
+    val waRadii = if (isWide) {
+        getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    } else {
+        getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    }
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
@@ -1026,7 +1080,7 @@ fun generateEditorial3ActionBentoContactsBitmap(
 
     canvas.save()
     val heroClipPath = Path().apply {
-        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+        addRoundRect(heroRect, heroRadii, Path.Direction.CW)
     }
     canvas.clipPath(heroClipPath)
 
@@ -1058,7 +1112,7 @@ fun generateEditorial3ActionBentoContactsBitmap(
         }
         canvas.drawRect(heroRect, gradientPaint)
     } else {
-        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+        canvas.drawPath(heroClipPath, cardPaint)
 
         val heroCx = heroRect.centerX()
         val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
@@ -1102,9 +1156,14 @@ fun generateEditorial3ActionBentoContactsBitmap(
         color = accentColorInt
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
-    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
-    canvas.drawRoundRect(waRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callPath = Path().apply { addRoundRect(callRect, callRadii, Path.Direction.CW) }
+    val msgPath = Path().apply { addRoundRect(msgRect, msgRadii, Path.Direction.CW) }
+    val waPath = Path().apply { addRoundRect(waRect, waRadii, Path.Direction.CW) }
+
+    canvas.drawPath(callPath, accentCardPaint)
+    canvas.drawPath(msgPath, cardPaint)
+    canvas.drawPath(waPath, cardPaint)
 
     val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
@@ -1182,15 +1241,9 @@ fun generateStacked3ActionBentoContactsBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1203,9 +1256,9 @@ fun generateStacked3ActionBentoContactsBitmap(
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
@@ -1229,42 +1282,74 @@ fun generateStacked3ActionBentoContactsBitmap(
     val pad = scaleFactor * 8f
     val gap = scaleFactor * 6f
 
-    val innerW = (cardRect.width() - (pad * 2f) - (gap * 2f)).coerceAtLeast(1f)
+    val innerW = (cardRect.width() - (pad * 2f)).coerceAtLeast(1f)
     val innerH = (cardRect.height() - (pad * 2f) - gap).coerceAtLeast(1f)
 
-    val heroH = innerH * 0.54f
-    val bottomH = innerH - heroH
-    val bottomW = innerW / 3f
+    val aspectRatio = cardRect.width() / cardRect.height()
 
-    val heroRect = RectF(
-        cardRect.left + pad,
-        cardRect.top + pad,
-        cardRect.right - pad,
-        cardRect.top + pad + heroH
-    )
+    // Mode 1: Wide (Hero Left, 3 Right Stacked)
+    // Mode 2: Tall (Hero Top, 3 Bottom Stacked)
+    // Mode 3: Default/Square (Hero Top, 3 Bottom Side-by-Side)
+    val isWide = isResponsive && aspectRatio >= 1.4f
+    val isTallStacked = isResponsive && aspectRatio <= 0.65f
 
-    val callRect = RectF(
-        cardRect.left + pad,
-        heroRect.bottom + gap,
-        cardRect.left + pad + bottomW,
-        cardRect.bottom - pad
-    )
+    val heroRect: RectF
+    val callRect: RectF
+    val msgRect: RectF
+    val waRect: RectF
 
-    val msgRect = RectF(
-        callRect.right + gap,
-        heroRect.bottom + gap,
-        callRect.right + gap + bottomW,
-        cardRect.bottom - pad
-    )
+    if (isWide) {
+        val heroW = innerW * 0.50f
+        val rightW = innerW - heroW - gap
+        val rightH = (cardRect.height() - (pad * 2f) - (gap * 2f)) / 3f
 
-    val waRect = RectF(
-        msgRect.right + gap,
-        heroRect.bottom + gap,
-        cardRect.right - pad,
-        cardRect.bottom - pad
-    )
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.bottom - pad)
+        callRect = RectF(heroRect.right + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + rightH)
+        msgRect = RectF(heroRect.right + gap, callRect.bottom + gap, cardRect.right - pad, callRect.bottom + gap + rightH)
+        waRect = RectF(heroRect.right + gap, msgRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    } else if (isTallStacked) {
+        val heroH = innerH * 0.48f
+        val rightH = (innerH - heroH - (gap * 2f)) / 3f
 
-    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        callRect = RectF(cardRect.left + pad, heroRect.bottom + gap, cardRect.right - pad, heroRect.bottom + gap + rightH)
+        msgRect = RectF(cardRect.left + pad, callRect.bottom + gap, cardRect.right - pad, callRect.bottom + gap + rightH)
+        waRect = RectF(cardRect.left + pad, msgRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    } else {
+        val heroH = innerH * 0.54f
+        val bottomW = (innerW - (gap * 2f)) / 3f
+
+        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        callRect = RectF(cardRect.left + pad, heroRect.bottom + gap, cardRect.left + pad + bottomW, cardRect.bottom - pad)
+        msgRect = RectF(callRect.right + gap, heroRect.bottom + gap, callRect.right + gap + bottomW, cardRect.bottom - pad)
+        waRect = RectF(msgRect.right + gap, heroRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+    }
+
+    val minTileDim = minOf(heroRect.width(), heroRect.height())
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minTileDim * 0.20f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minTileDim * 0.48f)
+
+    fun getRadii(tl: Float, tr: Float, br: Float, bl: Float) = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+
+    val heroRadii = when {
+        isWide -> getRadii(outerCornerR, defaultInnerR, defaultInnerR, outerCornerR)
+        else -> getRadii(outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
+    }
+
+    val callRadii = when {
+        isWide -> getRadii(defaultInnerR, outerCornerR, defaultInnerR, defaultInnerR)
+        isTallStacked -> getRadii(defaultInnerR, defaultInnerR, defaultInnerR, defaultInnerR)
+        else -> getRadii(defaultInnerR, defaultInnerR, defaultInnerR, outerCornerR)
+    }
+
+    val msgRadii = getRadii(defaultInnerR, defaultInnerR, defaultInnerR, defaultInnerR)
+
+    val waRadii = when {
+        isWide -> getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+        isTallStacked -> getRadii(defaultInnerR, defaultInnerR, outerCornerR, outerCornerR)
+        else -> getRadii(defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    }
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
@@ -1276,7 +1361,7 @@ fun generateStacked3ActionBentoContactsBitmap(
 
     canvas.save()
     val heroClipPath = Path().apply {
-        addRoundRect(heroRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+        addRoundRect(heroRect, heroRadii, Path.Direction.CW)
     }
     canvas.clipPath(heroClipPath)
 
@@ -1308,7 +1393,7 @@ fun generateStacked3ActionBentoContactsBitmap(
         }
         canvas.drawRect(heroRect, gradientPaint)
     } else {
-        canvas.drawRoundRect(heroRect, innerCardRadius, innerCardRadius, cardPaint)
+        canvas.drawPath(heroClipPath, cardPaint)
 
         val heroCx = heroRect.centerX()
         val avatarRadius = (minOf(heroRect.width(), heroRect.height()) * 0.28f).coerceAtLeast(scaleFactor * 12f)
@@ -1352,9 +1437,14 @@ fun generateStacked3ActionBentoContactsBitmap(
         color = accentColorInt
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(callRect, innerCardRadius, innerCardRadius, accentCardPaint)
-    canvas.drawRoundRect(msgRect, innerCardRadius, innerCardRadius, cardPaint)
-    canvas.drawRoundRect(waRect, innerCardRadius, innerCardRadius, cardPaint)
+
+    val callPath = Path().apply { addRoundRect(callRect, callRadii, Path.Direction.CW) }
+    val msgPath = Path().apply { addRoundRect(msgRect, msgRadii, Path.Direction.CW) }
+    val waPath = Path().apply { addRoundRect(waRect, waRadii, Path.Direction.CW) }
+
+    canvas.drawPath(callPath, accentCardPaint)
+    canvas.drawPath(msgPath, cardPaint)
+    canvas.drawPath(waPath, cardPaint)
 
     val callTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
@@ -1432,15 +1522,9 @@ fun generateFullPhotoContactBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1453,9 +1537,9 @@ fun generateFullPhotoContactBitmap(
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
@@ -1553,15 +1637,9 @@ fun generateShapedContactBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1574,7 +1652,7 @@ fun generateShapedContactBitmap(
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
     // Forced 1:1 Fixed Square Geometry
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -1627,7 +1705,6 @@ fun generateShapedContactBitmap(
         val avatarRadius = (minOf(cardRect.width(), cardRect.height()) * 0.18f).coerceAtLeast(scaleFactor * 12f)
         val avatarTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
-        // Position avatar node higher into the widest upper belly of shapes (star/heart/triangle)
         val avatarCy = cy - (cardRect.height() * 0.12f)
 
         drawAvatarNode(
@@ -1636,7 +1713,6 @@ fun generateShapedContactBitmap(
             accentColorInt, avatarTextColor
         )
 
-        // Strict 52% max width constraint to prevent bottom text clipping across all shapes
         val maxTextWidth = cardRect.width() * 0.52f
         val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
@@ -1720,6 +1796,7 @@ fun generateHeartContactBitmap(context: Context, config: SlateWidgetConfig, isRe
 fun generateTriangleContactBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int) =
     generateShapedContactBitmap(context, config, LauncherShape.TRIANGLE, wDp, hDp, widgetId)
 
+
 // Universal Multi-Contact Grid Generator (Widgets 23 - 27) - Bento Tile Grid Layout
 fun generateMultiContactGridBitmap(
     context: Context,
@@ -1730,15 +1807,9 @@ fun generateMultiContactGridBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val minDimension = (60 * scaleFactor).toInt()
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(minDimension)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1751,7 +1822,6 @@ fun generateMultiContactGridBitmap(
     val b = Color.blue(accentColorInt) / 255f
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
-    // Target aspect ratios for Fixed Mode
     val targetRatio = when (slotCount) {
         2 -> 2.0f
         3 -> 3.0f
@@ -1762,12 +1832,12 @@ fun generateMultiContactGridBitmap(
     }
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -1785,26 +1855,64 @@ fun generateMultiContactGridBitmap(
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val (cols, rows) = when (slotCount) {
-        2 -> 2 to 1
-        3 -> 3 to 1
-        4 -> 2 to 2
-        6 -> 3 to 2
-        8 -> 4 to 2
-        else -> 2 to 2
+    val aspectRatio = cardRect.width() / cardRect.height()
+
+    // Responsive aspect-ratio grid reflow logic
+    val (cols, rows) = if (isResponsive) {
+        when (slotCount) {
+            2 -> when {
+                aspectRatio >= 1.1f -> 2 to 1
+                else -> 1 to 2
+            }
+            3 -> when {
+                aspectRatio >= 1.6f -> 3 to 1
+                aspectRatio <= 0.65f -> 1 to 3
+                else -> 3 to 1
+            }
+            4 -> when {
+                aspectRatio >= 2.2f -> 4 to 1
+                aspectRatio <= 0.55f -> 1 to 4
+                else -> 2 to 2
+            }
+            6 -> when {
+                aspectRatio >= 2.5f -> 6 to 1
+                aspectRatio >= 1.2f -> 3 to 2
+                aspectRatio <= 0.45f -> 1 to 6
+                else -> 2 to 3
+            }
+            8 -> when {
+                aspectRatio >= 2.8f -> 8 to 1
+                aspectRatio >= 1.2f -> 4 to 2
+                aspectRatio <= 0.45f -> 1 to 8
+                else -> 2 to 4
+            }
+            else -> 2 to 2
+        }
+    } else {
+        when (slotCount) {
+            2 -> 2 to 1
+            3 -> 3 to 1
+            4 -> 2 to 2
+            6 -> 3 to 2
+            8 -> 4 to 2
+            else -> 2 to 2
+        }
     }
 
-    // Grid Inner Tile Dimensions & Padding
     val pad = scaleFactor * 6f
     val gap = scaleFactor * 6f
 
-    val availableW = cardRect.width() - (pad * 2f) - (gap * (cols - 1))
-    val availableH = cardRect.height() - (pad * 2f) - (gap * (rows - 1))
+    val availableW = (cardRect.width() - (pad * 2f) - (gap * (cols - 1))).coerceAtLeast(1f)
+    val availableH = (cardRect.height() - (pad * 2f) - (gap * (rows - 1))).coerceAtLeast(1f)
 
     val tileW = availableW / cols
     val tileH = availableH / rows
 
-    val innerCardRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(tileW, tileH) * 0.20f)
+    val outerCornerR = (outerRadius - pad)
+        .coerceAtLeast(defaultInnerR)
+        .coerceAtMost(minOf(tileW, tileH) * 0.48f)
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
@@ -1822,15 +1930,23 @@ fun generateMultiContactGridBitmap(
         val slotConfig = loadSlotConfig(context, widgetId, i)
         val photoBitmap = if (slotConfig.isConfigured) loadContactPhoto(context, slotConfig.photoUri) else null
 
-        canvas.save()
+        // Concentric corner radii matching the outer container's corners
+        val tl = if (col == 0 && row == 0) outerCornerR else defaultInnerR
+        val tr = if (col == cols - 1 && row == 0) outerCornerR else defaultInnerR
+        val br = if (col == cols - 1 && row == rows - 1) outerCornerR else defaultInnerR
+        val bl = if (col == 0 && row == rows - 1) outerCornerR else defaultInnerR
+
+        val cornerRadii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+
         val tilePath = Path().apply {
-            addRoundRect(tileRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+            addRoundRect(tileRect, cornerRadii, Path.Direction.CW)
         }
+
+        canvas.save()
         canvas.clipPath(tilePath)
 
         if (!slotConfig.isConfigured) {
-            // --- 1. Unconfigured Responsive Tile State ---
-            canvas.drawRoundRect(tileRect, innerCardRadius, innerCardRadius, tilePaint)
+            canvas.drawPath(tilePath, tilePaint)
 
             val maxTextWidth = tileW * 0.88f
             val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1839,45 +1955,44 @@ fun generateMultiContactGridBitmap(
                 textAlign = Paint.Align.CENTER
             }
 
+            val iconSize = (minOf(tileW, tileH) * 0.28f).coerceAtLeast(scaleFactor * 10f)
             val singleLineText = "Tap to configure"
-            var singleLineFontSize = (tileH * 0.12f).coerceIn(scaleFactor * 8f, scaleFactor * 13f)
+            var singleLineFontSize = (tileH * 0.12f).coerceIn(scaleFactor * 7f, scaleFactor * 13f)
             textPaint.textSize = singleLineFontSize
 
-            if (textPaint.measureText(singleLineText) <= maxTextWidth) {
-                // Render Single Line
-                val iconSize = (minOf(tileW, tileH) * 0.28f).coerceAtLeast(scaleFactor * 12f)
-                val iconCy = tileRect.centerY() - (tileH * 0.08f)
+            if (textPaint.measureText(singleLineText) <= maxTextWidth && tileH >= scaleFactor * 36f) {
+                val iconCy = tileRect.centerY() - (singleLineFontSize * 0.6f)
                 drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), iconCy, iconSize, Color.GRAY)
 
-                val textY = tileRect.bottom - (scaleFactor * 8f)
-                canvas.drawText(singleLineText, tileRect.centerX(), textY, textPaint)
-            } else {
-                // Responsive Multi-Line Fallback ("Tap to" / "configure")
+                val textY = tileRect.centerY() + (iconSize * 0.48f) + (singleLineFontSize * 0.7f)
+                if (textY < tileRect.bottom - (pad * 0.5f)) {
+                    canvas.drawText(singleLineText, tileRect.centerX(), textY, textPaint)
+                }
+            } else if (tileH >= scaleFactor * 28f) {
                 val line1 = "Tap to"
                 val line2 = "configure"
 
-                var multiFontSize = (tileH * 0.11f).coerceIn(scaleFactor * 7.5f, scaleFactor * 11f)
+                var multiFontSize = (tileH * 0.11f).coerceIn(scaleFactor * 6f, scaleFactor * 11f)
                 textPaint.textSize = multiFontSize
 
-                while ((textPaint.measureText(line1) > maxTextWidth || textPaint.measureText(line2) > maxTextWidth) && multiFontSize > scaleFactor * 6f) {
-                    multiFontSize -= scaleFactor * 0.5f
-                    textPaint.textSize = multiFontSize
+                if (textPaint.measureText(line1) <= maxTextWidth && textPaint.measureText(line2) <= maxTextWidth) {
+                    val iconCy = tileRect.centerY() - (multiFontSize * 1.1f)
+                    drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), iconCy, iconSize * 0.85f, Color.GRAY)
+
+                    val textY1 = iconCy + (iconSize * 0.45f) + multiFontSize
+                    val textY2 = textY1 + (multiFontSize * 1.15f)
+                    if (textY2 < tileRect.bottom) {
+                        canvas.drawText(line1, tileRect.centerX(), textY1, textPaint)
+                        canvas.drawText(line2, tileRect.centerX(), textY2, textPaint)
+                    }
+                } else {
+                    drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), tileRect.centerY(), iconSize, Color.GRAY)
                 }
-
-                val lineGap = multiFontSize * 1.15f
-                val textY2 = tileRect.bottom - (scaleFactor * 6f)
-                val textY1 = textY2 - lineGap
-
-                val iconSize = (minOf(tileW, tileH) * 0.24f).coerceAtLeast(scaleFactor * 10f)
-                val iconCy = tileRect.top + (tileH * 0.35f)
-                drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), iconCy, iconSize, Color.GRAY)
-
-                canvas.drawText(line1, tileRect.centerX(), textY1, textPaint)
-                canvas.drawText(line2, tileRect.centerX(), textY2, textPaint)
+            } else {
+                drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), tileRect.centerY(), iconSize, Color.GRAY)
             }
 
         } else if (photoBitmap != null) {
-            // --- 2. Full-Bleed Photo Tile with Overlaid Name ---
             val targetRatio = tileRect.width() / tileRect.height()
             val imgW = photoBitmap.width.toFloat()
             val imgH = photoBitmap.height.toFloat()
@@ -1911,7 +2026,7 @@ fun generateMultiContactGridBitmap(
                 textAlign = Paint.Align.CENTER
             }
             val maxTextWidth = tileW * 0.88f
-            var fontSize = (tileH * 0.15f).coerceIn(scaleFactor * 9f, scaleFactor * 16f)
+            var fontSize = (tileH * 0.15f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
             namePaint.textSize = fontSize
             while (namePaint.measureText(slotConfig.contactName) > maxTextWidth && fontSize > scaleFactor * 7f) {
                 fontSize -= scaleFactor * 0.6f
@@ -1919,12 +2034,11 @@ fun generateMultiContactGridBitmap(
             }
 
             val displayName = formatSmartName(slotConfig.contactName, namePaint, maxTextWidth)
-            val textY = tileRect.bottom - (scaleFactor * 8f)
+            val textY = tileRect.bottom - (scaleFactor * 6f)
             canvas.drawText(displayName, tileRect.centerX(), textY, namePaint)
 
         } else {
-            // --- 3. Fallback Initials Avatar Tile ---
-            canvas.drawRoundRect(tileRect, innerCardRadius, innerCardRadius, tilePaint)
+            canvas.drawPath(tilePath, tilePaint)
 
             val avatarRadius = (minOf(tileW, tileH) * 0.24f).coerceAtLeast(scaleFactor * 10f)
             val avatarCy = tileRect.centerY() - (tileH * 0.08f)
@@ -1942,7 +2056,7 @@ fun generateMultiContactGridBitmap(
                 textAlign = Paint.Align.CENTER
             }
             val maxTextWidth = tileW * 0.88f
-            var fontSize = (tileH * 0.15f).coerceIn(scaleFactor * 9f, scaleFactor * 16f)
+            var fontSize = (tileH * 0.15f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
             namePaint.textSize = fontSize
             while (namePaint.measureText(slotConfig.contactName) > maxTextWidth && fontSize > scaleFactor * 7f) {
                 fontSize -= scaleFactor * 0.6f
@@ -1950,7 +2064,7 @@ fun generateMultiContactGridBitmap(
             }
 
             val displayName = formatSmartName(slotConfig.contactName, namePaint, maxTextWidth)
-            val textY = tileRect.bottom - (scaleFactor * 8f)
+            val textY = tileRect.bottom - (scaleFactor * 6f)
             canvas.drawText(displayName, tileRect.centerX(), textY, namePaint)
         }
 
