@@ -2,16 +2,19 @@ package com.altusix.slate.widgets.clock.analog
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
-import com.altusix.slate.data.local.SlateWidgetConfig
-import java.util.Calendar
 import androidx.core.content.res.ResourcesCompat
 import com.altusix.slate.R
+import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
+import com.altusix.slate.utils.getSlateFont
+import com.altusix.slate.utils.getStandardCornerRadius
+import java.util.Calendar
 
 private data class SquirclePoint(
     val x: Float,
@@ -59,12 +62,9 @@ fun generateAnalogPrecisionClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -72,7 +72,7 @@ fun generateAnalogPrecisionClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#9E9E9E")
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -86,7 +86,7 @@ fun generateAnalogPrecisionClockBitmap(
 
     val clockCx = cardRect.centerX()
     val clockCy = cardRect.centerY()
-    val clockRadius = (size / 2f) - (12f * density)
+    val clockRadius = (size / 2f) - (12f * scaleFactor)
 
     val timeState = AnalogClockTimeState.now()
 
@@ -99,14 +99,14 @@ fun generateAnalogPrecisionClockBitmap(
         val angleRad = Math.toRadians((i * 30f - 90f).toDouble())
         val isCardinal = (i % 3 == 0)
         val outerR = clockRadius
-        val innerR = if (isCardinal) clockRadius - (12f * density) else clockRadius - (7f * density)
+        val innerR = if (isCardinal) clockRadius - (12f * scaleFactor) else clockRadius - (7f * scaleFactor)
 
         val x1 = (clockCx + innerR * Math.cos(angleRad)).toFloat()
         val y1 = (clockCy + innerR * Math.sin(angleRad)).toFloat()
         val x2 = (clockCx + outerR * Math.cos(angleRad)).toFloat()
         val y2 = (clockCy + outerR * Math.sin(angleRad)).toFloat()
 
-        tickPaint.strokeWidth = if (isCardinal) 2.4f * density else 1.4f * density
+        tickPaint.strokeWidth = if (isCardinal) 2.4f * scaleFactor else 1.4f * scaleFactor
         tickPaint.color = if (isCardinal) primaryText else secondaryText
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
@@ -115,7 +115,7 @@ fun generateAnalogPrecisionClockBitmap(
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 3.8f * density
+        strokeWidth = 3.8f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(
@@ -129,7 +129,7 @@ fun generateAnalogPrecisionClockBitmap(
     val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 2.2f * density
+        strokeWidth = 2.2f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(
@@ -144,7 +144,7 @@ fun generateAnalogPrecisionClockBitmap(
     val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.STROKE
-        strokeWidth = 1.2f * density
+        strokeWidth = 1.2f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(
@@ -159,13 +159,13 @@ fun generateAnalogPrecisionClockBitmap(
         color = accentColorInt
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(clockCx, clockCy, 3.5f * density, hubPaint)
+    canvas.drawCircle(clockCx, clockCy, 3.5f * scaleFactor, hubPaint)
 
     val hubCenterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(clockCx, clockCy, 1.8f * density, hubCenterPaint)
+    canvas.drawCircle(clockCx, clockCy, 1.8f * scaleFactor, hubCenterPaint)
 
     return bitmap
 }
@@ -178,12 +178,9 @@ fun generateBauhausClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -191,13 +188,12 @@ fun generateBauhausClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#8E8E93")
 
-    // Fixed 1:1 Square layout container centered within bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cardRadius = size * 0.18f
+    val cardRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
@@ -208,7 +204,6 @@ fun generateBauhausClockBitmap(
     val clockCx = cardRect.centerX()
     val clockCy = cardRect.centerY()
 
-    // Fully proportional squircle boundary coordinates
     val margin = size * 0.06f
     val halfW = (size / 2f) - margin
     val halfH = (size / 2f) - margin
@@ -216,7 +211,6 @@ fun generateBauhausClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 1. Render 60 Radial Micro-Ticks (Aesthetic Center-Aligned Lines)
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -232,7 +226,6 @@ fun generateBauhausClockBitmap(
         val isCardinal = (i % 15 == 0)
         val isHour = (i % 5 == 0)
 
-        // Radial length pointing inward toward clock center
         val tickLen = when {
             isCardinal -> size * 0.12f
             isHour -> size * 0.085f
@@ -258,7 +251,6 @@ fun generateBauhausClockBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // 2. Proportional Clock Hands
     val hourLen = halfW * 0.45f
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -302,7 +294,6 @@ fun generateBauhausClockBitmap(
 
     canvas.drawLine(secTailX, secTailY, secTipX, secTipY, secHandPaint)
 
-    // Center Hub Pivot
     val hubRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
@@ -318,7 +309,6 @@ fun generateBauhausClockBitmap(
     return bitmap
 }
 
-
 // 3. CYBER SKELETON RING DIAL (2x2 Square / Circular Skeleton Face)
 fun generateCyberSkeletonClockBitmap(
     context: Context,
@@ -327,12 +317,9 @@ fun generateCyberSkeletonClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -340,8 +327,7 @@ fun generateCyberSkeletonClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#9E9E9E")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -351,7 +337,6 @@ fun generateCyberSkeletonClockBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    // Draw perfect circular container
     canvas.drawOval(cardRect, bgPaint)
 
     val clockCx = cardRect.centerX()
@@ -360,7 +345,6 @@ fun generateCyberSkeletonClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Crosshair Guidelines
     val crosshairPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#15000000") else Color.parseColor("#20FFFFFF")
         style = Paint.Style.STROKE
@@ -369,7 +353,6 @@ fun generateCyberSkeletonClockBitmap(
     canvas.drawLine(clockCx - clockRadius, clockCy, clockCx + clockRadius, clockCy, crosshairPaint)
     canvas.drawLine(clockCx, clockCy - clockRadius, clockCx, clockCy + clockRadius, crosshairPaint)
 
-    // 3. Concentric Ring Tracks
     val ringTrackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#1F000000") else Color.parseColor("#2AFFFFFF")
         style = Paint.Style.STROKE
@@ -378,7 +361,6 @@ fun generateCyberSkeletonClockBitmap(
     canvas.drawCircle(clockCx, clockCy, clockRadius, ringTrackPaint)
     canvas.drawCircle(clockCx, clockCy, clockRadius * 0.65f, ringTrackPaint)
 
-    // 4. Precision Perimeter Micro-ticks (60 Ticks)
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -400,7 +382,6 @@ fun generateCyberSkeletonClockBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // 5. Proportional Hands Rendering
     val hourLen = clockRadius * 0.52f
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -445,7 +426,6 @@ fun generateCyberSkeletonClockBitmap(
         secPaint
     )
 
-    // Open Skeleton Hub
     val hubRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.STROKE
@@ -470,12 +450,9 @@ fun generateSculptedPillClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -483,8 +460,7 @@ fun generateSculptedPillClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#757575") else Color.parseColor("#9E9E9E")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -494,7 +470,6 @@ fun generateSculptedPillClockBitmap(
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    // Draw perfect circular container
     canvas.drawOval(cardRect, bgPaint)
 
     val clockCx = cardRect.centerX()
@@ -503,7 +478,6 @@ fun generateSculptedPillClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Subtle Outer Orbital Ring Track & Accent Satellite Node
     val trackRadius = radius - (size * 0.08f)
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#0F000000") else Color.parseColor("#14FFFFFF")
@@ -512,7 +486,6 @@ fun generateSculptedPillClockBitmap(
     }
     canvas.drawCircle(clockCx, clockCy, trackRadius, trackPaint)
 
-    // Orbiting Accent Node (Seconds Satellite)
     val satX = (clockCx + trackRadius * Math.cos(timeState.secondAngleRad)).toFloat()
     val satY = (clockCy + trackRadius * Math.sin(timeState.secondAngleRad)).toFloat()
 
@@ -522,7 +495,6 @@ fun generateSculptedPillClockBitmap(
     }
     canvas.drawCircle(satX, satY, size * 0.022f, satPaint)
 
-    // 3. Hour Hand: Bold Sculpted Capsule / Pill Blade
     val hourLen = trackRadius * 0.42f
     val hourWidth = size * 0.085f
     val hourTipX = (clockCx + hourLen * Math.cos(timeState.hourAngleRad)).toFloat()
@@ -536,7 +508,6 @@ fun generateSculptedPillClockBitmap(
     }
     canvas.drawLine(clockCx, clockCy, hourTipX, hourTipY, hourPaint)
 
-    // 4. Minute Hand: Sleek Tapered Pill Needle
     val minLen = trackRadius * 0.76f
     val minWidth = size * 0.038f
     val minTipX = (clockCx + minLen * Math.cos(timeState.minuteAngleRad)).toFloat()
@@ -550,7 +521,6 @@ fun generateSculptedPillClockBitmap(
     }
     canvas.drawLine(clockCx, clockCy, minTipX, minTipY, minPaint)
 
-    // 5. Center Hub Cutout / Pivot Ring
     val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
@@ -574,28 +544,23 @@ fun generateBoldTypographyClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
 
-    // Mid-tone numeral color with clean opacity depth
     val numeralColor = if (isLight) Color.parseColor("#3B000000") else Color.parseColor("#45FFFFFF")
 
-    // 1. Calculate Fixed Square Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cardRadius = size * 0.18f
+    val cardRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
@@ -608,11 +573,10 @@ fun generateBoldTypographyClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Proportional Cardinal Numerals (Sized & Offset to Prevent Collisions)
     val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = numeralColor
         textSize = size * 0.35f
-        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        typeface = getSlateFont(context, weight = 900)
         textAlign = Paint.Align.CENTER
     }
 
@@ -621,17 +585,11 @@ fun generateBoldTypographyClockBitmap(
 
     val numOffset = size * 0.26f
 
-    // "12" Top
     canvas.drawText("12", clockCx, clockCy - numOffset + textYCenter, numPaint)
-    // "3" Right
     canvas.drawText("3", clockCx + numOffset, clockCy + textYCenter, numPaint)
-    // "6" Bottom
     canvas.drawText("6", clockCx, clockCy + numOffset + textYCenter, numPaint)
-    // "9" Left
     canvas.drawText("9", clockCx - numOffset, clockCy + textYCenter, numPaint)
 
-    // 3. Heavy Capsule Clock Hands
-    // Hour Hand
     val hourLen = size * 0.21f
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -646,7 +604,6 @@ fun generateBoldTypographyClockBitmap(
         hourHandPaint
     )
 
-    // Minute Hand
     val minLen = size * 0.34f
     val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -661,7 +618,6 @@ fun generateBoldTypographyClockBitmap(
         minHandPaint
     )
 
-    // Second Hand
     val secLen = size * 0.38f
     val secTailLen = size * 0.08f
     val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -678,7 +634,6 @@ fun generateBoldTypographyClockBitmap(
         secHandPaint
     )
 
-    // 4. Center Hub Pivot
     val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.FILL
@@ -702,30 +657,24 @@ fun generateCyberCondensedClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
 
-    // Subtle dark tint for background numerals
     val numeralColor = if (isLight) Color.parseColor("#22000000") else Color.parseColor("#2BFFFFFF")
 
-    // Load custom font from res/font/outward_block.ttf
     val customTypeface = try {
-        ResourcesCompat.getFont(context, R.font.outward_block) ?: Typeface.DEFAULT_BOLD
+        ResourcesCompat.getFont(context, R.font.outward_block) ?: getSlateFont(context, weight = 900)
     } catch (_: Exception) {
-        Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        getSlateFont(context, weight = 900)
     }
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -743,7 +692,6 @@ fun generateCyberCondensedClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. High-Impact Typography using Custom Outward Block Font
     val sideNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = numeralColor
         textSize = size * 1f
@@ -754,7 +702,6 @@ fun generateCyberCondensedClockBitmap(
     val fmSide = sideNumPaint.fontMetrics
     val sideYCenter = clockCy - ((fmSide.descent + fmSide.ascent) / 1.57f)
 
-    // Draw Left "9" and Right "3"
     canvas.drawText("9", clockCx - (size * 0.25f), sideYCenter, sideNumPaint)
     canvas.drawText("3", clockCx + (size * 0.25f), sideYCenter, sideNumPaint)
 
@@ -769,16 +716,13 @@ fun generateCyberCondensedClockBitmap(
     val topYCenter = (clockCy - size * 0.25f) - ((fmTop.descent + fmTop.ascent) / 2f)
     val bottomYCenter = (clockCy + size * 0.33f) - ((fmTop.descent + fmTop.ascent) / 2f)
 
-    // Draw Top "12" and Bottom "06"
     canvas.drawText("12", clockCx, topYCenter, topNumPaint)
     canvas.drawText("06", clockCx, bottomYCenter, topNumPaint)
 
-    // 3. Rotated Precision Hands
     val hourDeg = (timeState.hoursWithMinutes * 30f)
     val minDeg = (timeState.minutesWithSeconds * 6f)
     val secDeg = (timeState.secondsWithMillis * 6f)
 
-    // A. HOUR HAND: Slotted Architectural Capsule Blade
     val hourWidth = size * 0.068f
     val hourLength = radius * 0.44f
     val hourTail = size * 0.025f
@@ -812,7 +756,6 @@ fun generateCyberCondensedClockBitmap(
     canvas.drawRoundRect(slotRect, slotWidth / 2f, slotWidth / 2f, slotCutoutPaint)
     canvas.restore()
 
-    // B. MINUTE HAND: Clean Minimal Precision Wand
     val minWidth = size * 0.018f
     val minLength = radius * 0.70f
     val minTail = radius * 0.10f
@@ -833,7 +776,6 @@ fun generateCyberCondensedClockBitmap(
     )
     canvas.restore()
 
-    // C. SECOND HAND: Accent Line with Dual Ring Pivot Hub
     val secLen = radius * 0.82f
     val secTailLen = radius * 0.18f
     val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -873,20 +815,16 @@ fun generateCapsuleSkeletonClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -904,7 +842,6 @@ fun generateCapsuleSkeletonClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. 12 Minimal Perimeter Radial Ticks
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -930,7 +867,6 @@ fun generateCapsuleSkeletonClockBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // 3. Date Window at 4:30 Position
     val cal = Calendar.getInstance()
     val dayStr = cal.get(Calendar.DAY_OF_MONTH).toString()
 
@@ -957,20 +893,20 @@ fun generateCapsuleSkeletonClockBitmap(
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(dateRect, size * 0.035f, size * 0.035f, dateBgPaint)
-    canvas.drawRoundRect(dateRect, size * 0.035f, size * 0.035f, dateBorderPaint)
+    val dateCornerRadius = (scaleFactor * 6f).coerceAtMost(minOf(dateBoxW, dateBoxH) * 0.22f)
+    canvas.drawRoundRect(dateRect, dateCornerRadius, dateCornerRadius, dateBgPaint)
+    canvas.drawRoundRect(dateRect, dateCornerRadius, dateCornerRadius, dateBorderPaint)
 
     val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = size * 0.075f
-        typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
+        typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
     val fmDate = dateTextPaint.fontMetrics
     val dateTextY = dateCy - ((fmDate.descent + fmDate.ascent) / 2f)
     canvas.drawText(dayStr, dateCx, dateTextY, dateTextPaint)
 
-    // 4. Rotated Precision Capsule Frame Hands
     val hourDeg = (timeState.hoursWithMinutes * 30f)
     val minDeg = (timeState.minutesWithSeconds * 6f)
     val secDeg = (timeState.secondsWithMillis * 6f)
@@ -990,7 +926,6 @@ fun generateCapsuleSkeletonClockBitmap(
         canvas.save()
         canvas.rotate(deg, clockCx, clockCy)
 
-        // Outer Frame
         val frameRect = RectF(
             clockCx - (width / 2f),
             clockCy - length,
@@ -1000,7 +935,6 @@ fun generateCapsuleSkeletonClockBitmap(
         val cornerR = width / 2f
         canvas.drawRoundRect(frameRect, cornerR, cornerR, framePaint)
 
-        // Inner Accent Tip
         val tipMargin = strokeW * 1.2f
         val tipH = width * 0.75f
         val tipRect = RectF(
@@ -1015,13 +949,9 @@ fun generateCapsuleSkeletonClockBitmap(
         canvas.restore()
     }
 
-    // A. Hour Hand (Shorter)
     drawCapsuleHand(radius * 0.42f, size * 0.082f, hourDeg)
-
-    // B. Minute Hand (Longer)
     drawCapsuleHand(radius * 0.68f, size * 0.075f, minDeg)
 
-    // C. Pivot Hub
     val pivotOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.FILL
@@ -1034,7 +964,6 @@ fun generateCapsuleSkeletonClockBitmap(
     canvas.drawCircle(clockCx, clockCy, pivotRadius, pivotOuterPaint)
     canvas.drawCircle(clockCx, clockCy, pivotRadius * 0.65f, pivotInnerPaint)
 
-    // D. Second Hand
     val secLen = radius * 0.82f
     val secTailLen = radius * 0.15f
     val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1059,20 +988,16 @@ fun generateApexArrowheadClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -1090,7 +1015,6 @@ fun generateApexArrowheadClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Hour Markers (Cardinal Inward Arrowheads & Minor Line Ticks)
     val margin = size * 0.06f
     val outerR = radius - margin
 
@@ -1114,11 +1038,9 @@ fun generateApexArrowheadClockBitmap(
         val isCardinal = (i % 3 == 0)
 
         if (isCardinal) {
-            // Draw Sharp Inward Arrowhead Path for 12, 3, 6, 9
             val cosA = Math.cos(angleRad).toFloat()
             val sinA = Math.sin(angleRad).toFloat()
 
-            // Perpendicular unit vector
             val perpX = -sinA
             val perpY = cosA
 
@@ -1134,7 +1056,7 @@ fun generateApexArrowheadClockBitmap(
             val corner2X = baseX - (arrowWidth / 2f) * perpX
             val corner2Y = baseY - (arrowWidth / 2f) * perpY
 
-            val arrowPath = android.graphics.Path().apply {
+            val arrowPath = Path().apply {
                 moveTo(corner1X, corner1Y)
                 lineTo(tipX, tipY)
                 lineTo(corner2X, corner2Y)
@@ -1142,7 +1064,6 @@ fun generateApexArrowheadClockBitmap(
             }
             canvas.drawPath(arrowPath, arrowPaint)
         } else {
-            // Draw Clean Line Ticks for Minor Hours
             val tickLen = size * 0.06f
             val innerR = outerR - tickLen
 
@@ -1155,7 +1076,6 @@ fun generateApexArrowheadClockBitmap(
         }
     }
 
-    // 3. Rotated Precision Ball-Tip Hands
     val hourDeg = (timeState.hoursWithMinutes * 30f)
     val minDeg = (timeState.minutesWithSeconds * 6f)
     val secDeg = (timeState.secondsWithMillis * 6f)
@@ -1178,7 +1098,6 @@ fun generateApexArrowheadClockBitmap(
         strokeWidth = size * 0.008f
     }
 
-    // A. Hour Hand (Ball-Tip Wand)
     val hourLen = radius * 0.44f
     val hourDotR = size * 0.026f
     canvas.save()
@@ -1188,7 +1107,6 @@ fun generateApexArrowheadClockBitmap(
     canvas.drawCircle(clockCx, clockCy - hourLen, hourDotR, dotBorderPaint)
     canvas.restore()
 
-    // B. Minute Hand (Longer Ball-Tip Wand)
     val minLen = radius * 0.70f
     val minDotR = size * 0.024f
     canvas.save()
@@ -1198,12 +1116,10 @@ fun generateApexArrowheadClockBitmap(
     canvas.drawCircle(clockCx, clockCy - minLen, minDotR, dotBorderPaint)
     canvas.restore()
 
-    // C. Pivot Ring Hub
     val pivotRadius = size * 0.032f
     canvas.drawCircle(clockCx, clockCy, pivotRadius, dotPaint)
     canvas.drawCircle(clockCx, clockCy, pivotRadius, dotBorderPaint)
 
-    // D. Second Hand (Thin Needle)
     val secLen = radius * 0.82f
     val secTailLen = radius * 0.16f
     val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1228,12 +1144,9 @@ fun generateConcentricOrbitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1241,8 +1154,7 @@ fun generateConcentricOrbitalClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#20000000") else Color.parseColor("#25FFFFFF")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -1260,24 +1172,19 @@ fun generateConcentricOrbitalClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // -------------------------------------------------------------------------
-    // 🎛️ DESIGN TUNING CONTROLS (Adjust these variables to change geometry)
-    // -------------------------------------------------------------------------
-    val outerRadiusMultiplier = 0.76f  // Outer Ring Radius (Minute Arc)
-    val innerRadiusMultiplier = 0.58f  // Inner Ring Radius (Hour Arc) -> WIDER GAP
-    val secOrbitMultiplier    = 0.89f  // Orbiting Seconds Dot Radius
+    val outerRadiusMultiplier = 0.76f
+    val innerRadiusMultiplier = 0.58f
+    val secOrbitMultiplier    = 0.89f
 
-    val outerStrokeWidth      = size * 0.030f // Thicker Minute Ring
-    val innerStrokeWidth      = size * 0.035f // Thicker Hour Ring
-    val bgTrackStrokeWidth    = size * 0.018f // Dark Background Track Thickness
-    val secondsDotSize        = size * 0.028f // Orbiting Seconds Satellite Size
-    // -------------------------------------------------------------------------
+    val outerStrokeWidth      = size * 0.030f
+    val innerStrokeWidth      = size * 0.035f
+    val bgTrackStrokeWidth    = size * 0.018f
+    val secondsDotSize        = size * 0.028f
 
     val outerRadius = radius * outerRadiusMultiplier
     val innerRadius = radius * innerRadiusMultiplier
     val secOrbitRadius = radius * secOrbitMultiplier
 
-    // Background Ring Tracks
     val trackPaintOuter = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.STROKE
@@ -1292,7 +1199,6 @@ fun generateConcentricOrbitalClockBitmap(
     canvas.drawCircle(clockCx, clockCy, outerRadius, trackPaintOuter)
     canvas.drawCircle(clockCx, clockCy, innerRadius, trackPaintInner)
 
-    // 2. OUTER RING: MINUTE PROGRESS ARC
     val minProgress = timeState.minutesWithSeconds / 60f
     val minSweepAngle = (minProgress * 360f).coerceAtLeast(1f)
 
@@ -1308,7 +1214,6 @@ fun generateConcentricOrbitalClockBitmap(
     )
     canvas.drawArc(outerRect, -90f, minSweepAngle, false, minArcPaint)
 
-    // 3. INNER RING: HOUR PROGRESS ARC
     val hourProgress = (timeState.hoursWithMinutes % 12f) / 12f
     val hourSweepAngle = (hourProgress * 360f).coerceAtLeast(1f)
 
@@ -1324,7 +1229,6 @@ fun generateConcentricOrbitalClockBitmap(
     )
     canvas.drawArc(innerRect, -90f, hourSweepAngle, false, hourArcPaint)
 
-    // 4. ORBITING SECONDS SATELLITE NODE
     val secX = (clockCx + secOrbitRadius * Math.cos(timeState.secondAngleRad)).toFloat()
     val secY = (clockCy + secOrbitRadius * Math.sin(timeState.secondAngleRad)).toFloat()
 
@@ -1345,12 +1249,9 @@ fun generateTripleOrbitalDotsClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1358,8 +1259,7 @@ fun generateTripleOrbitalDotsClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#20000000") else Color.parseColor("#25FFFFFF")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -1377,24 +1277,19 @@ fun generateTripleOrbitalDotsClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // -------------------------------------------------------------------------
-    // 🎛️ DESIGN TUNING CONTROLS
-    // -------------------------------------------------------------------------
-    val secOrbitMultiplier  = 0.86f // Outer Track (Seconds)
-    val minOrbitMultiplier  = 0.68f // Middle Track (Minutes)
-    val hourOrbitMultiplier = 0.50f // Inner Track (Hours)
+    val secOrbitMultiplier  = 0.86f
+    val minOrbitMultiplier  = 0.68f
+    val hourOrbitMultiplier = 0.50f
 
-    val trackStrokeWidth = size * 0.014f // Track Ring Thickness
-    val hourDotRadius    = size * 0.038f // Inner Hour Node Radius
-    val minDotRadius     = size * 0.030f // Middle Minute Node Radius
-    val secDotRadius     = size * 0.022f // Outer Second Node Radius
-    // -------------------------------------------------------------------------
+    val trackStrokeWidth = size * 0.014f
+    val hourDotRadius    = size * 0.038f
+    val minDotRadius     = size * 0.030f
+    val secDotRadius     = size * 0.022f
 
     val secOrbitRadius  = radius * secOrbitMultiplier
     val minOrbitRadius  = radius * minOrbitMultiplier
     val hourOrbitRadius = radius * hourOrbitMultiplier
 
-    // 2. Render 3 Concentric Track Rings
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.STROKE
@@ -1405,8 +1300,6 @@ fun generateTripleOrbitalDotsClockBitmap(
     canvas.drawCircle(clockCx, clockCy, minOrbitRadius, trackPaint)
     canvas.drawCircle(clockCx, clockCy, hourOrbitRadius, trackPaint)
 
-    // 3. Orbiting Nodes Geometry
-    // A. INNER TRACK: Hour Node
     val hourX = (clockCx + hourOrbitRadius * Math.cos(timeState.hourAngleRad)).toFloat()
     val hourY = (clockCy + hourOrbitRadius * Math.sin(timeState.hourAngleRad)).toFloat()
 
@@ -1416,7 +1309,6 @@ fun generateTripleOrbitalDotsClockBitmap(
     }
     canvas.drawCircle(hourX, hourY, hourDotRadius, hourDotPaint)
 
-    // B. MIDDLE TRACK: Minute Node
     val minX = (clockCx + minOrbitRadius * Math.cos(timeState.minuteAngleRad)).toFloat()
     val minY = (clockCy + minOrbitRadius * Math.sin(timeState.minuteAngleRad)).toFloat()
 
@@ -1426,7 +1318,6 @@ fun generateTripleOrbitalDotsClockBitmap(
     }
     canvas.drawCircle(minX, minY, minDotRadius, minDotPaint)
 
-    // C. OUTER TRACK: Second Node (Accent Color)
     val secX = (clockCx + secOrbitRadius * Math.cos(timeState.secondAngleRad)).toFloat()
     val secY = (clockCy + secOrbitRadius * Math.sin(timeState.secondAngleRad)).toFloat()
 
@@ -1436,7 +1327,6 @@ fun generateTripleOrbitalDotsClockBitmap(
     }
     canvas.drawCircle(secX, secY, secDotRadius, secDotPaint)
 
-    // Center Core Axis Dot
     val centerPivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.FILL
@@ -1454,20 +1344,16 @@ fun generateSectorSweepClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -1485,7 +1371,6 @@ fun generateSectorSweepClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Sector / Pie Wedge Geometry
     val dialMargin = size * 0.05f
     val dialRadius = radius - dialMargin
 
@@ -1501,10 +1386,8 @@ fun generateSectorSweepClockBitmap(
         clockCx - dialRadius, clockCy - dialRadius,
         clockCx + dialRadius, clockCy + dialRadius
     )
-    // Draw filled wedge from 12 o'clock
     canvas.drawArc(dialRect, -90f, sweepAngle, true, sectorPaint)
 
-    // 3. Cardinal Line Ticks
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
@@ -1526,14 +1409,12 @@ fun generateSectorSweepClockBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // 4. Rotated Hands with Dark Outline Casing (Prevents disappearing hands)
     val hourDeg = (timeState.hoursWithMinutes * 30f)
     val minDeg = (timeState.minutesWithSeconds * 6f)
     val secDeg = (timeState.secondsWithMillis * 6f)
 
     val outlineStrokeExtra = size * 0.012f
 
-    // Helper to draw hands with dark outlines for high contrast
     fun drawContrastedHand(length: Float, handWidth: Float, deg: Float, handColor: Int) {
         val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = bgColor
@@ -1550,20 +1431,14 @@ fun generateSectorSweepClockBitmap(
 
         canvas.save()
         canvas.rotate(deg, clockCx, clockCy)
-        // Dark outline casing
         canvas.drawLine(clockCx, clockCy, clockCx, clockCy - length, outlinePaint)
-        // Primary hand stroke
         canvas.drawLine(clockCx, clockCy, clockCx, clockCy - length, mainHandPaint)
         canvas.restore()
     }
 
-    // A. Hour Hand
     drawContrastedHand(dialRadius * 0.52f, size * 0.024f, hourDeg, primaryText)
-
-    // B. Minute Hand
     drawContrastedHand(dialRadius * 0.78f, size * 0.018f, minDeg, primaryText)
 
-    // C. Second Hand
     val secLen = dialRadius * 0.88f
     val secTailLen = dialRadius * 0.16f
     val secOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1584,7 +1459,6 @@ fun generateSectorSweepClockBitmap(
     canvas.drawLine(clockCx, clockCy + secTailLen, clockCx, clockCy - secLen, secPaint)
     canvas.restore()
 
-    // D. Center Pivot Hub (With Dark Contrast Casing)
     val pivotRadius = size * 0.028f
     val pivotBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
@@ -1608,12 +1482,9 @@ fun generateRotatingRingClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1621,8 +1492,7 @@ fun generateRotatingRingClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#18000000") else Color.parseColor("#22FFFFFF")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -1640,13 +1510,11 @@ fun generateRotatingRingClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Concentric Ring Boundary Radii
-    val r0 = radius * 0.05f   // Center Axis Radius
-    val r1 = radius * 0.38f   // Inner Ring Radius (Hour boundary)
-    val r2 = radius * 0.64f   // Middle Ring Radius (Minute boundary)
-    val r3 = radius * 0.88f   // Outer Ring Radius (Second boundary)
+    val r0 = radius * 0.05f
+    val r1 = radius * 0.38f
+    val r2 = radius * 0.64f
+    val r3 = radius * 0.88f
 
-    // Draw Static Concentric Boundary Rings
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.STROKE
@@ -1656,12 +1524,10 @@ fun generateRotatingRingClockBitmap(
     canvas.drawCircle(clockCx, clockCy, r2, trackPaint)
     canvas.drawCircle(clockCx, clockCy, r3, trackPaint)
 
-    // Rotation Angles
     val hourDeg = timeState.hoursWithMinutes * 30f
     val minDeg = timeState.minutesWithSeconds * 6f
     val secDeg = timeState.secondsWithMillis * 6f
 
-    // 3. HOUR HAND: Solid Capsule Extending from Center to Inner Ring (r1)
     val hourWidth = size * 0.070f
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -1678,7 +1544,6 @@ fun generateRotatingRingClockBitmap(
     canvas.drawRoundRect(hourRect, hourWidth / 2f, hourWidth / 2f, hourHandPaint)
     canvas.restore()
 
-    // 4. MINUTE HAND: Hollow Capsule Frame Extending from Center to Middle Ring (r2)
     val minWidth = size * 0.060f
     val minFramePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -1696,7 +1561,6 @@ fun generateRotatingRingClockBitmap(
     canvas.drawRoundRect(minRect, minWidth / 2f, minWidth / 2f, minFramePaint)
     canvas.restore()
 
-    // 5. SECOND HAND: Accent Needle Extending from Center to Outer Ring (r3)
     val secWidth = size * 0.020f
     val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -1713,7 +1577,6 @@ fun generateRotatingRingClockBitmap(
     canvas.drawRoundRect(secRect, secWidth / 2f, secWidth / 2f, secHandPaint)
     canvas.restore()
 
-    // 6. Center Pivot Node
     val centerPivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.FILL
@@ -1731,36 +1594,33 @@ fun generateHourglassClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
+    val cardRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, size * 0.18f, size * 0.18f, bgPaint)
+    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
 
     val clockCx = cardRect.centerX()
     val clockCy = cardRect.centerY()
 
     val timeState = AnalogClockTimeState.now()
 
-    // 1. Organic Curved Hourglass Path Geometry
     val topWidth = size * 0.32f
     val waistWidth = size * 0.035f
     val halfH = size * 0.36f
@@ -1768,8 +1628,7 @@ fun generateHourglassClockBitmap(
     val topYPos = clockCy - halfH
     val botYPos = clockCy + halfH
 
-    // Separate Top & Bottom Chambers for Precise Sand Clipping
-    val topChamberPath = android.graphics.Path().apply {
+    val topChamberPath = Path().apply {
         moveTo(clockCx - topWidth, topYPos)
         lineTo(clockCx + topWidth, topYPos)
         cubicTo(
@@ -1786,7 +1645,7 @@ fun generateHourglassClockBitmap(
         close()
     }
 
-    val bottomChamberPath = android.graphics.Path().apply {
+    val bottomChamberPath = Path().apply {
         moveTo(clockCx - waistWidth, clockCy)
         lineTo(clockCx + waistWidth, clockCy)
         cubicTo(
@@ -1803,12 +1662,11 @@ fun generateHourglassClockBitmap(
         close()
     }
 
-    val fullGlassPath = android.graphics.Path().apply {
+    val fullGlassPath = Path().apply {
         addPath(topChamberPath)
         addPath(bottomChamberPath)
     }
 
-    // 2. 60-Minute Sand Progress Logic
     val minuteProgress = (timeState.minutesWithSeconds / 60f).coerceIn(0.001f, 0.999f)
 
     val sandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1816,7 +1674,6 @@ fun generateHourglassClockBitmap(
         style = Paint.Style.FILL
     }
 
-    // A. Top Chamber Sand (Depleting)
     val topSandY = topYPos + (minuteProgress * halfH)
     canvas.save()
     canvas.clipPath(topChamberPath)
@@ -1827,11 +1684,10 @@ fun generateHourglassClockBitmap(
     )
     canvas.restore()
 
-    // B. Bottom Chamber Sand (Accumulating with natural parabolic heap)
     val bottomSandLevelY = botYPos - (minuteProgress * halfH)
     val moundHeight = size * 0.035f * Math.sin(minuteProgress * Math.PI).toFloat()
 
-    val sandMoundPath = android.graphics.Path().apply {
+    val sandMoundPath = Path().apply {
         moveTo(clockCx - topWidth * 1.2f, botYPos + size * 0.1f)
         lineTo(clockCx - topWidth * 1.2f, bottomSandLevelY)
         quadTo(
@@ -1847,7 +1703,6 @@ fun generateHourglassClockBitmap(
     canvas.drawPath(sandMoundPath, sandPaint)
     canvas.restore()
 
-    // C. Falling Sand Stream Line
     if (minuteProgress < 0.97f) {
         val streamPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColorInt
@@ -1858,7 +1713,6 @@ fun generateHourglassClockBitmap(
         canvas.drawLine(clockCx, clockCy, clockCx, bottomSandLevelY - moundHeight, streamPaint)
     }
 
-    // 3. Glass Vessel Outer Contour Stroke & Structural Caps
     val glassFramePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
@@ -1868,7 +1722,6 @@ fun generateHourglassClockBitmap(
     }
     canvas.drawPath(fullGlassPath, glassFramePaint)
 
-    // Structural Cap Bars (Top & Bottom)
     val capWidth = topWidth * 1.08f
     val capHeight = size * 0.022f
     val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1881,14 +1734,13 @@ fun generateHourglassClockBitmap(
     val botCapRect = RectF(clockCx - capWidth, botYPos - (capHeight * 0.3f), clockCx + capWidth, botYPos + capHeight)
     canvas.drawRoundRect(botCapRect, capHeight, capHeight, capPaint)
 
-    // Subtle Inner Glass Reflection Highlight
     val reflectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(45, 255, 255, 255)
         style = Paint.Style.STROKE
         strokeWidth = size * 0.008f
         strokeCap = Paint.Cap.ROUND
     }
-    val topReflectionPath = android.graphics.Path().apply {
+    val topReflectionPath = Path().apply {
         moveTo(clockCx - topWidth * 0.75f, topYPos + size * 0.03f)
         cubicTo(
             clockCx - topWidth * 0.35f, clockCy - halfH * 0.4f,
@@ -1898,7 +1750,6 @@ fun generateHourglassClockBitmap(
     }
     canvas.drawPath(topReflectionPath, reflectionPaint)
 
-    // 4. Rotated Precision Hands with Contrast Casing
     val hourDeg = timeState.hoursWithMinutes * 30f
     val minDeg = timeState.minutesWithSeconds * 6f
     val secDeg = timeState.secondsWithMillis * 6f
@@ -1926,13 +1777,9 @@ fun generateHourglassClockBitmap(
         canvas.restore()
     }
 
-    // A. Hour Hand
     drawContrastedPillHand(size * 0.21f, size * 0.028f, hourDeg, primaryText)
-
-    // B. Minute Hand
     drawContrastedPillHand(size * 0.31f, size * 0.018f, minDeg, primaryText)
 
-    // C. Second Hand
     val secLen = size * 0.34f
     val secTailLen = size * 0.07f
     val secOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1953,7 +1800,6 @@ fun generateHourglassClockBitmap(
     canvas.drawLine(clockCx, clockCy + secTailLen, clockCx, clockCy - secLen, secPaint)
     canvas.restore()
 
-    // 5. Center Pivot Node (Architectural Ring Node)
     val pivotRadius = size * 0.026f
     val pivotOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(220, 16, 16, 24)
@@ -1983,12 +1829,9 @@ fun generateMinimalDotsClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1996,8 +1839,7 @@ fun generateMinimalDotsClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#35000000") else Color.parseColor("#45FFFFFF")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -2015,7 +1857,6 @@ fun generateMinimalDotsClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. 12 Perimeter Dot Hour Markers
     val markerRadius = radius * 0.82f
     val cardinalDotRadius = size * 0.022f
     val minorDotRadius = size * 0.012f
@@ -2044,12 +1885,10 @@ fun generateMinimalDotsClockBitmap(
         }
     }
 
-    // 3. Rotated Precision Hands
     val hourDeg = timeState.hoursWithMinutes * 30f
     val minDeg = timeState.minutesWithSeconds * 6f
     val secDeg = timeState.secondsWithMillis * 6f
 
-    // A. Hour Hand (Short Thick Capsule)
     val hourWidth = size * 0.048f
     val hourLen = radius * 0.38f
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2063,7 +1902,6 @@ fun generateMinimalDotsClockBitmap(
     canvas.drawLine(clockCx, clockCy, clockCx, clockCy - hourLen, hourPaint)
     canvas.restore()
 
-    // B. Minute Hand (Sleek Wand)
     val minWidth = size * 0.020f
     val minLen = radius * 0.68f
     val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2077,7 +1915,6 @@ fun generateMinimalDotsClockBitmap(
     canvas.drawLine(clockCx, clockCy, clockCx, clockCy - minLen, minPaint)
     canvas.restore()
 
-    // C. Second Hand (Thin Red/Accent Needle)
     val secLen = radius * 0.78f
     val secTailLen = radius * 0.12f
     val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2091,7 +1928,6 @@ fun generateMinimalDotsClockBitmap(
     canvas.drawLine(clockCx, clockCy + secTailLen, clockCx, clockCy - secLen, secPaint)
     canvas.restore()
 
-    // 4. Center Pivot Hub (Dual-Tone Node)
     val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#90A4AE") else Color.parseColor("#78909C")
         style = Paint.Style.FILL
@@ -2115,12 +1951,9 @@ fun generateRadarScopeClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -2128,8 +1961,7 @@ fun generateRadarScopeClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
     val gridColor = if (isLight) Color.parseColor("#1E000000") else Color.parseColor("#25FFFFFF")
 
-    // 1. Calculate Fixed Circular Card Bounds
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
@@ -2147,7 +1979,6 @@ fun generateRadarScopeClockBitmap(
 
     val timeState = AnalogClockTimeState.now()
 
-    // 2. Radar Grid (Concentric Range Rings & Crosshairs)
     val scopeRadius = radius * 0.85f
     val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = gridColor
@@ -2155,16 +1986,13 @@ fun generateRadarScopeClockBitmap(
         strokeWidth = size * 0.008f
     }
 
-    // Range Rings
     canvas.drawCircle(clockCx, clockCy, scopeRadius, gridPaint)
     canvas.drawCircle(clockCx, clockCy, scopeRadius * 0.62f, gridPaint)
     canvas.drawCircle(clockCx, clockCy, scopeRadius * 0.32f, gridPaint)
 
-    // Crosshair Guidelines
     canvas.drawLine(clockCx - scopeRadius, clockCy, clockCx + scopeRadius, clockCy, gridPaint)
     canvas.drawLine(clockCx, clockCy - scopeRadius, clockCx, clockCy + scopeRadius, gridPaint)
 
-    // 3. Live Trailing Radar Sweep Sector (40-degree beam attached to seconds)
     val secDeg = timeState.secondsWithMillis * 6f
     val sweepRect = RectF(
         clockCx - scopeRadius, clockCy - scopeRadius,
@@ -2182,11 +2010,9 @@ fun generateRadarScopeClockBitmap(
     }
     canvas.drawArc(sweepRect, secDeg - 90f - 40f, 40f, true, sweepPaint)
 
-    // 4. Rotated Hands
     val hourDeg = timeState.hoursWithMinutes * 30f
     val minDeg = timeState.minutesWithSeconds * 6f
 
-    // A. Hour Hand (Solid Capsule Target Lock)
     val hourWidth = size * 0.055f
     val hourLen = scopeRadius * 0.48f
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2204,7 +2030,6 @@ fun generateRadarScopeClockBitmap(
     canvas.drawRoundRect(hourRect, hourWidth / 2f, hourWidth / 2f, hourPaint)
     canvas.restore()
 
-    // B. Minute Hand (Wand with Target Lock Reticle Tip)
     val minWidth = size * 0.016f
     val minLen = scopeRadius * 0.76f
     val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2224,7 +2049,6 @@ fun generateRadarScopeClockBitmap(
     canvas.drawCircle(clockCx, clockCy - minLen, size * 0.028f, minRingPaint)
     canvas.restore()
 
-    // C. Second Hand (Leading Radar Beam Needle)
     val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.STROKE
@@ -2236,7 +2060,6 @@ fun generateRadarScopeClockBitmap(
     canvas.drawLine(clockCx, clockCy + (scopeRadius * 0.15f), clockCx, clockCy - scopeRadius, secPaint)
     canvas.restore()
 
-    // D. Radar Pivot Core
     val pivotRadius = size * 0.028f
     val pivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
