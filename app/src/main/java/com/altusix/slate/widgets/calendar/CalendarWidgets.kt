@@ -268,39 +268,17 @@ class CalendarDiagonalSplitReceiver : BaseCalendarReceiver() {
         generateDiagonalSplitDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 12. SPLIT DASHBOARD CALENDAR (4x2 / Split Date & Month Grid)
+// 12. SPLIT DASHBOARD CALENDAR (4x2)
 class CalendarDashboardReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateSplitDashboardCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
-}
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateSplitDashboardCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
 
-// 13. FOCUS TIMELINE CALENDAR (4x2 / Split Dual-Block Timeline)
+// 13. FOCUS TIMELINE CALENDAR (4x2)
 class CalendarFocusTimelineReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateFocusTimelineCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
-}
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateFocusTimelineCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
 
-// 14. ANALOG TIMELINE HYBRID (4x2 / Clock & Date Pill Strip)
+// 14. ANALOG TIMELINE HYBRID (4x2)
 class CalendarAnalogTimelineReceiver : BaseCalendarReceiver() {
-
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateAnalogTimelineCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
-
-    override fun onEnabled(context: Context) {
-        super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-}
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateAnalogTimelineCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
 
 // 15. WEEK PROGRESS CALENDAR (4x2 / Capsule Progress Tracker)
 class CalendarWeekProgressReceiver : BaseCalendarReceiver() {
@@ -403,27 +381,9 @@ class CalendarAnalogCalendarHybridReceiver : BaseCalendarReceiver() {
     }
 }
 
-// 29. ARCHITECTURAL ANALOG DASHBOARD (4x2 / Sculpted Dial & Day Progress)
+// 29. ARCHITECTURAL ANALOG DASHBOARD (4x2)
 class CalendarArchitecturalAnalogReceiver : BaseCalendarReceiver() {
-
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateArchitecturalAnalogDashboardBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
-
-    override fun onEnabled(context: Context) {
-        super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
-    }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
-    }
-}
+    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateArchitecturalAnalogReceiverBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
 
 // 30. RADIAL ARC ORBITAL DASHBOARD (4x2 / Concentric Time Arcs & Life Progress)
 class CalendarRadialArcReceiver : BaseCalendarReceiver() {
