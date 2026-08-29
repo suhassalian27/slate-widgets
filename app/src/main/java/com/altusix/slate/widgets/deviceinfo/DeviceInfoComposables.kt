@@ -18,12 +18,14 @@ import android.os.Environment
 import android.os.StatFs
 import android.os.SystemClock
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
 import java.net.NetworkInterface
 import java.util.Collections
 import java.util.concurrent.TimeUnit
+import android.graphics.Path
 
 fun fetchDeviceInfoData(context: Context): DeviceInfoData {
     var batteryPct = 0
@@ -165,7 +167,6 @@ fun fetchDeviceInfoData(context: Context): DeviceInfoData {
         }
     }
 
-    // 1. Internet Speed / Active Link Bandwidth
     var speedMbps = "100 Mbps"
     try {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -187,7 +188,6 @@ fun fetchDeviceInfoData(context: Context): DeviceInfoData {
         }
     } catch (_: Exception) {}
 
-    // 2. Mobile & Wi-Fi Data Usage Counters
     var todayMobileDataMb = "0.0 MB"
     var todayWifiDataGb = "0.0 GB"
     try {
@@ -316,14 +316,9 @@ private fun generateSinglePill2x1Bitmap(
     subValue: String? = null,
     accentOverride: Int? = null
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val wasRefreshed = isJustRefreshed(context, widgetId)
     val isLight = config.themeMode == "LIGHT"
@@ -334,12 +329,12 @@ private fun generateSinglePill2x1Bitmap(
 
     val targetRatio = 2.4f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -347,7 +342,7 @@ private fun generateSinglePill2x1Bitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -363,7 +358,6 @@ private fun generateSinglePill2x1Bitmap(
     val valueSize = (cardRect.height() * 0.30f).coerceIn(scaleFactor * 11f, scaleFactor * 24f)
     val subSize = (cardRect.height() * 0.12f).coerceIn(scaleFactor * 6f, scaleFactor * 10.5f)
 
-    // Applied accent color + tiny letter spacing for header label
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         textSize = labelSize
@@ -377,7 +371,6 @@ private fun generateSinglePill2x1Bitmap(
         typeface = getSlateFont(context, weight = 800)
     }
 
-    // Applied tiny letter spacing for bottom subtext
     val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = subSize
@@ -387,7 +380,6 @@ private fun generateSinglePill2x1Bitmap(
 
     val hasSub = !subValue.isNullOrBlank()
 
-    // Increased gap between text lines
     val gap = (cardRect.height() * 0.05f).coerceIn(scaleFactor * 5f, scaleFactor * 9f)
 
     val totalTextH = if (hasSub) (labelSize + gap + valueSize + gap + subSize) else (labelSize + gap + valueSize)
@@ -411,6 +403,13 @@ private fun generateSinglePill2x1Bitmap(
     return bitmap
 }
 
+private fun createCornerPath(rect: RectF, tl: Float, tr: Float, br: Float, bl: Float): android.graphics.Path {
+    val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+    return android.graphics.Path().apply {
+        addRoundRect(rect, radii, android.graphics.Path.Direction.CW)
+    }
+}
+
 // 1. DEVICE INFO MINI BENTO (2x2)
 fun generateDeviceInfoMiniBento2x2Bitmap(
     context: Context,
@@ -420,14 +419,9 @@ fun generateDeviceInfoMiniBento2x2Bitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val info = fetchDeviceInfoData(context)
     val wasRefreshed = isJustRefreshed(context, widgetId)
@@ -438,28 +432,50 @@ fun generateDeviceInfoMiniBento2x2Bitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val aspectRatio = cardRect.width() / cardRect.height()
+
+    // Responsive aspect-ratio grid reflow logic
+    val (cols, rows) = if (isResponsive) {
+        when {
+            aspectRatio >= 2.2f -> 4 to 1
+            aspectRatio <= 0.55f -> 1 to 4
+            else -> 2 to 2
+        }
+    } else {
+        2 to 2
+    }
 
     val pad = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
     val gap = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
-    val tileW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val tileH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val innerRadius = (cornerRadius - pad).coerceAtLeast(scaleFactor * 4f).coerceAtMost(minOf(tileW, tileH) * 0.22f)
+
+    val availableW = (cardRect.width() - (pad * 2f) - (gap * (cols - 1))).coerceAtLeast(1f)
+    val availableH = (cardRect.height() - (pad * 2f) - (gap * (rows - 1))).coerceAtLeast(1f)
+
+    val tileW = availableW / cols
+    val tileH = availableH / rows
+
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(tileW, tileH) * 0.20f)
+    val outerCornerR = (outerRadius - pad)
+        .coerceAtLeast(defaultInnerR)
+        .coerceAtMost(minOf(tileW, tileH) * 0.48f)
+
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
         style = Paint.Style.FILL
@@ -492,13 +508,21 @@ fun generateDeviceInfoMiniBento2x2Bitmap(
     )
 
     for (i in tiles.indices) {
-        val col = i % 2
-        val row = i / 2
+        val col = i % cols
+        val row = i / cols
+
         val left = cardRect.left + pad + col * (tileW + gap)
         val top = cardRect.top + pad + row * (tileH + gap)
         val rect = RectF(left, top, left + tileW, top + tileH)
 
-        drawBentoTile(canvas, rect, innerRadius, tilePaint)
+        // Concentric corner radii matching the outer container's corners
+        val tl = if (col == 0 && row == 0) outerCornerR else defaultInnerR
+        val tr = if (col == cols - 1 && row == 0) outerCornerR else defaultInnerR
+        val br = if (col == cols - 1 && row == rows - 1) outerCornerR else defaultInnerR
+        val bl = if (col == 0 && row == rows - 1) outerCornerR else defaultInnerR
+
+        val tilePath = createCornerPath(rect, tl, tr, br, bl)
+        canvas.drawPath(tilePath, tilePaint)
 
         val (label, value, overrideColor) = tiles[i]
         val labelY = rect.top + (tileH * 0.35f)
@@ -527,14 +551,9 @@ fun generateStorageBarCapsule2x1Bitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val info = fetchDeviceInfoData(context)
     val wasRefreshed = isJustRefreshed(context, widgetId)
@@ -546,12 +565,12 @@ fun generateStorageBarCapsule2x1Bitmap(
 
     val targetRatio = 2.4f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -559,7 +578,7 @@ fun generateStorageBarCapsule2x1Bitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -647,6 +666,7 @@ fun generateStorageBarCapsule2x1Bitmap(
     return bitmap
 }
 
+
 // 3. FULL SYSTEM DASHBOARD BENTO (4x2)
 fun generateDeviceInfoDashboard4x2Bitmap(
     context: Context,
@@ -656,14 +676,9 @@ fun generateDeviceInfoDashboard4x2Bitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val info = fetchDeviceInfoData(context)
     val wasRefreshed = isJustRefreshed(context, widgetId)
@@ -673,14 +688,14 @@ fun generateDeviceInfoDashboard4x2Bitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    val targetRatio = 2.0f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        var cardH = h.toFloat()
+        val targetRatio = 2.0f
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -688,26 +703,74 @@ fun generateDeviceInfoDashboard4x2Bitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val pad = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
     val gap = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
-    val halfW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val halfH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val innerRadius = (cornerRadius - pad).coerceAtLeast(scaleFactor * 4f).coerceAtMost(minOf(halfW, halfH) * 0.22f)
+
+    val aspectRatio = cardRect.width() / cardRect.height()
+    val isHorizontalLayout = if (isResponsive) aspectRatio >= 1.0f else true
+
+    val bLeft: RectF
+    val tr1: RectF
+    val tr2: RectF
+
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(cardRect.width(), cardRect.height()) * 0.15f)
+
+    val bLeftPath: Path
+    val tr1Path: Path
+    val tr2Path: Path
+
+    if (isHorizontalLayout) {
+        val halfW = (cardRect.width() - (pad * 2f) - gap) / 2f
+        val halfH = (cardRect.height() - (pad * 2f) - gap) / 2f
+
+        bLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.bottom - pad)
+        tr1 = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH)
+        tr2 = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+        val outerCornerR = (outerRadius - pad)
+            .coerceAtLeast(defaultInnerR)
+            .coerceAtMost(minOf(bLeft.width(), bLeft.height()) * 0.48f)
+
+        bLeftPath = createCornerPath(bLeft, outerCornerR, defaultInnerR, defaultInnerR, outerCornerR)
+        tr1Path = createCornerPath(tr1, defaultInnerR, outerCornerR, defaultInnerR, defaultInnerR)
+        tr2Path = createCornerPath(tr2, defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    } else {
+        // Vertical layout for tall containers (Top Storage Hero + Bottom 2 Side-by-Side Cards)
+        val innerH = (cardRect.height() - (pad * 2f) - gap).coerceAtLeast(1f)
+        val innerW = (cardRect.width() - (pad * 2f) - gap).coerceAtLeast(1f)
+
+        val heroH = innerH * 0.42f
+        val bottomH = innerH - heroH
+        val bottomW = innerW / 2f
+
+        bLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+        tr1 = RectF(cardRect.left + pad, bLeft.bottom + gap, cardRect.left + pad + bottomW, cardRect.bottom - pad)
+        tr2 = RectF(tr1.right + gap, bLeft.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+        val outerCornerR = (outerRadius - pad)
+            .coerceAtLeast(defaultInnerR)
+            .coerceAtMost(minOf(bLeft.width(), bLeft.height()) * 0.48f)
+
+        bLeftPath = createCornerPath(bLeft, outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
+        tr1Path = createCornerPath(tr1, defaultInnerR, defaultInnerR, defaultInnerR, outerCornerR)
+        tr2Path = createCornerPath(tr2, defaultInnerR, defaultInnerR, outerCornerR, defaultInnerR)
+    }
+
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
         style = Paint.Style.FILL
     }
 
-    val minTileDim = minOf(halfW, halfH)
+    val minTileDim = minOf(tr1.width(), tr1.height())
 
     val labelSize = (minTileDim * 0.18f).coerceIn(scaleFactor * 6f, scaleFactor * 11f)
     val valueSize = (minTileDim * 0.28f).coerceIn(scaleFactor * 8f, scaleFactor * 18f)
@@ -729,13 +792,12 @@ fun generateDeviceInfoDashboard4x2Bitmap(
         typeface = getSlateFont(context, weight = 600)
     }
 
-    val tilePadX = halfW * 0.10f
-    val tilePadY = (minTileDim * 0.12f).coerceAtMost(scaleFactor * 12f)
-    val textGap = (minTileDim * 0.08f).coerceIn(scaleFactor * 3f, scaleFactor * 7f)
+    val tilePadX = bLeft.width() * 0.08f
+    val tilePadY = (bLeft.height() * 0.12f).coerceAtMost(scaleFactor * 12f)
+    val textGap = (bLeft.height() * 0.08f).coerceIn(scaleFactor * 3f, scaleFactor * 7f)
 
-    // Big Left Card: Storage Details
-    val bLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.bottom - pad)
-    drawBentoTile(canvas, bLeft, innerRadius, tilePaint)
+    // Storage Details Card
+    canvas.drawPath(bLeftPath, tilePaint)
     val bLeftMaxW = bLeft.width() - (tilePadX * 2f)
 
     val bLeftLine1Y = bLeft.top + tilePadY + labelSize
@@ -746,28 +808,28 @@ fun generateDeviceInfoDashboard4x2Bitmap(
     drawAutoFitText(canvas, "${info.storagePct}% Used", bLeft.left + tilePadX, bLeftLine2Y, bLeftMaxW, valuePaint, scaleFactor * 5f)
     drawAutoFitText(canvas, "${String.format("%.1f", info.usedStorageGb)} / ${info.totalStorageGb.toInt()} GB", bLeft.left + tilePadX, bLeftLine3Y, bLeftMaxW, subPaint, scaleFactor * 4f)
 
-    // Top Right: RAM
-    val tr1 = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH)
-    drawBentoTile(canvas, tr1, innerRadius, tilePaint)
-    val tr1MaxW = tr1.width() - (tilePadX * 2f)
+    // RAM Card
+    canvas.drawPath(tr1Path, tilePaint)
+    val tr1PadX = tr1.width() * 0.10f
+    val tr1MaxW = tr1.width() - (tr1PadX * 2f)
 
     val tr1Line1Y = tr1.top + tilePadY + labelSize
     val tr1Line2Y = tr1Line1Y + textGap + valueSize
 
-    drawAutoFitText(canvas, "RAM MEMORY", tr1.left + tilePadX, tr1Line1Y, tr1MaxW, labelPaint, scaleFactor * 4f)
-    drawAutoFitText(canvas, "${info.ramPct}% (${String.format("%.1f", info.usedRamGb)}GB)", tr1.left + tilePadX, tr1Line2Y, tr1MaxW, valuePaint, scaleFactor * 5f)
+    drawAutoFitText(canvas, "RAM MEMORY", tr1.left + tr1PadX, tr1Line1Y, tr1MaxW, labelPaint, scaleFactor * 4f)
+    drawAutoFitText(canvas, "${info.ramPct}% (${String.format("%.1f", info.usedRamGb)}GB)", tr1.left + tr1PadX, tr1Line2Y, tr1MaxW, valuePaint, scaleFactor * 5f)
 
-    // Bottom Right: Battery
-    val tr2 = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
-    drawBentoTile(canvas, tr2, innerRadius, tilePaint)
-    val tr2MaxW = tr2.width() - (tilePadX * 2f)
+    // Battery Card
+    canvas.drawPath(tr2Path, tilePaint)
+    val tr2PadX = tr2.width() * 0.10f
+    val tr2MaxW = tr2.width() - (tr2PadX * 2f)
 
     val tr2Line1Y = tr2.top + tilePadY + labelSize
     val tr2Line2Y = tr2Line1Y + textGap + valueSize
 
-    drawAutoFitText(canvas, "BATTERY", tr2.left + tilePadX, tr2Line1Y, tr2MaxW, labelPaint, scaleFactor * 4f)
+    drawAutoFitText(canvas, "BATTERY", tr2.left + tr2PadX, tr2Line1Y, tr2MaxW, labelPaint, scaleFactor * 4f)
     val batPaint = Paint(valuePaint).apply { color = accentColorInt }
-    drawAutoFitText(canvas, "${info.batteryPct}%" + if (info.isCharging) " ⚡" else "", tr2.left + tilePadX, tr2Line2Y, tr2MaxW, batPaint, scaleFactor * 5f)
+    drawAutoFitText(canvas, "${info.batteryPct}%" + if (info.isCharging) " ⚡" else "", tr2.left + tr2PadX, tr2Line2Y, tr2MaxW, batPaint, scaleFactor * 5f)
 
     if (wasRefreshed) {
         drawRefreshBadge(canvas, context, cardRect, scaleFactor, accentColorInt)
@@ -775,8 +837,6 @@ fun generateDeviceInfoDashboard4x2Bitmap(
 
     return bitmap
 }
-
-
 
 // TRUE MINIMAL CAPSULE PILL RENDERER (Full Stadium Rounded, Centered Accent Value)
 private fun generateMinimalCapsulePillBitmap(
@@ -789,14 +849,9 @@ private fun generateMinimalCapsulePillBitmap(
     displayValue: String,
     accentOverride: Int? = null
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val wasRefreshed = isJustRefreshed(context, widgetId)
     val bgColor = getSafeBgColor(config)
@@ -804,12 +859,12 @@ private fun generateMinimalCapsulePillBitmap(
 
     val targetRatio = 2.4f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -863,14 +918,9 @@ private fun generateSingleCard2x1Bitmap(
     subValue: String? = null,
     accentOverride: Int? = null
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(density, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast((60 * scaleFactor).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val wasRefreshed = isJustRefreshed(context, widgetId)
     val isLight = config.themeMode == "LIGHT"
@@ -881,12 +931,12 @@ private fun generateSingleCard2x1Bitmap(
 
     val targetRatio = 2.4f
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -894,7 +944,7 @@ private fun generateSingleCard2x1Bitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -959,12 +1009,10 @@ fun runQuickSpeedBenchmark(context: Context): String {
     val activeNet = cm?.activeNetwork
     val caps = cm?.getNetworkCapabilities(activeNet)
 
-    // 1. Verify device is connected to an active network
     if (caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
         return "Offline"
     }
 
-    // 2. Try HTTP latency ping
     var isHttpSuccess = false
     try {
         val url = java.net.URL("https://www.google.com/generate_204")
@@ -980,7 +1028,6 @@ fun runQuickSpeedBenchmark(context: Context): String {
         }
     } catch (_: Exception) {}
 
-    // 3. Measure downstream link speed from active hardware interface
     val downKbps = caps.linkDownstreamBandwidthKbps
     if (downKbps > 0) {
         val speedMbps = downKbps / 1000f
