@@ -133,7 +133,8 @@ private fun invokeRenderMethod(
             p == Context::class.java -> args[i] = context
             p == SlateWidgetConfig::class.java -> args[i] = defaultConfig
             p == CalculatorState::class.java -> args[i] = CalculatorState()
-            p == Boolean::class.javaPrimitiveType || p == Boolean::class.javaObjectType -> args[i] = true
+            // Pass false so isResponsive = false for all preview bitmap generators
+            p == Boolean::class.javaPrimitiveType || p == Boolean::class.javaObjectType -> args[i] = false
         }
     }
 
