@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.calculator.CalculatorState
+import com.altusix.slate.widgets.camera.CameraWidgetConfig
 
 @Composable
 fun SlateWidgetPreviewImage(
@@ -79,10 +80,6 @@ private fun generatePreviewBitmap(
             accentColorHex = 0xFFFFFFFFL
         )
 
-        // Adjust this multiplier to control preview corner radius:
-        // 1.15f - 1.30f = Smaller/sharper corner radius in preview
-        // 1.00f         = Default launcher corner radius
-        // 0.85f - 0.95f = Larger/rounder corner radius in preview
         val radiusScaleMultiplier = 1.4f
 
         val adjustedWDp = (wDp * radiusScaleMultiplier).toInt()
@@ -132,9 +129,20 @@ private fun invokeRenderMethod(
         when {
             p == Context::class.java -> args[i] = context
             p == SlateWidgetConfig::class.java -> args[i] = defaultConfig
+            p == CameraWidgetConfig::class.java -> args[i] = CameraWidgetConfig()
             p == CalculatorState::class.java -> args[i] = CalculatorState()
-            // Pass false so isResponsive = false for all preview bitmap generators
             p == Boolean::class.javaPrimitiveType || p == Boolean::class.javaObjectType -> args[i] = false
+            else -> {
+                if (p != Int::class.javaPrimitiveType && p != Int::class.javaObjectType) {
+                    try {
+                        val constr = p.declaredConstructors.firstOrNull { it.parameterTypes.isEmpty() }
+                        if (constr != null) {
+                            constr.isAccessible = true
+                            args[i] = constr.newInstance()
+                        }
+                    } catch (_: Exception) { }
+                }
+            }
         }
     }
 

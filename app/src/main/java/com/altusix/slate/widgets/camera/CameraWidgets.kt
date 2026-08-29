@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.provider.MediaStore
 import android.widget.RemoteViews
 import com.altusix.slate.R
@@ -14,16 +15,17 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getCameraWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
+        SlateWidgetInfo(name = "Stacked Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameStackedReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Taped Polaroid Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameTapedReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Push Pin Polaroid Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFramePushPinReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Camera Shutter Launcher", sizeText = "2x2", category = "Camera", receiverClass = CameraShutterLauncherReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Wide Photo Frame", sizeText = "4x2", category = "Camera", receiverClass = CameraPhotoFrame4x2Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Photo Frame & Gallery", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Circle Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameCircleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Organic Blob Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameBlobReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Fluid Blob Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameFluidBlobReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Stacked Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameStackedReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Taped Polaroid Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameTapedReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Push Pin Polaroid Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFramePushPinReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Camera Shutter Launcher", sizeText = "2x2", category = "Camera", receiverClass = CameraShutterLauncherReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Aperture Lens Capsule", sizeText = "2x1", category = "Camera", receiverClass = CameraAperturePillReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Aperture Lens Capsule", sizeText = "2x1", category = "Camera", receiverClass = CameraAperturePillReceiver::class.java, hasModeOption = true),
+
     )
 }
 
@@ -73,6 +75,11 @@ fun updateCameraWidget(context: Context, appWidgetManager: AppWidgetManager, wid
 
 // 1. WIDE PHOTO FRAME (4x2 / Fixed Aspect Photo Display)
 class CameraPhotoFrame4x2Receiver : AppWidgetProvider() {
+
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrame4x2Bitmap(context, config, cameraConfig, wDp, hDp)
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
@@ -147,6 +154,11 @@ class CameraPhotoFrame4x2Receiver : AppWidgetProvider() {
 
 // 2. PHOTO FRAME & GALLERY (2x2 / Responsive & Fixed Aspect Photo Display)
 class CameraPhotoFrameReceiver : AppWidgetProvider() {
+
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrameCameraBitmap(context, config, cameraConfig, isResponsive, wDp, hDp)
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
@@ -224,6 +236,11 @@ class CameraPhotoFrameReceiver : AppWidgetProvider() {
 // 3. CIRCLE PHOTO FRAME (2x2 / Circular Aspect Display)
 class CameraPhotoFrameCircleReceiver : AppWidgetProvider() {
 
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrameCircleBitmap(context, config, cameraConfig, wDp, hDp)
+    }
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
@@ -297,6 +314,11 @@ class CameraPhotoFrameCircleReceiver : AppWidgetProvider() {
 
 // 4. ORGANIC BLOB PHOTO FRAME (2x2 / Asymmetric Pebble Display)
 class CameraPhotoFrameBlobReceiver : AppWidgetProvider() {
+
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrameBlobCameraBitmap(context, config, cameraConfig, wDp, hDp)
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
@@ -372,6 +394,11 @@ class CameraPhotoFrameBlobReceiver : AppWidgetProvider() {
 // 5. FLUID BLOB PHOTO FRAME (2x2 / Organic Wave Display)
 class CameraPhotoFrameFluidBlobReceiver : AppWidgetProvider() {
 
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrameFluidBlobCameraBitmap(context, config, cameraConfig, wDp, hDp)
+    }
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
@@ -445,6 +472,11 @@ class CameraPhotoFrameFluidBlobReceiver : AppWidgetProvider() {
 
 // 6. STACKED PHOTO FRAME (2x2 / Layered Polaroid Stack Display)
 class CameraPhotoFrameStackedReceiver : AppWidgetProvider() {
+
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrameStackedCameraBitmap(context, config, cameraConfig, wDp, hDp)
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
@@ -520,6 +552,11 @@ class CameraPhotoFrameStackedReceiver : AppWidgetProvider() {
 // 7. TAPED POLAROID PHOTO FRAME (2x2 / Masking Tape Mounted Display)
 class CameraPhotoFrameTapedReceiver : AppWidgetProvider() {
 
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFrameTapedCameraBitmap(context, config, cameraConfig, wDp, hDp)
+    }
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
@@ -593,6 +630,11 @@ class CameraPhotoFrameTapedReceiver : AppWidgetProvider() {
 
 // 8. PUSH PIN POLAROID PHOTO FRAME (2x2 / Red Thumbtack Mounted Display)
 class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
+
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
+        return generatePhotoFramePushPinCameraBitmap(context, config, cameraConfig, wDp, hDp)
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
@@ -668,6 +710,10 @@ class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
 // 9. SHUTTER LAUNCHER (2x2 / Minimal Camera Trigger Display)
 class CameraShutterLauncherReceiver : AppWidgetProvider() {
 
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        return generateCameraShutterLauncherBitmap(context, config, isResponsive, wDp, hDp)
+    }
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
@@ -711,6 +757,10 @@ class CameraShutterLauncherReceiver : AppWidgetProvider() {
 
 // 10. APERTURE LENS CAPSULE (2x1 / Sleek Dual-Action Camera Pill)
 class CameraAperturePillReceiver : AppWidgetProvider() {
+
+    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        return generateCameraAperturePillBitmap(context, config, isResponsive, wDp, hDp)
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
