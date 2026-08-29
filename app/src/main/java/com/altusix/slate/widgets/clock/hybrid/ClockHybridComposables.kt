@@ -12,11 +12,12 @@ import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
 import com.altusix.slate.R
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.widgets.clock.digital.DigitalClockTimeState
-import com.altusix.slate.widgets.clock.digital.drawAutoFitText
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import com.altusix.slate.widgets.clock.digital.DigitalClockTimeState
+import com.altusix.slate.widgets.clock.digital.drawAutoFitText
 
 // --- AUTHENTIC 6-SIDED 7-SEGMENT LCD RENDERER ---
 private fun drawAngled7SegmentDigit(
@@ -169,12 +170,9 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((70 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -183,14 +181,14 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -199,12 +197,12 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val padX = cardRect.width() * 0.07f
     val padY = cardRect.height() * 0.08f
@@ -226,7 +224,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         for (i in 0 until 12) {
             val angleRad = Math.toRadians((i * 30).toDouble())
             val isMajor = i % 3 == 0
-            val markerRadius = if (isMajor) 2.2f * density else 1.2f * density
+            val markerRadius = if (isMajor) 2.2f * scaleFactor else 1.2f * scaleFactor
             val dist = radius * 0.84f
             val mx = centerX + (Math.cos(angleRad) * dist).toFloat()
             val my = centerY + (Math.sin(angleRad) * dist).toFloat()
@@ -240,7 +238,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
             style = Paint.Style.STROKE
-            strokeWidth = 3f * density
+            strokeWidth = 3f * scaleFactor
             strokeCap = Paint.Cap.ROUND
         }
         canvas.drawLine(
@@ -254,7 +252,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
             style = Paint.Style.STROKE
-            strokeWidth = 2f * density
+            strokeWidth = 2f * scaleFactor
             strokeCap = Paint.Cap.ROUND
         }
         canvas.drawLine(
@@ -268,7 +266,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
             color = accentColorInt
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(centerX, centerY, 3f * density, capPaint)
+        canvas.drawCircle(centerX, centerY, 3f * scaleFactor, capPaint)
     }
 
     if (aspect >= 1.20f) {
@@ -292,7 +290,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
             textSize = 100f
         }
         val refTimeW = refTimePaint.measureText(digitalTimeStr)
-        val timeTextSize = minOf(maxTimeH, 100f * (digitalAreaW / refTimeW)).coerceAtLeast(11f * density)
+        val timeTextSize = minOf(maxTimeH, 100f * (digitalAreaW / refTimeW)).coerceAtLeast(11f * scaleFactor)
 
         val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
@@ -304,7 +302,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         val timeBounds = Rect()
         timePaint.getTextBounds(digitalTimeStr, 0, digitalTimeStr.length, timeBounds)
 
-        var dateTextSize = (timeTextSize * 0.28f).coerceAtLeast(10f * density)
+        var dateTextSize = (timeTextSize * 0.28f).coerceAtLeast(10f * scaleFactor)
         val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColorInt
             textSize = dateTextSize
@@ -352,7 +350,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         val refTimeW = refTimePaint.measureText(digitalTimeStr)
 
         val maxTimeH = digitalAreaH * 0.50f
-        val timeTextSize = minOf(maxTimeH, 100f * (usableW / refTimeW)).coerceAtLeast(12f * density)
+        val timeTextSize = minOf(maxTimeH, 100f * (usableW / refTimeW)).coerceAtLeast(12f * scaleFactor)
 
         val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
@@ -364,7 +362,7 @@ fun generateAnalogDigitalSplitHybridClockBitmap(
         val timeBounds = Rect()
         timePaint.getTextBounds(digitalTimeStr, 0, digitalTimeStr.length, timeBounds)
 
-        var dateTextSize = (timeTextSize * 0.28f).coerceAtLeast(10f * density)
+        var dateTextSize = (timeTextSize * 0.28f).coerceAtLeast(10f * scaleFactor)
         val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColorInt
             textSize = dateTextSize
@@ -402,14 +400,9 @@ fun generateMinimalDialHybridClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -417,28 +410,24 @@ fun generateMinimalDialHybridClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#80FFFFFF")
 
-    // Fixed 1:1 Aspect Ratio Card
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = HybridClockTimeState.now()
     val dialCenterX = cardRect.centerX()
     val dialCenterY = cardRect.centerY()
     val dialRadius = size * 0.42f
 
-    // =========================================================================
-    // 1. DIAL MARKS (Cardinal 12, 3, 6, 9 Ticks)
-    // =========================================================================
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.STROKE
@@ -461,16 +450,12 @@ fun generateMinimalDialHybridClockBitmap(
         )
     }
 
-    // =========================================================================
-    // 2. STACKED DIGITAL TIME (Top Right Overlay)
-    // =========================================================================
     val hourStr = timeState.hour24.toString().padStart(2, '0')
     val minStr = timeState.minute.toString().padStart(2, '0')
 
     val digitalRightX = cardRect.right - (size * 0.12f)
     val digitalTopY = cardRect.top + (size * 0.15f)
 
-    // Bold Hour Digits
     val hourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = size * 0.17f
@@ -482,7 +467,6 @@ fun generateMinimalDialHybridClockBitmap(
     val hourY = digitalTopY + hourBounds.height()
     canvas.drawText(hourStr, digitalRightX, hourY, hourPaint)
 
-    // Thin/Light Minute Digits
     val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = size * 0.17f
@@ -494,9 +478,6 @@ fun generateMinimalDialHybridClockBitmap(
     val minY = hourY + minBounds.height() + (size * 0.02f)
     canvas.drawText(minStr, digitalRightX, minY, minPaint)
 
-    // =========================================================================
-    // 3. ACCENT DAY LABEL (Bottom Center Accent)
-    // =========================================================================
     val cal = java.util.Calendar.getInstance()
     val fullDayName = java.text.SimpleDateFormat("EEEE", java.util.Locale.ENGLISH).format(cal.time).uppercase()
 
@@ -510,14 +491,10 @@ fun generateMinimalDialHybridClockBitmap(
     val dayY = cardRect.bottom - (size * 0.18f)
     canvas.drawText(fullDayName, dialCenterX, dayY, dayPaint)
 
-    // =========================================================================
-    // 4. ANALOG CLOCK HANDS
-    // =========================================================================
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
     val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
 
-    // Hour Hand (Wide Rounded Capsule Bar)
     val hourHandLen = dialRadius * 0.45f
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -532,7 +509,6 @@ fun generateMinimalDialHybridClockBitmap(
         hourHandPaint
     )
 
-    // Minute Hand (Crisp Solid Hand)
     val minHandLen = dialRadius * 0.76f
     val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -547,7 +523,6 @@ fun generateMinimalDialHybridClockBitmap(
         minHandPaint
     )
 
-    // Second Needle Hand (Thin Accent Red Line)
     val secHandLen = dialRadius * 0.85f
     val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -562,7 +537,6 @@ fun generateMinimalDialHybridClockBitmap(
         secHandPaint
     )
 
-    // Layered Center Cap Dot
     val capOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(30, 0, 0, 0) else Color.argb(40, 255, 255, 255)
         style = Paint.Style.FILL
@@ -586,30 +560,27 @@ fun generateBoldTypographicDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((100 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val clockCx = cardRect.centerX()
     val timeState = DigitalClockTimeState.now()
@@ -644,14 +615,17 @@ fun generateBoldTypographicDigitalClockBitmap(
         color = capsuleBgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(capsuleRect, capsuleH / 2f, capsuleH / 2f, capsulePaint)
+    val capsuleRadius = (cardCornerRadius - size * 0.08f)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(capsuleH * 0.5f)
+    canvas.drawRoundRect(capsuleRect, capsuleRadius, capsuleRadius, capsulePaint)
 
     val capsuleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(15, 0, 0, 0) else Color.argb(20, 255, 255, 255)
         style = Paint.Style.STROKE
         strokeWidth = size * 0.006f
     }
-    canvas.drawRoundRect(capsuleRect, capsuleH / 2f, capsuleH / 2f, capsuleStrokePaint)
+    canvas.drawRoundRect(capsuleRect, capsuleRadius, capsuleRadius, capsuleStrokePaint)
 
     val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -675,14 +649,9 @@ fun generateLcdSevenSegmentDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -690,18 +659,18 @@ fun generateLcdSevenSegmentDigitalClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#80FFFFFF")
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = DigitalClockTimeState.now()
 
@@ -785,32 +754,27 @@ fun generateAsymmetricSlantedDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = DigitalClockTimeState.now()
 
@@ -855,32 +819,27 @@ fun generateAsymmetricOverlayDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val timeState = DigitalClockTimeState.now()
 
@@ -933,12 +892,9 @@ fun generateGradientTallDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((70 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -954,14 +910,14 @@ fun generateGradientTallDigitalClockBitmap(
     val accentTop = Color.HSVToColor(hsv)
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -970,12 +926,12 @@ fun generateGradientTallDigitalClockBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val padX = cardRect.width() * 0.07f
     val padY = cardRect.height() * 0.08f
@@ -994,7 +950,7 @@ fun generateGradientTallDigitalClockBitmap(
     val aspect = cardRect.width() / cardRect.height()
 
     if (aspect >= 1.25f) {
-        val dateTextSize = (cardRect.height() * 0.125f).coerceIn(11f * density, 24f * density)
+        val dateTextSize = (cardRect.height() * 0.125f).coerceIn(11f * scaleFactor, 24f * scaleFactor)
         val datePaintPrimary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
             textSize = dateTextSize
@@ -1039,7 +995,7 @@ fun generateGradientTallDigitalClockBitmap(
 
         val maxFromHeight = leftSectionH * 0.84f
         val maxFromWidth = 100f * (leftSectionW / refTotalW)
-        val timeTextSize = minOf(maxFromHeight, maxFromWidth).coerceAtLeast(14f * density)
+        val timeTextSize = minOf(maxFromHeight, maxFromWidth).coerceAtLeast(14f * scaleFactor)
 
         val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = getSlateFont(context, weight = 700)
@@ -1053,7 +1009,7 @@ fun generateGradientTallDigitalClockBitmap(
 
         val timeBounds = android.graphics.Rect()
         timePaint.getTextBounds("00", 0, 2, timeBounds)
-        val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
+        val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * scaleFactor)
 
         val gradientTopY = timeY - timeBounds.height()
         val gradientBottomY = timeY
@@ -1090,7 +1046,7 @@ fun generateGradientTallDigitalClockBitmap(
         canvas.drawText(dateLine2, dateRightX, line2Y, datePaintSecondary)
 
     } else {
-        val dateTextSize = (cardRect.height() * 0.12f).coerceIn(12f * density, 22f * density)
+        val dateTextSize = (cardRect.height() * 0.12f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
         val datePaintPrimary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
             textSize = dateTextSize
@@ -1135,7 +1091,7 @@ fun generateGradientTallDigitalClockBitmap(
 
         val maxFromHeight = timeAreaH * 0.88f
         val maxFromWidth = 100f * (timeAreaW / refTotalW)
-        val timeTextSize = minOf(maxFromHeight, maxFromWidth).coerceAtLeast(14f * density)
+        val timeTextSize = minOf(maxFromHeight, maxFromWidth).coerceAtLeast(14f * scaleFactor)
 
         val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = getSlateFont(context, weight = 700)
@@ -1151,7 +1107,7 @@ fun generateGradientTallDigitalClockBitmap(
 
         val timeBounds = android.graphics.Rect()
         timePaint.getTextBounds("00", 0, 2, timeBounds)
-        val timeY = timeAreaTop + (timeAreaH + timeBounds.height()) / 2f - (2f * density)
+        val timeY = timeAreaTop + (timeAreaH + timeBounds.height()) / 2f - (2f * scaleFactor)
 
         val gradientTopY = timeY - timeBounds.height()
         val gradientBottomY = timeY
@@ -1192,12 +1148,9 @@ fun generateScriptOverlayDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((220 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((110 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1205,14 +1158,14 @@ fun generateScriptOverlayDigitalClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -1221,12 +1174,12 @@ fun generateScriptOverlayDigitalClockBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val padX = cardRect.width() * 0.08f
     val padY = cardRect.height() * 0.10f
@@ -1266,7 +1219,7 @@ fun generateScriptOverlayDigitalClockBitmap(
     val timeBounds = android.graphics.Rect()
     giantTimePaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
     val timeCx = cardRect.centerX()
-    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * density)
+    val timeY = cardRect.centerY() + (timeBounds.height() / 2f) - (2f * scaleFactor)
 
     canvas.drawText(timeText, timeCx, timeY, giantTimePaint)
 
@@ -1286,7 +1239,7 @@ fun generateScriptOverlayDigitalClockBitmap(
     }
 
     val dateX = cardRect.left + padX
-    val dateY = cardRect.bottom - padY - (2f * density)
+    val dateY = cardRect.bottom - padY - (2f * scaleFactor)
 
     var scriptTextSize = cardRect.height() * 0.32f
     val scriptPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1303,7 +1256,7 @@ fun generateScriptOverlayDigitalClockBitmap(
     }
 
     val scriptX = cardRect.left + padX
-    val scriptY = dateY - dateTextSize - (2f * density)
+    val scriptY = dateY - dateTextSize - (2f * scaleFactor)
 
     canvas.drawText(fullDayName, scriptX, scriptY, scriptPaint)
     canvas.drawText(fullMonthName, dateX, dateY, datePaint)
@@ -1319,26 +1272,23 @@ fun generateSplitFlapDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((140 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((70 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -1347,12 +1297,12 @@ fun generateSplitFlapDigitalClockBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardRadius = getStandardCornerRadius(density)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardRadius, cardRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val padX = cardRect.width() * 0.08f
     val padY = cardRect.height() * 0.08f
@@ -1377,7 +1327,7 @@ fun generateSplitFlapDigitalClockBitmap(
     val totalTilesW = (tileW * 2f) + tileGapX
     val tileStartX = cardRect.centerX() - (totalTilesW / 2f)
 
-    var dateTextSize = (tileH * 0.22f).coerceIn(12f * density, 20f * density)
+    var dateTextSize = (tileH * 0.22f).coerceIn(12f * scaleFactor, 20f * scaleFactor)
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         textSize = dateTextSize
@@ -1395,7 +1345,7 @@ fun generateSplitFlapDigitalClockBitmap(
     datePaint.getTextBounds(dateStr, 0, dateStr.length, dateBounds)
     val dateTextHeight = dateBounds.height().toFloat()
 
-    val gapY = (tileH * 0.16f).coerceIn(8f * density, 18f * density)
+    val gapY = (tileH * 0.16f).coerceIn(8f * scaleFactor, 18f * scaleFactor)
 
     val totalBlockHeight = tileH + gapY + dateTextHeight
     val blockTopY = cardRect.centerY() - (totalBlockHeight / 2f)
@@ -1403,7 +1353,10 @@ fun generateSplitFlapDigitalClockBitmap(
     val tileTopY = blockTopY
     val dateY = blockTopY + tileH + gapY + dateTextHeight - dateBounds.bottom
 
-    val tileRadius = (tileH * 0.14f).coerceIn(6f * density, 14f * density)
+    val tileRadius = (cardCornerRadius - padY)
+        .coerceAtLeast(scaleFactor * 6f)
+        .coerceAtMost(minOf(tileW, tileH) * 0.22f)
+
     val tileBgColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#222226")
 
     val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1415,7 +1368,7 @@ fun generateSplitFlapDigitalClockBitmap(
     val splitLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = splitLineColor
         style = Paint.Style.STROKE
-        strokeWidth = 2f * density
+        strokeWidth = 2f * scaleFactor
     }
 
     val pinColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#3A3A3C")
@@ -1447,19 +1400,19 @@ fun generateSplitFlapDigitalClockBitmap(
 
         val textBounds = android.graphics.Rect()
         textPaint.getTextBounds(digits, 0, digits.length, textBounds)
-        val textY = tileRect.centerY() + (textBounds.height() / 2f) - (2f * density)
+        val textY = tileRect.centerY() + (textBounds.height() / 2f) - (2f * scaleFactor)
 
         canvas.drawText(digits, tileRect.centerX(), textY, textPaint)
 
         val midY = tileRect.centerY()
         canvas.drawLine(tileRect.left, midY, tileRect.right, midY, splitLinePaint)
 
-        val pinW = 4.5f * density
-        val pinH = 3f * density
+        val pinW = 4.5f * scaleFactor
+        val pinH = 3f * scaleFactor
         val leftPin = RectF(tileRect.left, midY - (pinH / 2f), tileRect.left + pinW, midY + (pinH / 2f))
         val rightPin = RectF(tileRect.right - pinW, midY - (pinH / 2f), tileRect.right, midY + (pinH / 2f))
-        canvas.drawRoundRect(leftPin, 1f * density, 1f * density, pinPaint)
-        canvas.drawRoundRect(rightPin, 1f * density, 1f * density, pinPaint)
+        canvas.drawRoundRect(leftPin, 1f * scaleFactor, 1f * scaleFactor, pinPaint)
+        canvas.drawRoundRect(rightPin, 1f * scaleFactor, 1f * scaleFactor, pinPaint)
     }
 
     val hourTileRect = RectF(tileStartX, tileTopY, tileStartX + tileW, tileTopY + tileH)
@@ -1481,12 +1434,9 @@ fun generateVerticalCapsuleDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((200 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1494,14 +1444,14 @@ fun generateVerticalCapsuleDigitalClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 0.5f
-        var cardW = w.toFloat()
+        var cardW = w
         var cardH = cardW / targetRatio
 
-        if (cardH > h.toFloat()) {
-            cardH = h.toFloat()
+        if (cardH > h) {
+            cardH = h
             cardW = cardH * targetRatio
         }
 
@@ -1551,10 +1501,10 @@ fun generateVerticalCapsuleDigitalClockBitmap(
     val digitH = timeBounds.height().toFloat()
 
     val badgeW = cardRect.width() - (padX * 2f)
-    val badgeHeight = (timeTextSize * 0.42f).coerceIn(22f * density, 42f * density)
+    val badgeHeight = (timeTextSize * 0.42f).coerceIn(22f * scaleFactor, 42f * scaleFactor)
     val badgeRadius = badgeHeight / 2f
 
-    val gapY = (cardRect.width() * 0.08f).coerceIn(6f * density, 16f * density)
+    val gapY = (cardRect.width() * 0.08f).coerceIn(6f * scaleFactor, 16f * scaleFactor)
 
     val totalStackH = digitH + gapY + badgeHeight + gapY + digitH
     val stackTopY = cardRect.centerY() - (totalStackH / 2f)
@@ -1597,7 +1547,7 @@ fun generateVerticalCapsuleDigitalClockBitmap(
 
     val badgeTextBounds = android.graphics.Rect()
     badgeTextPaint.getTextBounds(badgeText, 0, badgeText.length, badgeTextBounds)
-    val badgeTextY = badgeRect.centerY() + (badgeTextBounds.height() / 2f) - (1f * density)
+    val badgeTextY = badgeRect.centerY() + (badgeTextBounds.height() / 2f) - (1f * scaleFactor)
 
     canvas.drawText(badgeText, badgeRect.centerX(), badgeTextY, badgeTextPaint)
     canvas.drawText(minStr, cardRect.centerX(), minY, timePaint)
@@ -1613,12 +1563,9 @@ fun generatePillCapsuleHybridClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast((100 * density).toInt())
-    val h = (hDp * density).toInt().coerceAtLeast((200 * density).toInt())
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1626,13 +1573,12 @@ fun generatePillCapsuleHybridClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#80FFFFFF")
 
-    // Enforce Fixed 1:2 Target Aspect Ratio
     val targetRatio = 0.5f
-    var cardW = w.toFloat()
+    var cardW = w
     var cardH = cardW / targetRatio
 
-    if (cardH > h.toFloat()) {
-        cardH = h.toFloat()
+    if (cardH > h) {
+        cardH = h
         cardW = cardH * targetRatio
     }
 
@@ -1640,7 +1586,6 @@ fun generatePillCapsuleHybridClockBitmap(
     val topY = (h - cardH) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    // Outer Pill Capsule
     val cardRadius = cardRect.width() / 2f
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1655,28 +1600,23 @@ fun generatePillCapsuleHybridClockBitmap(
     val digitalTimeStr = "$hourStr:$minStr"
     val dateStr = "${timeState.dayOfWeek} ${timeState.dayOfMonth}"
 
-    // =========================================================================
-    // 1. TOP SECTION: ANALOG DIAL MATCHED TO TOP ARC
-    // =========================================================================
     val dialCenterX = cardRect.centerX()
     val dialCenterY = cardRect.top + cardRadius
 
     val dialInset = cardW * 0.08f
     val dialRadius = cardRadius - dialInset
 
-    // Outer Circle Ring
     val outerCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#30000000") else Color.parseColor("#40FFFFFF")
         style = Paint.Style.STROKE
-        strokeWidth = 2.0f * density
+        strokeWidth = 2.0f * scaleFactor
     }
     canvas.drawCircle(dialCenterX, dialCenterY, dialRadius, outerCirclePaint)
 
-    // Major Ticks & Minor Dots
     val majorTickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 2.2f * density
+        strokeWidth = 2.2f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     val minorDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1704,13 +1644,12 @@ fun generatePillCapsuleHybridClockBitmap(
             canvas.drawCircle(
                 dialCenterX + cos * dotR,
                 dialCenterY + sin * dotR,
-                1.4f * density,
+                1.4f * scaleFactor,
                 minorDotPaint
             )
         }
     }
 
-    // Dial Hands
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
 
@@ -1718,7 +1657,7 @@ fun generatePillCapsuleHybridClockBitmap(
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 3.2f * density
+        strokeWidth = 3.2f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(
@@ -1732,7 +1671,7 @@ fun generatePillCapsuleHybridClockBitmap(
     val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.STROKE
-        strokeWidth = 2.2f * density
+        strokeWidth = 2.2f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(
@@ -1746,11 +1685,8 @@ fun generatePillCapsuleHybridClockBitmap(
         color = primaryText
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(dialCenterX, dialCenterY, 3.0f * density, capPaint)
+    canvas.drawCircle(dialCenterX, dialCenterY, 3.0f * scaleFactor, capPaint)
 
-    // =========================================================================
-    // 2. MIDDLE SECTION: DIGITAL TIME & DATE BADGE CALCULATIONS
-    // =========================================================================
     val timeMaxW = cardW * 0.82f
     val refTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 700)
@@ -1769,9 +1705,8 @@ fun generatePillCapsuleHybridClockBitmap(
     timePaint.getTextBounds(digitalTimeStr, 0, digitalTimeStr.length, timeBounds)
     val digitH = timeBounds.height().toFloat()
 
-    // Date Badge Dimensions
     val badgeW = cardW * 0.76f
-    val badgeH = (cardW * 0.17f).coerceIn(22f * density, 40f * density)
+    val badgeH = (cardW * 0.17f).coerceIn(22f * scaleFactor, 40f * scaleFactor)
     val badgeRadius = badgeH / 2f
 
     val gap1 = cardW * 0.13f
@@ -1781,21 +1716,16 @@ fun generatePillCapsuleHybridClockBitmap(
     val digitalTimeY = dialBottom + gap1 + digitH - timeBounds.bottom
     val badgeTop = dialBottom + gap1 + digitH + gap2
 
-    // Draw Digital Time
     canvas.drawText(digitalTimeStr, cardRect.centerX(), digitalTimeY, timePaint)
 
     val badgeRect = RectF(cardRect.centerX() - (badgeW / 2f), badgeTop, cardRect.centerX() + (badgeW / 2f), badgeTop + badgeH)
 
-    // =========================================================================
-    // 3. BOTTOM SECTION: SWINGING PENDULUM (DRAWN BEHIND DATE BADGE)
-    // =========================================================================
     val pivotX = cardRect.centerX()
     val pivotY = badgeRect.centerY()
 
-    // Smooth sine-wave pendulum swing
     val currentTimeMs = System.currentTimeMillis()
     val swingProgress = Math.sin((currentTimeMs % 2000L) / 2000.0 * 2.0 * Math.PI)
-    val maxSwingAngleRad = Math.toRadians(18.0) // ±18 degrees angle
+    val maxSwingAngleRad = Math.toRadians(18.0)
     val currentAngleRad = swingProgress * maxSwingAngleRad
 
     val pendulumLen = (cardRect.bottom - pivotY - (cardW * 0.22f)).coerceAtLeast(10f)
@@ -1803,16 +1733,14 @@ fun generatePillCapsuleHybridClockBitmap(
     val bobX = pivotX + (Math.sin(currentAngleRad) * pendulumLen).toFloat()
     val bobY = pivotY + (Math.cos(currentAngleRad) * pendulumLen).toFloat()
 
-    // Pendulum Rod
     val rodPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#50000000") else Color.parseColor("#70FFFFFF")
         style = Paint.Style.STROKE
-        strokeWidth = 1.8f * density
+        strokeWidth = 1.8f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(pivotX, pivotY, bobX, bobY, rodPaint)
 
-    // Pendulum Weighted Bob
     val bobRadius = cardW * 0.055f
     val bobOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -1825,16 +1753,13 @@ fun generatePillCapsuleHybridClockBitmap(
     val bobBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 1.2f * density
+        strokeWidth = 1.2f * scaleFactor
     }
 
     canvas.drawCircle(bobX, bobY, bobRadius, bobOuterPaint)
     canvas.drawCircle(bobX, bobY, bobRadius, bobBorderPaint)
     canvas.drawCircle(bobX, bobY, bobRadius * 0.40f, bobInnerPaint)
 
-    // =========================================================================
-    // 4. DATE BADGE FOREGROUND (OVERLAYED TO HIDE TOP OF PENDULUM ROD)
-    // =========================================================================
     val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
@@ -1863,7 +1788,7 @@ fun generatePillCapsuleHybridClockBitmap(
 
     val badgeBounds = Rect()
     badgeTextPaint.getTextBounds(dateStr, 0, dateStr.length, badgeBounds)
-    val badgeTextY = badgeRect.centerY() + (badgeBounds.height() / 2f) - (1f * density)
+    val badgeTextY = badgeRect.centerY() + (badgeBounds.height() / 2f) - (1f * scaleFactor)
 
     canvas.drawText(dateStr, badgeRect.centerX(), badgeTextY, badgeTextPaint)
 
@@ -1878,26 +1803,19 @@ fun generateOverlappingTypographicHybridClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val density = displayDensity
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val cx = w / 2f
     val cy = h / 2f
     val circleRadius = size / 2f
 
-    // 1. CIRCULAR BOUNDARY & CANVAS CLIPPING
     val circlePath = Path().apply {
         addCircle(cx, cy, circleRadius, Path.Direction.CW)
     }
@@ -1918,25 +1836,21 @@ fun generateOverlappingTypographicHybridClockBitmap(
     }
     canvas.drawCircle(cx, cy, circleRadius, facePaint)
 
-    // =========================================================================
-    // USER CONTROLS & MANUAL CONFIGURATION
-    // =========================================================================
-    val hourX = cx - circleRadius * 0.14f          // Top hours horizontal position
-    val hourY = cy - circleRadius * 0.05f          // Top hours vertical baseline
-    val minX  = cx - circleRadius * 0.84f          // Bottom minutes horizontal position
-    val minY  = cy + circleRadius * 0.88f          // Bottom minutes vertical baseline
-    val digitGap = circleRadius * 0.48f            // Spacing between digits
+    val hourX = cx - circleRadius * 0.14f
+    val hourY = cy - circleRadius * 0.05f
+    val minX  = cx - circleRadius * 0.84f
+    val minY  = cy + circleRadius * 0.88f
+    val digitGap = circleRadius * 0.48f
 
-    val dateX = cx - circleRadius * 0.65f          // Top-Left date horizontal position
-    val dateY = cy - circleRadius * 0.48f          // Top-Left date vertical position
+    val dateX = cx - circleRadius * 0.65f
+    val dateY = cy - circleRadius * 0.48f
 
-    val knockoutStrokeWidth = circleRadius * 0.14f // Vertical cutout gap between top and bottom rows
-    val digitStrokeWidth = circleRadius * 0.06f    // Cutout stroke separating overlapping digits
-    val handOutlineWidth = 1.5f * density          // Background outline stroke around hands
+    val knockoutStrokeWidth = circleRadius * 0.14f
+    val digitStrokeWidth = circleRadius * 0.06f
+    val handOutlineWidth = 1.5f * scaleFactor
 
-    val dimDigitAlpha = 155                        // Opacity for 1st digits (0..255)
-    val fullDigitAlpha = 255                       // Opacity for 2nd digits (0..255)
-    // =========================================================================
+    val dimDigitAlpha = 155
+    val fullDigitAlpha = 255
 
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
@@ -1946,7 +1860,6 @@ fun generateOverlappingTypographicHybridClockBitmap(
     val dimAccentColor = Color.argb(dimDigitAlpha, r, g, b)
     val fullAccentColor = Color.argb(fullDigitAlpha, r, g, b)
 
-    // 2. OVERLAPPING DIGITS CALCULATIONS & PAINTS
     val timeState = HybridClockTimeState.now()
     val hourStr = timeState.hour24.toString().padStart(2, '0')
     val minStr = timeState.minute.toString().padStart(2, '0')
@@ -1954,7 +1867,6 @@ fun generateOverlappingTypographicHybridClockBitmap(
     val displayTypeface = getSlateFont(context, weight = 900)
     val numTextSize = circleRadius * 1.12f
 
-    // Fill Paints
     val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = dimAccentColor
         textSize = numTextSize
@@ -1969,7 +1881,6 @@ fun generateOverlappingTypographicHybridClockBitmap(
         textAlign = Paint.Align.LEFT
     }
 
-    // Digit Cutout Stroke Paint (Separates overlapping digits in the same row)
     val digitCutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = faceBgColor
         textSize = numTextSize
@@ -1980,7 +1891,6 @@ fun generateOverlappingTypographicHybridClockBitmap(
         strokeJoin = Paint.Join.ROUND
     }
 
-    // Row Cutout Stroke Paint (Separates top row from bottom row)
     val rowCutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = faceBgColor
         textSize = numTextSize
@@ -1996,21 +1906,17 @@ fun generateOverlappingTypographicHybridClockBitmap(
     val m1 = minStr[0].toString()
     val m2 = minStr[1].toString()
 
-    // --- STEP 1: BOTTOM ROW MINUTES ---
     canvas.drawText(m1, minX, minY, dimPaint)
     canvas.drawText(m2, minX + digitGap, minY, digitCutoutPaint)
     canvas.drawText(m2, minX + digitGap, minY, fullPaint)
 
-    // --- STEP 2: TOP ROW KNOCKOUT OVER BOTTOM ROW ---
     canvas.drawText(h1, hourX, hourY, rowCutoutPaint)
     canvas.drawText(h2, hourX + digitGap, hourY, rowCutoutPaint)
 
-    // --- STEP 3: TOP ROW HOURS ---
     canvas.drawText(h1, hourX, hourY, dimPaint)
     canvas.drawText(h2, hourX + digitGap, hourY, digitCutoutPaint)
     canvas.drawText(h2, hourX + digitGap, hourY, fullPaint)
 
-    // 3. TOP-LEFT DAY & MONTH OVERLAY
     val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = circleRadius * 0.14f
@@ -2038,7 +1944,6 @@ fun generateOverlappingTypographicHybridClockBitmap(
     canvas.drawText(monthStr, dateX, dateY + dateLineHeight, dateKnockoutPaint)
     canvas.drawText(monthStr, dateX, dateY + dateLineHeight, dateTextPaint)
 
-    // 4. ANALOG HANDS WITH BACKGROUND OUTLINE STROKES
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
     val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
@@ -2077,7 +1982,6 @@ fun generateOverlappingTypographicHybridClockBitmap(
     drawHandWithOutline(minAngleRad, minHandLen, minHandWidth, primaryText)
     drawHandWithOutline(secAngleRad, secHandLen, secHandWidth, fullAccentColor)
 
-    // Center Cap Dot
     val capOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = faceBgColor
         style = Paint.Style.FILL
@@ -2109,26 +2013,19 @@ fun generateGiantHourTypographicHybridClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val density = displayDensity
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val cx = w / 2f
     val cy = h / 2f
     val circleRadius = size / 2f
 
-    // 1. CIRCULAR BOUNDARY & CANVAS CLIPPING
     val circlePath = Path().apply {
         addCircle(cx, cy, circleRadius, Path.Direction.CW)
     }
@@ -2149,23 +2046,18 @@ fun generateGiantHourTypographicHybridClockBitmap(
     }
     canvas.drawCircle(cx, cy, circleRadius, facePaint)
 
-    // =========================================================================
-    // USER CONTROLS & MANUAL CONFIGURATION
-    // =========================================================================
-    val hourX = cx - circleRadius * 0.88f          // Giant hour horizontal position
-    val hourY = cy + circleRadius * 0.82f          // Giant hour vertical baseline
-    val digitGap = circleRadius * 0.44f            // Spacing between 1st and 2nd hour digit
+    val hourX = cx - circleRadius * 0.88f
+    val hourY = cy + circleRadius * 0.82f
+    val digitGap = circleRadius * 0.44f
 
-    val infoX = cx + circleRadius * 0.70f          // Digital time & date right-aligned position
-    val infoY = cy + circleRadius * -0.44f          // Digital time baseline
-    val dateLineGap = circleRadius * 0.16f         // Vertical space between time & date
+    val infoX = cx + circleRadius * 0.70f
+    val infoY = cy + circleRadius * -0.44f
+    val dateLineGap = circleRadius * 0.16f
 
-    val digitStrokeWidth = circleRadius * 0.04f    // Separation stroke between overlapping hour digits
-    val handOutlineWidth = 1.5f * density          // Background outline stroke around hands
+    val digitStrokeWidth = circleRadius * 0.04f
+    val handOutlineWidth = 1.5f * scaleFactor
 
-    val dimDigitAlpha = 180                        // Opacity for 1st hour digit (0..255)
-    val fullDigitAlpha = 255                       // Opacity for 2nd hour digit (0..255)
-    // =========================================================================
+    val fullDigitAlpha = 255
 
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val creamColor = if (isLight) Color.parseColor("#2C2C2E") else Color.parseColor("#F2EAD3")
@@ -2179,7 +2071,6 @@ fun generateGiantHourTypographicHybridClockBitmap(
     val hourStr = timeState.hour24.toString().padStart(2, '0')
     val minStr = timeState.minute.toString().padStart(2, '0')
 
-    // 2. GIANT HOUR DIGITS (Bottom Anchor)
     val displayTypeface = getSlateFont(context, weight = 900)
     val numTextSize = circleRadius * 1.15f
 
@@ -2210,14 +2101,11 @@ fun generateGiantHourTypographicHybridClockBitmap(
         strokeJoin = Paint.Join.ROUND
     }
 
-    // Render 1st Hour Digit
     canvas.drawText(h1, hourX, hourY, h1Paint)
 
-    // Render 2nd Hour Digit with Cutout Stroke
     canvas.drawText(h2, hourX + digitGap, hourY, digitCutoutPaint)
     canvas.drawText(h2, hourX + digitGap, hourY, h2Paint)
 
-    // 3. MID-RIGHT DIGITAL TIME & DATE STACK
     val digitalTimeStr = "${timeState.hour24.toString().padStart(2, '0')}:${minStr}"
     val dateStr = "${timeState.monthName.take(3)} ${timeState.dayOfMonth}"
 
@@ -2243,24 +2131,20 @@ fun generateGiantHourTypographicHybridClockBitmap(
         textAlign = Paint.Align.RIGHT
     }
 
-    // Draw Digital Time with Knockout
     infoKnockoutPaint.textSize = digitalTimePaint.textSize
     infoKnockoutPaint.typeface = digitalTimePaint.typeface
     canvas.drawText(digitalTimeStr, infoX, infoY, infoKnockoutPaint)
     canvas.drawText(digitalTimeStr, infoX, infoY, digitalTimePaint)
 
-    // Draw Date with Knockout
     infoKnockoutPaint.textSize = dateTextPaint.textSize
     infoKnockoutPaint.typeface = dateTextPaint.typeface
     canvas.drawText(dateStr, infoX, infoY + dateLineGap, infoKnockoutPaint)
     canvas.drawText(dateStr, infoX, infoY + dateLineGap, dateTextPaint)
 
-    // 4. ANALOG CLOCK HANDS
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
     val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
 
-    // HOUR HAND: Skeleton Loop Hand
     canvas.save()
     canvas.translate(cx, cy)
     canvas.rotate(Math.toDegrees(hourAngleRad).toFloat() + 90f)
@@ -2284,7 +2168,6 @@ fun generateGiantHourTypographicHybridClockBitmap(
     canvas.drawRoundRect(loopRect, hourWidth / 2f, hourWidth / 2f, hourHandPaint)
     canvas.restore()
 
-    // MINUTE HAND: Solid Needle Hand
     val minHandLen = circleRadius * 0.82f
     val minHandWidth = circleRadius * 0.032f
 
@@ -2306,7 +2189,6 @@ fun generateGiantHourTypographicHybridClockBitmap(
     canvas.drawLine(cx, cy, minStopX, minStopY, minOutlinePaint)
     canvas.drawLine(cx, cy, minStopX, minStopY, minHandPaint)
 
-    // SECOND HAND: Accent Needle
     val secHandLen = circleRadius * 0.88f
     val secHandWidth = circleRadius * 0.014f
 
@@ -2328,7 +2210,6 @@ fun generateGiantHourTypographicHybridClockBitmap(
     canvas.drawLine(cx, cy, secStopX, secStopY, secOutlinePaint)
     canvas.drawLine(cx, cy, secStopX, secStopY, secHandPaint)
 
-    // CENTER CAP
     val capOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = faceBgColor
         style = Paint.Style.FILL
@@ -2360,31 +2241,24 @@ fun generateSquircleTickDigitalClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    // Strict Binary Lit vs. Unlit Colors
     val unlitColor = if (isLight) Color.argb(40, 0, 0, 0) else Color.argb(50, 255, 255, 255)
     val litColor = accentColorInt
 
-    // 1. Base Card Container
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
-    val cardRadius = size * 0.18f
+    val cardRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
@@ -2403,14 +2277,13 @@ fun generateSquircleTickDigitalClockBitmap(
     val timeState = HybridClockTimeState.now()
     val currentSecond = timeState.second
 
-    // 2. Render 60 Uniform Radial Ticks
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = size * 0.012f // Fixed uniform width for all ticks
+        strokeWidth = size * 0.012f
     }
 
-    val uniformTickLen = size * 0.050f // Fixed uniform length for all ticks
+    val uniformTickLen = size * 0.050f
 
     for (i in 0 until 60) {
         val angleRad = Math.toRadians(i * 6.0 - 90.0)
@@ -2434,7 +2307,6 @@ fun generateSquircleTickDigitalClockBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // 3. Centered Bold Digital Clock
     val hourStr = timeState.hour24.toString().padStart(2, '0')
     val minStr = timeState.minute.toString().padStart(2, '0')
     val timeStr = "$hourStr:$minStr"
@@ -2471,26 +2343,20 @@ fun generateArcDateWedgeClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val cx = w / 2f
     val cy = h / 2f
     val circleRadius = size / 2f
 
-    // 1. CIRCULAR BOUNDARY & CANVAS CLIPPING
     val circlePath = Path().apply {
         addCircle(cx, cy, circleRadius, Path.Direction.CW)
     }
@@ -2506,7 +2372,6 @@ fun generateArcDateWedgeClockBitmap(
 
     val timeState = HybridClockTimeState.now()
 
-    // 2. INNER BOUNDARY RING & SCALED ARC DATE
     val ringRadius = circleRadius * 0.74f
 
     val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2516,7 +2381,6 @@ fun generateArcDateWedgeClockBitmap(
     }
     canvas.drawCircle(cx, cy, ringRadius, ringPaint)
 
-    // Date formatting
     val cal = java.util.Calendar.getInstance()
     val fullDayStr = java.text.SimpleDateFormat("EEEE", java.util.Locale.ENGLISH).format(cal.time).uppercase()
     val fullMonthStr = java.text.SimpleDateFormat("MMMM", java.util.Locale.ENGLISH).format(cal.time).uppercase()
@@ -2529,7 +2393,6 @@ fun generateArcDateWedgeClockBitmap(
         addArc(arcBounds, -165f, 150f)
     }
 
-    // Increased Text Size
     val arcTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         textSize = size * 0.052f
@@ -2540,12 +2403,10 @@ fun generateArcDateWedgeClockBitmap(
 
     canvas.drawTextOnPath(dateArcText, textArcPath, 0f, 0f, arcTextPaint)
 
-    // 3. REFINED HANDS DESIGN (INSET WITH CLEAR GAP FROM RING)
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
     val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
 
-    // HOUR HAND: Tapered Sword
     val hourHandLen = ringRadius * 0.55f
     val hourBaseWidth = circleRadius * 0.075f
     val hourTipWidth = circleRadius * 0.012f
@@ -2571,7 +2432,6 @@ fun generateArcDateWedgeClockBitmap(
     }
     canvas.drawPath(hourPath, hourHandPaint)
 
-    // MINUTE HAND: Inset Solid Needle (0.82f of ring radius leaves a clean gap)
     val minHandLen = ringRadius * 0.82f
     val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -2584,7 +2444,6 @@ fun generateArcDateWedgeClockBitmap(
     val minStopY = cy + (Math.sin(minAngleRad) * minHandLen).toFloat()
     canvas.drawLine(cx, cy, minStopX, minStopY, minHandPaint)
 
-    // SECOND HAND: Inset Accent Needle
     val secHandLen = ringRadius * 0.86f
     val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -2597,7 +2456,6 @@ fun generateArcDateWedgeClockBitmap(
     val secStopY = cy + (Math.sin(secAngleRad) * secHandLen).toFloat()
     canvas.drawLine(cx, cy, secStopX, secStopY, secHandPaint)
 
-    // CENTER HUB CAP
     val hubOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
@@ -2623,14 +2481,9 @@ fun generateHorizontalPillHybridClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(210)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -2638,13 +2491,12 @@ fun generateHorizontalPillHybridClockBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#80FFFFFF")
 
-    // Enforce Fixed 2:1 Aspect Ratio
     val targetRatio = 2.0f
-    var cardH = h.toFloat()
+    var cardH = h
     var cardW = cardH * targetRatio
 
-    if (cardW > w.toFloat()) {
-        cardW = w.toFloat()
+    if (cardW > w) {
+        cardW = w
         cardH = cardW / targetRatio
     }
 
@@ -2652,7 +2504,6 @@ fun generateHorizontalPillHybridClockBitmap(
     val topY = (h - cardH) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    // Outer Pill Capsule
     val pillRadius = cardRect.height() / 2f
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2663,14 +2514,10 @@ fun generateHorizontalPillHybridClockBitmap(
 
     val timeState = HybridClockTimeState.now()
 
-    // =========================================================================
-    // 1. LEFT SECTION: INSET ANALOG DIAL
-    // =========================================================================
     val dialCenterX = cardRect.left + pillRadius
     val dialCenterY = cardRect.centerY()
     val dialRadius = pillRadius * 0.78f
 
-    // Inset Dark/Light Inner Circle Dial Background
     val dialBgColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
     val dialBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = dialBgColor
@@ -2678,7 +2525,6 @@ fun generateHorizontalPillHybridClockBitmap(
     }
     canvas.drawCircle(dialCenterX, dialCenterY, dialRadius, dialBgPaint)
 
-    // Dial Hour Marks (12 Dots/Ticks)
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         style = Paint.Style.FILL
@@ -2699,12 +2545,10 @@ fun generateHorizontalPillHybridClockBitmap(
         )
     }
 
-    // Hands Calculations
     val hourAngleRad = Math.toRadians(((timeState.hour12 % 12 + timeState.minute / 60f) * 30f - 90f).toDouble())
     val minAngleRad = Math.toRadians(((timeState.minute + timeState.second / 60f) * 6f - 90f).toDouble())
     val secAngleRad = Math.toRadians(((timeState.second) * 6f - 90f).toDouble())
 
-    // Hour Hand
     val hourHandLen = dialRadius * 0.48f
     val hourHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -2719,7 +2563,6 @@ fun generateHorizontalPillHybridClockBitmap(
         hourHandPaint
     )
 
-    // Minute Hand
     val minHandLen = dialRadius * 0.74f
     val minHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -2734,7 +2577,6 @@ fun generateHorizontalPillHybridClockBitmap(
         minHandPaint
     )
 
-    // Second Needle Hand
     val secHandLen = dialRadius * 0.82f
     val secHandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -2749,16 +2591,12 @@ fun generateHorizontalPillHybridClockBitmap(
         secHandPaint
     )
 
-    // Pivot Center Cap Dot
     val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
     }
     canvas.drawCircle(dialCenterX, dialCenterY, scaleFactor * 2.0f, capPaint)
 
-    // =========================================================================
-    // 2. RIGHT SECTION: CENTERED DIGITAL TIME
-    // =========================================================================
     val hourStr = timeState.hour24.toString().padStart(2, '0')
     val minStr = timeState.minute.toString().padStart(2, '0')
     val digitalTimeStr = "$hourStr:$minStr"
@@ -2797,27 +2635,21 @@ fun generateMinimalCapsulePillClockBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(210)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
 
-    // Enforce 2:1 Aspect Ratio
     val targetRatio = 2.0f
-    var cardH = h.toFloat()
+    var cardH = h
     var cardW = cardH * targetRatio
 
-    if (cardW > w.toFloat()) {
-        cardW = w.toFloat()
+    if (cardW > w) {
+        cardW = w
         cardH = cardW / targetRatio
     }
 
@@ -2825,7 +2657,6 @@ fun generateMinimalCapsulePillClockBitmap(
     val topY = (h - cardH) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    // Outer Pill Capsule Container
     val pillRadius = cardRect.height() / 2f
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2836,9 +2667,6 @@ fun generateMinimalCapsulePillClockBitmap(
 
     val timeState = HybridClockTimeState.now()
 
-    // =========================================================================
-    // 1. LEFT SECTION: INSET ACCENT DATE BADGE
-    // =========================================================================
     val badgeCx = cardRect.left + pillRadius
     val badgeCy = cardRect.centerY()
     val badgeRadius = pillRadius * 0.74f
@@ -2849,7 +2677,6 @@ fun generateMinimalCapsulePillClockBitmap(
     }
     canvas.drawCircle(badgeCx, badgeCy, badgeRadius, badgeBgPaint)
 
-    // Contrast text color for badge
     val r = Color.red(accentColorInt) / 255f
     val g = Color.green(accentColorInt) / 255f
     val b = Color.blue(accentColorInt) / 255f
@@ -2880,14 +2707,10 @@ fun generateMinimalCapsulePillClockBitmap(
     canvas.drawText(dayStr, badgeCx, dayY, dayTextPaint)
     canvas.drawText(dateNumStr, badgeCx, dateY, dateNumPaint)
 
-    // =========================================================================
-    // 2. RIGHT SECTION: BOLD DIGITAL TIME (SHIFTED LEFT)
-    // =========================================================================
     val hourStr = timeState.hour24.toString().padStart(2, '0')
     val minStr = timeState.minute.toString().padStart(2, '0')
     val digitalTimeStr = "$hourStr:$minStr"
 
-    // Shift time position closer to the date badge to eliminate excess gap
     val badgeRightEdge = badgeCx + badgeRadius
     val availableWidth = cardRect.right - badgeRightEdge
     val digitalCenterX = badgeRightEdge + (availableWidth * 0.48f)

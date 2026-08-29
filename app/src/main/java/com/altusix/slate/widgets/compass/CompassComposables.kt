@@ -9,6 +9,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
@@ -22,14 +23,9 @@ fun generateDotMatrixCompassBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -38,23 +34,23 @@ fun generateDotMatrixCompassBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#50FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
@@ -145,14 +141,9 @@ fun generateTacticalRadarCompassBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -161,23 +152,23 @@ fun generateTacticalRadarCompassBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#50FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
@@ -271,14 +262,9 @@ fun generateMinimalistBezelCompassBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -287,23 +273,23 @@ fun generateMinimalistBezelCompassBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#50FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
-        val size = minOf(w, h).toFloat()
+        val size = minOf(w, h)
         val leftX = (w - size) / 2f
         val topY = (h - size) / 2f
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
@@ -401,14 +387,9 @@ fun generateHorizontalPillCompassBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(480)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(240)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -417,14 +398,14 @@ fun generateHorizontalPillCompassBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#60FFFFFF")
 
     val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
+        RectF(0f, 0f, w, h)
     } else {
         val targetRatio = 2.0f
-        var cardH = h.toFloat()
+        var cardH = h
         var cardW = cardH * targetRatio
 
-        if (cardW > w.toFloat()) {
-            cardW = w.toFloat()
+        if (cardW > w) {
+            cardW = w
             cardH = cardW / targetRatio
         }
 
@@ -437,7 +418,6 @@ fun generateHorizontalPillCompassBitmap(
     val pillRadius = pillH / 2f
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
-    // 1. Background Pill Container
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -458,10 +438,8 @@ fun generateHorizontalPillCompassBitmap(
     val cx = cardRect.centerX()
     val cyBase = cardRect.centerY() - (if (isActive) pillH * 0.06f else 0f)
 
-    // Baseline where ticks sit
     val yBase = cyBase + (pillH * 0.04f)
 
-    // 2. Ruler Tape Dimensions
     val pxPerDegree = pillH * 0.11f
     val tapeLeft = cardRect.left + (pillH * 0.35f)
     val tapeRight = cardRect.right - (pillH * 0.35f)
@@ -514,10 +492,8 @@ fun generateHorizontalPillCompassBitmap(
                 else -> scaleFactor * 1.0f
             }
 
-            // Draw Tick UPWARD from baseline
             canvas.drawLine(x, yBase, x, yTickTop, tickPaint)
 
-            // Draw Text Label ABOVE the longest tick (Clear gap, no overlap)
             if (is30Deg) {
                 val labelStr = when (normalizedDeg) {
                     0 -> "N"
@@ -540,7 +516,6 @@ fun generateHorizontalPillCompassBitmap(
     }
     canvas.restore()
 
-    // 3. Center Fixed Reticle Pointer (Stops at yBase - 0.04f, well below text)
     val reticlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isActive) accentColorInt else primaryText
         style = Paint.Style.STROKE
@@ -557,7 +532,6 @@ fun generateHorizontalPillCompassBitmap(
     }
     canvas.drawCircle(cx, reticleYBottom + (scaleFactor * 1.5f), scaleFactor * 2.2f, reticleDotPaint)
 
-    // 4. Active State Bottom Heading Badge
     if (isActive) {
         val r = Color.red(accentColorInt) / 255f
         val g = Color.green(accentColorInt) / 255f
@@ -603,14 +577,9 @@ fun generatePureCircleCompassBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val displayDensity = context.resources.displayMetrics.density
-    val scaleFactor = maxOf(displayDensity, 3.5f)
-
-    val w = (wDp * scaleFactor).toInt().coerceAtLeast(420)
-    val h = (hDp * scaleFactor).toInt().coerceAtLeast(420)
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -618,15 +587,13 @@ fun generatePureCircleCompassBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#50FFFFFF")
 
-    // Enforce strict 1:1 circular aspect ratio
-    val size = minOf(w, h).toFloat()
+    val size = minOf(w, h)
     val leftX = (w - size) / 2f
     val topY = (h - size) / 2f
     val cardRect = RectF(leftX, topY, leftX + size, topY + size)
 
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
-    // Outer Circle Base
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -641,7 +608,6 @@ fun generatePureCircleCompassBitmap(
     val isActive = compassState.isActive
     val azimuth = if (isActive) compassState.azimuthDegrees else 0f
 
-    // Inner Subtle Guide Ring
     val innerRingRadius = radius * 0.82f
     val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
@@ -650,7 +616,6 @@ fun generatePureCircleCompassBitmap(
     }
     canvas.drawCircle(cx, cy, innerRingRadius, ringPaint)
 
-    // Rotating Bezel Ring
     canvas.save()
     if (isActive) {
         canvas.rotate(-azimuth, cx, cy)
@@ -662,7 +627,7 @@ fun generatePureCircleCompassBitmap(
     }
 
     for (i in 0 until 360 step 15) {
-        if (i == 0) continue // Skip 0° slot for North Triangle
+        if (i == 0) continue
 
         val angleRad = Math.toRadians((i - 90).toDouble())
         val isMajor = i % 90 == 0
@@ -679,7 +644,6 @@ fun generatePureCircleCompassBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // North Triangle Indicator (Muted Gray when Inactive, Accent Color when Active)
     val triangleH = radius * 0.18f
     val triangleW = radius * 0.16f
     val triTopY = cy - (radius * 0.84f)
@@ -700,7 +664,6 @@ fun generatePureCircleCompassBitmap(
 
     canvas.restore()
 
-    // Center Heading Readout
     val dirLetter = compassState.cardinalDirection
     val degText = "${azimuth.toInt()}°"
 
