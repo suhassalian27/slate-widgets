@@ -14,11 +14,29 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getCalculatorWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Standard Calculator", "2x2", "Calculator", StandardCalc2x2Receiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Split Capsule Calc", "2x2", "Calculator", SplitCalc2x2Receiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Studio Express Calc", "4x2", "Calculator", StudioCalc4x2Receiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Standard Calculator", "2x2", "Calculator", StandardCalc2x2Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Split Capsule Calc", "2x2", "Calculator", SplitCalc2x2Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Studio Express Calc", "4x2", "Calculator", StudioCalc4x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Circular Stage Calc", "2x2", "Calculator", CircleCalc2x2Receiver::class.java, hasModeOption = false)
     )
+}
+
+private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val modeKey = "widget_${widgetId}_mode"
+    val isResponsiveKey = "widget_${widgetId}_is_responsive"
+
+    if (widgetPrefs.contains(modeKey)) {
+        return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+    }
+    if (widgetPrefs.contains(isResponsiveKey)) {
+        return widgetPrefs.getBoolean(isResponsiveKey, true)
+    }
+
+    val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+    val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
+    widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
+    return defaultResponsive
 }
 
 fun updateAllCalculatorWidgets(context: Context) {
@@ -48,7 +66,7 @@ abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvide
         const val EXTRA_KEY = "extra_calc_key"
     }
 
-    abstract fun renderBitmap(context: Context, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): android.graphics.Bitmap
+    abstract fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap
     abstract fun getKeyMap(): Map<Int, String>
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -91,7 +109,7 @@ abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvide
             val wDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 160
             val hDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 160
 
-            val bitmap = renderBitmap(context, state, config, wDp, hDp)
+            val bitmap = renderBitmap(context, id, state, config, wDp, hDp)
             val views = RemoteViews(context.packageName, layoutResId)
             views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
 
@@ -118,8 +136,7 @@ abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvide
 }
 
 class StandardCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calculator_2x2_layout) {
-    override fun renderBitmap(context: Context, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int) =
-        generateCalculator2x2Bitmap(context, state, config, wDp, hDp)
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateCalculator2x2Bitmap(context, state, config, parseAndLockIsResponsive(context, appWidgetId), wDp, hDp, appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL", R.id.btn_calc_percent to "%", R.id.btn_calc_div to "÷",
@@ -131,8 +148,7 @@ class StandardCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calculator_2x2_
 }
 
 class SplitCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_split_layout) {
-    override fun renderBitmap(context: Context, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int) =
-        generateSplitCalculatorBitmap(context, state, config, wDp, hDp)
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateSplitCalculatorBitmap(context, state, config, parseAndLockIsResponsive(context, appWidgetId), wDp, hDp, appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL", R.id.btn_calc_percent to "%",
@@ -145,8 +161,7 @@ class SplitCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_split_layout)
 }
 
 class StudioCalc4x2Receiver : BaseCalcReceiver(R.layout.widget_calc_4x2_layout) {
-    override fun renderBitmap(context: Context, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int) =
-        generateStudioCalculator4x2Bitmap(context, state, config, wDp, hDp)
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateStudioCalculator4x2Bitmap(context, state, config, parseAndLockIsResponsive(context, appWidgetId), wDp, hDp, appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_7 to "7", R.id.btn_calc_8 to "8", R.id.btn_calc_9 to "9", R.id.btn_calc_div to "÷",
@@ -158,8 +173,7 @@ class StudioCalc4x2Receiver : BaseCalcReceiver(R.layout.widget_calc_4x2_layout) 
 }
 
 class CircleCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_circle_layout) {
-    override fun renderBitmap(context: Context, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int) =
-        generateCircleCalculatorBitmap(context, state, config, wDp, hDp)
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateCircleCalculatorBitmap(context, state, config, isResponsive = false, wDp = wDp, hDp = hDp, widgetId = appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL", R.id.btn_calc_percent to "%", R.id.btn_calc_div to "÷",

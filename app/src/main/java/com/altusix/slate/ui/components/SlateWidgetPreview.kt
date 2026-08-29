@@ -21,16 +21,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.widgets.calculator.CalculatorState
 
 @Composable
 fun SlateWidgetPreviewImage(
     widgetInfo: SlateWidgetInfo,
+    targetWidthDp: Int,
+    targetHeightDp: Int,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
 
-    val previewBitmap = remember(widgetInfo) {
-        generatePreviewBitmap(context, widgetInfo)
+    val previewBitmap = remember(widgetInfo, targetWidthDp, targetHeightDp) {
+        generatePreviewBitmap(context, widgetInfo, targetWidthDp, targetHeightDp)
     }
 
     Box(
@@ -57,7 +60,12 @@ fun SlateWidgetPreviewImage(
     }
 }
 
-private fun generatePreviewBitmap(context: Context, widgetInfo: SlateWidgetInfo): Bitmap? {
+private fun generatePreviewBitmap(
+    context: Context,
+    widgetInfo: SlateWidgetInfo,
+    wDp: Int,
+    hDp: Int
+): Bitmap? {
     return try {
         val clazz = widgetInfo.receiverClass
         val constructor = clazz.declaredConstructors.firstOrNull { it.parameterTypes.isEmpty() } ?: return null
@@ -71,14 +79,14 @@ private fun generatePreviewBitmap(context: Context, widgetInfo: SlateWidgetInfo)
             accentColorHex = 0xFFFFFFFFL
         )
 
-        val (wDp, hDp) = when (widgetInfo.sizeText) {
-            "4x1" -> 300 to 75
-            "4x2" -> 300 to 150
-            "3x2" -> 220 to 150
-            "2x1" -> 200 to 100
-            "1x2" -> 100 to 200
-            else -> 150 to 150
-        }
+        // Adjust this multiplier to control preview corner radius:
+        // 1.15f - 1.30f = Smaller/sharper corner radius in preview
+        // 1.00f         = Default launcher corner radius
+        // 0.85f - 0.95f = Larger/rounder corner radius in preview
+        val radiusScaleMultiplier = 1.4f
+
+        val adjustedWDp = (wDp * radiusScaleMultiplier).toInt()
+        val adjustedHDp = (hDp * radiusScaleMultiplier).toInt()
 
         val methods = clazz.methods + clazz.declaredMethods
         for (method in methods) {
@@ -89,8 +97,8 @@ private fun generatePreviewBitmap(context: Context, widgetInfo: SlateWidgetInfo)
                     method = method,
                     context = context,
                     defaultConfig = defaultConfig,
-                    wDp = wDp,
-                    hDp = hDp
+                    wDp = adjustedWDp,
+                    hDp = adjustedHDp
                 )
                 if (bitmap != null) return bitmap
             }
@@ -124,35 +132,33 @@ private fun invokeRenderMethod(
         when {
             p == Context::class.java -> args[i] = context
             p == SlateWidgetConfig::class.java -> args[i] = defaultConfig
-            p == Boolean::class.javaPrimitiveType || p == Boolean::class.javaObjectType -> args[i] = false
+            p == CalculatorState::class.java -> args[i] = CalculatorState()
+            p == Boolean::class.javaPrimitiveType || p == Boolean::class.javaObjectType -> args[i] = true
         }
     }
 
     when (method.name) {
         "renderWidgetBitmap" -> {
-            // BaseCanvasWidgetProvider: (context, appWidgetId, config, wDp, hDp)
             if (intIndices.size >= 3) {
-                args[intIndices[0]] = -1    // appWidgetId
-                args[intIndices[1]] = wDp   // wDp
-                args[intIndices[2]] = hDp   // hDp
+                args[intIndices[0]] = -1
+                args[intIndices[1]] = wDp
+                args[intIndices[2]] = hDp
             } else if (intIndices.size == 2) {
                 args[intIndices[0]] = wDp
                 args[intIndices[1]] = hDp
             }
         }
         "renderBitmapForWidget" -> {
-            // BaseDeviceInfoReceiver: (context, config, isResponsive, wDp, hDp, widgetId)
             if (intIndices.size >= 3) {
-                args[intIndices[0]] = wDp   // wDp
-                args[intIndices[1]] = hDp   // hDp
-                args[intIndices[2]] = -1    // widgetId
+                args[intIndices[0]] = wDp
+                args[intIndices[1]] = hDp
+                args[intIndices[2]] = -1
             } else if (intIndices.size == 2) {
                 args[intIndices[0]] = wDp
                 args[intIndices[1]] = hDp
             }
         }
         else -> {
-            // Fallback resolution for custom single-widget render methods
             if (intIndices.size == 2) {
                 args[intIndices[0]] = wDp
                 args[intIndices[1]] = hDp

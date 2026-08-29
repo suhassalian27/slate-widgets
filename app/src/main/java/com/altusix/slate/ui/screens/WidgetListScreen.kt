@@ -1,14 +1,13 @@
 package com.altusix.slate.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +41,10 @@ import com.altusix.slate.widgets.compass.getCompassWidgetsCatalog
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
 import com.altusix.slate.widgets.deviceinfo.getDeviceInfoWidgetsCatalog
 
-
+private fun isFullWidthWidget(sizeText: String): Boolean {
+    val clean = sizeText.lowercase()
+    return clean.startsWith("5x") || clean.startsWith("4x") || clean == "3x2" || clean == "3x3"
+}
 
 @Composable
 fun WidgetListScreen(
@@ -93,6 +95,41 @@ fun WidgetListScreen(
                 clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets + deviceInfoWidgets
     }
 
+    val widgetSpans = remember(displayedWidgets) {
+        val spans = IntArray(displayedWidgets.size)
+        var i = 0
+        while (i < displayedWidgets.size) {
+            if (isFullWidthWidget(displayedWidgets[i].sizeText)) {
+                spans[i] = 6
+                i++
+            } else {
+                var j = i
+                while (j < displayedWidgets.size) {
+                    if (isFullWidthWidget(displayedWidgets[j].sizeText)) break
+                    j++
+                }
+                val count = j - i
+                if (count == 1) {
+                    spans[i] = 6
+                } else if (count % 2 == 0) {
+                    for (k in i until j) {
+                        spans[k] = 3
+                    }
+                } else {
+                    val twoPerRowEnd = j - 3
+                    for (k in i until twoPerRowEnd) {
+                        spans[k] = 3
+                    }
+                    for (k in twoPerRowEnd until j) {
+                        spans[k] = 2
+                    }
+                }
+                i = j
+            }
+        }
+        spans
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -133,20 +170,21 @@ fun WidgetListScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            columns = GridCells.Fixed(6),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(
+            itemsIndexed(
                 items = displayedWidgets,
-                span = { widget ->
-                    val isFullWidth = widget.sizeText.startsWith("4x") || widget.sizeText == "3x2"
-                    if (isFullWidth) GridItemSpan(2) else GridItemSpan(1)
+                span = { index, _ ->
+                    val spanValue = if (index < widgetSpans.size) widgetSpans[index] else 3
+                    GridItemSpan(spanValue)
                 }
-            ) { widget ->
-                SleekWidgetCard(widgetInfo = widget) {
+            ) { index, widget ->
+                val span = if (index < widgetSpans.size) widgetSpans[index] else 3
+                SleekWidgetCard(widgetInfo = widget, span = span) {
                     onWidgetSelect(widget)
                 }
             }
@@ -157,45 +195,48 @@ fun WidgetListScreen(
 @Composable
 fun SleekWidgetCard(
     widgetInfo: SlateWidgetInfo,
+    span: Int = 3,
     onClick: () -> Unit
 ) {
-    val outerShape = RoundedCornerShape(16.dp)
+    val outerShape = RoundedCornerShape(14.dp)
     val innerShape = RoundedCornerShape(10.dp)
 
-    val previewHeightModifier = when (widgetInfo.sizeText) {
-        "4x1" -> Modifier.fillMaxWidth().height(84.dp)
-        "4x2" -> Modifier.fillMaxWidth().height(150.dp)
-        "3x2" -> Modifier.fillMaxWidth().height(130.dp)
-        "1x2" -> Modifier.fillMaxWidth().aspectRatio(0.62f)
-        "2x1" -> Modifier.fillMaxWidth().aspectRatio(2.1f)
+    val previewHeightModifier = when (widgetInfo.sizeText.lowercase()) {
+        "5x1", "4x1" -> Modifier.fillMaxWidth().height(88.dp)
+        "5x2", "4x2" -> Modifier.fillMaxWidth().height(154.dp)
+        "3x2", "3x3" -> Modifier.fillMaxWidth().height(134.dp)
         else -> Modifier.fillMaxWidth().aspectRatio(1.0f)
     }
+
+    val previewPadding = if (span == 2) 10.dp else 12.dp
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(outerShape)
             .background(Color(0xFF1C1C1E))
-            .border(1.dp, Color(0xFF2C2C2E), outerShape)
             .clickable { onClick() }
             .padding(6.dp)
     ) {
-        // Inner Container Box
-        Box(
+        BoxWithConstraints(
             modifier = previewHeightModifier
                 .clip(innerShape)
-                .background(Color(0xFF4F535C)),
+                .background(Color(0xFF3A3E4B)),
             contentAlignment = Alignment.Center
         ) {
+            val boxWidthDp = (maxWidth.value - (previewPadding.value * 2)).toInt().coerceAtLeast(60)
+            val boxHeightDp = (maxHeight.value - (previewPadding.value * 2)).toInt().coerceAtLeast(60)
+
             SlateWidgetPreviewImage(
                 widgetInfo = widgetInfo,
+                targetWidthDp = boxWidthDp,
+                targetHeightDp = boxHeightDp,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(6.dp)
+                    .padding(previewPadding)
             )
         }
 
-        // Card Information Footer
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -207,7 +248,7 @@ fun SleekWidgetCard(
                 Text(
                     text = widgetInfo.name,
                     color = Color.White,
-                    fontSize = 13.sp,
+                    fontSize = if (span == 2) 11.sp else 13.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -219,12 +260,12 @@ fun SleekWidgetCard(
                     Text(
                         text = widgetInfo.sizeText.replace('x', '×'),
                         color = Color(0xFFA0A5B5),
-                        fontSize = 11.sp,
+                        fontSize = if (span == 2) 9.sp else 11.sp,
                         fontWeight = FontWeight.Normal
                     )
 
                     if (widgetInfo.hasModeOption) {
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -234,7 +275,7 @@ fun SleekWidgetCard(
                             Text(
                                 text = "DUAL",
                                 color = Color(0xFFB0B5C2),
-                                fontSize = 8.sp,
+                                fontSize = 7.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -242,13 +283,13 @@ fun SleekWidgetCard(
                 }
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(4.dp))
 
             Icon(
                 imageVector = getOutlinedStarIcon(),
                 contentDescription = "Pin Widget",
                 tint = Color.White,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(if (span == 2) 18.dp else 22.dp)
             )
         }
     }
