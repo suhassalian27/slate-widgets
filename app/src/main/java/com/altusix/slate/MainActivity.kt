@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
-import com.altusix.slate.ui.screens.WidgetListScreen
+import com.altusix.slate.ui.dashboard.DashboardScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 var pendingWidgetInfo by remember { mutableStateOf<SlateWidgetInfo?>(null) }
 
-                WidgetListScreen(
+                DashboardScreen(
                     onWidgetSelect = { widget ->
                         if (widget.hasModeOption) {
                             pendingWidgetInfo = widget
