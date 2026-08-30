@@ -8,6 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -33,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -56,12 +55,16 @@ enum class NavItem(
     SETTINGS("Setting", Icons.Outlined.Settings)
 }
 
+private fun calculateLuminance(color: Color): Float {
+    return 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
+}
+
 @Composable
 fun BottomNavBar(
     selectedItem: NavItem,
     onItemSelected: (NavItem) -> Unit,
     modifier: Modifier = Modifier,
-    barBackgroundColor: Color = Color(0xFF1C1C1C),  // <--- Capsule background color
+    barBackgroundColor: Color = Color(0xFF0C0B0A),  // <--- Capsule background color
     accentColor: Color = Color(0xFF7C4DFF),         // <--- Active circle bubble color
     unselectedIconColor: Color = Color(0xFF8E8E93)  // <--- Inactive icon color
 ) {
@@ -79,14 +82,12 @@ fun BottomNavBar(
     val totalHeightDp = topHeadroomDp + barHeightDp
 
     // --- 2. CRADLE & BUBBLE SHAPE CONTROLS ---
-    val circleSizeDp = 48.dp        // Size of the purple circle bubble
+    val circleSizeDp = 52.dp        // Size of the purple circle bubble
     val cradleWidthDp = 56.dp       // Horizontal radius of the cradle opening
     val cradleDepthDp = 32.dp       // Vertical depth of the cradle cutout
 
-    // Bezier Curve Fine-Tuning Ratios (Adjust these to keep shape when reducing width)
-    // Top shoulder entrance handle (0.35f to 0.65f)
+    // Bezier Curve Fine-Tuning Ratios
     val cradleTopRatio = 0.50f
-    // Bottom dip curve handle (0.20f to 0.50f)
     val cradleBottomRatio = 0.52f
 
     // Inner side padding for tab slot centering
@@ -96,6 +97,21 @@ fun BottomNavBar(
     val barHeightPx = with(density) { barHeightDp.toPx() }
     val cradleWidthPx = with(density) { cradleWidthDp.toPx() }
     val cradleDepthPx = with(density) { cradleDepthDp.toPx() }
+
+    // Smart contrast calculations
+    val accentLuminance = remember(accentColor) { calculateLuminance(accentColor) }
+    val isLightAccent = accentLuminance > 0.55f
+    val isDarkAccent = accentLuminance < 0.20f
+    val activeIconColor = if (isLightAccent) Color(0xFF121214) else Color.White
+
+    // Smart thin border stroke color based on accent theme luminance
+    val bubbleBorderColor = remember(accentColor, isDarkAccent, isLightAccent) {
+        when {
+            isDarkAccent -> Color.White.copy(alpha = 0.30f)
+            isLightAccent -> Color.Black.copy(alpha = 0.15f)
+            else -> Color.White.copy(alpha = 0.20f)
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -199,7 +215,7 @@ fun BottomNavBar(
             )
         }
 
-        // 2. Sliding Purple Circle Bubble
+        // 2. Sliding Circle Bubble with Clean Thin Border Stroke
         val bubbleOffsetY = topHeadroomDp - (circleSizeDp / 2f) + 3.dp
         val bubbleOffsetDp = with(density) { (animatedCenterX - (with(density) { circleSizeDp.toPx() } / 2f)).toDp() }
 
@@ -207,7 +223,7 @@ fun BottomNavBar(
             modifier = Modifier
                 .offset(x = bubbleOffsetDp, y = bubbleOffsetY)
                 .size(circleSizeDp)
-                .shadow(elevation = 14.dp, shape = CircleShape, spotColor = accentColor)
+                .border(width = 1.dp, color = bubbleBorderColor, shape = CircleShape)
                 .clip(CircleShape)
                 .background(accentColor)
         )
@@ -230,7 +246,6 @@ fun BottomNavBar(
                 val tabCenterX = tabCentersPx.getOrElse(index) { 0f }
                 val tabLeftDp = with(density) { (tabCenterX - (with(density) { tabSlotWidthDp.toPx() } / 2f)).toDp() }
 
-                // Lift offset aligning active icon inside purple circle
                 val targetIconOffsetY = if (isSelected) (-26.5).dp else 0.dp
 
                 val iconOffsetY by animateDpAsState(
@@ -252,7 +267,7 @@ fun BottomNavBar(
                 )
 
                 val iconTint by animateColorAsState(
-                    targetValue = if (isSelected) Color.White else unselectedIconColor,
+                    targetValue = if (isSelected) activeIconColor else unselectedIconColor,
                     animationSpec = tween(180),
                     label = "IconTint"
                 )

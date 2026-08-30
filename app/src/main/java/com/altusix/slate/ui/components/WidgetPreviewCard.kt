@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
+import com.altusix.slate.core.theme.SlateThemeSettings
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.calculator.CalculatorState
 import com.altusix.slate.widgets.camera.CameraWidgetConfig
@@ -27,14 +28,15 @@ import com.altusix.slate.widgets.camera.CameraWidgetConfig
 @Composable
 fun SlateWidgetPreviewImage(
     widgetInfo: SlateWidgetInfo,
+    themeSettings: SlateThemeSettings,
     targetWidthDp: Int,
     targetHeightDp: Int,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
 
-    val previewBitmap = remember(widgetInfo, targetWidthDp, targetHeightDp) {
-        generatePreviewBitmap(context, widgetInfo, targetWidthDp, targetHeightDp)
+    val previewBitmap = remember(widgetInfo, targetWidthDp, targetHeightDp, themeSettings) {
+        generatePreviewBitmap(context, widgetInfo, themeSettings, targetWidthDp, targetHeightDp)
     }
 
     Box(
@@ -61,9 +63,17 @@ fun SlateWidgetPreviewImage(
     }
 }
 
+private fun calculateLuminance(hex: Long): Float {
+    val r = ((hex shr 16) and 0xFFL) / 255f
+    val g = ((hex shr 8) and 0xFFL) / 255f
+    val b = (hex and 0xFFL) / 255f
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
+}
+
 private fun generatePreviewBitmap(
     context: Context,
     widgetInfo: SlateWidgetInfo,
+    themeSettings: SlateThemeSettings,
     wDp: Int,
     hDp: Int
 ): Bitmap? {
@@ -73,15 +83,18 @@ private fun generatePreviewBitmap(
         constructor.isAccessible = true
         val receiverInstance = constructor.newInstance()
 
-        val defaultConfig = SlateWidgetConfig(
-            themeMode = "DARK",
-            backgroundColorHex = 0xFF161618L,
-            opacity = 1.0f,
-            accentColorHex = 0xFFFFFFFFL
+        val bgHex = themeSettings.bgHex
+        val accentHex = themeSettings.accentHex
+        val isLight = calculateLuminance(bgHex) > 0.5f
+
+        val dynamicConfig = SlateWidgetConfig(
+            themeMode = if (isLight) "LIGHT" else "DARK",
+            backgroundColorHex = bgHex,
+            opacity = themeSettings.opacity,
+            accentColorHex = accentHex
         )
 
         val radiusScaleMultiplier = 1.4f
-
         val adjustedWDp = (wDp * radiusScaleMultiplier).toInt()
         val adjustedHDp = (hDp * radiusScaleMultiplier).toInt()
 
@@ -93,7 +106,7 @@ private fun generatePreviewBitmap(
                     receiverInstance = receiverInstance,
                     method = method,
                     context = context,
-                    defaultConfig = defaultConfig,
+                    defaultConfig = dynamicConfig,
                     wDp = adjustedWDp,
                     hDp = adjustedHDp
                 )

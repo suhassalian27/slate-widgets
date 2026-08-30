@@ -26,14 +26,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
+import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.ui.components.BottomNavBar
 import com.altusix.slate.ui.components.NavItem
+import com.altusix.slate.ui.screens.ThemeScreen
 import com.altusix.slate.ui.screens.WidgetListScreen
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val themePrefs = ThemePreferences(this)
 
         setContent {
             MaterialTheme(
@@ -44,16 +48,18 @@ class MainActivity : ComponentActivity() {
             ) {
                 var currentTab by remember { mutableStateOf(NavItem.WIDGETS) }
                 var pendingWidgetInfo by remember { mutableStateOf<SlateWidgetInfo?>(null) }
+                var themeSettings by remember { mutableStateOf(themePrefs.getThemeSettings()) }
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black)
                 ) {
-                    // 1. Active Tab Content
+                    // 1. Tab Content Screens
                     Box(modifier = Modifier.fillMaxSize()) {
                         when (currentTab) {
                             NavItem.WIDGETS -> WidgetListScreen(
+                                themeSettings = themeSettings,
                                 onWidgetSelect = { widget ->
                                     if (widget.hasModeOption) {
                                         pendingWidgetInfo = widget
@@ -63,15 +69,22 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                             NavItem.WALLPAPER -> PlaceholderScreen("Wallpaper Screen")
-                            NavItem.THEME -> PlaceholderScreen("Theme Screen")
+                            NavItem.THEME -> ThemeScreen(
+                                themeSettings = themeSettings,
+                                onThemeChanged = { newSettings ->
+                                    themeSettings = newSettings
+                                    themePrefs.saveThemeSettings(newSettings)
+                                }
+                            )
                             NavItem.SETTINGS -> PlaceholderScreen("Settings Screen")
                         }
                     }
 
-                    // 2. Navigation Bar (Uses default barBackgroundColor from BottomNavBar.kt)
+                    // 2. Navigation Bar
                     BottomNavBar(
                         selectedItem = currentTab,
                         onItemSelected = { currentTab = it },
+                        accentColor = themeSettings.accentColor,
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
                 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
+import com.altusix.slate.core.theme.SlateThemeSettings
 import com.altusix.slate.ui.components.SlateWidgetPreviewImage
 import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
@@ -48,6 +49,7 @@ private fun isFullWidthWidget(sizeText: String): Boolean {
 
 @Composable
 fun WidgetListScreen(
+    themeSettings: SlateThemeSettings,
     onWidgetSelect: (SlateWidgetInfo) -> Unit
 ) {
     val aiWidgets = remember { getAiWidgetsCatalog() }
@@ -184,7 +186,11 @@ fun WidgetListScreen(
                 }
             ) { index, widget ->
                 val span = if (index < widgetSpans.size) widgetSpans[index] else 3
-                SleekWidgetCard(widgetInfo = widget, span = span) {
+                SleekWidgetCard(
+                    widgetInfo = widget,
+                    themeSettings = themeSettings,
+                    span = span
+                ) {
                     onWidgetSelect(widget)
                 }
             }
@@ -195,6 +201,7 @@ fun WidgetListScreen(
 @Composable
 fun SleekWidgetCard(
     widgetInfo: SlateWidgetInfo,
+    themeSettings: SlateThemeSettings,
     span: Int = 3,
     onClick: () -> Unit
 ) {
@@ -208,20 +215,20 @@ fun SleekWidgetCard(
         else -> Modifier.fillMaxWidth().aspectRatio(1.0f)
     }
 
-    val previewPadding = if (span == 2) 10.dp else 12.dp
+    val previewPadding = if (span == 2) 10.dp else 22.dp
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(outerShape)
-            .background(Color(0xFF1C1C1E))
+            .background(Color(0xFF111111))
             .clickable { onClick() }
-            .padding(6.dp)
+            .padding(0.dp)
     ) {
         BoxWithConstraints(
             modifier = previewHeightModifier
                 .clip(innerShape)
-                .background(Color(0xFF3A3E4B)),
+                .background(Color(0xFF41434B)),
             contentAlignment = Alignment.Center
         ) {
             val boxWidthDp = (maxWidth.value - (previewPadding.value * 2)).toInt().coerceAtLeast(60)
@@ -229,6 +236,7 @@ fun SleekWidgetCard(
 
             SlateWidgetPreviewImage(
                 widgetInfo = widgetInfo,
+                themeSettings = themeSettings,
                 targetWidthDp = boxWidthDp,
                 targetHeightDp = boxHeightDp,
                 modifier = Modifier

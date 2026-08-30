@@ -49,6 +49,7 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
 import com.altusix.slate.widgets.ai.updateAllAiWidgets
+import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
 import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
 import com.altusix.slate.widgets.applauncher.updateAllAppLauncherWidgets
 import com.altusix.slate.widgets.battery.getBatteryWidgetsCatalog
@@ -66,16 +67,18 @@ import com.altusix.slate.widgets.clock.digital.getClockDigitalWidgetsCatalog
 import com.altusix.slate.widgets.clock.digital.updateAllClockDigitalWidgets
 import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
 import com.altusix.slate.widgets.clock.hybrid.updateAllClockHybridWidgets
-import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
-import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
-import com.altusix.slate.ui.config.AppFolderWidgetConfigActivity
-import com.altusix.slate.ui.config.AppLauncherConfigActivity
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
-import com.altusix.slate.ui.config.ContactsWidgetConfigActivity
 import com.altusix.slate.widgets.deviceinfo.updateAllDeviceInfoWidgets
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
+}
+
+private fun calculateLuminance(hex: Long): Float {
+    val r = ((hex shr 16) and 0xFFL) / 255f
+    val g = ((hex shr 8) and 0xFFL) / 255f
+    val b = (hex and 0xFFL) / 255f
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
 }
 
 class WidgetConfigActivity : ComponentActivity() {
@@ -108,7 +111,7 @@ class WidgetConfigActivity : ComponentActivity() {
         val isContacts = getContactsWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
 
         if (isAppFolder) {
-            val forwardIntent = Intent(this, com.altusix.slate.ui.config.AppFolderWidgetConfigActivity::class.java).apply {
+            val forwardIntent = Intent(this, AppFolderWidgetConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }
                 addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
             }
@@ -118,7 +121,7 @@ class WidgetConfigActivity : ComponentActivity() {
         }
 
         if (isAppLauncher) {
-            val forwardIntent = Intent(this, com.altusix.slate.ui.config.AppLauncherConfigActivity::class.java).apply {
+            val forwardIntent = Intent(this, AppLauncherConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }
                 addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
             }
@@ -158,7 +161,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 val defaultWidgetOpacity = catalogItem?.defaultOpacity ?: 1.0f
                 val hasModeOption = catalogItem?.hasModeOption ?: false
 
-                var selectedBgHex by remember { mutableLongStateOf(0xFF161618L) }
+                var selectedBgHex by remember { mutableLongStateOf(0xFF000000L) } // Default to AMOLED
                 var selectedAccentHex by remember { mutableLongStateOf(0xFFFFFFFFL) }
                 var opacity by remember { mutableFloatStateOf(1.0f) }
                 var isResponsive by remember { mutableStateOf(true) }
@@ -171,7 +174,7 @@ class WidgetConfigActivity : ComponentActivity() {
                     isResponsive = prefs.getBoolean("widget_${appWidgetId}_is_responsive", true)
 
                     if (prefs.contains("widget_${appWidgetId}_bg_color")) {
-                        selectedBgHex = prefs.getLong("widget_${appWidgetId}_bg_color", 0xFF161618L)
+                        selectedBgHex = prefs.getLong("widget_${appWidgetId}_bg_color", 0xFF000000L)
                         selectedAccentHex = prefs.getLong("widget_${appWidgetId}_accent_color", 0xFFFFFFFFL)
                     }
                 }
@@ -233,13 +236,6 @@ class WidgetConfigActivity : ComponentActivity() {
         }
     }
 
-    private fun calculateLuminance(hex: Long): Float {
-        val r = ((hex shr 16) and 0xFFL) / 255f
-        val g = ((hex shr 8) and 0xFFL) / 255f
-        val b = (hex and 0xFFL) / 255f
-        return 0.2126f * r + 0.7152f * g + 0.0722f * b
-    }
-
     private fun saveAndFinish(config: SlateWidgetConfig, isResponsive: Boolean) {
         val prefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
         prefs.edit()
@@ -299,7 +295,7 @@ private fun SlateWidgetConfigSheetContent(
     val textColor = if (isLightBg) Color.Black else Color.White
 
     val bgPresets = listOf(
-        0xFF161618L to "Dark",
+        0xFF161618L to "Matte",
         0xFF000000L to "AMOLED",
         0xFFFFFFFFL to "Light"
     )
@@ -517,12 +513,6 @@ private fun SlateWidgetConfigSheetContent(
             ModernOpacitySlider(
                 value = opacity,
                 onValueChange = onOpacityChanged,
-//                valueRange = 0.0f..1.0f,
-//                colors = SliderDefaults.colors(
-//                    thumbColor = Color.White,
-//                    activeTrackColor = Color.White,
-//                    inactiveTrackColor = Color(0xFF242428)
-//                )
             )
 
             if (hasModeOption) {
@@ -563,13 +553,6 @@ private fun SlateWidgetConfigSheetContent(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
-}
-
-private fun calculateLuminance(hex: Long): Float {
-    val r = ((hex shr 16) and 0xFFL) / 255f
-    val g = ((hex shr 8) and 0xFFL) / 255f
-    val b = (hex and 0xFFL) / 255f
-    return 0.2126f * r + 0.7152f * g + 0.0722f * b
 }
 
 private fun generateArcGaugeBitmapPreview(percentage: Int, accentColor: Color, trackColor: Color): Bitmap {
