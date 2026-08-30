@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.model.SlateWidgetInfo
-import com.altusix.slate.ui.dashboard.DashboardScreen
+import com.altusix.slate.ui.components.BottomNavBar
+import com.altusix.slate.ui.components.NavItem
+import com.altusix.slate.ui.screens.WidgetListScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -40,17 +42,39 @@ class MainActivity : ComponentActivity() {
                     surface = Color(0xFF141416)
                 )
             ) {
+                var currentTab by remember { mutableStateOf(NavItem.WIDGETS) }
                 var pendingWidgetInfo by remember { mutableStateOf<SlateWidgetInfo?>(null) }
 
-                DashboardScreen(
-                    onWidgetSelect = { widget ->
-                        if (widget.hasModeOption) {
-                            pendingWidgetInfo = widget
-                        } else {
-                            pinWidgetToHomeScreen(this@MainActivity, widget.receiverClass)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                ) {
+                    // 1. Active Tab Content
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        when (currentTab) {
+                            NavItem.WIDGETS -> WidgetListScreen(
+                                onWidgetSelect = { widget ->
+                                    if (widget.hasModeOption) {
+                                        pendingWidgetInfo = widget
+                                    } else {
+                                        pinWidgetToHomeScreen(this@MainActivity, widget.receiverClass)
+                                    }
+                                }
+                            )
+                            NavItem.WALLPAPER -> PlaceholderScreen("Wallpaper Screen")
+                            NavItem.THEME -> PlaceholderScreen("Theme Screen")
+                            NavItem.SETTINGS -> PlaceholderScreen("Settings Screen")
                         }
                     }
-                )
+
+                    // 2. Navigation Bar (Uses default barBackgroundColor from BottomNavBar.kt)
+                    BottomNavBar(
+                        selectedItem = currentTab,
+                        onItemSelected = { currentTab = it },
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+                }
 
                 if (pendingWidgetInfo != null) {
                     WidgetModeBottomSheet(
@@ -94,6 +118,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlaceholderScreen(title: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = title,
+            color = Color.White,
+            fontSize = 18.sp
+        )
     }
 }
 
