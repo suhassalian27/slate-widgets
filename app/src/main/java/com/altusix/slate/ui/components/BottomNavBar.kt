@@ -317,11 +317,11 @@ fun BottomNavBar(
                         Text(
                             text = item.title,
                             color = Color.White,
-                            fontSize = 15.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 6.dp)
+                                .padding(bottom = 5.dp)
                                 .graphicsLayer {
                                     alpha = labelAlpha
                                     translationY = labelOffsetY

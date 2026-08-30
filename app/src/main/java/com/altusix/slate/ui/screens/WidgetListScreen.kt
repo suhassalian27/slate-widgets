@@ -1,5 +1,9 @@
 package com.altusix.slate.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,6 +13,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -18,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.font.FontWeight
@@ -41,12 +49,15 @@ import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
 import com.altusix.slate.widgets.compass.getCompassWidgetsCatalog
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
 import com.altusix.slate.widgets.deviceinfo.getDeviceInfoWidgetsCatalog
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private fun isFullWidthWidget(sizeText: String): Boolean {
     val clean = sizeText.lowercase()
     return clean.startsWith("5x") || clean.startsWith("4x") || clean == "3x2" || clean == "3x3"
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WidgetListScreen(
     themeSettings: SlateThemeSettings,
@@ -75,61 +86,21 @@ fun WidgetListScreen(
         )
     }
 
-    var selectedCategoryIndex by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0) { categories.size }
+    val categoryListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
-    val displayedWidgets = when (selectedCategoryIndex) {
-        1 -> aiWidgets
-        2 -> appFolderWidgets
-        3 -> appLauncherWidgets
-        4 -> batteryWidgets
-        5 -> bluetoothWidgets
-        6 -> calculatorWidgets
-        7 -> calendarWidgets
-        8 -> cameraWidgets
-        9 -> clockWidgets
-        10 -> clockDigitalWidgets
-        11 -> clockHybridWidgets
-        12 -> compassWidgets
-        13 -> contactsWidgets
-        14 -> deviceInfoWidgets
-        else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
-                calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
-                clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets + deviceInfoWidgets
-    }
+    LaunchedEffect(pagerState.currentPage) {
+        val layoutInfo = categoryListState.layoutInfo
+        val visibleItems = layoutInfo.visibleItemsInfo
+        val targetItem = visibleItems.firstOrNull { it.index == pagerState.currentPage }
 
-    val widgetSpans = remember(displayedWidgets) {
-        val spans = IntArray(displayedWidgets.size)
-        var i = 0
-        while (i < displayedWidgets.size) {
-            if (isFullWidthWidget(displayedWidgets[i].sizeText)) {
-                spans[i] = 6
-                i++
-            } else {
-                var j = i
-                while (j < displayedWidgets.size) {
-                    if (isFullWidthWidget(displayedWidgets[j].sizeText)) break
-                    j++
-                }
-                val count = j - i
-                if (count == 1) {
-                    spans[i] = 6
-                } else if (count % 2 == 0) {
-                    for (k in i until j) {
-                        spans[k] = 3
-                    }
-                } else {
-                    val twoPerRowEnd = j - 3
-                    for (k in i until twoPerRowEnd) {
-                        spans[k] = 3
-                    }
-                    for (k in twoPerRowEnd until j) {
-                        spans[k] = 2
-                    }
-                }
-                i = j
-            }
+        if (targetItem != null) {
+            val centerOffset = (layoutInfo.viewportSize.width - targetItem.size) / 2
+            categoryListState.animateScrollToItem(pagerState.currentPage, -centerOffset)
+        } else {
+            categoryListState.animateScrollToItem(pagerState.currentPage)
         }
-        spans
     }
 
     Column(
@@ -147,17 +118,22 @@ fun WidgetListScreen(
         )
 
         LazyRow(
+            state = categoryListState,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(horizontal = 20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            itemsIndexed(categories) { index, title ->
-                val isSelected = selectedCategoryIndex == index
+            itemsIndexed(categories, key = { _, title -> title }) { index, title ->
+                val isSelected = pagerState.currentPage == index
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(if (isSelected) Color.White else Color(0xFF1C1C1E))
-                        .clickable { selectedCategoryIndex = index }
+                        .clickable {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        }
                         .padding(horizontal = 18.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -172,30 +148,145 @@ fun WidgetListScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(6),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
             modifier = Modifier.fillMaxSize()
-        ) {
-            itemsIndexed(
-                items = displayedWidgets,
-                span = { index, _ ->
-                    val spanValue = if (index < widgetSpans.size) widgetSpans[index] else 3
-                    GridItemSpan(spanValue)
+        ) { page ->
+            val displayedWidgets = remember(page) {
+                when (page) {
+                    1 -> aiWidgets
+                    2 -> appFolderWidgets
+                    3 -> appLauncherWidgets
+                    4 -> batteryWidgets
+                    5 -> bluetoothWidgets
+                    6 -> calculatorWidgets
+                    7 -> calendarWidgets
+                    8 -> cameraWidgets
+                    9 -> clockWidgets
+                    10 -> clockDigitalWidgets
+                    11 -> clockHybridWidgets
+                    12 -> compassWidgets
+                    13 -> contactsWidgets
+                    14 -> deviceInfoWidgets
+                    else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
+                            calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
+                            clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets + deviceInfoWidgets
                 }
-            ) { index, widget ->
-                val span = if (index < widgetSpans.size) widgetSpans[index] else 3
-                SleekWidgetCard(
-                    widgetInfo = widget,
-                    themeSettings = themeSettings,
-                    span = span
-                ) {
-                    onWidgetSelect(widget)
+            }
+
+            val widgetSpans = remember(displayedWidgets) {
+                val spans = IntArray(displayedWidgets.size)
+                var i = 0
+                while (i < displayedWidgets.size) {
+                    if (isFullWidthWidget(displayedWidgets[i].sizeText)) {
+                        spans[i] = 6
+                        i++
+                    } else {
+                        var j = i
+                        while (j < displayedWidgets.size) {
+                            if (isFullWidthWidget(displayedWidgets[j].sizeText)) break
+                            j++
+                        }
+                        val count = j - i
+                        if (count == 1) {
+                            spans[i] = 6
+                        } else if (count % 2 == 0) {
+                            for (k in i until j) {
+                                spans[k] = 3
+                            }
+                        } else {
+                            val twoPerRowEnd = j - 3
+                            for (k in i until twoPerRowEnd) {
+                                spans[k] = 3
+                            }
+                            for (k in twoPerRowEnd until j) {
+                                spans[k] = 2
+                            }
+                        }
+                        i = j
+                    }
+                }
+                spans
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(6),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                itemsIndexed(
+                    items = displayedWidgets,
+                    key = { _, widget -> widget.receiverClass.name },
+                    span = { index, _ ->
+                        val spanValue = if (index < widgetSpans.size) widgetSpans[index] else 3
+                        GridItemSpan(spanValue)
+                    }
+                ) { index, widget ->
+                    val span = if (index < widgetSpans.size) widgetSpans[index] else 3
+
+                    StaggeredAnimatedWidgetCard(
+                        index = index,
+                        page = page,
+                        currentPage = pagerState.currentPage,
+                        widgetInfo = widget,
+                        themeSettings = themeSettings,
+                        span = span,
+                        onClick = { onWidgetSelect(widget) }
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+fun StaggeredAnimatedWidgetCard(
+    index: Int,
+    page: Int,
+    currentPage: Int,
+    widgetInfo: SlateWidgetInfo,
+    themeSettings: SlateThemeSettings,
+    span: Int,
+    onClick: () -> Unit
+) {
+    val animProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(currentPage) {
+        if (currentPage == page) {
+            animProgress.snapTo(0f)
+            val delayMillis = (index.coerceAtMost(8) * 45L)
+            delay(delayMillis)
+            animProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.58f,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        }
+    }
+
+    val scale = 0.78f + (0.22f * animProgress.value)
+    val alpha = animProgress.value.coerceIn(0f, 1f)
+    val offsetY = (1f - animProgress.value) * 60f
+
+    Box(
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            this.alpha = alpha
+            translationY = offsetY
+        }
+    ) {
+        SleekWidgetCard(
+            widgetInfo = widgetInfo,
+            themeSettings = themeSettings,
+            span = span,
+            onClick = onClick
+        )
     }
 }
 
@@ -209,14 +300,15 @@ fun SleekWidgetCard(
     val outerShape = RoundedCornerShape(14.dp)
     val innerShape = RoundedCornerShape(10.dp)
 
-    val previewHeightModifier = when (widgetInfo.sizeText.lowercase()) {
-        "5x1", "4x1" -> Modifier.fillMaxWidth().height(88.dp)
-        "5x2", "4x2" -> Modifier.fillMaxWidth().height(154.dp)
-        "3x2", "3x3" -> Modifier.fillMaxWidth().height(134.dp)
-        else -> Modifier.fillMaxWidth().aspectRatio(1.0f)
+    val (previewHeightModifier, targetHeightDp) = when (widgetInfo.sizeText.lowercase()) {
+        "5x1", "4x1" -> Modifier.fillMaxWidth().height(88.dp) to 88
+        "5x2", "4x2" -> Modifier.fillMaxWidth().height(154.dp) to 154
+        "3x2", "3x3" -> Modifier.fillMaxWidth().height(134.dp) to 134
+        else -> Modifier.fillMaxWidth().aspectRatio(1.0f) to 160
     }
 
     val previewPadding = if (span == 2) 10.dp else 22.dp
+    val targetWidthDp = if (span == 6) 320 else if (span == 2) 100 else 150
 
     Column(
         modifier = Modifier
@@ -226,20 +318,17 @@ fun SleekWidgetCard(
             .clickable { onClick() }
             .padding(0.dp)
     ) {
-        BoxWithConstraints(
+        Box(
             modifier = previewHeightModifier
                 .clip(innerShape)
                 .background(Color(0xFF41434B)),
             contentAlignment = Alignment.Center
         ) {
-            val boxWidthDp = (maxWidth.value - (previewPadding.value * 2)).toInt().coerceAtLeast(60)
-            val boxHeightDp = (maxHeight.value - (previewPadding.value * 2)).toInt().coerceAtLeast(60)
-
             SlateWidgetPreviewImage(
                 widgetInfo = widgetInfo,
                 themeSettings = themeSettings,
-                targetWidthDp = boxWidthDp,
-                targetHeightDp = boxHeightDp,
+                targetWidthDp = targetWidthDp,
+                targetHeightDp = targetHeightDp,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(previewPadding)

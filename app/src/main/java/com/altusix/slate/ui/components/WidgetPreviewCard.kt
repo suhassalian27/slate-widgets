@@ -2,13 +2,13 @@ package com.altusix.slate.ui.components
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +24,11 @@ import com.altusix.slate.core.theme.SlateThemeSettings
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.widgets.calculator.CalculatorState
 import com.altusix.slate.widgets.camera.CameraWidgetConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+// In-memory cache to prevent re-generating bitmaps during scroll
+private val previewBitmapCache = LruCache<String, Bitmap>(50)
 
 @Composable
 fun SlateWidgetPreviewImage(
@@ -34,18 +39,33 @@ fun SlateWidgetPreviewImage(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var previewBitmap by remember(widgetInfo, targetWidthDp, targetHeightDp, themeSettings) {
+        val cacheKey = "${widgetInfo.receiverClass.name}_${targetWidthDp}_${targetHeightDp}_${themeSettings.bgHex}_${themeSettings.accentHex}_${themeSettings.opacity}"
+        mutableStateOf(previewBitmapCache.get(cacheKey))
+    }
 
-    val previewBitmap = remember(widgetInfo, targetWidthDp, targetHeightDp, themeSettings) {
-        generatePreviewBitmap(context, widgetInfo, themeSettings, targetWidthDp, targetHeightDp)
+    // Render bitmap on background thread
+    LaunchedEffect(widgetInfo, targetWidthDp, targetHeightDp, themeSettings) {
+        val cacheKey = "${widgetInfo.receiverClass.name}_${targetWidthDp}_${targetHeightDp}_${themeSettings.bgHex}_${themeSettings.accentHex}_${themeSettings.opacity}"
+        if (previewBitmap == null) {
+            val bitmap = withContext(Dispatchers.Default) {
+                generatePreviewBitmap(context, widgetInfo, themeSettings, targetWidthDp, targetHeightDp)
+            }
+            if (bitmap != null) {
+                previewBitmapCache.put(cacheKey, bitmap)
+                previewBitmap = bitmap
+            }
+        }
     }
 
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        if (previewBitmap != null) {
+        val currentBitmap = previewBitmap
+        if (currentBitmap != null) {
             Image(
-                bitmap = previewBitmap.asImageBitmap(),
+                bitmap = currentBitmap.asImageBitmap(),
                 contentDescription = widgetInfo.name,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
@@ -53,7 +73,7 @@ fun SlateWidgetPreviewImage(
         } else {
             Text(
                 text = widgetInfo.name,
-                color = Color.White,
+                color = Color.White.copy(alpha = 0.5f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,

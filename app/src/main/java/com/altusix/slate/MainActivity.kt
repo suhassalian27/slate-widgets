@@ -13,6 +13,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -59,9 +68,56 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(Color.Black)
                 ) {
-                    // 1. Tab Content Screens
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        when (currentTab) {
+                    // 1. Animated Tab Content Screens
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            val targetIndex = NavItem.entries.indexOf(targetState)
+                            val initialIndex = NavItem.entries.indexOf(initialState)
+
+                            val springSpec = spring<Float>(
+                                dampingRatio = 0.82f,
+                                stiffness = Spring.StiffnessLow
+                            )
+
+                            if (targetIndex > initialIndex) {
+                                // Moving Right -> Slide in from Right, Slide out to Left
+                                (slideInHorizontally(
+                                    animationSpec = spring(
+                                        dampingRatio = 0.82f,
+                                        stiffness = Spring.StiffnessLow
+                                    ),
+                                    initialOffsetX = { fullWidth -> (fullWidth * 0.18f).toInt() }
+                                ) + fadeIn(animationSpec = tween(200))) togetherWith
+                                        (slideOutHorizontally(
+                                            animationSpec = spring(
+                                                dampingRatio = 0.82f,
+                                                stiffness = Spring.StiffnessLow
+                                            ),
+                                            targetOffsetX = { fullWidth -> -(fullWidth * 0.18f).toInt() }
+                                        ) + fadeOut(animationSpec = tween(160)))
+                            } else {
+                                // Moving Left -> Slide in from Left, Slide out to Right
+                                (slideInHorizontally(
+                                    animationSpec = spring(
+                                        dampingRatio = 0.82f,
+                                        stiffness = Spring.StiffnessLow
+                                    ),
+                                    initialOffsetX = { fullWidth -> -(fullWidth * 0.18f).toInt() }
+                                ) + fadeIn(animationSpec = tween(200))) togetherWith
+                                        (slideOutHorizontally(
+                                            animationSpec = spring(
+                                                dampingRatio = 0.82f,
+                                                stiffness = Spring.StiffnessLow
+                                            ),
+                                            targetOffsetX = { fullWidth -> (fullWidth * 0.18f).toInt() }
+                                        ) + fadeOut(animationSpec = tween(160)))
+                            }
+                        },
+                        label = "TabScreenAnimation",
+                        modifier = Modifier.fillMaxSize()
+                    ) { targetTab ->
+                        when (targetTab) {
                             NavItem.WIDGETS -> WidgetListScreen(
                                 themeSettings = themeSettings,
                                 onWidgetSelect = { widget ->
