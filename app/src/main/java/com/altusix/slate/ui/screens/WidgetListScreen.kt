@@ -136,13 +136,14 @@ fun WidgetListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF000000))
+            .statusBarsPadding()
     ) {
         Text(
             text = "Widgets",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 14.dp)
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 18.dp)
         )
 
         LazyRow(
@@ -175,7 +176,7 @@ fun WidgetListScreen(
             columns = GridCells.Fixed(6),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             itemsIndexed(

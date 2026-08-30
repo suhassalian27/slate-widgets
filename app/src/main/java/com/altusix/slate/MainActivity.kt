@@ -12,6 +12,7 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,12 +30,15 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.ui.components.BottomNavBar
 import com.altusix.slate.ui.components.NavItem
+import com.altusix.slate.ui.screens.SettingsScreen
 import com.altusix.slate.ui.screens.ThemeScreen
+import com.altusix.slate.ui.screens.WallpaperScreen
 import com.altusix.slate.ui.screens.WidgetListScreen
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         val themePrefs = ThemePreferences(this)
@@ -68,7 +72,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
-                            NavItem.WALLPAPER -> PlaceholderScreen("Wallpaper Screen")
+                            NavItem.WALLPAPER -> WallpaperScreen()
                             NavItem.THEME -> ThemeScreen(
                                 themeSettings = themeSettings,
                                 onThemeChanged = { newSettings ->
@@ -76,7 +80,7 @@ class MainActivity : ComponentActivity() {
                                     themePrefs.saveThemeSettings(newSettings)
                                 }
                             )
-                            NavItem.SETTINGS -> PlaceholderScreen("Settings Screen")
+                            NavItem.SETTINGS -> SettingsScreen()
                         }
                     }
 
@@ -85,7 +89,9 @@ class MainActivity : ComponentActivity() {
                         selectedItem = currentTab,
                         onItemSelected = { currentTab = it },
                         accentColor = themeSettings.accentColor,
-                        modifier = Modifier.align(Alignment.BottomCenter)
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
                     )
                 }
 
@@ -131,22 +137,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = title,
-            color = Color.White,
-            fontSize = 18.sp
-        )
     }
 }
 

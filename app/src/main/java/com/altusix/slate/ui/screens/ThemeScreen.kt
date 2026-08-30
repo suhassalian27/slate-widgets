@@ -70,21 +70,17 @@ fun ThemeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .statusBarsPadding()
             .verticalScroll(scrollState)
             .padding(horizontal = 20.dp)
-            .padding(top = 28.dp, bottom = 120.dp)
+            .padding(top = 16.dp, bottom = 140.dp)
     ) {
         Text(
             text = "Theme Studio",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = "Customize the global style applied across your widgets",
-            fontSize = 13.sp,
-            color = Color(0xFF8E8E93),
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 24.dp)
         )
 
         // 1. HERO PREVIEW STAGE WITH AMBIENT GLOW
@@ -182,7 +178,7 @@ fun ThemeScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         val bgOptions = listOf(
-            Triple(0xFF161618L, "Matte", Color(0xFF161618)), // Renamed from "Dark"
+            Triple(0xFF161618L, "Matte", Color(0xFF161618)),
             Triple(0xFF000000L, "AMOLED", Color(0xFF000000)),
             Triple(0xFFFFFFFFL, "Light", Color(0xFFF5F5F7))
         )
