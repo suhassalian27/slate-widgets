@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_image_view" android:layout_width="match_parent" android:layout_height="match_parent" android:adjustViewBounds="true" android:scaleType="fitCenter" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="8dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.18" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.52" android:orientation="horizontal">
+                <FrameLayout android:id="@+id/btn_mode_vs_robot" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/btn_mode_vs_person" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+            </LinearLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.10" />
+            <FrameLayout android:id="@+id/btn_reset" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.38" android:clickable="true" android:focusable="true" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.82" android:orientation="vertical">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <FrameLayout android:id="@+id/cell_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/cell_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/cell_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <FrameLayout android:id="@+id/cell_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/cell_4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/cell_5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <FrameLayout android:id="@+id/cell_6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/cell_7" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+                <FrameLayout android:id="@+id/cell_8" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
