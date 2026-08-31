@@ -1,6 +1,5 @@
 package com.altusix.slate.ui.screens
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -49,8 +48,8 @@ import com.altusix.slate.widgets.clock.hybrid.getClockHybridWidgetsCatalog
 import com.altusix.slate.widgets.compass.getCompassWidgetsCatalog
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
 import com.altusix.slate.widgets.deviceinfo.getDeviceInfoWidgetsCatalog
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 private fun isFullWidthWidget(sizeText: String): Boolean {
     val clean = sizeText.lowercase()
@@ -90,6 +89,7 @@ fun WidgetListScreen(
     val categoryListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    // Smoothly auto-center active category pill
     LaunchedEffect(pagerState.currentPage) {
         val layoutInfo = categoryListState.layoutInfo
         val visibleItems = layoutInfo.visibleItemsInfo
@@ -131,7 +131,14 @@ fun WidgetListScreen(
                         .background(if (isSelected) Color.White else Color(0xFF1C1C1E))
                         .clickable {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
+                                // Premium slow & smooth transition physics
+                                pagerState.animateScrollToPage(
+                                    page = index,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.75f,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                )
                             }
                         }
                         .padding(horizontal = 18.dp, vertical = 8.dp)
@@ -227,66 +234,42 @@ fun WidgetListScreen(
                 ) { index, widget ->
                     val span = if (index < widgetSpans.size) widgetSpans[index] else 3
 
-                    StaggeredAnimatedWidgetCard(
-                        index = index,
-                        page = page,
-                        currentPage = pagerState.currentPage,
-                        widgetInfo = widget,
-                        themeSettings = themeSettings,
-                        span = span,
-                        onClick = { onWidgetSelect(widget) }
-                    )
+                    // OFFSET-DRIVEN ANIMATION: Guarantees 0 glitches & ignores vertical scroll
+                    Box(
+                        modifier = Modifier.graphicsLayer {
+                            // Calculate exactly how far this page is from the screen center
+                            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                            val baseAbsOffset = pageOffset.absoluteValue
+
+                            // Add a subtle stagger multiplier based on index for the cascading pop effect
+                            val staggerFactor = (index % 12) * 0.08f
+                            val animatedOffset = (baseAbsOffset * (1f + staggerFactor)).coerceIn(0f, 1f)
+
+                            // 1f = fully settled on screen. 0f = fully off screen.
+                            val progress = 1f - animatedOffset
+
+                            // Scale smoothly from 80% to 100% based on pager offset
+                            val scale = 0.80f + (0.20f * progress)
+                            scaleX = scale
+                            scaleY = scale
+
+                            // Fade opacity based on progress
+                            alpha = progress.coerceIn(0f, 1f)
+
+                            // Glide upwards by 60px as the page comes into view
+                            translationY = (1f - progress) * 60f
+                        }
+                    ) {
+                        SleekWidgetCard(
+                            widgetInfo = widget,
+                            themeSettings = themeSettings,
+                            span = span,
+                            onClick = { onWidgetSelect(widget) }
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun StaggeredAnimatedWidgetCard(
-    index: Int,
-    page: Int,
-    currentPage: Int,
-    widgetInfo: SlateWidgetInfo,
-    themeSettings: SlateThemeSettings,
-    span: Int,
-    onClick: () -> Unit
-) {
-    val animProgress = remember { Animatable(0f) }
-
-    LaunchedEffect(currentPage) {
-        if (currentPage == page) {
-            animProgress.snapTo(0f)
-            val delayMillis = (index.coerceAtMost(8) * 45L)
-            delay(delayMillis)
-            animProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.58f,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
-        }
-    }
-
-    val scale = 0.78f + (0.22f * animProgress.value)
-    val alpha = animProgress.value.coerceIn(0f, 1f)
-    val offsetY = (1f - animProgress.value) * 60f
-
-    Box(
-        modifier = Modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-            this.alpha = alpha
-            translationY = offsetY
-        }
-    ) {
-        SleekWidgetCard(
-            widgetInfo = widgetInfo,
-            themeSettings = themeSettings,
-            span = span,
-            onClick = onClick
-        )
     }
 }
 
