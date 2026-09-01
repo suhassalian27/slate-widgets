@@ -115,7 +115,8 @@ abstract class BaseGamesReceiver : AppWidgetProvider() {
 fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Tic Tac Toe", category = "Games", sizeText = "2x2", receiverClass = GamesTicTacToeReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "2048 Micro", category = "Games", sizeText = "2x2", receiverClass = Games2048Receiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "2048 Micro", category = "Games", sizeText = "2x2", receiverClass = Games2048Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Rock Paper Scissors", category = "Games", sizeText = "2x2", receiverClass = GamesRpsReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -434,6 +435,144 @@ class Games2048Receiver : BaseGamesReceiver() {
 
         val resetIntent = Intent(context, Games2048Receiver::class.java).apply {
             action = "com.altusix.slate.ACTION_2048_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// --- ROCK PAPER SCISSORS GAME ENGINE ---
+
+private fun getRpsState(context: Context, widgetId: Int): RpsState {
+    val prefs = context.getSharedPreferences("slate_rps_prefs", Context.MODE_PRIVATE)
+    return RpsState(
+        playerMove = prefs.getInt("widget_${widgetId}_p_move", 0),
+        botMove = prefs.getInt("widget_${widgetId}_b_move", 0),
+        result = prefs.getInt("widget_${widgetId}_result", 0),
+        playerWins = prefs.getInt("widget_${widgetId}_p_wins", 0),
+        botWins = prefs.getInt("widget_${widgetId}_b_wins", 0),
+        streak = prefs.getInt("widget_${widgetId}_streak", 0)
+    )
+}
+
+private fun saveRpsState(context: Context, widgetId: Int, state: RpsState) {
+    val prefs = context.getSharedPreferences("slate_rps_prefs", Context.MODE_PRIVATE)
+    prefs.edit()
+        .putInt("widget_${widgetId}_p_move", state.playerMove)
+        .putInt("widget_${widgetId}_b_move", state.botMove)
+        .putInt("widget_${widgetId}_result", state.result)
+        .putInt("widget_${widgetId}_p_wins", state.playerWins)
+        .putInt("widget_${widgetId}_b_wins", state.botWins)
+        .putInt("widget_${widgetId}_streak", state.streak)
+        .apply()
+}
+
+// 3. ROCK PAPER SCISSORS INTERACTIVE (2x2)
+class GamesRpsReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateRpsWidgetBitmap(context, config, false, wDp, hDp, -1, RpsState(1, 3, 1, 8, 4, 3))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_RPS_CHOICE" -> {
+                val playerChoice = intent.getIntExtra("EXTRA_CHOICE", 0)
+                if (playerChoice in 1..3) {
+                    val current = getRpsState(context, widgetId)
+                    val botChoice = (1..3).random()
+
+                    // Result: 1: Player Win, 2: Bot Win, 3: Draw
+                    val result = when {
+                        playerChoice == botChoice -> 3
+                        (playerChoice == 1 && botChoice == 3) ||
+                                (playerChoice == 2 && botChoice == 1) ||
+                                (playerChoice == 3 && botChoice == 2) -> 1
+                        else -> 2
+                    }
+
+                    val newPWins = if (result == 1) current.playerWins + 1 else current.playerWins
+                    val newBWins = if (result == 2) current.botWins + 1 else current.botWins
+                    val newStreak = when (result) {
+                        1 -> current.streak + 1
+                        2 -> 0
+                        else -> current.streak
+                    }
+
+                    val updatedState = RpsState(
+                        playerMove = playerChoice,
+                        botMove = botChoice,
+                        result = result,
+                        playerWins = newPWins,
+                        botWins = newBWins,
+                        streak = newStreak
+                    )
+
+                    saveRpsState(context, widgetId, updatedState)
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateWidget(context, appWidgetManager, widgetId)
+                }
+            }
+            "com.altusix.slate.ACTION_RPS_RESET" -> {
+                val resetState = RpsState()
+                saveRpsState(context, widgetId, resetState)
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_rps_layout)
+        val state = getRpsState(context, widgetId)
+        val bitmap = generateRpsWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val actions = mapOf(
+            R.id.btn_rock to 1,
+            R.id.btn_paper to 2,
+            R.id.btn_scissors to 3
+        )
+
+        for ((btnId, choice) in actions) {
+            val choiceIntent = Intent(context, GamesRpsReceiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_RPS_CHOICE"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("EXTRA_CHOICE", choice)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + btnId,
+                choiceIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(btnId, pendingIntent)
+        }
+
+        val resetIntent = Intent(context, GamesRpsReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_RPS_RESET"
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
         }
         views.setOnClickPendingIntent(
