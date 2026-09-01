@@ -1707,3 +1707,544 @@ fun generatePuzzleWidgetBitmap(
 
     return bitmap
 }
+
+data class MinesweeperState(
+    val mines: List<Boolean> = List(16) { false },
+    val revealed: List<Boolean> = List(16) { false },
+    val flagged: List<Boolean> = List(16) { false },
+    val isFlagMode: Boolean = false, // false = DIG, true = FLAG
+    val status: Int = 0              // 0: IDLE, 1: PLAYING, 2: WON, 3: LOST
+)
+
+// 8. MINESWEEPER MINI INTERACTIVE (2x2)
+fun generateMinesweeperWidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: MinesweeperState = MinesweeperState()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#70FFFFFF")
+
+    val isAccentLight = ((Color.red(accentColorInt) * 0.2126f) + (Color.green(accentColorInt) * 0.7152f) + (Color.blue(accentColorInt) * 0.0722f)) / 255f > 0.5f
+    val onAccentTextColor = if (isAccentLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+    val gap = (minCardDim * 0.020f).coerceIn(scaleFactor * 2f, scaleFactor * 5f)
+
+    val availableH = cardRect.height() - (pad * 2f)
+
+    // 1. TOP HEADER: MINES REMAINING, DIG/FLAG TOGGLE, RESET
+    val headerH = (availableH * 0.15f).coerceIn(scaleFactor * 24f, scaleFactor * 48f)
+    val headerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + headerH)
+    val pillRadius = headerH * 0.32f
+
+    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val totalMines = state.mines.count { it }
+    val flagsPlaced = state.flagged.count { it }
+    val remainingMines = maxOf(0, (if (totalMines == 0) 3 else totalMines) - flagsPlaced)
+
+    val countW = (headerRect.width() - (gap * 2f)) * 0.34f
+    val modeW = (headerRect.width() - (gap * 2f)) * 0.36f
+    val resetW = (headerRect.width() - (gap * 2f)) * 0.30f
+
+    val countRect = RectF(headerRect.left, headerRect.top, headerRect.left + countW, headerRect.bottom)
+    val modeRect = RectF(countRect.right + gap, headerRect.top, countRect.right + gap + modeW, headerRect.bottom)
+    val resetRect = RectF(modeRect.right + gap, headerRect.top, headerRect.right, headerRect.bottom)
+
+    canvas.drawRoundRect(countRect, pillRadius, pillRadius, pillBgPaint)
+
+    // Mode Toggle Pill Styling
+    if (state.isFlagMode) {
+        val flagModePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(45, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+            style = Paint.Style.FILL
+        }
+        val flagBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.STROKE
+            strokeWidth = scaleFactor * 1.8f
+        }
+        canvas.drawRoundRect(modeRect, pillRadius, pillRadius, flagModePaint)
+        canvas.drawRoundRect(modeRect, pillRadius, pillRadius, flagBorderPaint)
+    } else {
+        canvas.drawRoundRect(modeRect, pillRadius, pillRadius, pillBgPaint)
+    }
+
+    // Reset Pill Glow on Win/Loss
+    if (state.status == 2) {
+        val winPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#34C759"); style = Paint.Style.FILL }
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, winPaint)
+    } else if (state.status == 3) {
+        val losePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FF453A"); style = Paint.Style.FILL }
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, losePaint)
+    } else {
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, pillBgPaint)
+    }
+
+    // Typography
+    val labelTextSize = (headerH * 0.22f).coerceAtLeast(scaleFactor * 6f)
+    val statTextSize = (headerH * 0.38f).coerceAtLeast(scaleFactor * 7.5f)
+
+    val statLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = labelTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val countValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    canvas.drawText("MINES", countRect.centerX(), countRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("$remainingMines", countRect.centerX(), countRect.top + headerH * 0.82f, countValPaint)
+
+    // Mode Toggle Label (DIG vs FLAG)
+    val modeText = if (state.isFlagMode) "FLAG ⚑" else "DIG ⛏"
+    val modeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (state.isFlagMode) accentColorInt else primaryText
+        textSize = (headerH * 0.34f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val mFm = modeTextPaint.fontMetrics
+    canvas.drawText(modeText, modeRect.centerX(), modeRect.centerY() - (mFm.ascent + mFm.descent) / 2f, modeTextPaint)
+
+    // Reset Label
+    val resetLabel = when (state.status) {
+        2 -> "WON!"
+        3 -> "RETRY"
+        else -> "RESET"
+    }
+    val resetTextColor = when (state.status) {
+        2, 3 -> Color.WHITE
+        else -> primaryText
+    }
+    val resetTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = resetTextColor
+        textSize = (headerH * 0.34f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val rFm = resetTextPaint.fontMetrics
+    canvas.drawText(resetLabel, resetRect.centerX(), resetRect.centerY() - (rFm.ascent + rFm.descent) / 2f, resetTextPaint)
+
+    // 2. 4x4 MINESWEEPER BOARD
+    val gridTop = headerRect.bottom + gap
+    val gridRect = RectF(cardRect.left + pad, gridTop, cardRect.right - pad, cardRect.bottom - pad)
+
+    val cellW = (gridRect.width() - (gap * 3f)) / 4f
+    val cellH = (gridRect.height() - (gap * 3f)) / 4f
+    val minCellDim = minOf(cellW, cellH)
+    val cellRadius = (minCellDim * 0.22f).coerceAtLeast(scaleFactor * 4f)
+
+    val unrevealedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F4F4F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    val revealedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#121214")
+        style = Paint.Style.FILL
+    }
+    val minePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FF453A")
+        style = Paint.Style.FILL
+    }
+
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+        textSize = (minCellDim * 0.44f).coerceAtLeast(scaleFactor * 9f)
+    }
+
+    for (row in 0..3) {
+        for (col in 0..3) {
+            val idx = row * 4 + col
+            val left = gridRect.left + col * (cellW + gap)
+            val top = gridRect.top + row * (cellH + gap)
+            val cellBox = RectF(left, top, left + cellW, top + cellH)
+
+            val isRev = state.revealed[idx]
+            val isFlg = state.flagged[idx]
+            val isMine = state.mines[idx]
+
+            if (isRev) {
+                if (isMine) {
+                    // Exploded Mine
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, minePaint)
+                    drawMineIcon(canvas, cellBox.centerX(), cellBox.centerY(), minCellDim * 0.5f, Color.WHITE, scaleFactor)
+                } else {
+                    // Revealed Safe Cell
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, revealedPaint)
+                    val adjCount = getAdjacentMinesCount(state.mines, row, col)
+                    if (adjCount > 0) {
+                        numPaint.color = getMinesweeperNumberColor(adjCount, accentColorInt)
+                        val nFm = numPaint.fontMetrics
+                        val nY = cellBox.centerY() - (nFm.ascent + nFm.descent) / 2f
+                        canvas.drawText("$adjCount", cellBox.centerX(), nY, numPaint)
+                    }
+                }
+            } else {
+                if (state.status == 3 && isMine) {
+                    // Game Over: Reveal all hidden mines
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, unrevealedPaint)
+                    drawMineIcon(canvas, cellBox.centerX(), cellBox.centerY(), minCellDim * 0.48f, Color.parseColor("#FF453A"), scaleFactor)
+                } else {
+                    // Standard Unrevealed Tile
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, unrevealedPaint)
+
+                    if (isFlg) {
+                        drawFlagIcon(canvas, cellBox.centerX(), cellBox.centerY(), minCellDim * 0.5f, accentColorInt, scaleFactor)
+                    }
+                }
+            }
+        }
+    }
+
+    return bitmap
+}
+
+private fun getAdjacentMinesCount(mines: List<Boolean>, row: Int, col: Int): Int {
+    var count = 0
+    for (dr in -1..1) {
+        for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val r = row + dr
+            val c = col + dc
+            if (r in 0..3 && c in 0..3) {
+                if (mines[r * 4 + c]) count++
+            }
+        }
+    }
+    return count
+}
+
+private fun getMinesweeperNumberColor(count: Int, accentColor: Int): Int {
+    return when (count) {
+        1 -> accentColor
+        2 -> Color.parseColor("#34C759")
+        3 -> Color.parseColor("#FF9500")
+        else -> Color.parseColor("#FF3B30")
+    }
+}
+
+private fun drawFlagIcon(canvas: android.graphics.Canvas, cx: Float, cy: Float, size: Float, color: Int, scaleFactor: Float) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2f
+        strokeCap = Paint.Cap.ROUND
+    }
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.FILL
+    }
+
+    // Pole
+    val poleX = cx - (size * 0.22f)
+    val topY = cy - (size * 0.42f)
+    val botY = cy + (size * 0.42f)
+    canvas.drawLine(poleX, topY, poleX, botY, paint)
+
+    // Flag pennant
+    val flagPath = Path().apply {
+        moveTo(poleX, topY)
+        lineTo(cx + (size * 0.32f), topY + (size * 0.22f))
+        lineTo(poleX, topY + (size * 0.44f))
+        close()
+    }
+    canvas.drawPath(flagPath, fillPaint)
+
+    // Base stand
+    canvas.drawLine(poleX - scaleFactor * 3.5f, botY, poleX + scaleFactor * 3.5f, botY, paint)
+}
+
+private fun drawMineIcon(canvas: android.graphics.Canvas, cx: Float, cy: Float, size: Float, color: Int, scaleFactor: Float) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.FILL
+    }
+    val spikePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.2f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val r = size * 0.28f
+    canvas.drawCircle(cx, cy, r, paint)
+
+    // Spikes (Cross and diagonals)
+    val ext = size * 0.45f
+    canvas.drawLine(cx - ext, cy, cx + ext, cy, spikePaint)
+    canvas.drawLine(cx, cy - ext, cx, cy + ext, spikePaint)
+    canvas.drawLine(cx - ext * 0.7f, cy - ext * 0.7f, cx + ext * 0.7f, cy + ext * 0.7f, spikePaint)
+    canvas.drawLine(cx - ext * 0.7f, cy + ext * 0.7f, cx + ext * 0.7f, cy - ext * 0.7f, spikePaint)
+}
+
+data class Connect4State(
+    val board: List<Int> = List(25) { 0 }, // 5x5 grid (0: Empty, 1: Player, 2: Bot)
+    val playerWins: Int = 0,
+    val botWins: Int = 0,
+    val status: Int = 0,                   // 0: YOUR_TURN, 1: BOT_WON, 2: PLAYER_WON, 3: DRAW
+    val winningCells: List<Int> = emptyList()
+)
+
+// 9. CONNECT FOUR MICRO INTERACTIVE (2x2)
+fun generateConnect4WidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: Connect4State = Connect4State()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#70FFFFFF")
+
+    val isAccentLight = ((Color.red(accentColorInt) * 0.2126f) + (Color.green(accentColorInt) * 0.7152f) + (Color.blue(accentColorInt) * 0.0722f)) / 255f > 0.5f
+    val onAccentTextColor = if (isAccentLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+    val gap = (minCardDim * 0.020f).coerceIn(scaleFactor * 2f, scaleFactor * 5f)
+
+    val availableH = cardRect.height() - (pad * 2f)
+
+    // 1. TOP STATS BAR: YOU, BOT, STATUS PILL & RESET
+    val headerH = (availableH * 0.15f).coerceIn(scaleFactor * 24f, scaleFactor * 48f)
+    val headerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + headerH)
+    val pillRadius = headerH * 0.32f
+
+    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val statsW = (headerRect.width() - gap) * 0.70f
+    val resetW = (headerRect.width() - gap) * 0.30f
+
+    val statsRect = RectF(headerRect.left, headerRect.top, headerRect.left + statsW, headerRect.bottom)
+    val resetRect = RectF(statsRect.right + gap, headerRect.top, headerRect.right, headerRect.bottom)
+
+    canvas.drawRoundRect(statsRect, pillRadius, pillRadius, pillBgPaint)
+
+    if (state.status != 0) {
+        val resetGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = when (state.status) {
+                2 -> accentColorInt
+                1 -> Color.parseColor("#FF453A")
+                else -> secondaryText
+            }
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, resetGlowPaint)
+    } else {
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, pillBgPaint)
+    }
+
+    // Stats Typography
+    val labelTextSize = (headerH * 0.22f).coerceAtLeast(scaleFactor * 6f)
+    val statTextSize = (headerH * 0.38f).coerceAtLeast(scaleFactor * 7.5f)
+
+    val statLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = labelTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val youValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val botValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val colW = statsRect.width() / 3f
+    val c1x = statsRect.left + (colW * 0.5f)
+    val c2x = statsRect.left + (colW * 1.5f)
+    val c3x = statsRect.left + (colW * 2.5f)
+
+    canvas.drawText("YOU", c1x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.playerWins}", c1x, statsRect.top + headerH * 0.82f, youValPaint)
+
+    canvas.drawText("BOT", c2x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.botWins}", c2x, statsRect.top + headerH * 0.82f, botValPaint)
+
+    // Status Indicator Text
+    val statusText = when (state.status) {
+        2 -> "WIN!"
+        1 -> "LOSE"
+        3 -> "DRAW"
+        else -> "DROP"
+    }
+    val statusColor = when (state.status) {
+        2 -> accentColorInt
+        1 -> Color.parseColor("#FF453A")
+        else -> secondaryText
+    }
+    val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = statusColor
+        textSize = (headerH * 0.36f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val sFm = statusPaint.fontMetrics
+    canvas.drawText(statusText, c3x, statsRect.centerY() - (sFm.ascent + sFm.descent) / 2f, statusPaint)
+
+    // Reset Button Label
+    val resetLabel = if (state.status != 0) "REPLAY" else "RESET"
+    val resetTextColor = if (state.status != 0) (if (state.status == 2) onAccentTextColor else Color.WHITE) else primaryText
+    val resetTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = resetTextColor
+        textSize = (headerH * 0.34f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val rFm = resetTextPaint.fontMetrics
+    canvas.drawText(resetLabel, resetRect.centerX(), resetRect.centerY() - (rFm.ascent + rFm.descent) / 2f, resetTextPaint)
+
+    // 2. 5x5 PERFORATED CONNECT FOUR BOARD
+    val gridTop = headerRect.bottom + gap
+    val gridRect = RectF(cardRect.left + pad, gridTop, cardRect.right - pad, cardRect.bottom - pad)
+
+    val boardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F4F4F7") else Color.parseColor("#17171A")
+        style = Paint.Style.FILL
+    }
+    val boardRadius = (minOf(gridRect.width(), gridRect.height()) * 0.08f).coerceAtLeast(scaleFactor * 6f)
+    canvas.drawRoundRect(gridRect, boardRadius, boardRadius, boardBgPaint)
+
+    val slotW = gridRect.width() / 5f
+    val slotH = gridRect.height() / 5f
+    val tokenRadius = (minOf(slotW, slotH) * 0.36f).coerceAtLeast(scaleFactor * 5f)
+
+    val emptySlotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#101012")
+        style = Paint.Style.FILL
+    }
+    val playerTokenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val playerTokenInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.5f
+    }
+    val botTokenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#2C2C2E") else Color.parseColor("#FFFFFF")
+        style = Paint.Style.FILL
+    }
+    val botTokenInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(45, 0, 0, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.5f
+    }
+    val winGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (state.status == 2) accentColorInt else Color.parseColor("#FF453A")
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.8f
+    }
+
+    for (row in 0..4) {
+        for (col in 0..4) {
+            val idx = row * 5 + col
+            val valNum = state.board[idx]
+            val cx = gridRect.left + col * slotW + (slotW / 2f)
+            val cy = gridRect.top + row * slotH + (slotH / 2f)
+
+            // Perforated slot backdrop
+            canvas.drawCircle(cx, cy, tokenRadius, emptySlotPaint)
+
+            when (valNum) {
+                1 -> {
+                    // Player Token
+                    canvas.drawCircle(cx, cy, tokenRadius, playerTokenPaint)
+                    canvas.drawCircle(cx, cy, tokenRadius * 0.72f, playerTokenInnerPaint)
+                }
+                2 -> {
+                    // Bot Token
+                    canvas.drawCircle(cx, cy, tokenRadius, botTokenPaint)
+                    canvas.drawCircle(cx, cy, tokenRadius * 0.72f, botTokenInnerPaint)
+                }
+            }
+
+            // Winning Line Pulse Ring
+            if (state.winningCells.contains(idx)) {
+                canvas.drawCircle(cx, cy, tokenRadius * 1.15f, winGlowPaint)
+            }
+        }
+    }
+
+    return bitmap
+}
+

@@ -129,7 +129,9 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Dice Roller", category = "Games", sizeText = "2x2", receiverClass = GamesDiceReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Coin Flip", category = "Games", sizeText = "2x2", receiverClass = GamesCoinFlipReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Simon Sequence", category = "Games", sizeText = "2x2", receiverClass = GamesSimonReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Sliding 8-Puzzle", category = "Games", sizeText = "2x2", receiverClass = GamesPuzzleReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Sliding 8-Puzzle", category = "Games", sizeText = "2x2", receiverClass = GamesPuzzleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Minesweeper Mini", category = "Games", sizeText = "2x2", receiverClass = GamesMinesweeperReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Connect Four", category = "Games", sizeText = "2x2", receiverClass = GamesConnect4Receiver::class.java, hasModeOption = true)
     )
 }
 
@@ -1328,3 +1330,493 @@ class GamesPuzzleReceiver : BaseGamesReceiver() {
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
+
+// --- MINESWEEPER ENGINE & PERSISTENCE ---
+
+private fun getMinesweeperState(context: Context, widgetId: Int): MinesweeperState {
+    val prefs = context.getSharedPreferences("slate_mines_prefs", Context.MODE_PRIVATE)
+    val minesStr = prefs.getString("widget_${widgetId}_mines", "") ?: ""
+    val revStr = prefs.getString("widget_${widgetId}_rev", "") ?: ""
+    val flgStr = prefs.getString("widget_${widgetId}_flg", "") ?: ""
+    val isFlagMode = prefs.getBoolean("widget_${widgetId}_mode", false)
+    val status = prefs.getInt("widget_${widgetId}_status", 0)
+
+    val mines = if (minesStr.isEmpty()) List(16) { false } else minesStr.split(",").map { it == "1" }
+    val rev = if (revStr.isEmpty()) List(16) { false } else revStr.split(",").map { it == "1" }
+    val flg = if (flgStr.isEmpty()) List(16) { false } else flgStr.split(",").map { it == "1" }
+
+    return MinesweeperState(mines, rev, flg, isFlagMode, status)
+}
+
+private fun saveMinesweeperState(context: Context, widgetId: Int, state: MinesweeperState) {
+    val prefs = context.getSharedPreferences("slate_mines_prefs", Context.MODE_PRIVATE)
+    val minesStr = state.mines.joinToString(",") { if (it) "1" else "0" }
+    val revStr = state.revealed.joinToString(",") { if (it) "1" else "0" }
+    val flgStr = state.flagged.joinToString(",") { if (it) "1" else "0" }
+
+    prefs.edit()
+        .putString("widget_${widgetId}_mines", minesStr)
+        .putString("widget_${widgetId}_rev", revStr)
+        .putString("widget_${widgetId}_flg", flgStr)
+        .putBoolean("widget_${widgetId}_mode", state.isFlagMode)
+        .putInt("widget_${widgetId}_status", state.status)
+        .apply()
+}
+
+private fun generateMines(firstSafeIndex: Int): List<Boolean> {
+    val mineIndices = mutableSetOf<Int>()
+    while (mineIndices.size < 3) {
+        val rand = (0..15).random()
+        if (rand != firstSafeIndex) {
+            mineIndices.add(rand)
+        }
+    }
+    return List(16) { it in mineIndices }
+}
+
+private fun floodReveal(mines: List<Boolean>, revealed: BooleanArray, flagged: List<Boolean>, startIndex: Int) {
+    if (startIndex !in 0..15 || revealed[startIndex] || flagged[startIndex]) return
+    revealed[startIndex] = true
+
+    val row = startIndex / 4
+    val col = startIndex % 4
+
+    // Count adjacent
+    var count = 0
+    for (dr in -1..1) {
+        for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val r = row + dr
+            val c = col + dc
+            if (r in 0..3 && c in 0..3) {
+                if (mines[r * 4 + c]) count++
+            }
+        }
+    }
+
+    // If zero adjacent mines, flood neighbors
+    if (count == 0) {
+        for (dr in -1..1) {
+            for (dc in -1..1) {
+                if (dr == 0 && dc == 0) continue
+                val r = row + dr
+                val c = col + dc
+                if (r in 0..3 && c in 0..3) {
+                    val nIdx = r * 4 + c
+                    if (!revealed[nIdx] && !flagged[nIdx]) {
+                        floodReveal(mines, revealed, flagged, nIdx)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 8. MINESWEEPER MINI INTERACTIVE (2x2)
+class GamesMinesweeperReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val demoMines = listOf(false, false, true, false, false, false, false, false, true, false, false, false, false, false, false, true)
+        val demoRev = listOf(true, true, false, false, true, true, false, false, false, true, false, false, false, false, false, false)
+        val demoFlg = listOf(false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false)
+        return generateMinesweeperWidgetBitmap(context, config, false, wDp, hDp, -1, MinesweeperState(demoMines, demoRev, demoFlg, false, 1))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_MINES_CELL" -> {
+                val cellIndex = intent.getIntExtra("CELL_INDEX", -1)
+                val current = getMinesweeperState(context, widgetId)
+
+                if (cellIndex in 0..15 && current.status != 2 && current.status != 3) {
+                    if (current.isFlagMode) {
+                        // Toggle Flag on unrevealed tile
+                        if (!current.revealed[cellIndex]) {
+                            val newFlagged = current.flagged.toMutableList()
+                            newFlagged[cellIndex] = !newFlagged[cellIndex]
+                            val updatedState = current.copy(flagged = newFlagged)
+                            saveMinesweeperState(context, widgetId, updatedState)
+
+                            val appWidgetManager = AppWidgetManager.getInstance(context)
+                            updateWidget(context, appWidgetManager, widgetId)
+                        }
+                    } else {
+                        // DIG MODE
+                        if (!current.flagged[cellIndex] && !current.revealed[cellIndex]) {
+                            val currentMines = if (current.status == 0 || !current.mines.any { it }) {
+                                generateMines(cellIndex)
+                            } else current.mines
+
+                            if (currentMines[cellIndex]) {
+                                // Hit Mine -> GAME OVER (LOST)
+                                val newRev = current.revealed.toMutableList()
+                                newRev[cellIndex] = true
+                                val lostState = current.copy(mines = currentMines, revealed = newRev, status = 3)
+                                saveMinesweeperState(context, widgetId, lostState)
+
+                                val appWidgetManager = AppWidgetManager.getInstance(context)
+                                updateWidget(context, appWidgetManager, widgetId)
+                            } else {
+                                // Safe Dig with flood fill
+                                val revArray = current.revealed.toBooleanArray()
+                                floodReveal(currentMines, revArray, current.flagged, cellIndex)
+                                val newRevList = revArray.toList()
+
+                                // Win check: All 13 non-mine tiles revealed
+                                val nonMineCount = 16 - currentMines.count { it }
+                                val revealedSafeCount = newRevList.indices.count { newRevList[it] && !currentMines[it] }
+                                val isWon = revealedSafeCount == nonMineCount
+
+                                val updatedState = current.copy(
+                                    mines = currentMines,
+                                    revealed = newRevList,
+                                    status = if (isWon) 2 else 1
+                                )
+                                saveMinesweeperState(context, widgetId, updatedState)
+
+                                val appWidgetManager = AppWidgetManager.getInstance(context)
+                                updateWidget(context, appWidgetManager, widgetId)
+                            }
+                        }
+                    }
+                }
+            }
+            "com.altusix.slate.ACTION_MINES_MODE" -> {
+                val current = getMinesweeperState(context, widgetId)
+                val updatedState = current.copy(isFlagMode = !current.isFlagMode)
+                saveMinesweeperState(context, widgetId, updatedState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+            "com.altusix.slate.ACTION_MINES_RESET" -> {
+                val resetState = MinesweeperState()
+                saveMinesweeperState(context, widgetId, resetState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_minesweeper_layout)
+        val state = getMinesweeperState(context, widgetId)
+        val bitmap = generateMinesweeperWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val cellIds = intArrayOf(
+            R.id.btn_cell_0, R.id.btn_cell_1, R.id.btn_cell_2, R.id.btn_cell_3,
+            R.id.btn_cell_4, R.id.btn_cell_5, R.id.btn_cell_6, R.id.btn_cell_7,
+            R.id.btn_cell_8, R.id.btn_cell_9, R.id.btn_cell_10, R.id.btn_cell_11,
+            R.id.btn_cell_12, R.id.btn_cell_13, R.id.btn_cell_14, R.id.btn_cell_15
+        )
+
+        for (i in 0..15) {
+            val cellIntent = Intent(context, GamesMinesweeperReceiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_MINES_CELL"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("CELL_INDEX", i)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + cellIds[i],
+                cellIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(cellIds[i], pendingIntent)
+        }
+
+        val modeIntent = Intent(context, GamesMinesweeperReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_MINES_MODE"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_mode,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_mode,
+                modeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        val resetIntent = Intent(context, GamesMinesweeperReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_MINES_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+
+
+// --- CONNECT FOUR GAME ENGINE & PERSISTENCE ---
+
+private fun getConnect4State(context: Context, widgetId: Int): Connect4State {
+    val prefs = context.getSharedPreferences("slate_c4_prefs", Context.MODE_PRIVATE)
+    val boardStr = prefs.getString("widget_${widgetId}_board", "") ?: ""
+    val board = if (boardStr.isEmpty()) List(25) { 0 } else boardStr.split(",").mapNotNull { it.trim().toIntOrNull() }
+    val pWins = prefs.getInt("widget_${widgetId}_p_wins", 0)
+    val bWins = prefs.getInt("widget_${widgetId}_b_wins", 0)
+    val status = prefs.getInt("widget_${widgetId}_status", 0)
+    val winStr = prefs.getString("widget_${widgetId}_win_cells", "") ?: ""
+    val winCells = if (winStr.isEmpty()) emptyList() else winStr.split(",").mapNotNull { it.trim().toIntOrNull() }
+
+    return Connect4State(board, pWins, bWins, status, winCells)
+}
+
+private fun saveConnect4State(context: Context, widgetId: Int, state: Connect4State) {
+    val prefs = context.getSharedPreferences("slate_c4_prefs", Context.MODE_PRIVATE)
+    val boardStr = state.board.joinToString(",")
+    val winStr = state.winningCells.joinToString(",")
+    prefs.edit()
+        .putString("widget_${widgetId}_board", boardStr)
+        .putInt("widget_${widgetId}_p_wins", state.playerWins)
+        .putInt("widget_${widgetId}_b_wins", state.botWins)
+        .putInt("widget_${widgetId}_status", state.status)
+        .putString("widget_${widgetId}_win_cells", winStr)
+        .apply()
+}
+
+// Drops a token into column (0..4) at the lowest available row (returns new board or null if column full)
+private fun dropPiece(board: List<Int>, col: Int, player: Int): Pair<List<Int>, Int>? {
+    for (row in 4 downTo 0) {
+        val idx = row * 5 + col
+        if (board[idx] == 0) {
+            val newBoard = board.toMutableList()
+            newBoard[idx] = player
+            return Pair(newBoard, idx)
+        }
+    }
+    return null
+}
+
+// Checks 4-in-a-row (horizontal, vertical, diagonal) on a 5x5 board
+private fun checkConnect4Win(board: List<Int>, player: Int): List<Int>? {
+    // 1. Horizontal (row 0..4, col 0..1)
+    for (r in 0..4) {
+        for (c in 0..1) {
+            val indices = listOf(r * 5 + c, r * 5 + c + 1, r * 5 + c + 2, r * 5 + c + 3)
+            if (indices.all { board[it] == player }) return indices
+        }
+    }
+    // 2. Vertical (row 0..1, col 0..4)
+    for (r in 0..1) {
+        for (c in 0..4) {
+            val indices = listOf(r * 5 + c, (r + 1) * 5 + c, (r + 2) * 5 + c, (r + 3) * 5 + c)
+            if (indices.all { board[it] == player }) return indices
+        }
+    }
+    // 3. Diagonal Down-Right (row 0..1, col 0..1)
+    for (r in 0..1) {
+        for (c in 0..1) {
+            val indices = listOf(r * 5 + c, (r + 1) * 5 + c + 1, (r + 2) * 5 + c + 2, (r + 3) * 5 + c + 3)
+            if (indices.all { board[it] == player }) return indices
+        }
+    }
+    // 4. Diagonal Down-Left (row 0..1, col 3..4)
+    for (r in 0..1) {
+        for (c in 3..4) {
+            val indices = listOf(r * 5 + c, (r + 1) * 5 + c - 1, (r + 2) * 5 + c - 2, (r + 3) * 5 + c - 3)
+            if (indices.all { board[it] == player }) return indices
+        }
+    }
+    return null
+}
+
+// Smart Bot logic: 1. Win if possible, 2. Block player win, 3. Prefer center columns
+private fun computeBotMove(board: List<Int>): Int {
+    val validCols = (0..4).filter { col -> board[col] == 0 }
+    if (validCols.isEmpty()) return -1
+
+    // 1. Check if bot can win immediately
+    for (col in validCols) {
+        val next = dropPiece(board, col, 2)
+        if (next != null && checkConnect4Win(next.first, 2) != null) {
+            return col
+        }
+    }
+    // 2. Check if bot needs to block player win
+    for (col in validCols) {
+        val next = dropPiece(board, col, 1)
+        if (next != null && checkConnect4Win(next.first, 1) != null) {
+            return col
+        }
+    }
+    // 3. Prefer center column (2), then inner (1, 3), then outer (0, 4)
+    val preferences = listOf(2, 1, 3, 0, 4)
+    for (p in preferences) {
+        if (p in validCols) return p
+    }
+
+    return validCols.random()
+}
+
+// 9. CONNECT FOUR MICRO INTERACTIVE (2x2)
+class GamesConnect4Receiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val demoBoard = List(25) { 0 }.toMutableList().apply {
+            this[22] = 1; this[21] = 2; this[17] = 1; this[16] = 2; this[12] = 1; this[7] = 1
+        }
+        return generateConnect4WidgetBitmap(context, config, false, wDp, hDp, -1, Connect4State(demoBoard, 4, 2, 0, emptyList()))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_C4_DROP" -> {
+                val col = intent.getIntExtra("EXTRA_COL", -1)
+                val current = getConnect4State(context, widgetId)
+
+                if (col in 0..4 && current.status == 0) {
+                    val pDrop = dropPiece(current.board, col, 1)
+                    if (pDrop != null) {
+                        val (pBoard, _) = pDrop
+                        val pWin = checkConnect4Win(pBoard, 1)
+
+                        if (pWin != null) {
+                            // Player Won!
+                            val wonState = current.copy(
+                                board = pBoard,
+                                playerWins = current.playerWins + 1,
+                                status = 2,
+                                winningCells = pWin
+                            )
+                            saveConnect4State(context, widgetId, wonState)
+                            val appWidgetManager = AppWidgetManager.getInstance(context)
+                            updateWidget(context, appWidgetManager, widgetId)
+                        } else if (!pBoard.contains(0)) {
+                            // Draw
+                            val drawState = current.copy(board = pBoard, status = 3)
+                            saveConnect4State(context, widgetId, drawState)
+                            val appWidgetManager = AppWidgetManager.getInstance(context)
+                            updateWidget(context, appWidgetManager, widgetId)
+                        } else {
+                            // Bot Turn
+                            val botCol = computeBotMove(pBoard)
+                            val bDrop = if (botCol != -1) dropPiece(pBoard, botCol, 2) else null
+
+                            if (bDrop != null) {
+                                val (bBoard, _) = bDrop
+                                val bWin = checkConnect4Win(bBoard, 2)
+
+                                val updatedState = if (bWin != null) {
+                                    current.copy(
+                                        board = bBoard,
+                                        botWins = current.botWins + 1,
+                                        status = 1,
+                                        winningCells = bWin
+                                    )
+                                } else if (!bBoard.contains(0)) {
+                                    current.copy(board = bBoard, status = 3)
+                                } else {
+                                    current.copy(board = bBoard, status = 0)
+                                }
+
+                                saveConnect4State(context, widgetId, updatedState)
+                                val appWidgetManager = AppWidgetManager.getInstance(context)
+                                updateWidget(context, appWidgetManager, widgetId)
+                            }
+                        }
+                    }
+                }
+            }
+            "com.altusix.slate.ACTION_C4_RESET" -> {
+                val current = getConnect4State(context, widgetId)
+                val resetState = Connect4State(
+                    board = List(25) { 0 },
+                    playerWins = current.playerWins,
+                    botWins = current.botWins,
+                    status = 0,
+                    winningCells = emptyList()
+                )
+                saveConnect4State(context, widgetId, resetState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_connect4_layout)
+        val state = getConnect4State(context, widgetId)
+        val bitmap = generateConnect4WidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val colIds = intArrayOf(
+            R.id.btn_col_0,
+            R.id.btn_col_1,
+            R.id.btn_col_2,
+            R.id.btn_col_3,
+            R.id.btn_col_4
+        )
+
+        for (i in 0..4) {
+            val dropIntent = Intent(context, GamesConnect4Receiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_C4_DROP"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("EXTRA_COL", i)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + colIds[i],
+                dropIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(colIds[i], pendingIntent)
+        }
+
+        val resetIntent = Intent(context, GamesConnect4Receiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_C4_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+

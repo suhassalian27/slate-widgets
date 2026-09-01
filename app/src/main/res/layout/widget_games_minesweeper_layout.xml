@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_image_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter" />
+
+    <!-- Clickable Overlay Controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:weightSum="100">
+
+        <!-- Top Header Controls (Mine Counter, Mode Toggle, Reset) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="16"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:weightSum="100">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="34" />
+
+            <FrameLayout
+                android:id="@+id/btn_mode"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="36" />
+
+            <FrameLayout
+                android:id="@+id/btn_reset"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="30" />
+        </LinearLayout>
+
+        <!-- 4x4 Grid Controls -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="84"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:weightSum="4">
+
+            <!-- Row 0 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:weightSum="4">
+                <FrameLayout android:id="@+id/btn_cell_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            </LinearLayout>
+
+            <!-- Row 1 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:weightSum="4">
+                <FrameLayout android:id="@+id/btn_cell_4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_7" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            </LinearLayout>
+
+            <!-- Row 2 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:weightSum="4">
+                <FrameLayout android:id="@+id/btn_cell_8" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_9" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_11" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            </LinearLayout>
+
+            <!-- Row 3 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:weightSum="4">
+                <FrameLayout android:id="@+id/btn_cell_12" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_13" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_14" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/btn_cell_15" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

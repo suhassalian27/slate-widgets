@@ -2547,6 +2547,38 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 8. Minesweeper Mini Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesMinesweeperReceiver"
+            android:exported="true"
+            android:label="Slate Minesweeper">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_MINES_CELL" />
+                <action android:name="com.altusix.slate.ACTION_MINES_MODE" />
+                <action android:name="com.altusix.slate.ACTION_MINES_RESET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 9. Connect Four Micro Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesConnect4Receiver"
+            android:exported="true"
+            android:label="Slate Connect Four">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_C4_DROP" />
+                <action android:name="com.altusix.slate.ACTION_C4_RESET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+
+
 
     </application>
 </manifest>
