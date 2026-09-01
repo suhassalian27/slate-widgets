@@ -7,28 +7,24 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Bundle
 import android.provider.AlarmClock
 import android.widget.RemoteViews
-
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.service.SlateClockTickerService
+import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 
 // --- CATALOG REGISTRATION & BATCH UPDATES ---
 
 fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-
         SlateWidgetInfo("Minimal Divider Digital", "2x2", "Clock – Digital", ClockDigitalMinimalDividerReceiver::class.java, hasModeOption = false),
-
-
         SlateWidgetInfo("Compact Block Digital", "2x2", "Clock – Digital", ClockDigitalCompactBlockReceiver::class.java, hasModeOption = false),
-
         SlateWidgetInfo("Typographic Word Digital", "2x2", "Clock – Digital", ClockDigitalTextWordReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Giant Hour Capsule Digital", "2x2", "Clock – Digital", ClockDigitalGiantHourCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Modern 3D LED Digital", "4x2", "Clock – Digital", ClockDigitalModern3dLedReceiver::class.java, hasModeOption = false),
-
         SlateWidgetInfo("Dual Pill Stack Digital", "1x2", "Clock – Digital", ClockDigitalDualPillStackReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Typeface 1", "4x2", "Clock – Digital", ClockDigitalTextFont1Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
         SlateWidgetInfo("Typeface 2", "4x2", "Clock – Digital", ClockDigitalTextFont2Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
@@ -64,23 +60,17 @@ fun getClockDigitalWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Typeface 32", "4x2", "Clock – Digital", ClockDigitalTextFont32Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
         SlateWidgetInfo("Typeface 33", "4x2", "Clock – Digital", ClockDigitalTextFont33Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f),
         SlateWidgetInfo("Typeface 34", "4x2", "Clock – Digital", ClockDigitalTextFont34Receiver::class.java, hasModeOption = false, defaultOpacity = 0.0f)
-
-// --- BATCH UPDATE RECEIVERS LIST ---
     )
 }
 
 fun updateAllClockDigitalWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
     val receivers = listOf(
-
         ClockDigitalMinimalDividerReceiver::class.java,
-
         ClockDigitalCompactBlockReceiver::class.java,
-
         ClockDigitalTextWordReceiver::class.java,
         ClockDigitalGiantHourCapsuleReceiver::class.java,
         ClockDigitalModern3dLedReceiver::class.java,
-
         ClockDigitalDualPillStackReceiver::class.java,
         ClockDigitalTextFont1Receiver::class.java,
         ClockDigitalTextFont2Receiver::class.java,
@@ -160,10 +150,51 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int,
-        newOptions: android.os.Bundle?
+        newOptions: Bundle?
     ) {
         updateSingleWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+    }
+
+    private fun loadSlateWidgetConfig(context: Context, widgetId: Int, defaultOpacity: Float): SlateWidgetConfig {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val bgKey = "widget_${widgetId}_bg_color"
+
+        // Snapshot and permanently lock the current global theme on initial placement
+        if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
+            val globalSettings = ThemePreferences(context).getThemeSettings()
+            val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
+                    ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
+                    ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
+
+            val initialOpacity = if (defaultOpacity == 0.0f) 0.0f else globalSettings.opacity
+
+            widgetPrefs.edit()
+                .putString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+                .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+                .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+                .putFloat("widget_${widgetId}_opacity", initialOpacity)
+                .apply()
+        }
+
+        val globalSettings = ThemePreferences(context).getThemeSettings()
+        val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+        val fallbackOpacity = if (defaultOpacity == 0.0f) 0.0f else globalSettings.opacity
+        val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", fallbackOpacity)
+        val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+
+        val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
+                ((bgColor shr 8 and 0xFFL) * 0.7152f) +
+                ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
+        val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+            ?: if (isLight) "LIGHT" else "DARK"
+
+        return SlateWidgetConfig(
+            themeMode = mode,
+            backgroundColorHex = bgColor,
+            opacity = opacity,
+            accentColorHex = accentColor
+        )
     }
 
     private fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
@@ -171,40 +202,28 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
             val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
             val appLauncherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
 
-            val themeMode = widgetPrefs.getString("widget_${id}_theme_mode", "DARK") ?: "DARK"
-            val defaultBg = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
-            val defaultAccent = if (themeMode == "LIGHT") 0xFF000000L else 0xFFFFFFFFL
-
-            val bgColor = widgetPrefs.getLong("widget_${id}_bg_color", defaultBg)
-//            val opacity = widgetPrefs.getFloat("widget_${id}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${id}_accent_color", defaultAccent)
-
             val widgetInfo = getClockDigitalWidgetsCatalog().find { it.receiverClass == javaClass }
             val defaultOpacity = widgetInfo?.defaultOpacity ?: 1.0f
 
-            val opacity = widgetPrefs.getFloat("widget_${id}_opacity", defaultOpacity)
-
-            val config = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-
-            // --- PER-INSTANCE LOCK: Reads global default ONLY on first render, then locks to widget_${id} ---
+            val config = loadSlateWidgetConfig(context, id, defaultOpacity)
             val isResponsive = parseAndLockIsResponsive(widgetPrefs, appLauncherPrefs, id)
 
             val options = manager.getAppWidgetOptions(id)
-            val isPortrait = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-            val rawW = if (isPortrait) {
-                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
+            val rawW = if (isLandscape) {
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 180) ?: 180
             } else {
-                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH) ?: 0
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180) ?: 180
             }
-            val rawH = if (isPortrait) {
-                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) ?: 0
+            val rawH = if (isLandscape) {
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 80) ?: 80
             } else {
-                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
+                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 80) ?: 80
             }
 
-            val wDp = rawW.coerceAtLeast(180)
-            val hDp = rawH.coerceAtLeast(80)
+            val wDp = (if (rawW <= 0) 180 else rawW).coerceAtLeast(140)
+            val hDp = (if (rawH <= 0) 80 else rawH).coerceAtLeast(60)
 
             val rawBitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
             val bitmap = scaleBitmapForIPC(rawBitmap, maxDimensionPx = 800)
@@ -217,7 +236,7 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
                 context,
                 id,
                 clockIntent,
-                PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
 
@@ -239,7 +258,6 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
         val keyWMode = "widget_${id}_mode"
         val keyWResponsive = "widget_${id}_is_responsive"
 
-        // 1. If this widget instance already has its own saved preference, use it!
         if (widgetPrefs.contains(keyWMode)) {
             val modeStr = widgetPrefs.getString(keyWMode, "RESPONSIVE")
             return modeStr.equals("RESPONSIVE", ignoreCase = true)
@@ -248,10 +266,8 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
             return widgetPrefs.getBoolean(keyWResponsive, true)
         }
 
-        // 2. First-time render for this ID! Read current pinning default from MainActivity...
         val defaultIsResponsive = appLauncherPrefs.getBoolean("default_is_responsive", true)
 
-        // 3. ...and IMMEDIATELY lock it to this specific widget ID!
         widgetPrefs.edit()
             .putBoolean(keyWResponsive, defaultIsResponsive)
             .putString(keyWMode, if (defaultIsResponsive) "RESPONSIVE" else "FIXED")
@@ -307,18 +323,13 @@ abstract class BaseDigitalClockReceiver : AppWidgetProvider() {
     }
 }
 
-
 // --- WIDGET RECEIVERS ---
-
-
 
 // 2. MINIMAL DIVIDER DIGITAL (2x2 / Stacked Time with Accent Line Divider)
 class ClockDigitalMinimalDividerReceiver : BaseDigitalClockReceiver() {
     override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
         generateMinimalDividerDigitalClockBitmap(context, config, isResponsive, wDp, hDp)
 }
-
-
 
 // 5. COMPACT BLOCK DIGITAL (2x2 / 4-Digit Block Time in Condensed Font)
 class ClockDigitalCompactBlockReceiver : BaseDigitalClockReceiver() {

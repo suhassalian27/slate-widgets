@@ -7,10 +7,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
+import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getCameraWidgetsCatalog(): List<SlateWidgetInfo> {
@@ -24,9 +26,83 @@ fun getCameraWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Circle Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameCircleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Organic Blob Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameBlobReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Fluid Blob Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameFluidBlobReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Aperture Lens Capsule", sizeText = "2x1", category = "Camera", receiverClass = CameraAperturePillReceiver::class.java, hasModeOption = true),
-
+        SlateWidgetInfo(name = "Aperture Lens Capsule", sizeText = "2x1", category = "Camera", receiverClass = CameraAperturePillReceiver::class.java, hasModeOption = true)
     )
+}
+
+private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val bgKey = "widget_${widgetId}_bg_color"
+
+    if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
+        val globalSettings = ThemePreferences(context).getThemeSettings()
+        val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
+                ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
+                ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
+
+        widgetPrefs.edit()
+            .putString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+            .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+            .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+            .putFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+            .apply()
+    }
+
+    val globalSettings = ThemePreferences(context).getThemeSettings()
+    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+
+    val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
+            ((bgColor shr 8 and 0xFFL) * 0.7152f) +
+            ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
+    val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+        ?: if (isLight) "LIGHT" else "DARK"
+
+    return SlateWidgetConfig(
+        themeMode = mode,
+        backgroundColorHex = bgColor,
+        opacity = opacity,
+        accentColorHex = accentColor
+    )
+}
+
+private fun createConfigIntent(context: Context, widgetId: Int): Intent {
+    return Intent(context, CameraWidgetConfigActivity::class.java).apply {
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
+}
+
+private fun getPhotoPendingIntent(context: Context, widgetId: Int, cameraConfig: CameraWidgetConfig): PendingIntent? {
+    if (cameraConfig.photoUri.isNullOrEmpty()) {
+        return PendingIntent.getActivity(
+            context,
+            widgetId,
+            createConfigIntent(context, widgetId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    return when (cameraConfig.clickAction) {
+        PhotoClickAction.OPEN_GALLERY -> {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                type = "image/*"
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+        PhotoClickAction.OPEN_CAMERA -> {
+            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+        PhotoClickAction.OPEN_SETTINGS -> {
+            PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+        PhotoClickAction.NOTHING -> null
+    }
 }
 
 fun updateAllCameraWidgets(context: Context) {
@@ -85,7 +161,7 @@ class CameraPhotoFrame4x2Receiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -93,7 +169,6 @@ class CameraPhotoFrame4x2Receiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 320) ?: 320 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 320) ?: 320
@@ -101,53 +176,21 @@ class CameraPhotoFrame4x2Receiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 320 else wDpRaw
             val hDp = if (hDpRaw <= 0) 160 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrame4x2Bitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrame4x2Bitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -157,14 +200,14 @@ class CameraPhotoFrameReceiver : AppWidgetProvider() {
 
     fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
-        return generatePhotoFrameCameraBitmap(context, config, cameraConfig, isResponsive, wDp, hDp)
+        return generatePhotoFrameCameraBitmap(context, config, cameraConfig, false, wDp, hDp)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -172,7 +215,6 @@ class CameraPhotoFrameReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -181,54 +223,21 @@ class CameraPhotoFrameReceiver : AppWidgetProvider() {
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
             val isResponsive = parseAndLockIsResponsive(context, widgetId)
-
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrameCameraBitmap(context, baseConfig, cameraConfig, isResponsive, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrameCameraBitmap(context, config, cameraConfig, isResponsive, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -245,7 +254,7 @@ class CameraPhotoFrameCircleReceiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -253,7 +262,6 @@ class CameraPhotoFrameCircleReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -261,53 +269,21 @@ class CameraPhotoFrameCircleReceiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 200 else wDpRaw
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrameCircleBitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrameCircleBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -324,7 +300,7 @@ class CameraPhotoFrameBlobReceiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -332,7 +308,6 @@ class CameraPhotoFrameBlobReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -340,53 +315,21 @@ class CameraPhotoFrameBlobReceiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 200 else wDpRaw
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrameBlobCameraBitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrameBlobCameraBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -403,7 +346,7 @@ class CameraPhotoFrameFluidBlobReceiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -411,7 +354,6 @@ class CameraPhotoFrameFluidBlobReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -419,53 +361,21 @@ class CameraPhotoFrameFluidBlobReceiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 200 else wDpRaw
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrameFluidBlobCameraBitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrameFluidBlobCameraBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -482,7 +392,7 @@ class CameraPhotoFrameStackedReceiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -490,7 +400,6 @@ class CameraPhotoFrameStackedReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -498,53 +407,21 @@ class CameraPhotoFrameStackedReceiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 200 else wDpRaw
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrameStackedCameraBitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrameStackedCameraBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -561,7 +438,7 @@ class CameraPhotoFrameTapedReceiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -569,7 +446,6 @@ class CameraPhotoFrameTapedReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -577,53 +453,21 @@ class CameraPhotoFrameTapedReceiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 200 else wDpRaw
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFrameTapedCameraBitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFrameTapedCameraBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -640,7 +484,7 @@ class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -648,7 +492,6 @@ class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
     companion object {
         fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
             val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
@@ -656,53 +499,21 @@ class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
             val wDp = if (wDpRaw <= 0) 200 else wDpRaw
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generatePhotoFramePushPinCameraBitmap(context, baseConfig, cameraConfig, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generatePhotoFramePushPinCameraBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            if (cameraConfig.photoUri.isNullOrEmpty()) {
-                val configIntent = PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, configIntent)
+            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
+            if (pendingIntent != null) {
+                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
             } else {
-                val pendingIntent: PendingIntent? = when (cameraConfig.clickAction) {
-                    PhotoClickAction.OPEN_GALLERY -> {
-                        val intent = Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_CAMERA -> {
-                        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                        PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.OPEN_SETTINGS -> {
-                        PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    }
-                    PhotoClickAction.NOTHING -> null
-                }
-
-                if (pendingIntent != null) {
-                    views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-                } else {
-                    val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-                }
+                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
-        }
-
-        private fun createConfigIntent(context: Context, widgetId: Int): Intent {
-            return Intent(context, CameraWidgetConfigActivity::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
         }
     }
 }
@@ -711,14 +522,14 @@ class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
 class CameraShutterLauncherReceiver : AppWidgetProvider() {
 
     fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
-        return generateCameraShutterLauncherBitmap(context, config, isResponsive, wDp, hDp)
+        return generateCameraShutterLauncherBitmap(context, config, false, wDp, hDp)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -733,20 +544,13 @@ class CameraShutterLauncherReceiver : AppWidgetProvider() {
             val hDp = if (hDpRaw <= 0) 200 else hDpRaw
 
             val isResponsive = parseAndLockIsResponsive(context, widgetId)
-
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generateCameraShutterLauncherBitmap(context, baseConfig, isResponsive, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generateCameraShutterLauncherBitmap(context, config, isResponsive, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            val cameraIntent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
             val pendingIntent = PendingIntent.getActivity(context, widgetId, cameraIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
 
@@ -759,14 +563,14 @@ class CameraShutterLauncherReceiver : AppWidgetProvider() {
 class CameraAperturePillReceiver : AppWidgetProvider() {
 
     fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
-        return generateCameraAperturePillBitmap(context, config, isResponsive, wDp, hDp)
+        return generateCameraAperturePillBitmap(context, config, false, wDp, hDp)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updatePhotoWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
@@ -781,20 +585,13 @@ class CameraAperturePillReceiver : AppWidgetProvider() {
             val hDp = if (hDpRaw <= 0) 120 else hDpRaw
 
             val isResponsive = parseAndLockIsResponsive(context, widgetId)
-
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val themeMode = widgetPrefs.getString("widget_${widgetId}_theme_mode", "DARK") ?: "DARK"
-            val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", 0xFF121214L)
-            val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
-
-            val baseConfig = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-            val bitmap = generateCameraAperturePillBitmap(context, baseConfig, isResponsive, wDp, hDp)
+            val config = loadSlateWidgetConfig(context, widgetId)
+            val bitmap = generateCameraAperturePillBitmap(context, config, isResponsive, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-            val cameraIntent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
             val pendingIntent = PendingIntent.getActivity(context, widgetId, cameraIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
 

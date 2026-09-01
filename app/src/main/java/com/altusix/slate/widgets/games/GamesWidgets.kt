@@ -13,35 +13,32 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 
-fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
-    val globalSettings = ThemePreferences(context).getThemeSettings()
+private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val bgKey = "widget_${widgetId}_bg_color"
 
-    val bgHex = if (widgetPrefs.contains("widget_${widgetId}_bg_color")) {
-        widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-    } else {
-        globalSettings.bgHex
+    // Snapshot and lock current global theme when the widget is first created
+    if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
+        val globalSettings = ThemePreferences(context).getThemeSettings()
+        widgetPrefs.edit()
+            .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+            .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+            .putFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+            .apply()
     }
 
-    val accentHex = if (widgetPrefs.contains("widget_${widgetId}_accent_color")) {
-        widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
-    } else {
-        globalSettings.accentHex
-    }
+    val globalSettings = ThemePreferences(context).getThemeSettings()
+    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
 
-    val opacity = if (widgetPrefs.contains("widget_${widgetId}_opacity")) {
-        widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-    } else {
-        globalSettings.opacity
-    }
-
-    val isLight = (((bgHex shr 16 and 0xFFL) * 0.2126f) + ((bgHex shr 8 and 0xFFL) * 0.7152f) + ((bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
+    val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) + ((bgColor shr 8 and 0xFFL) * 0.7152f) + ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
 
     return SlateWidgetConfig(
         themeMode = if (isLight) "LIGHT" else "DARK",
-        backgroundColorHex = bgHex,
+        backgroundColorHex = bgColor,
         opacity = opacity,
-        accentColorHex = accentHex
+        accentColorHex = accentColor
     )
 }
 

@@ -11,8 +11,9 @@ import android.provider.CalendarContract
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
-import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.core.service.SlateClockTickerService
+import com.altusix.slate.core.theme.ThemePreferences
+import com.altusix.slate.data.local.SlateWidgetConfig
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -67,6 +68,62 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Architectural Analog Dashboard", "4x2", "Calendar", CalendarArchitecturalAnalogReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Radial Arc Orbital Dashboard", "4x2", "Calendar", CalendarRadialArcReceiver::class.java, hasModeOption = true)
     )
+}
+
+private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val bgKey = "widget_${widgetId}_bg_color"
+
+    // Snapshot and permanently lock the current global theme on initial placement
+    if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
+        val globalSettings = ThemePreferences(context).getThemeSettings()
+        val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
+                ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
+                ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
+
+        widgetPrefs.edit()
+            .putString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+            .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+            .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+            .putFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+            .apply()
+    }
+
+    val globalSettings = ThemePreferences(context).getThemeSettings()
+    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+
+    val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
+            ((bgColor shr 8 and 0xFFL) * 0.7152f) +
+            ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
+    val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+        ?: if (isLight) "LIGHT" else "DARK"
+
+    return SlateWidgetConfig(
+        themeMode = mode,
+        backgroundColorHex = bgColor,
+        opacity = opacity,
+        accentColorHex = accentColor
+    )
+}
+
+private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val modeKey = "widget_${widgetId}_mode"
+    val isResponsiveKey = "widget_${widgetId}_is_responsive"
+
+    if (widgetPrefs.contains(modeKey)) {
+        return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+    }
+    if (widgetPrefs.contains(isResponsiveKey)) {
+        return widgetPrefs.getBoolean(isResponsiveKey, true)
+    }
+
+    val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+    val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
+    widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
+    return defaultResponsive
 }
 
 fun updateAllCalendarWidgets(context: Context) {
@@ -147,49 +204,16 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
 
     private fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
         try {
-            val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val calPrefs = context.getSharedPreferences("slate_calendar_prefs", Context.MODE_PRIVATE)
-
-            val themeMode = widgetPrefs.getString("widget_${id}_theme_mode", "DARK") ?: "DARK"
-            val defaultBg = if (themeMode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
-            val defaultAccent = if (themeMode == "LIGHT") 0xFF000000L else 0xFFFFFFFFL
-
-            val bgColor = widgetPrefs.getLong("widget_${id}_bg_color", defaultBg)
-            val opacity = widgetPrefs.getFloat("widget_${id}_opacity", 1.0f)
-            val accentColor = widgetPrefs.getLong("widget_${id}_accent_color", defaultAccent)
-
-            val config = SlateWidgetConfig(themeMode, bgColor, opacity, accentColor)
-
-            val keyCalResponsive = "calendar_${id}_is_responsive"
-            val keyWMode = "widget_${id}_mode"
-            val keyWResponsive = "widget_${id}_is_responsive"
-
-            val isResponsive = when {
-                widgetPrefs.contains(keyWMode) -> {
-                    widgetPrefs.getString(keyWMode, "RESPONSIVE").equals("RESPONSIVE", ignoreCase = true)
-                }
-                calPrefs.contains(keyCalResponsive) -> {
-                    calPrefs.getBoolean(keyCalResponsive, true)
-                }
-                widgetPrefs.contains(keyWResponsive) -> {
-                    widgetPrefs.getBoolean(keyWResponsive, true)
-                }
-                else -> {
-                    val defaultResponsive = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-                        .getBoolean("default_is_responsive", true)
-                    calPrefs.edit().putBoolean(keyCalResponsive, defaultResponsive).apply()
-                    defaultResponsive
-                }
-            }
+            val config = loadSlateWidgetConfig(context, id)
+            val isResponsive = parseAndLockIsResponsive(context, id)
 
             val options = manager.getAppWidgetOptions(id)
-            val minW = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
-            val minH = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
-            val maxW = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH) ?: 0
-            val maxH = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) ?: 0
+            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 140) ?: 140 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 140) ?: 140
+            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 60) ?: 60 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 60) ?: 60
 
-            val wDp = maxOf(minW, maxW, 140)
-            val hDp = maxOf(minH, maxH, 60)
+            val wDp = if (wDpRaw <= 0) 140 else wDpRaw
+            val hDp = if (hDpRaw <= 0) 60 else hDpRaw
 
             val bitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
             val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
@@ -376,7 +400,6 @@ class CalendarAnalogCalendarHybridReceiver : BaseCalendarReceiver() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // Ensure ticker service is alive when widgets update
         context.startService(Intent(context, SlateClockTickerService::class.java))
     }
 }

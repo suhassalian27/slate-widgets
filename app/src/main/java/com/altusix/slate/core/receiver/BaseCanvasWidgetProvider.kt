@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.RemoteViews
 import com.altusix.slate.R
+import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.config.WidgetConfigActivity
 import kotlinx.coroutines.CoroutineScope
@@ -57,15 +58,33 @@ abstract class BaseCanvasWidgetProvider : AppWidgetProvider() {
     fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
         CoroutineScope(Dispatchers.IO).launch {
             val prefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-            val mode = prefs.getString("widget_${appWidgetId}_theme_mode", "DARK") ?: "DARK"
+            val bgKey = "widget_${appWidgetId}_bg_color"
 
-            // Dynamic defaults based on theme mode
-            val defaultBg = if (mode == "LIGHT") 0xFFFFFFFFL else 0xFF161618L
-            val defaultAccent = if (mode == "LIGHT") 0xFF000000L else 0xFFFFFFFFL
+            // Snapshot and permanently lock the current global theme on initial placement
+            if (!prefs.contains(bgKey) && appWidgetId != -1) {
+                val globalSettings = ThemePreferences(context).getThemeSettings()
+                val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
+                        ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
+                        ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
 
-            val bg = prefs.getLong("widget_${appWidgetId}_bg_color", defaultBg)
-            val opacity = prefs.getFloat("widget_${appWidgetId}_opacity", 1.0f)
-            val accent = prefs.getLong("widget_${appWidgetId}_accent_color", defaultAccent)
+                prefs.edit()
+                    .putString("widget_${appWidgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+                    .putLong("widget_${appWidgetId}_bg_color", globalSettings.bgHex)
+                    .putLong("widget_${appWidgetId}_accent_color", globalSettings.accentHex)
+                    .putFloat("widget_${appWidgetId}_opacity", globalSettings.opacity)
+                    .apply()
+            }
+
+            val globalSettings = ThemePreferences(context).getThemeSettings()
+            val bg = prefs.getLong("widget_${appWidgetId}_bg_color", globalSettings.bgHex)
+            val opacity = prefs.getFloat("widget_${appWidgetId}_opacity", globalSettings.opacity)
+            val accent = prefs.getLong("widget_${appWidgetId}_accent_color", globalSettings.accentHex)
+
+            val isLight = (((bg shr 16 and 0xFFL) * 0.2126f) +
+                    ((bg shr 8 and 0xFFL) * 0.7152f) +
+                    ((bg and 0xFFL) * 0.0722f)) / 255f > 0.5f
+            val mode = prefs.getString("widget_${appWidgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+                ?: if (isLight) "LIGHT" else "DARK"
 
             val config = SlateWidgetConfig(
                 themeMode = mode,
@@ -75,11 +94,12 @@ abstract class BaseCanvasWidgetProvider : AppWidgetProvider() {
             )
 
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
-            val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
+            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 150) ?: 150 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 150) ?: 150
+            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150) ?: 150 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 150) ?: 150
 
-            val wDp = if (minWidth > 0) minWidth else 150
-            val hDp = if (minHeight > 0) minHeight else 150
+            val wDp = if (wDpRaw > 0) wDpRaw else 150
+            val hDp = if (hDpRaw > 0) hDpRaw else 150
 
             val bitmap = renderWidgetBitmap(context, appWidgetId, config, wDp, hDp)
 
