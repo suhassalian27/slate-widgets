@@ -941,3 +941,147 @@ private fun drawRpsIcon(
         }
     }
 }
+
+data class DiceState(
+    val currentRoll: Int = 6,
+    val rotationAngle: Float = 0f,
+    val scale: Float = 1.0f,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f
+)
+
+// 4. DICE ROLLER INTERACTIVE (2x2 - Minimalist Accent Edition)
+fun generateDiceWidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: DiceState = DiceState()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.06f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
+
+    // Sized so rotated corner diagonal fits safely inside padded bounds
+    val baseSize = (minCardDim - (pad * 2f)) * 0.62f
+    val dieSize = baseSize * state.scale
+    val dieRadius = (dieSize * 0.24f).coerceAtLeast(scaleFactor * 8f)
+
+    // Clamp physics offsets to stay strictly inside the card
+    val maxOffset = pad * 0.75f
+    val clampedOffsetX = (state.offsetX * scaleFactor).coerceIn(-maxOffset, maxOffset)
+    val clampedOffsetY = (state.offsetY * scaleFactor).coerceIn(-maxOffset, maxOffset)
+
+    val cx = cardRect.centerX() + clampedOffsetX
+    val cy = cardRect.centerY() + clampedOffsetY
+
+    canvas.save()
+    canvas.rotate(state.rotationAngle, cx, cy)
+
+    val dieRect = RectF(cx - dieSize / 2f, cy - dieSize / 2f, cx + dieSize / 2f, cy + dieSize / 2f)
+
+    // 1. Dice Face Background Fill
+    val dieFacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F4F4F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(dieRect, dieRadius, dieRadius, dieFacePaint)
+
+    // 2. Ambient Accent Glow Layer
+    val accentGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(25, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(dieRect, dieRadius, dieRadius, accentGlowPaint)
+
+    // 3. Accent Precision Border
+    val dieBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(85, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.5f
+    }
+    canvas.drawRoundRect(dieRect, dieRadius, dieRadius, dieBorderPaint)
+
+    // 4. Accent-Filled Pips (Dots)
+    val pipR = dieSize * 0.088f
+    val pipOffset = dieSize * 0.255f
+
+    val pipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+
+    val tl = floatArrayOf(cx - pipOffset, cy - pipOffset)
+    val tr = floatArrayOf(cx + pipOffset, cy - pipOffset)
+    val ml = floatArrayOf(cx - pipOffset, cy)
+    val mr = floatArrayOf(cx + pipOffset, cy)
+    val bl = floatArrayOf(cx - pipOffset, cy + pipOffset)
+    val br = floatArrayOf(cx + pipOffset, cy + pipOffset)
+    val cc = floatArrayOf(cx, cy)
+
+    when (state.currentRoll) {
+        1 -> {
+            canvas.drawCircle(cc[0], cc[1], pipR * 1.35f, pipPaint)
+        }
+        2 -> {
+            canvas.drawCircle(tl[0], tl[1], pipR, pipPaint)
+            canvas.drawCircle(br[0], br[1], pipR, pipPaint)
+        }
+        3 -> {
+            canvas.drawCircle(tl[0], tl[1], pipR, pipPaint)
+            canvas.drawCircle(cc[0], cc[1], pipR, pipPaint)
+            canvas.drawCircle(br[0], br[1], pipR, pipPaint)
+        }
+        4 -> {
+            canvas.drawCircle(tl[0], tl[1], pipR, pipPaint)
+            canvas.drawCircle(tr[0], tr[1], pipR, pipPaint)
+            canvas.drawCircle(bl[0], bl[1], pipR, pipPaint)
+            canvas.drawCircle(br[0], br[1], pipR, pipPaint)
+        }
+        5 -> {
+            canvas.drawCircle(tl[0], tl[1], pipR, pipPaint)
+            canvas.drawCircle(tr[0], tr[1], pipR, pipPaint)
+            canvas.drawCircle(cc[0], cc[1], pipR, pipPaint)
+            canvas.drawCircle(bl[0], bl[1], pipR, pipPaint)
+            canvas.drawCircle(br[0], br[1], pipR, pipPaint)
+        }
+        6 -> {
+            canvas.drawCircle(tl[0], tl[1], pipR, pipPaint)
+            canvas.drawCircle(tr[0], tr[1], pipR, pipPaint)
+            canvas.drawCircle(ml[0], ml[1], pipR, pipPaint)
+            canvas.drawCircle(mr[0], mr[1], pipR, pipPaint)
+            canvas.drawCircle(bl[0], bl[1], pipR, pipPaint)
+            canvas.drawCircle(br[0], br[1], pipR, pipPaint)
+        }
+    }
+
+    canvas.restore()
+    return bitmap
+}

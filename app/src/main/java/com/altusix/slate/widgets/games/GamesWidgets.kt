@@ -12,6 +12,15 @@ import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.random.Random
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
 
 private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
@@ -116,7 +125,8 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Tic Tac Toe", category = "Games", sizeText = "2x2", receiverClass = GamesTicTacToeReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "2048 Micro", category = "Games", sizeText = "2x2", receiverClass = Games2048Receiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Rock Paper Scissors", category = "Games", sizeText = "2x2", receiverClass = GamesRpsReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Rock Paper Scissors", category = "Games", sizeText = "2x2", receiverClass = GamesRpsReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Dice Roller", category = "Games", sizeText = "2x2", receiverClass = GamesDiceReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -584,6 +594,158 @@ class GamesRpsReceiver : BaseGamesReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+
+// --- DICE GAME ENGINE & PERSISTENCE ---
+
+private fun getDiceState(context: Context, widgetId: Int): DiceState {
+    val prefs = context.getSharedPreferences("slate_dice_prefs", Context.MODE_PRIVATE)
+    val roll = prefs.getInt("widget_${widgetId}_roll", 6)
+    val rot = prefs.getFloat("widget_${widgetId}_rot", 0f)
+    return DiceState(currentRoll = roll, rotationAngle = rot, scale = 1.0f, offsetX = 0f, offsetY = 0f)
+}
+
+private fun saveDiceState(context: Context, widgetId: Int, state: DiceState) {
+    val prefs = context.getSharedPreferences("slate_dice_prefs", Context.MODE_PRIVATE)
+    prefs.edit()
+        .putInt("widget_${widgetId}_roll", state.currentRoll)
+        .putFloat("widget_${widgetId}_rot", state.rotationAngle)
+        .apply()
+}
+
+// 4. DICE ROLLER INTERACTIVE (2x2)
+class GamesDiceReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateDiceWidgetBitmap(context, config, false, wDp, hDp, -1, DiceState(5, -4f, 1.0f))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        if (intent.action == "com.altusix.slate.ACTION_DICE_ROLL") {
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                    val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                    val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+                    val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+                    val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+                    val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+
+                    val isResponsive = parseAndLockIsResponsive(context, widgetId)
+                    val config = loadSlateWidgetConfig(context, widgetId)
+
+                    val current = getDiceState(context, widgetId)
+                    val finalRoll = (1..6).random()
+                    val finalAngle = ((-4..4).random()).toFloat()
+                    val spinDirection = if (Math.random() < 0.5) 1f else -1f
+                    val totalSpinDegrees = (360f * 1.5f * spinDirection) + finalAngle
+
+                    val rollSequence = intArrayOf(
+                        (1..6).random(), (1..6).random(), (1..6).random(),
+                        (1..6).random(), (1..6).random(), (1..6).random(),
+                        (1..6).random(), (1..6).random(), (1..6).random(),
+                        finalRoll, finalRoll, finalRoll, finalRoll, finalRoll, finalRoll, finalRoll
+                    )
+
+                    val totalFrames = 16
+
+                    for (frame in 0 until totalFrames) {
+                        val t = frame.toFloat() / (totalFrames - 1).toFloat()
+                        val isFinal = frame == totalFrames - 1
+
+                        // 1. Continuous Ease-Out Spin
+                        val easeOutProgress = 1f - (1f - t).pow(2.4f)
+                        val angle = if (isFinal) finalAngle else (current.rotationAngle + (totalSpinDegrees * easeOutProgress))
+
+                        // 2. Controlled Bounce & Sway within safe inner limits
+                        val decay = (1f - t).pow(1.8f)
+                        val offsetY = if (isFinal) 0f else (-10f * sin(t * PI.toFloat() * 3.5f).coerceAtLeast(0f) * decay)
+                        val offsetX = if (isFinal) 0f else (6f * cos(t * PI.toFloat() * 2.5f) * decay * spinDirection)
+
+                        // 3. Subtle Elastic Scale
+                        val scale = if (isFinal) 1.0f else (1.0f + (0.05f * sin(t * PI.toFloat() * 5f) * decay))
+
+                        val faceValue = if (isFinal || t > 0.65f) finalRoll else rollSequence[frame]
+
+                        val frameState = DiceState(
+                            currentRoll = faceValue,
+                            rotationAngle = angle,
+                            scale = scale,
+                            offsetX = offsetX,
+                            offsetY = offsetY
+                        )
+
+                        if (isFinal) {
+                            saveDiceState(context, widgetId, frameState)
+                        }
+
+                        val bitmap = generateDiceWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, frameState)
+                        val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
+                        views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
+
+                        val rollIntent = Intent(context, GamesDiceReceiver::class.java).apply {
+                            action = "com.altusix.slate.ACTION_DICE_ROLL"
+                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                        }
+                        val pendingIntent = PendingIntent.getBroadcast(
+                            context,
+                            widgetId,
+                            rollIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
+
+                        appWidgetManager.updateAppWidget(widgetId, views)
+
+                        if (!isFinal) {
+                            val frameDelay = (45L + (35L * t.pow(1.5f)).toLong())
+                            delay(frameDelay)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    pendingResult.finish()
+                }
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
+        val state = getDiceState(context, widgetId)
+        val bitmap = generateDiceWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
+
+        val rollIntent = Intent(context, GamesDiceReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_DICE_ROLL"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            widgetId,
+            rollIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }

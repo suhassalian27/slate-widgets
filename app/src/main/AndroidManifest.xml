@@ -2493,6 +2493,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 4. Dice Roller Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesDiceReceiver"
+            android:exported="true"
+            android:label="Slate Dice Roller">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_DICE_ROLL" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>
