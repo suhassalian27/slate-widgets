@@ -128,7 +128,8 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Rock Paper Scissors", category = "Games", sizeText = "2x2", receiverClass = GamesRpsReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Dice Roller", category = "Games", sizeText = "2x2", receiverClass = GamesDiceReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Coin Flip", category = "Games", sizeText = "2x2", receiverClass = GamesCoinFlipReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Simon Sequence", category = "Games", sizeText = "2x2", receiverClass = GamesSimonReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Simon Sequence", category = "Games", sizeText = "2x2", receiverClass = GamesSimonReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Sliding 8-Puzzle", category = "Games", sizeText = "2x2", receiverClass = GamesPuzzleReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -1156,5 +1157,174 @@ class GamesSimonReceiver : BaseGamesReceiver() {
     ) {
         val state = getSimonState(context, widgetId)
         renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, state)
+    }
+}
+
+
+// --- SLIDING 8-PUZZLE ENGINE & PERSISTENCE ---
+
+private fun getPuzzleState(context: Context, widgetId: Int): PuzzleState {
+    val prefs = context.getSharedPreferences("slate_puzzle_prefs", Context.MODE_PRIVATE)
+    val boardStr = prefs.getString("widget_${widgetId}_board", null)
+    val board = if (boardStr.isNullOrEmpty()) {
+        generateSolvablePuzzle()
+    } else {
+        boardStr.split(",").mapNotNull { it.trim().toIntOrNull() }
+    }
+    val moves = prefs.getInt("widget_${widgetId}_moves", 0)
+    val bestMoves = prefs.getInt("widget_${widgetId}_best", 0)
+    val isSolved = isPuzzleSolved(board)
+
+    return PuzzleState(board, moves, bestMoves, isSolved)
+}
+
+private fun savePuzzleState(context: Context, widgetId: Int, state: PuzzleState) {
+    val prefs = context.getSharedPreferences("slate_puzzle_prefs", Context.MODE_PRIVATE)
+    val boardStr = state.board.joinToString(",")
+    prefs.edit()
+        .putString("widget_${widgetId}_board", boardStr)
+        .putInt("widget_${widgetId}_moves", state.moves)
+        .putInt("widget_${widgetId}_best", state.bestMoves)
+        .apply()
+}
+
+private fun isPuzzleSolved(board: List<Int>): Boolean {
+    val target = listOf(1, 2, 3, 4, 5, 6, 7, 8, 0)
+    return board == target
+}
+
+// Generates a guaranteed solvable 3x3 sliding puzzle (even inversion count)
+private fun generateSolvablePuzzle(): List<Int> {
+    val target = listOf(1, 2, 3, 4, 5, 6, 7, 8, 0)
+    while (true) {
+        val shuffled = (0..8).shuffled()
+        if (shuffled == target) continue
+
+        // Count inversions (excluding 0)
+        var inversions = 0
+        val nonZero = shuffled.filter { it != 0 }
+        for (i in nonZero.indices) {
+            for (j in i + 1 until nonZero.size) {
+                if (nonZero[i] > nonZero[j]) inversions++
+            }
+        }
+
+        // For a 3x3 board, solvable if and only if inversions is even
+        if (inversions % 2 == 0) {
+            return shuffled
+        }
+    }
+}
+
+// 7. SLIDING 8-PUZZLE INTERACTIVE (2x2)
+class GamesPuzzleReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generatePuzzleWidgetBitmap(context, config, false, wDp, hDp, -1, PuzzleState(listOf(1, 2, 3, 4, 5, 6, 7, 8, 0), 18, 14, true))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_PUZZLE_MOVE" -> {
+                val cellIndex = intent.getIntExtra("CELL_INDEX", -1)
+                val current = getPuzzleState(context, widgetId)
+
+                if (cellIndex in 0..8 && !current.isSolved) {
+                    val emptyIndex = current.board.indexOf(0)
+                    if (emptyIndex != -1) {
+                        val rowT = cellIndex / 3
+                        val colT = cellIndex % 3
+                        val rowE = emptyIndex / 3
+                        val colE = emptyIndex % 3
+
+                        // Valid move if Manhattan distance is 1
+                        val isAdjacent = (kotlin.math.abs(rowT - rowE) + kotlin.math.abs(colT - colE)) == 1
+
+                        if (isAdjacent) {
+                            val newBoard = current.board.toMutableList()
+                            newBoard[emptyIndex] = newBoard[cellIndex]
+                            newBoard[cellIndex] = 0
+
+                            val newMoves = current.moves + 1
+                            val solved = isPuzzleSolved(newBoard)
+                            val newBest = if (solved) {
+                                if (current.bestMoves == 0 || newMoves < current.bestMoves) newMoves else current.bestMoves
+                            } else current.bestMoves
+
+                            val updatedState = PuzzleState(newBoard, newMoves, newBest, solved)
+                            savePuzzleState(context, widgetId, updatedState)
+
+                            val appWidgetManager = AppWidgetManager.getInstance(context)
+                            updateWidget(context, appWidgetManager, widgetId)
+                        }
+                    }
+                }
+            }
+            "com.altusix.slate.ACTION_PUZZLE_RESET" -> {
+                val current = getPuzzleState(context, widgetId)
+                val newBoard = generateSolvablePuzzle()
+                val resetState = PuzzleState(newBoard, 0, current.bestMoves, false)
+                savePuzzleState(context, widgetId, resetState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_puzzle_layout)
+        val state = getPuzzleState(context, widgetId)
+        val bitmap = generatePuzzleWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val cellIds = intArrayOf(
+            R.id.btn_cell_0, R.id.btn_cell_1, R.id.btn_cell_2,
+            R.id.btn_cell_3, R.id.btn_cell_4, R.id.btn_cell_5,
+            R.id.btn_cell_6, R.id.btn_cell_7, R.id.btn_cell_8
+        )
+
+        for (i in 0..8) {
+            val moveIntent = Intent(context, GamesPuzzleReceiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_PUZZLE_MOVE"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("CELL_INDEX", i)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + cellIds[i],
+                moveIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(cellIds[i], pendingIntent)
+        }
+
+        val resetIntent = Intent(context, GamesPuzzleReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_PUZZLE_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
     }
 }

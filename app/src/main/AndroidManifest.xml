@@ -2533,6 +2533,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 7. Sliding 8-Puzzle Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesPuzzleReceiver"
+            android:exported="true"
+            android:label="Slate Sliding Puzzle">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_PUZZLE_MOVE" />
+                <action android:name="com.altusix.slate.ACTION_PUZZLE_RESET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>

@@ -1510,3 +1510,200 @@ fun generateSimonWidgetBitmap(
     return bitmap
 }
 
+data class PuzzleState(
+    val board: List<Int> = listOf(1, 2, 3, 4, 5, 6, 7, 8, 0), // 0 is empty slot
+    val moves: Int = 0,
+    val bestMoves: Int = 0,
+    val isSolved: Boolean = false
+)
+
+// 7. SLIDING 8-PUZZLE INTERACTIVE (2x2)
+fun generatePuzzleWidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: PuzzleState = PuzzleState()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#70FFFFFF")
+
+    val isAccentLight = ((Color.red(accentColorInt) * 0.2126f) + (Color.green(accentColorInt) * 0.7152f) + (Color.blue(accentColorInt) * 0.0722f)) / 255f > 0.5f
+    val onAccentTextColor = if (isAccentLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+    val gap = (minCardDim * 0.022f).coerceIn(scaleFactor * 2.5f, scaleFactor * 5.5f)
+
+    val availableH = cardRect.height() - (pad * 2f)
+
+    // 1. TOP STATS BAR: MOVES, BEST, SHUFFLE / RESET
+    val headerH = (availableH * 0.15f).coerceIn(scaleFactor * 24f, scaleFactor * 48f)
+    val headerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + headerH)
+    val pillRadius = headerH * 0.32f
+
+    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val statsW = (headerRect.width() - gap) * 0.68f
+    val resetW = (headerRect.width() - gap) * 0.32f
+
+    val statsRect = RectF(headerRect.left, headerRect.top, headerRect.left + statsW, headerRect.bottom)
+    val resetRect = RectF(statsRect.right + gap, headerRect.top, headerRect.right, headerRect.bottom)
+
+    canvas.drawRoundRect(statsRect, pillRadius, pillRadius, pillBgPaint)
+
+    if (state.isSolved) {
+        val resetGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, resetGlowPaint)
+    } else {
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, pillBgPaint)
+    }
+
+    // Stats Typography
+    val labelTextSize = (headerH * 0.22f).coerceAtLeast(scaleFactor * 6f)
+    val statTextSize = (headerH * 0.38f).coerceAtLeast(scaleFactor * 7.5f)
+
+    val statLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = labelTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val movesValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val bestValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val colW = statsRect.width() / 2f
+    val c1x = statsRect.left + (colW * 0.5f)
+    val c2x = statsRect.left + (colW * 1.5f)
+
+    canvas.drawText("MOVES", c1x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.moves}", c1x, statsRect.top + headerH * 0.82f, movesValPaint)
+
+    canvas.drawText("BEST", c2x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    val bestStr = if (state.bestMoves > 0) "${state.bestMoves}" else "--"
+    canvas.drawText(bestStr, c2x, statsRect.top + headerH * 0.82f, bestValPaint)
+
+    val resetLabel = if (state.isSolved) "REPLAY" else "SHUFFLE"
+    val resetTextColor = if (state.isSolved) onAccentTextColor else primaryText
+    val resetTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = resetTextColor
+        textSize = (headerH * 0.34f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val rFm = resetTextPaint.fontMetrics
+    canvas.drawText(resetLabel, resetRect.centerX(), resetRect.centerY() - (rFm.ascent + rFm.descent) / 2f, resetTextPaint)
+
+    // 2. 3x3 SLIDING TILE GRID
+    val gridTop = headerRect.bottom + gap
+    val gridRect = RectF(cardRect.left + pad, gridTop, cardRect.right - pad, cardRect.bottom - pad)
+
+    val cellW = (gridRect.width() - (gap * 2f)) / 3f
+    val cellH = (gridRect.height() - (gap * 2f)) / 3f
+    val minCellDim = minOf(cellW, cellH)
+    val cellRadius = (minCellDim * 0.24f).coerceAtLeast(scaleFactor * 6f)
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F4F4F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    val correctBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(90, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2f
+    }
+    val solvedGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(45, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+    val tileTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = (minCellDim * 0.44f).coerceAtLeast(scaleFactor * 10f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    for (row in 0..2) {
+        for (col in 0..2) {
+            val idx = row * 3 + col
+            val valNum = state.board[idx]
+            val left = gridRect.left + col * (cellW + gap)
+            val top = gridRect.top + row * (cellH + gap)
+            val cellBox = RectF(left, top, left + cellW, top + cellH)
+
+            if (valNum > 0) {
+                // Tile in correct sequential position gets subtle accent highlight
+                val isCorrect = valNum == idx + 1
+
+                canvas.drawRoundRect(cellBox, cellRadius, cellRadius, tileBgPaint)
+
+                if (state.isSolved) {
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, solvedGlowPaint)
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, correctBorderPaint)
+                    tileTextPaint.color = accentColorInt
+                } else if (isCorrect) {
+                    canvas.drawRoundRect(cellBox, cellRadius, cellRadius, correctBorderPaint)
+                    tileTextPaint.color = primaryText
+                } else {
+                    tileTextPaint.color = primaryText
+                }
+
+                val tFm = tileTextPaint.fontMetrics
+                val tY = cellBox.centerY() - (tFm.ascent + tFm.descent) / 2f
+                canvas.drawText("$valNum", cellBox.centerX(), tY, tileTextPaint)
+            } else {
+                // Empty Slot
+                val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#141416")
+                    style = Paint.Style.FILL
+                }
+                canvas.drawRoundRect(cellBox, cellRadius, cellRadius, emptyPaint)
+            }
+        }
+    }
+
+    return bitmap
+}
