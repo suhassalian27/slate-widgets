@@ -208,7 +208,7 @@ class AppLauncherConfigActivity : ComponentActivity() {
                         selectedPackageName = config.packageName,
                         onDismiss = { showAppPickerSheet = false },
                         onAppSelected = { app ->
-                            config = config.copy(packageName = app.packageName, customText = app.label.take(4))
+                            config = config.copy(packageName = app.packageName, customText = app.label)
                             showAppPickerSheet = false
                         }
                     )
@@ -291,6 +291,10 @@ private fun AppLauncherConfigSheetContent(
         listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
     }
 
+    val isRectangleWidget = remember(widgetClassName) {
+        widgetClassName.contains("CustomText", ignoreCase = true) || widgetClassName.contains("Rectangle", ignoreCase = true)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -316,6 +320,13 @@ private fun AppLauncherConfigSheetContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        val is2x1Widget = remember(widgetClassName) {
+            widgetClassName.contains("CustomText", ignoreCase = true) ||
+                    widgetClassName.contains("Rectangle", ignoreCase = true) ||
+                    widgetClassName.contains("Pill", ignoreCase = true) ||
+                    widgetClassName.contains("Glitch", ignoreCase = true)
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -326,13 +337,19 @@ private fun AppLauncherConfigSheetContent(
             contentAlignment = Alignment.Center
         ) {
             val previewBitmap = remember(config, slateConfig, isResponsive) {
-                if (widgetClassName.contains("CustomText", ignoreCase = true) || widgetClassName.contains("Rectangle", ignoreCase = true)) {
+                if (widgetClassName.contains("Pill", ignoreCase = true)) {
+                    generatePillLauncherBitmap(context, slateConfig, config, 200, 100)
+                } else if (is2x1Widget) {
                     generateRectangleLauncherBitmap(context, slateConfig, config, 200, 100)
                 } else {
                     generateAdaptiveLauncherBitmap(context, slateConfig, config, 120, 120)
                 }
             }
-            Image(bitmap = previewBitmap.asImageBitmap(), contentDescription = "Preview", modifier = Modifier.size(120.dp))
+            Image(
+                bitmap = previewBitmap.asImageBitmap(),
+                contentDescription = "Preview",
+                modifier = if (is2x1Widget) Modifier.size(width = 180.dp, height = 90.dp) else Modifier.size(120.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -460,7 +477,7 @@ private fun AppLauncherConfigSheetContent(
                             OutlinedTextField(
                                 value = config.customText,
                                 onValueChange = { onConfigChanged(config.copy(customText = it)) },
-                                placeholder = { Text("Badge Text (Max 4 chars)", color = Color.Gray) },
+                                placeholder = { Text("Display text", color = Color.Gray) },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(14.dp),
                                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color(0xFF242428), focusedContainerColor = Color(0xFF141416), unfocusedContainerColor = Color(0xFF141416), focusedTextColor = Color.White, unfocusedTextColor = Color.White)
