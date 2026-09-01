@@ -127,7 +127,8 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "2048 Micro", category = "Games", sizeText = "2x2", receiverClass = Games2048Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Rock Paper Scissors", category = "Games", sizeText = "2x2", receiverClass = GamesRpsReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Dice Roller", category = "Games", sizeText = "2x2", receiverClass = GamesDiceReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Coin Flip", category = "Games", sizeText = "2x2", receiverClass = GamesCoinFlipReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Coin Flip", category = "Games", sizeText = "2x2", receiverClass = GamesCoinFlipReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Simon Sequence", category = "Games", sizeText = "2x2", receiverClass = GamesSimonReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -463,7 +464,6 @@ class Games2048Receiver : BaseGamesReceiver() {
 }
 
 // --- ROCK PAPER SCISSORS GAME ENGINE ---
-
 private fun getRpsState(context: Context, widgetId: Int): RpsState {
     val prefs = context.getSharedPreferences("slate_rps_prefs", Context.MODE_PRIVATE)
     return RpsState(
@@ -602,7 +602,6 @@ class GamesRpsReceiver : BaseGamesReceiver() {
 
 
 // --- DICE GAME ENGINE & PERSISTENCE ---
-
 private fun getDiceState(context: Context, widgetId: Int): DiceState {
     val prefs = context.getSharedPreferences("slate_dice_prefs", Context.MODE_PRIVATE)
     val roll = prefs.getInt("widget_${widgetId}_roll", 6)
@@ -754,7 +753,6 @@ class GamesDiceReceiver : BaseGamesReceiver() {
 
 
 // --- COIN FLIP GAME ENGINE & PERSISTENCE ---
-
 private fun getCoinFlipState(context: Context, widgetId: Int): CoinFlipState {
     val prefs = context.getSharedPreferences("slate_coin_prefs", Context.MODE_PRIVATE)
     val isHeads = prefs.getBoolean("widget_${widgetId}_is_heads", true)
@@ -891,5 +889,272 @@ class GamesCoinFlipReceiver : BaseGamesReceiver() {
         views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
 
         appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+
+// --- SIMON MEMORY ENGINE & PERSISTENCE ---
+private fun getSimonState(context: Context, widgetId: Int): SimonState {
+    val prefs = context.getSharedPreferences("slate_simon_prefs", Context.MODE_PRIVATE)
+    val seqStr = prefs.getString("widget_${widgetId}_seq", "") ?: ""
+    val sequence = if (seqStr.isEmpty()) emptyList() else seqStr.split(",").mapNotNull { it.trim().toIntOrNull() }
+    val step = prefs.getInt("widget_${widgetId}_step", 0)
+    val level = prefs.getInt("widget_${widgetId}_level", 0)
+    val best = prefs.getInt("widget_${widgetId}_best", 0)
+    val status = prefs.getInt("widget_${widgetId}_status", 0)
+
+    return SimonState(sequence, step, -1, level, best, status)
+}
+
+private fun saveSimonState(context: Context, widgetId: Int, state: SimonState) {
+    val prefs = context.getSharedPreferences("slate_simon_prefs", Context.MODE_PRIVATE)
+    val seqStr = state.sequence.joinToString(",")
+    val newBest = maxOf(state.level, state.bestLevel)
+    prefs.edit()
+        .putString("widget_${widgetId}_seq", seqStr)
+        .putInt("widget_${widgetId}_step", state.playerStep)
+        .putInt("widget_${widgetId}_level", state.level)
+        .putInt("widget_${widgetId}_best", newBest)
+        .putInt("widget_${widgetId}_status", state.status)
+        .apply()
+}
+
+// 6. SIMON MEMORY SEQUENCE INTERACTIVE (2x2)
+class GamesSimonReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateSimonWidgetBitmap(context, config, false, wDp, hDp, -1, SimonState(listOf(0, 2, 1), 1, 0, 3, 7, 2))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_SIMON_START_RESET" -> {
+                val current = getSimonState(context, widgetId)
+                val firstPad = (0..3).random()
+                val newSeq = listOf(firstPad)
+                val startState = SimonState(
+                    sequence = newSeq,
+                    playerStep = 0,
+                    activeFlashPad = -1,
+                    level = 1,
+                    bestLevel = current.bestLevel,
+                    status = 1 // WATCHING
+                )
+                saveSimonState(context, widgetId, startState)
+                playSequence(context, widgetId, newSeq, 1, current.bestLevel)
+            }
+            "com.altusix.slate.ACTION_SIMON_PAD" -> {
+                val padIndex = intent.getIntExtra("PAD_INDEX", -1)
+                val current = getSimonState(context, widgetId)
+
+                // Only accept input strictly during YOUR TURN (status == 2)
+                if (padIndex in 0..3 && current.status == 2 && current.sequence.isNotEmpty()) {
+                    val expected = current.sequence.getOrNull(current.playerStep)
+                    if (expected == padIndex) {
+                        val nextStep = current.playerStep + 1
+                        if (nextStep == current.sequence.size) {
+                            // Correct final step: Light up the pad, show SUCCESS, then transition
+                            val nextPad = (0..3).random()
+                            val nextSeq = current.sequence + nextPad
+                            val nextLevel = current.level + 1
+                            val newBest = maxOf(nextLevel, current.bestLevel)
+
+                            handleLastInputSuccess(context, widgetId, padIndex, nextSeq, nextLevel, newBest)
+                        } else {
+                            // Intermediate step: Light up pad briefly and advance step
+                            val advanceState = current.copy(playerStep = nextStep, activeFlashPad = padIndex)
+                            saveSimonState(context, widgetId, advanceState)
+                            flashIntermediatePad(context, widgetId, advanceState)
+                        }
+                    } else {
+                        // Mistake: Lock input and trigger GAME OVER
+                        val overState = current.copy(status = 4, activeFlashPad = -1)
+                        saveSimonState(context, widgetId, overState)
+                        val appWidgetManager = AppWidgetManager.getInstance(context)
+                        updateWidget(context, appWidgetManager, widgetId)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun flashIntermediatePad(context: Context, widgetId: Int, state: SimonState) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val (wDp, hDp) = getDimensions(context, appWidgetManager, widgetId)
+                val isResponsive = parseAndLockIsResponsive(context, widgetId)
+                val config = loadSlateWidgetConfig(context, widgetId)
+
+                // Flash pad ON
+                renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, state)
+                delay(150)
+
+                // Flash pad OFF (Stay in YOUR TURN)
+                val offState = state.copy(activeFlashPad = -1)
+                saveSimonState(context, widgetId, offState)
+                renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, offState)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun handleLastInputSuccess(
+        context: Context,
+        widgetId: Int,
+        lastPadIndex: Int,
+        nextSeq: List<Int>,
+        nextLevel: Int,
+        newBest: Int
+    ) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val (wDp, hDp) = getDimensions(context, appWidgetManager, widgetId)
+                val isResponsive = parseAndLockIsResponsive(context, widgetId)
+                val config = loadSlateWidgetConfig(context, widgetId)
+
+                // 1. Light up the final tapped pad
+                val litState = SimonState(nextSeq, 0, lastPadIndex, nextLevel - 1, newBest, 2)
+                renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, litState)
+                delay(180)
+
+                // 2. Turn off pad and show NICE! success banner
+                val successState = SimonState(nextSeq, 0, -1, nextLevel, newBest, 3)
+                renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, successState)
+                delay(550)
+
+                // 3. Play next round sequence
+                saveSimonState(context, widgetId, successState.copy(status = 1))
+                playSequenceInternal(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, nextSeq, nextLevel, newBest)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun playSequence(context: Context, widgetId: Int, sequence: List<Int>, level: Int, bestLevel: Int) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val (wDp, hDp) = getDimensions(context, appWidgetManager, widgetId)
+                val isResponsive = parseAndLockIsResponsive(context, widgetId)
+                val config = loadSlateWidgetConfig(context, widgetId)
+
+                delay(350)
+                playSequenceInternal(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, sequence, level, bestLevel)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private suspend fun playSequenceInternal(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        sequence: List<Int>,
+        level: Int,
+        bestLevel: Int
+    ) {
+        // Play through each step in sequence with clear flash and pause
+        for (pad in sequence) {
+            val litState = SimonState(sequence, 0, pad, level, bestLevel, 1)
+            renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, litState)
+            delay(280)
+
+            val unlitState = SimonState(sequence, 0, -1, level, bestLevel, 1)
+            renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, unlitState)
+            delay(130)
+        }
+
+        delay(120)
+
+        // Hand control to the player (YOUR TURN)
+        val userTurnState = SimonState(sequence, 0, -1, level, bestLevel, 2)
+        saveSimonState(context, widgetId, userTurnState)
+        renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, userTurnState)
+    }
+
+    private fun getDimensions(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int): Pair<Int, Int> {
+        val options = appWidgetManager.getAppWidgetOptions(widgetId)
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+        val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+        return Pair(wDp, hDp)
+    }
+
+    private fun renderViews(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        state: SimonState
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_simon_layout)
+        val bitmap = generateSimonWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pads = intArrayOf(R.id.btn_pad_0, R.id.btn_pad_1, R.id.btn_pad_2, R.id.btn_pad_3)
+        for (i in 0..3) {
+            val padIntent = Intent(context, GamesSimonReceiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_SIMON_PAD"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("PAD_INDEX", i)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + pads[i],
+                padIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(pads[i], pendingIntent)
+        }
+
+        val resetIntent = Intent(context, GamesSimonReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_SIMON_START_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val state = getSimonState(context, widgetId)
+        renderViews(context, appWidgetManager, widgetId, config, isResponsive, wDp, hDp, state)
     }
 }

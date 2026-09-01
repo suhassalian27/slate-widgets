@@ -1224,3 +1224,289 @@ fun generateCoinFlipWidgetBitmap(
 
     return bitmap
 }
+
+
+data class SimonState(
+    val sequence: List<Int> = emptyList(),
+    val playerStep: Int = 0,
+    val activeFlashPad: Int = -1,
+    val level: Int = 0,
+    val bestLevel: Int = 0,
+    val status: Int = 0 // 0: IDLE, 1: WATCHING, 2: YOUR_TURN, 3: ROUND_SUCCESS, 4: GAME_OVER
+)
+
+// 6. SIMON MEMORY SEQUENCE INTERACTIVE (2x2)
+fun generateSimonWidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: SimonState = SimonState()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#70FFFFFF")
+
+    val isAccentLight = ((Color.red(accentColorInt) * 0.2126f) + (Color.green(accentColorInt) * 0.7152f) + (Color.blue(accentColorInt) * 0.0722f)) / 255f > 0.5f
+    val onAccentTextColor = if (isAccentLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+    val gap = (minCardDim * 0.024f).coerceIn(scaleFactor * 2.5f, scaleFactor * 6f)
+
+    val availableH = cardRect.height() - (pad * 2f)
+
+    // 1. TOP HEADER
+    val headerH = (availableH * 0.15f).coerceIn(scaleFactor * 24f, scaleFactor * 48f)
+    val headerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + headerH)
+    val pillRadius = headerH * 0.32f
+
+    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val statsW = (headerRect.width() - gap) * 0.68f
+    val resetW = (headerRect.width() - gap) * 0.32f
+
+    val statsRect = RectF(headerRect.left, headerRect.top, headerRect.left + statsW, headerRect.bottom)
+    val resetRect = RectF(statsRect.right + gap, headerRect.top, headerRect.right, headerRect.bottom)
+
+    canvas.drawRoundRect(statsRect, pillRadius, pillRadius, pillBgPaint)
+
+    if (state.status == 0 || state.status == 4) {
+        val resetGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (state.status == 4) Color.parseColor("#FF453A") else accentColorInt
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, resetGlowPaint)
+    } else {
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, pillBgPaint)
+    }
+
+    val labelTextSize = (headerH * 0.22f).coerceAtLeast(scaleFactor * 6f)
+    val statTextSize = (headerH * 0.38f).coerceAtLeast(scaleFactor * 7.5f)
+
+    val statLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = labelTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val levelValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val bestValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val colW = statsRect.width() / 2f
+    val c1x = statsRect.left + (colW * 0.5f)
+    val c2x = statsRect.left + (colW * 1.5f)
+
+    canvas.drawText("LEVEL", c1x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.level}", c1x, statsRect.top + headerH * 0.82f, levelValPaint)
+
+    canvas.drawText("BEST", c2x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.bestLevel}", c2x, statsRect.top + headerH * 0.82f, bestValPaint)
+
+    val resetLabel = when (state.status) {
+        0 -> "START"
+        4 -> "RETRY"
+        else -> "RESET"
+    }
+    val resetTextColor = when (state.status) {
+        0 -> onAccentTextColor
+        4 -> Color.WHITE
+        else -> primaryText
+    }
+    val resetTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = resetTextColor
+        textSize = (headerH * 0.34f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val rFm = resetTextPaint.fontMetrics
+    canvas.drawText(resetLabel, resetRect.centerX(), resetRect.centerY() - (rFm.ascent + rFm.descent) / 2f, resetTextPaint)
+
+    // 2. 2x2 QUADRANT TOUCH PADS
+    val gridTop = headerRect.bottom + gap
+    val gridRect = RectF(cardRect.left + pad, gridTop, cardRect.right - pad, cardRect.bottom - pad)
+
+    val padW = (gridRect.width() - gap) / 2f
+    val padH = (gridRect.height() - gap) / 2f
+    val padRadius = (minOf(padW, padH) * 0.30f).coerceAtLeast(scaleFactor * 8f)
+
+    val basePadColor = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#17171A")
+    val padPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = scaleFactor * 3.5f }
+
+    val padColors = listOf(
+        accentColorInt,
+        Color.parseColor("#34C759"),
+        Color.parseColor("#FF9500"),
+        Color.parseColor("#007AFF")
+    )
+
+    val padBoxes = listOf(
+        RectF(gridRect.left, gridRect.top, gridRect.left + padW, gridRect.top + padH),
+        RectF(gridRect.left + padW + gap, gridRect.top, gridRect.right, gridRect.top + padH),
+        RectF(gridRect.left, gridRect.top + padH + gap, gridRect.left + padW, gridRect.bottom),
+        RectF(gridRect.left + padW + gap, gridRect.top + padH + gap, gridRect.right, gridRect.bottom)
+    )
+
+    for (i in 0..3) {
+        val box = padBoxes[i]
+        val isLit = state.activeFlashPad == i
+        val padColor = padColors[i]
+
+        if (isLit) {
+            padPaint.color = padColor
+            canvas.drawRoundRect(box, padRadius, padRadius, padPaint)
+
+            glowPaint.color = Color.argb(120, Color.red(padColor), Color.green(padColor), Color.blue(padColor))
+            canvas.drawRoundRect(box, padRadius, padRadius, glowPaint)
+        } else {
+            padPaint.color = basePadColor
+            canvas.drawRoundRect(box, padRadius, padRadius, padPaint)
+
+            val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(45, Color.red(padColor), Color.green(padColor), Color.blue(padColor))
+                style = Paint.Style.FILL
+            }
+            val coreInset = minOf(padW, padH) * 0.28f
+            val coreBox = RectF(box.left + coreInset, box.top + coreInset, box.right - coreInset, box.bottom - coreInset)
+            canvas.drawRoundRect(coreBox, padRadius * 0.6f, padRadius * 0.6f, corePaint)
+        }
+    }
+
+    // 3. CENTER BENTO BADGE (Curved Pill / Squircle)
+    val badgeW = (gridRect.width() * 0.44f).coerceIn(scaleFactor * 64f, scaleFactor * 130f)
+    val badgeH = (gridRect.height() * 0.25f).coerceIn(scaleFactor * 32f, scaleFactor * 60f)
+    val badgeRadius = (badgeH * 0.38f).coerceAtLeast(scaleFactor * 8f)
+
+    val badgeRect = RectF(
+        gridRect.centerX() - badgeW / 2f,
+        gridRect.centerY() - badgeH / 2f,
+        gridRect.centerX() + badgeW / 2f,
+        gridRect.centerY() + badgeH / 2f
+    )
+
+    val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#FFFFFF") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(badgeRect, badgeRadius, badgeRadius, badgeBgPaint)
+
+    val badgeBorderColor = when (state.status) {
+        1 -> Color.argb(90, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        2 -> Color.argb(70, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        3 -> Color.argb(90, 52, 199, 89)
+        4 -> Color.argb(90, 255, 69, 58)
+        else -> if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#2C2C2E")
+    }
+
+    val badgeBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = badgeBorderColor
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2f
+    }
+    canvas.drawRoundRect(badgeRect, badgeRadius, badgeRadius, badgeBorderPaint)
+
+    // Center Label
+    val statusText = when (state.status) {
+        0 -> "PLAY"
+        1 -> "WATCH"
+        2 -> "REPEAT"
+        3 -> "NICE!"
+        4 -> "OVER"
+        else -> "PLAY"
+    }
+
+    val statusTextColor = when (state.status) {
+        1 -> accentColorInt
+        2 -> primaryText
+        3 -> Color.parseColor("#34C759")
+        4 -> Color.parseColor("#FF453A")
+        else -> primaryText
+    }
+
+    val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = statusTextColor
+        typeface = getSlateFont(context, weight = 900)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val hasProgressDots = state.status == 2 && state.sequence.isNotEmpty() && state.sequence.size <= 8
+
+    var baseTextSize = badgeH * (if (hasProgressDots) 0.34f else 0.44f)
+    statusPaint.textSize = baseTextSize
+    val measuredW = statusPaint.measureText(statusText)
+    val maxAllowedW = badgeW * 0.82f
+    if (measuredW > maxAllowedW) {
+        baseTextSize *= (maxAllowedW / measuredW)
+        statusPaint.textSize = baseTextSize
+    }
+
+    val sFm = statusPaint.fontMetrics
+    val textCenterY = if (hasProgressDots) badgeRect.centerY() - (badgeH * 0.12f) else badgeRect.centerY()
+    val sY = textCenterY - (sFm.ascent + sFm.descent) / 2f
+    canvas.drawText(statusText, badgeRect.centerX(), sY, statusPaint)
+
+    // Large Progress Capsules during REPEAT phase
+    if (hasProgressDots) {
+        val totalSteps = state.sequence.size
+        val dotW = (scaleFactor * 6.5f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+        val dotH = scaleFactor * 3.5f
+        val dotGap = scaleFactor * 3.5f
+        val dotRadius = dotH / 2f
+
+        val totalDotsWidth = (totalSteps * dotW) + ((totalSteps - 1) * dotGap)
+        val dotsStartX = badgeRect.centerX() - (totalDotsWidth / 2f)
+        val dotsY = badgeRect.bottom - (badgeH * 0.24f)
+
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+        for (d in 0 until totalSteps) {
+            val dLeft = dotsStartX + d * (dotW + dotGap)
+            val dotBox = RectF(dLeft, dotsY - dotH / 2f, dLeft + dotW, dotsY + dotH / 2f)
+            dotPaint.color = if (d < state.playerStep) accentColorInt else Color.argb(40, Color.red(primaryText), Color.green(primaryText), Color.blue(primaryText))
+            canvas.drawRoundRect(dotBox, dotRadius, dotRadius, dotPaint)
+        }
+    }
+
+    return bitmap
+}
+

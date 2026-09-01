@@ -2519,6 +2519,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 6. Simon Memory Sequence Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesSimonReceiver"
+            android:exported="true"
+            android:label="Slate Simon Sequence">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_SIMON_PAD" />
+                <action android:name="com.altusix.slate.ACTION_SIMON_START_RESET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>
