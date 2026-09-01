@@ -21,6 +21,8 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
+import android.content.BroadcastReceiver
+import kotlinx.coroutines.launch
 
 private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
@@ -131,7 +133,8 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Simon Sequence", category = "Games", sizeText = "2x2", receiverClass = GamesSimonReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Sliding 8-Puzzle", category = "Games", sizeText = "2x2", receiverClass = GamesPuzzleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Minesweeper Mini", category = "Games", sizeText = "2x2", receiverClass = GamesMinesweeperReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Connect Four", category = "Games", sizeText = "2x2", receiverClass = GamesConnect4Receiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Connect Four", category = "Games", sizeText = "2x2", receiverClass = GamesConnect4Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Slate Snake", category = "Games", sizeText = "2x2", receiverClass = GamesSnakeReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -1820,3 +1823,258 @@ class GamesConnect4Receiver : BaseGamesReceiver() {
     }
 }
 
+
+
+// --- SNAKE GAME ENGINE & PERSISTENCE ---
+
+private fun getSnakeState(context: Context, widgetId: Int): SnakeState {
+    val prefs = context.getSharedPreferences("slate_snake_prefs", Context.MODE_PRIVATE)
+    val snakeStr = prefs.getString("widget_${widgetId}_snake", "") ?: ""
+    val snake = if (snakeStr.isEmpty()) emptyList() else snakeStr.split(",").mapNotNull { it.trim().toIntOrNull() }
+    val direction = prefs.getInt("widget_${widgetId}_dir", 3)
+    val foodIdx = prefs.getInt("widget_${widgetId}_food", -1)
+    val score = prefs.getInt("widget_${widgetId}_score", 0)
+    val best = prefs.getInt("widget_${widgetId}_best", 0)
+    val status = prefs.getInt("widget_${widgetId}_status", 0)
+
+    return SnakeState(snake, direction, foodIdx, score, best, status)
+}
+
+private fun saveSnakeState(context: Context, widgetId: Int, state: SnakeState) {
+    val prefs = context.getSharedPreferences("slate_snake_prefs", Context.MODE_PRIVATE)
+    val snakeStr = state.snake.joinToString(",")
+    val newBest = maxOf(state.score, state.bestScore)
+    prefs.edit()
+        .putString("widget_${widgetId}_snake", snakeStr)
+        .putInt("widget_${widgetId}_dir", state.direction)
+        .putInt("widget_${widgetId}_food", state.foodIndex)
+        .putInt("widget_${widgetId}_score", state.score)
+        .putInt("widget_${widgetId}_best", newBest)
+        .putInt("widget_${widgetId}_status", state.status)
+        .apply()
+}
+
+private fun getSnakeSessionId(context: Context, widgetId: Int): Long {
+    val prefs = context.getSharedPreferences("slate_snake_prefs", Context.MODE_PRIVATE)
+    return prefs.getLong("widget_${widgetId}_session", 0L)
+}
+
+private fun setSnakeSessionId(context: Context, widgetId: Int, session: Long) {
+    val prefs = context.getSharedPreferences("slate_snake_prefs", Context.MODE_PRIVATE)
+    prefs.edit().putLong("widget_${widgetId}_session", session).apply()
+}
+
+private fun spawnSnakeFood(state: SnakeState): Int {
+    val totalCells = state.gridWidth * state.gridHeight
+    val snakeCells = state.snake.toSet()
+    val emptyCells = (0 until totalCells).filter { it !in snakeCells }
+    return if (emptyCells.isNotEmpty()) emptyCells.random() else -1
+}
+
+// Launches autonomous movement loop running every ~260ms
+private fun launchSnakeGameLoop(context: Context, widgetId: Int, sessionId: Long) {
+    CoroutineScope(Dispatchers.Default).launch {
+        try {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+
+            while (true) {
+                val currentSession = getSnakeSessionId(context, widgetId)
+                if (currentSession != sessionId) break
+
+                var state = getSnakeState(context, widgetId)
+                if (state.status != 1 || state.snake.isEmpty()) break
+
+                val gridW = state.gridWidth
+                val gridH = state.gridHeight
+                val currentHead = state.snake.first()
+                var newRow = currentHead / gridW
+                var newCol = currentHead % gridW
+
+                when (state.direction) {
+                    0 -> newRow-- // Up
+                    1 -> newRow++ // Down
+                    2 -> newCol-- // Left
+                    3 -> newCol++ // Right
+                }
+
+                val isCollisionWall = newRow < 0 || newRow >= gridH || newCol < 0 || newCol >= gridW
+                val newHead = newRow * gridW + newCol
+                val snakeBodySet = state.snake.dropLast(1).toSet()
+                val isCollisionSelf = newHead in snakeBodySet
+
+                if (isCollisionWall || isCollisionSelf) {
+                    // Collision -> GAME OVER
+                    val gameOverState = state.copy(status = 2)
+                    saveSnakeState(context, widgetId, gameOverState)
+                    updateSnakeWidgetViews(context, appWidgetManager, widgetId, gameOverState)
+                    break
+                }
+
+                val consumingFood = newHead == state.foodIndex
+                val newSnake = mutableListOf(newHead)
+                newSnake.addAll(if (consumingFood) state.snake else state.snake.dropLast(1))
+
+                var newScore = state.score
+                var newFoodIdx = state.foodIndex
+
+                if (consumingFood) {
+                    newScore += 10
+                    newFoodIdx = spawnSnakeFood(state.copy(snake = newSnake))
+                }
+
+                val nextState = SnakeState(
+                    snake = newSnake,
+                    direction = state.direction,
+                    foodIndex = newFoodIdx,
+                    score = newScore,
+                    bestScore = maxOf(newScore, state.bestScore),
+                    status = 1
+                )
+
+                saveSnakeState(context, widgetId, nextState)
+                updateSnakeWidgetViews(context, appWidgetManager, widgetId, nextState)
+
+                // Progressive speed curve based on score (260ms down to 140ms)
+                val delayMs = (260L - (newScore / 40 * 15L)).coerceAtLeast(140L)
+                delay(delayMs)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
+private fun updateSnakeWidgetViews(
+    context: Context,
+    appWidgetManager: AppWidgetManager,
+    widgetId: Int,
+    state: SnakeState
+) {
+    val options = appWidgetManager.getAppWidgetOptions(widgetId)
+    val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+    val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+    val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+    val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+
+    val isResponsive = parseAndLockIsResponsive(context, widgetId)
+    val config = loadSlateWidgetConfig(context, widgetId)
+    val views = RemoteViews(context.packageName, R.layout.widget_games_snake_layout)
+    val bitmap = generateSnakeWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+    views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+    attachSnakePendingIntents(context, widgetId, views)
+    appWidgetManager.updateAppWidget(widgetId, views)
+}
+
+private fun attachSnakePendingIntents(context: Context, widgetId: Int, views: RemoteViews) {
+    val resetIntent = Intent(context, GamesSnakeReceiver::class.java).apply {
+        action = "com.altusix.slate.ACTION_SNAKE_START_RESET"
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+    }
+    views.setOnClickPendingIntent(
+        R.id.btn_reset,
+        PendingIntent.getBroadcast(
+            context,
+            widgetId * 1000 + R.id.btn_reset,
+            resetIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
+
+    val dirs = mapOf(
+        R.id.btn_up to 0,
+        R.id.btn_down to 1,
+        R.id.btn_left to 2,
+        R.id.btn_right to 3
+    )
+
+    for ((btnId, dir) in dirs) {
+        val moveIntent = Intent(context, GamesSnakeReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_SNAKE_MOVE"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+            putExtra("EXTRA_DIRECTION", dir)
+        }
+        views.setOnClickPendingIntent(
+            btnId,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + btnId,
+                moveIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+    }
+}
+
+// 10. SNAKE MICRO INTERACTIVE (2x2)
+class GamesSnakeReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val previewSnake = listOf(116, 115, 114, 98, 82, 83)
+        val previewFood = 88
+        return generateSnakeWidgetBitmap(context, config, false, wDp, hDp, -1, SnakeState(previewSnake, 3, previewFood, 60, 180, 1))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_SNAKE_START_RESET" -> {
+                val current = getSnakeState(context, widgetId)
+                val initialSnake = listOf(116, 115, 114, 113)
+                val initialDirection = 3
+                val initialFood = spawnSnakeFood(SnakeState(initialSnake))
+                val newSession = System.currentTimeMillis()
+                setSnakeSessionId(context, widgetId, newSession)
+
+                val startState = SnakeState(
+                    snake = initialSnake,
+                    direction = initialDirection,
+                    foodIndex = initialFood,
+                    score = 0,
+                    bestScore = current.bestScore,
+                    status = 1
+                )
+                saveSnakeState(context, widgetId, startState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateSnakeWidgetViews(context, appWidgetManager, widgetId, startState)
+
+                // Start automatic continuous movement
+                launchSnakeGameLoop(context, widgetId, newSession)
+            }
+            "com.altusix.slate.ACTION_SNAKE_MOVE" -> {
+                val newDir = intent.getIntExtra("EXTRA_DIRECTION", -1)
+                val current = getSnakeState(context, widgetId)
+
+                if (current.status == 1 && newDir in 0..3) {
+                    val currentDir = current.direction
+                    val isBackward = (currentDir == 0 && newDir == 1) ||
+                            (currentDir == 1 && newDir == 0) ||
+                            (currentDir == 2 && newDir == 3) ||
+                            (currentDir == 3 && newDir == 2)
+
+                    if (!isBackward) {
+                        saveSnakeState(context, widgetId, current.copy(direction = newDir))
+                    }
+                }
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val state = getSnakeState(context, widgetId)
+        updateSnakeWidgetViews(context, appWidgetManager, widgetId, state)
+    }
+}

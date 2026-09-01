@@ -2248,3 +2248,246 @@ fun generateConnect4WidgetBitmap(
     return bitmap
 }
 
+
+data class SnakeState(
+    val snake: List<Int> = emptyList(),
+    val direction: Int = 3,                 // 0: Up, 1: Down, 2: Left, 3: Right
+    val foodIndex: Int = -1,
+    val score: Int = 0,
+    val bestScore: Int = 0,
+    val status: Int = 0                     // 0: IDLE, 1: PLAYING, 2: GAME_OVER
+) {
+    val gridWidth = 16
+    val gridHeight = 16
+}
+
+// 10. SNAKE MICRO INTERACTIVE (2x2 - Dense Pixel Edition)
+fun generateSnakeWidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: SnakeState = SnakeState()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#70FFFFFF")
+
+    val isAccentLight = ((Color.red(accentColorInt) * 0.2126f) + (Color.green(accentColorInt) * 0.7152f) + (Color.blue(accentColorInt) * 0.0722f)) / 255f > 0.5f
+    val onAccentTextColor = if (isAccentLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+    val gap = (minCardDim * 0.022f).coerceIn(scaleFactor * 2f, scaleFactor * 5f)
+
+    val availableH = cardRect.height() - (pad * 2f)
+
+    // 1. TOP STATS BAR: SCORE, BEST & START/RESET
+    val headerH = (availableH * 0.14f).coerceIn(scaleFactor * 22f, scaleFactor * 46f)
+    val headerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + headerH)
+    val pillRadius = headerH * 0.32f
+
+    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val statsW = (headerRect.width() - gap) * 0.68f
+    val resetW = (headerRect.width() - gap) * 0.32f
+
+    val statsRect = RectF(headerRect.left, headerRect.top, headerRect.left + statsW, headerRect.bottom)
+    val resetRect = RectF(statsRect.right + gap, headerRect.top, headerRect.right, headerRect.bottom)
+
+    canvas.drawRoundRect(statsRect, pillRadius, pillRadius, pillBgPaint)
+
+    if (state.status == 0 || state.status == 2) {
+        val resetGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (state.status == 2) Color.parseColor("#FF453A") else accentColorInt
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, resetGlowPaint)
+    } else {
+        canvas.drawRoundRect(resetRect, pillRadius, pillRadius, pillBgPaint)
+    }
+
+    // Stats Typography
+    val labelTextSize = (headerH * 0.22f).coerceAtLeast(scaleFactor * 6f)
+    val statTextSize = (headerH * 0.38f).coerceAtLeast(scaleFactor * 7.5f)
+
+    val statLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = labelTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val scoreValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val bestValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = statTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val colW = statsRect.width() / 2f
+    val c1x = statsRect.left + (colW * 0.5f)
+    val c2x = statsRect.left + (colW * 1.5f)
+
+    canvas.drawText("SCORE", c1x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.score}", c1x, statsRect.top + headerH * 0.82f, scoreValPaint)
+
+    canvas.drawText("BEST", c2x, statsRect.top + headerH * 0.36f, statLabelPaint)
+    canvas.drawText("${state.bestScore}", c2x, statsRect.top + headerH * 0.82f, bestValPaint)
+
+    val resetLabel = when (state.status) {
+        0 -> "START"
+        2 -> "RETRY"
+        else -> "RESET"
+    }
+    val resetTextColor = if (state.status == 0) onAccentTextColor else (if (state.status == 2) Color.WHITE else primaryText)
+    val resetTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = resetTextColor
+        textSize = (headerH * 0.34f).coerceAtLeast(scaleFactor * 7f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val rFm = resetTextPaint.fontMetrics
+    canvas.drawText(resetLabel, resetRect.centerX(), resetRect.centerY() - (rFm.ascent + rFm.descent) / 2f, resetTextPaint)
+
+    // 2. 16x16 DENSE PIXEL ARENA
+    val navH = (availableH * 0.15f).coerceIn(scaleFactor * 24f, scaleFactor * 48f)
+    val gridTop = headerRect.bottom + gap
+    val gridBottom = cardRect.bottom - pad - navH - gap
+    val gridRect = RectF(cardRect.left + pad, gridTop, cardRect.right - pad, gridBottom)
+
+    // Recessed Screen Backdrop
+    val arenaBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#EAEAEF") else Color.parseColor("#121214")
+        style = Paint.Style.FILL
+    }
+    val arenaBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#DCDCE0") else Color.parseColor("#1C1C1F")
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.5f
+    }
+    val arenaRadius = (minCardDim * 0.04f).coerceAtLeast(scaleFactor * 6f)
+    canvas.drawRoundRect(gridRect, arenaRadius, arenaRadius, arenaBgPaint)
+    canvas.drawRoundRect(gridRect, arenaRadius, arenaRadius, arenaBorderPaint)
+
+    val innerPad = scaleFactor * 4f
+    val playableRect = RectF(gridRect.left + innerPad, gridRect.top + innerPad, gridRect.right - innerPad, gridRect.bottom - innerPad)
+
+    val cellW = playableRect.width() / state.gridWidth
+    val cellH = playableRect.height() / state.gridHeight
+    val pixelRadius = (minOf(cellW, cellH) * 0.25f).coerceAtLeast(scaleFactor * 1.2f)
+
+    // Snake Segment Paints
+    val snakeHeadPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val snakeBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(190, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+
+    val headIndex = state.snake.firstOrNull() ?: -1
+
+    // Draw Snake Segments
+    for (i in state.snake.indices) {
+        val idx = state.snake[i]
+        val row = idx / state.gridWidth
+        val col = idx % state.gridWidth
+        val left = playableRect.left + col * cellW
+        val top = playableRect.top + row * cellH
+        val cellBox = RectF(left + scaleFactor * 0.6f, top + scaleFactor * 0.6f, left + cellW - scaleFactor * 0.6f, top + cellH - scaleFactor * 0.6f)
+
+        if (idx == headIndex) {
+            canvas.drawRoundRect(cellBox, pixelRadius * 1.4f, pixelRadius * 1.4f, snakeHeadPaint)
+        } else {
+            canvas.drawRoundRect(cellBox, pixelRadius, pixelRadius, snakeBodyPaint)
+        }
+    }
+
+    // Draw Food
+    if (state.foodIndex in 0 until (state.gridWidth * state.gridHeight)) {
+        val fRow = state.foodIndex / state.gridWidth
+        val fCol = state.foodIndex % state.gridWidth
+        val fLeft = playableRect.left + fCol * cellW
+        val fTop = playableRect.top + fRow * cellH
+        val cx = fLeft + cellW / 2f
+        val cy = fTop + cellH / 2f
+        val foodR = (minOf(cellW, cellH) * 0.44f)
+
+        val foodGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(60, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+            style = Paint.Style.FILL
+        }
+        val foodCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy, foodR * 1.3f, foodGlowPaint)
+        canvas.drawCircle(cx, cy, foodR * 0.7f, foodCorePaint)
+    }
+
+    // 3. BOTTOM DIRECTIONAL CONTROLS (↑, ↓, ←, →)
+    val navRect = RectF(cardRect.left + pad, cardRect.bottom - pad - navH, cardRect.right - pad, cardRect.bottom - pad)
+    val navSlotW = (navRect.width() - (gap * 3f)) / 4f
+    val navRadius = navH * 0.28f
+
+    val navPillBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(35, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+
+    val arrowSymbols = arrayOf("↑", "↓", "←", "→")
+    val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = (navH * 0.46f).coerceAtLeast(scaleFactor * 8f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    for (i in 0..3) {
+        val slotLeft = navRect.left + i * (navSlotW + gap)
+        val slotBox = RectF(slotLeft, navRect.top, slotLeft + navSlotW, navRect.bottom)
+        canvas.drawRoundRect(slotBox, navRadius, navRadius, navPillBg)
+
+        val afm = arrowPaint.fontMetrics
+        val aY = slotBox.centerY() - (afm.ascent + afm.descent) / 2f
+        canvas.drawText(arrowSymbols[i], slotBox.centerX(), aY, arrowPaint)
+    }
+
+    return bitmap
+}
