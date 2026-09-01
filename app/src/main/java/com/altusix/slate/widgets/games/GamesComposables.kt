@@ -24,6 +24,10 @@ fun generateTicTacToeWidgetBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#50FFFFFF")
 
+    // Dynamic contrast check for accent fill
+    val isAccentLight = ((Color.red(accentColorInt) * 0.2126f) + (Color.green(accentColorInt) * 0.7152f) + (Color.blue(accentColorInt) * 0.0722f)) / 255f > 0.5f
+    val activeIconColor = if (isAccentLight) Color.parseColor("#1C1C1E") else Color.WHITE
+
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w, h)
     } else {
@@ -74,7 +78,7 @@ fun generateTicTacToeWidgetBitmap(
     // Sleek Robot Icon (Left Slot)
     val cx1 = modeRect.left + (halfModeW / 2f)
     val cy1 = modeRect.centerY()
-    val rColor = if (state.isVsRobot) Color.BLACK else secondaryText
+    val rColor = if (state.isVsRobot) activeIconColor else secondaryText
     val rPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = rColor; style = Paint.Style.FILL }
 
     val headW = modeRect.height() * 0.42f
@@ -95,7 +99,7 @@ fun generateTicTacToeWidgetBitmap(
     // Clean Material Person Icon (Right Slot)
     val cx2 = modeRect.left + halfModeW + (halfModeW / 2f)
     val cy2 = modeRect.centerY()
-    val pColor = if (!state.isVsRobot) Color.BLACK else secondaryText
+    val pColor = if (!state.isVsRobot) activeIconColor else secondaryText
     val pPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = pColor; style = Paint.Style.FILL }
 
     val pHeadR = modeRect.height() * 0.13f

@@ -41,9 +41,19 @@ class ThemePreferences(private val context: Context) {
     }
 
     fun updateHomeScreenWidgets() {
-        val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
-            putExtra("com.altusix.slate.EXTRA_THEME_CHANGED", true)
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val providers = appWidgetManager.getInstalledProvidersForPackage(context.packageName, null) ?: return
+
+        for (providerInfo in providers) {
+            val ids = appWidgetManager.getAppWidgetIds(providerInfo.provider) ?: intArrayOf()
+            if (ids.isNotEmpty()) {
+                val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                    component = providerInfo.provider
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                    putExtra("com.altusix.slate.EXTRA_THEME_CHANGED", true)
+                }
+                context.sendBroadcast(intent)
+            }
         }
-        context.sendBroadcast(intent)
     }
 }
