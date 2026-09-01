@@ -134,7 +134,9 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Sliding 8-Puzzle", category = "Games", sizeText = "2x2", receiverClass = GamesPuzzleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Minesweeper Mini", category = "Games", sizeText = "2x2", receiverClass = GamesMinesweeperReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Connect Four", category = "Games", sizeText = "2x2", receiverClass = GamesConnect4Receiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Slate Snake", category = "Games", sizeText = "2x2", receiverClass = GamesSnakeReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Slate Snake", category = "Games", sizeText = "2x2", receiverClass = GamesSnakeReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Lights Out Matrix", category = "Games", sizeText = "2x2", receiverClass = GamesLightsOutReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Micro Brick Breaker", category = "Games", sizeText = "2x2", receiverClass = GamesBreakerReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -2076,5 +2078,489 @@ class GamesSnakeReceiver : BaseGamesReceiver() {
     ) {
         val state = getSnakeState(context, widgetId)
         updateSnakeWidgetViews(context, appWidgetManager, widgetId, state)
+    }
+}
+
+
+
+// --- LIGHTS OUT GAME ENGINE & PERSISTENCE ---
+
+private fun getLightsOutState(context: Context, widgetId: Int): LightsOutState {
+    val prefs = context.getSharedPreferences("slate_lightsout_prefs", Context.MODE_PRIVATE)
+    val lightsStr = prefs.getString("widget_${widgetId}_lights", null)
+    val lights = if (lightsStr.isNullOrEmpty()) {
+        generateSolvableLightsOut()
+    } else {
+        lightsStr.split(",").map { it == "1" }
+    }
+    val moves = prefs.getInt("widget_${widgetId}_moves", 0)
+    val bestMoves = prefs.getInt("widget_${widgetId}_best", 0)
+    val isSolved = lights.none { it }
+
+    return LightsOutState(lights, moves, bestMoves, isSolved)
+}
+
+private fun saveLightsOutState(context: Context, widgetId: Int, state: LightsOutState) {
+    val prefs = context.getSharedPreferences("slate_lightsout_prefs", Context.MODE_PRIVATE)
+    val lightsStr = state.lights.joinToString(",") { if (it) "1" else "0" }
+    prefs.edit()
+        .putString("widget_${widgetId}_lights", lightsStr)
+        .putInt("widget_${widgetId}_moves", state.moves)
+        .putInt("widget_${widgetId}_best", state.bestMoves)
+        .apply()
+}
+
+// Toggles target cell and orthogonal neighbors
+private fun toggleLightsOutMatrix(lights: List<Boolean>, targetIdx: Int): List<Boolean> {
+    val next = lights.toMutableList()
+    val r = targetIdx / 3
+    val c = targetIdx % 3
+
+    val toToggle = mutableListOf(targetIdx)
+    if (r > 0) toToggle.add((r - 1) * 3 + c) // Up
+    if (r < 2) toToggle.add((r + 1) * 3 + c) // Down
+    if (c > 0) toToggle.add(r * 3 + (c - 1)) // Left
+    if (c < 2) toToggle.add(r * 3 + (c + 1)) // Right
+
+    for (idx in toToggle) {
+        next[idx] = !next[idx]
+    }
+    return next
+}
+
+// Scrambles from an all-off board (guarantees solvability)
+private fun generateSolvableLightsOut(): List<Boolean> {
+    while (true) {
+        var board = List(9) { false }
+        val scrambleSteps = (3..7).random()
+        repeat(scrambleSteps) {
+            val randIndex = (0..8).random()
+            board = toggleLightsOutMatrix(board, randIndex)
+        }
+        // Ensure at least 3 lights are active so puzzle isn't trivial
+        if (board.count { it } >= 3) {
+            return board
+        }
+    }
+}
+
+// 11. LIGHTS OUT MATRIX INTERACTIVE (2x2)
+class GamesLightsOutReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val preview = listOf(false, true, false, true, true, true, false, true, false)
+        return generateLightsOutWidgetBitmap(context, config, false, wDp, hDp, -1, LightsOutState(preview, 4, 8, false))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_LIGHTSOUT_TOGGLE" -> {
+                val cellIndex = intent.getIntExtra("EXTRA_CELL_INDEX", -1)
+                val current = getLightsOutState(context, widgetId)
+
+                if (cellIndex in 0..8 && !current.isSolved) {
+                    val nextLights = toggleLightsOutMatrix(current.lights, cellIndex)
+                    val newMoves = current.moves + 1
+                    val isSolved = nextLights.none { it }
+                    val newBest = if (isSolved) {
+                        if (current.bestMoves == 0 || newMoves < current.bestMoves) newMoves else current.bestMoves
+                    } else current.bestMoves
+
+                    val updatedState = LightsOutState(nextLights, newMoves, newBest, isSolved)
+                    saveLightsOutState(context, widgetId, updatedState)
+
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateWidget(context, appWidgetManager, widgetId)
+                }
+            }
+            "com.altusix.slate.ACTION_LIGHTSOUT_RESET" -> {
+                val current = getLightsOutState(context, widgetId)
+                val newBoard = generateSolvableLightsOut()
+                val resetState = LightsOutState(newBoard, 0, current.bestMoves, false)
+                saveLightsOutState(context, widgetId, resetState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_lightsout_layout)
+        val state = getLightsOutState(context, widgetId)
+        val bitmap = generateLightsOutWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val cellIds = intArrayOf(
+            R.id.btn_cell_0, R.id.btn_cell_1, R.id.btn_cell_2,
+            R.id.btn_cell_3, R.id.btn_cell_4, R.id.btn_cell_5,
+            R.id.btn_cell_6, R.id.btn_cell_7, R.id.btn_cell_8
+        )
+
+        for (i in 0..8) {
+            val toggleIntent = Intent(context, GamesLightsOutReceiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_LIGHTSOUT_TOGGLE"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("EXTRA_CELL_INDEX", i)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + cellIds[i],
+                toggleIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(cellIds[i], pendingIntent)
+        }
+
+        val resetIntent = Intent(context, GamesLightsOutReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_LIGHTSOUT_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// --- MICRO BRICK BREAKER ENGINE & PERSISTENCE ---
+
+private fun getBreakerState(context: Context, widgetId: Int): BreakerState {
+    val prefs = context.getSharedPreferences("slate_breaker_prefs", Context.MODE_PRIVATE)
+    val bricksStr = prefs.getString("widget_${widgetId}_bricks", "") ?: ""
+    val bricks = if (bricksStr.isEmpty()) List(40) { true } else bricksStr.split(",").map { it == "1" }
+    val ballX = prefs.getFloat("widget_${widgetId}_bx", 50f)
+    val ballY = prefs.getFloat("widget_${widgetId}_by", 75f)
+    val vx = prefs.getFloat("widget_${widgetId}_vx", 1.6f)
+    val vy = prefs.getFloat("widget_${widgetId}_vy", -2.2f)
+    val paddleX = prefs.getFloat("widget_${widgetId}_px", 50f)
+    val score = prefs.getInt("widget_${widgetId}_score", 0)
+    val lives = prefs.getInt("widget_${widgetId}_lives", 3)
+    val status = prefs.getInt("widget_${widgetId}_status", 0)
+
+    return BreakerState(bricks, ballX, ballY, vx, vy, paddleX, 26f, score, lives, status)
+}
+
+private fun saveBreakerState(context: Context, widgetId: Int, state: BreakerState) {
+    val prefs = context.getSharedPreferences("slate_breaker_prefs", Context.MODE_PRIVATE)
+    val bricksStr = state.bricks.joinToString(",") { if (it) "1" else "0" }
+    prefs.edit()
+        .putString("widget_${widgetId}_bricks", bricksStr)
+        .putFloat("widget_${widgetId}_bx", state.ballX)
+        .putFloat("widget_${widgetId}_by", state.ballY)
+        .putFloat("widget_${widgetId}_vx", state.vx)
+        .putFloat("widget_${widgetId}_vy", state.vy)
+        .putFloat("widget_${widgetId}_px", state.paddleX)
+        .putInt("widget_${widgetId}_score", state.score)
+        .putInt("widget_${widgetId}_lives", state.lives)
+        .putInt("widget_${widgetId}_status", state.status)
+        .apply()
+}
+
+private fun getBreakerSessionId(context: Context, widgetId: Int): Long {
+    val prefs = context.getSharedPreferences("slate_breaker_prefs", Context.MODE_PRIVATE)
+    return prefs.getLong("widget_${widgetId}_session", 0L)
+}
+
+private fun setBreakerSessionId(context: Context, widgetId: Int, session: Long) {
+    val prefs = context.getSharedPreferences("slate_breaker_prefs", Context.MODE_PRIVATE)
+    prefs.edit().putLong("widget_${widgetId}_session", session).apply()
+}
+
+private fun launchBreakerLoop(context: Context, widgetId: Int, sessionId: Long) {
+    CoroutineScope(Dispatchers.Default).launch {
+        try {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+
+            while (true) {
+                val currentSession = getBreakerSessionId(context, widgetId)
+                if (currentSession != sessionId) break
+
+                val state = getBreakerState(context, widgetId)
+                if (state.status != 1) break
+
+                var newBx = state.ballX + state.vx
+                var newBy = state.ballY + state.vy
+                var newVx = state.vx
+                var newVy = state.vy
+                var newLives = state.lives
+                var newScore = state.score
+                var newStatus = state.status
+                val newBricks = state.bricks.toMutableList()
+
+                // Left & Right Arena Walls
+                if (newBx <= 2.5f) {
+                    newBx = 2.5f
+                    newVx = kotlin.math.abs(newVx)
+                } else if (newBx >= 97.5f) {
+                    newBx = 97.5f
+                    newVx = -kotlin.math.abs(newVx)
+                }
+
+                // Top Ceiling Wall
+                if (newBy <= 2.5f) {
+                    newBy = 2.5f
+                    newVy = kotlin.math.abs(newVy)
+                }
+
+                // Paddle Top Surface Collision: Paddle top is at 91.5%, ball radius is ~2.5%
+                // Collision triggers as soon as the ball's bottom edge touches 91.5% (ball center at 89.0%)
+                val paddleTopSurface = 91.5f
+                val ballRadius = 2.5f
+                val halfPad = state.paddleW / 2f
+
+                if (newBy + ballRadius >= paddleTopSurface && state.ballY + ballRadius <= paddleTopSurface + 2f && newVy > 0f) {
+                    if (newBx in (state.paddleX - halfPad - 1.5f)..(state.paddleX + halfPad + 1.5f)) {
+                        newBy = paddleTopSurface - ballRadius // Place ball immediately on top of the paddle
+                        newVy = -kotlin.math.abs(newVy)
+                        val offsetRatio = ((newBx - state.paddleX) / halfPad).coerceIn(-1.2f, 1.2f)
+                        newVx = offsetRatio * 2.5f
+                    }
+                }
+
+                // 8 cols x 5 rows Brick Collision Zone (4% to 36.5% height)
+                if (newBy - ballRadius <= 36.5f && newBy + ballRadius >= 4f) {
+                    val col = (newBx / 12.5f).toInt().coerceIn(0, 7)
+                    val row = ((newBy - 4f) / 6.5f).toInt().coerceIn(0, 4)
+                    val idx = row * 8 + col
+
+                    if (idx in 0 until 40 && newBricks[idx]) {
+                        newBricks[idx] = false
+                        newVy = -newVy
+                        newScore += 5
+
+                        if (newBricks.none { it }) {
+                            newStatus = 3 // WON
+                        }
+                    }
+                }
+
+                // Bottom Floor Fall (When ball completely passes below the paddle)
+                if (newBy > 98f) {
+                    newLives--
+                    if (newLives <= 0) {
+                        newStatus = 4 // GAME OVER
+                    } else {
+                        // Reset above paddle
+                        newBx = state.paddleX
+                        newBy = 85f
+                        newVx = if (kotlin.random.Random.nextBoolean()) 1.6f else -1.6f
+                        newVy = -2.2f
+                    }
+                }
+
+                val nextState = BreakerState(
+                    bricks = newBricks,
+                    ballX = newBx,
+                    ballY = newBy,
+                    vx = newVx,
+                    vy = newVy,
+                    paddleX = state.paddleX,
+                    paddleW = state.paddleW,
+                    score = newScore,
+                    lives = newLives,
+                    status = newStatus
+                )
+
+                saveBreakerState(context, widgetId, nextState)
+                updateBreakerWidgetViews(context, appWidgetManager, widgetId, nextState)
+
+                if (newStatus != 1) break
+                delay(45L)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
+private fun updateBreakerWidgetViews(
+    context: Context,
+    appWidgetManager: AppWidgetManager,
+    widgetId: Int,
+    state: BreakerState
+) {
+    val options = appWidgetManager.getAppWidgetOptions(widgetId)
+    val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+    val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+    val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+    val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+
+    val isResponsive = parseAndLockIsResponsive(context, widgetId)
+    val config = loadSlateWidgetConfig(context, widgetId)
+    val views = RemoteViews(context.packageName, R.layout.widget_games_breaker_layout)
+    val bitmap = generateBreakerWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+    views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+    attachBreakerPendingIntents(context, widgetId, views)
+    appWidgetManager.updateAppWidget(widgetId, views)
+}
+
+private fun attachBreakerPendingIntents(context: Context, widgetId: Int, views: RemoteViews) {
+    // 1. Reset / Start
+    val resetIntent = Intent(context, GamesBreakerReceiver::class.java).apply {
+        action = "com.altusix.slate.ACTION_BREAKER_START_RESET"
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+    }
+    views.setOnClickPendingIntent(
+        R.id.btn_reset,
+        PendingIntent.getBroadcast(
+            context,
+            widgetId * 1000 + R.id.btn_reset,
+            resetIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
+
+    // 2. Pause / Resume
+    val pauseIntent = Intent(context, GamesBreakerReceiver::class.java).apply {
+        action = "com.altusix.slate.ACTION_BREAKER_PAUSE_RESUME"
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+    }
+    views.setOnClickPendingIntent(
+        R.id.btn_pause,
+        PendingIntent.getBroadcast(
+            context,
+            widgetId * 1000 + R.id.btn_pause,
+            pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
+
+    // 3. Move Paddle Left / Right
+    val leftIntent = Intent(context, GamesBreakerReceiver::class.java).apply {
+        action = "com.altusix.slate.ACTION_BREAKER_MOVE"
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        putExtra("EXTRA_DELTA", -12f)
+    }
+    views.setOnClickPendingIntent(
+        R.id.btn_left,
+        PendingIntent.getBroadcast(
+            context,
+            widgetId * 1000 + R.id.btn_left,
+            leftIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
+
+    val rightIntent = Intent(context, GamesBreakerReceiver::class.java).apply {
+        action = "com.altusix.slate.ACTION_BREAKER_MOVE"
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        putExtra("EXTRA_DELTA", 12f)
+    }
+    views.setOnClickPendingIntent(
+        R.id.btn_right,
+        PendingIntent.getBroadcast(
+            context,
+            widgetId * 1000 + R.id.btn_right,
+            rightIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
+}
+
+// 12. MICRO BRICK BREAKER INTERACTIVE (2x2)
+class GamesBreakerReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val previewBricks = List(40) { index -> index % 3 != 0 }
+        return generateBreakerWidgetBitmap(context, config, false, wDp, hDp, -1, BreakerState(previewBricks, 45f, 65f, 1.6f, -2.2f, 50f, 26f, 120, 3, 1))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_BREAKER_START_RESET" -> {
+                val newSession = System.currentTimeMillis()
+                setBreakerSessionId(context, widgetId, newSession)
+
+                val startState = BreakerState(
+                    bricks = List(40) { true },
+                    ballX = 50f,
+                    ballY = 75f,
+                    vx = if (kotlin.random.Random.nextBoolean()) 1.6f else -1.6f,
+                    vy = -2.2f,
+                    paddleX = 50f,
+                    paddleW = 26f,
+                    score = 0,
+                    lives = 3,
+                    status = 1
+                )
+                saveBreakerState(context, widgetId, startState)
+
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateBreakerWidgetViews(context, appWidgetManager, widgetId, startState)
+                launchBreakerLoop(context, widgetId, newSession)
+            }
+            "com.altusix.slate.ACTION_BREAKER_PAUSE_RESUME" -> {
+                val current = getBreakerState(context, widgetId)
+                if (current.status == 1) {
+                    // Pause Game
+                    val pausedState = current.copy(status = 2)
+                    saveBreakerState(context, widgetId, pausedState)
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateBreakerWidgetViews(context, appWidgetManager, widgetId, pausedState)
+                } else if (current.status == 2) {
+                    // Resume Game
+                    val newSession = System.currentTimeMillis()
+                    setBreakerSessionId(context, widgetId, newSession)
+                    val resumedState = current.copy(status = 1)
+                    saveBreakerState(context, widgetId, resumedState)
+
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateBreakerWidgetViews(context, appWidgetManager, widgetId, resumedState)
+                    launchBreakerLoop(context, widgetId, newSession)
+                }
+            }
+            "com.altusix.slate.ACTION_BREAKER_MOVE" -> {
+                val delta = intent.getFloatExtra("EXTRA_DELTA", 0f)
+                val current = getBreakerState(context, widgetId)
+
+                val halfPad = current.paddleW / 2f
+                val newPadX = (current.paddleX + delta).coerceIn(halfPad, 100f - halfPad)
+                saveBreakerState(context, widgetId, current.copy(paddleX = newPadX))
+
+                if (current.status != 1) {
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateBreakerWidgetViews(context, appWidgetManager, widgetId, current.copy(paddleX = newPadX))
+                }
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val state = getBreakerState(context, widgetId)
+        updateBreakerWidgetViews(context, appWidgetManager, widgetId, state)
     }
 }

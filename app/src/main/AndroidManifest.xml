@@ -2590,6 +2590,34 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 11. Lights Out Matrix Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesLightsOutReceiver"
+            android:exported="true"
+            android:label="Slate Lights Out">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_LIGHTSOUT_TOGGLE" />
+                <action android:name="com.altusix.slate.ACTION_LIGHTSOUT_RESET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 12. Micro Brick Breaker Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesBreakerReceiver"
+            android:exported="true"
+            android:label="Slate Brick Breaker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_BREAKER_START_RESET" />
+                <action android:name="com.altusix.slate.ACTION_BREAKER_MOVE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
 
