@@ -2506,6 +2506,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 5. Coin Flip Interactive (2x2) -->
+        <receiver
+            android:name=".widgets.games.GamesCoinFlipReceiver"
+            android:exported="true"
+            android:label="Slate Coin Flip">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.ACTION_COIN_FLIP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>

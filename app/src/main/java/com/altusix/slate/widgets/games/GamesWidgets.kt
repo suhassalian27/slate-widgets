@@ -126,7 +126,8 @@ fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Tic Tac Toe", category = "Games", sizeText = "2x2", receiverClass = GamesTicTacToeReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "2048 Micro", category = "Games", sizeText = "2x2", receiverClass = Games2048Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Rock Paper Scissors", category = "Games", sizeText = "2x2", receiverClass = GamesRpsReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Dice Roller", category = "Games", sizeText = "2x2", receiverClass = GamesDiceReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Dice Roller", category = "Games", sizeText = "2x2", receiverClass = GamesDiceReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Coin Flip", category = "Games", sizeText = "2x2", receiverClass = GamesCoinFlipReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -743,6 +744,148 @@ class GamesDiceReceiver : BaseGamesReceiver() {
             context,
             widgetId,
             rollIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+
+// --- COIN FLIP GAME ENGINE & PERSISTENCE ---
+
+private fun getCoinFlipState(context: Context, widgetId: Int): CoinFlipState {
+    val prefs = context.getSharedPreferences("slate_coin_prefs", Context.MODE_PRIVATE)
+    val isHeads = prefs.getBoolean("widget_${widgetId}_is_heads", true)
+    return CoinFlipState(isHeads = isHeads, flipAngleDeg = 0f, scale = 1.0f, offsetY = 0f)
+}
+
+private fun saveCoinFlipState(context: Context, widgetId: Int, state: CoinFlipState) {
+    val prefs = context.getSharedPreferences("slate_coin_prefs", Context.MODE_PRIVATE)
+    prefs.edit()
+        .putBoolean("widget_${widgetId}_is_heads", state.isHeads)
+        .apply()
+}
+
+// 5. COIN FLIP INTERACTIVE (2x2)
+class GamesCoinFlipReceiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateCoinFlipWidgetBitmap(context, config, false, wDp, hDp, -1, CoinFlipState(isHeads = true, flipAngleDeg = 0f, scale = 1.0f))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        if (intent.action == "com.altusix.slate.ACTION_COIN_FLIP") {
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                    val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                    val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
+                    val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
+                    val wDp = if (wDpRaw <= 0) 200 else wDpRaw
+                    val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+
+                    val isResponsive = parseAndLockIsResponsive(context, widgetId)
+                    val config = loadSlateWidgetConfig(context, widgetId)
+
+                    val currentState = getCoinFlipState(context, widgetId)
+                    val finalIsHeads = kotlin.random.Random.nextBoolean()
+
+                    // 5 full 360° revolutions for extended airtime
+                    val extraTurns = if (currentState.isHeads == finalIsHeads) 0f else 180f
+                    val totalFlipDegrees = (360f * 5f) + extraTurns
+
+                    // 26 frames spanning ~1.8s total duration
+                    val totalFrames = 26
+
+                    for (frame in 0 until totalFrames) {
+                        val t = frame.toFloat() / (totalFrames - 1).toFloat()
+                        val isFinal = frame == totalFrames - 1
+
+                        // 1. Smooth Decelerating Spin Curve
+                        val easeProgress = 1f - (1f - t).pow(2.2f)
+                        val angle = if (isFinal) 0f else (totalFlipDegrees * easeProgress)
+
+                        // 2. High Parabolic Toss Arc
+                        val decay = (1f - t).pow(1.3f)
+                        val offsetY = if (isFinal) 0f else (-22f * sin(t * Math.PI.toFloat()).coerceAtLeast(0f) * decay)
+
+                        // 3. Elevation Scale Pop
+                        val scale = if (isFinal) 1.0f else (1.0f + (0.10f * sin(t * Math.PI.toFloat()) * decay))
+
+                        val frameState = CoinFlipState(
+                            isHeads = if (isFinal) finalIsHeads else currentState.isHeads,
+                            flipAngleDeg = angle,
+                            scale = scale,
+                            offsetY = offsetY
+                        )
+
+                        if (isFinal) {
+                            saveCoinFlipState(context, widgetId, frameState)
+                        }
+
+                        val bitmap = generateCoinFlipWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, frameState)
+                        val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
+                        views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
+
+                        val flipIntent = Intent(context, GamesCoinFlipReceiver::class.java).apply {
+                            action = "com.altusix.slate.ACTION_COIN_FLIP"
+                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                        }
+                        val pendingIntent = PendingIntent.getBroadcast(
+                            context,
+                            widgetId,
+                            flipIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
+
+                        appWidgetManager.updateAppWidget(widgetId, views)
+
+                        if (!isFinal) {
+                            // Eased frame delay scaling from 48ms up to 105ms at landing
+                            val frameDelay = (48L + (58L * t.pow(1.6f)).toLong())
+                            delay(frameDelay)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    pendingResult.finish()
+                }
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        widgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
+        val state = getCoinFlipState(context, widgetId)
+        val bitmap = generateCoinFlipWidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
+
+        val flipIntent = Intent(context, GamesCoinFlipReceiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_COIN_FLIP"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            widgetId,
+            flipIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)

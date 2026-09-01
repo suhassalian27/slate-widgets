@@ -990,7 +990,7 @@ fun generateDiceWidgetBitmap(
     val pad = (minCardDim * 0.06f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
 
     // Sized so rotated corner diagonal fits safely inside padded bounds
-    val baseSize = (minCardDim - (pad * 2f)) * 0.62f
+    val baseSize = (minCardDim - (pad * 2f)) * 0.75f
     val dieSize = baseSize * state.scale
     val dieRadius = (dieSize * 0.24f).coerceAtLeast(scaleFactor * 8f)
 
@@ -1083,5 +1083,144 @@ fun generateDiceWidgetBitmap(
     }
 
     canvas.restore()
+    return bitmap
+}
+
+data class CoinFlipState(
+    val isHeads: Boolean = true,
+    val flipAngleDeg: Float = 0f,
+    val scale: Float = 1.0f,
+    val offsetY: Float = 0f
+)
+
+// 5. COIN FLIP INTERACTIVE (2x2 - Minimalist 3D Coin)
+fun generateCoinFlipWidgetBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    state: CoinFlipState = CoinFlipState()
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val minCardDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minCardDim * 0.06f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
+    val baseRadius = (minCardDim - (pad * 2f)) * 0.36f * state.scale
+
+    val maxOffset = pad * 0.75f
+    val clampedOffsetY = (state.offsetY * scaleFactor).coerceIn(-maxOffset, maxOffset)
+
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY() + clampedOffsetY
+
+    // 3D Vertical Flip Projection (Cosine squash on Y axis)
+    val angleRad = Math.toRadians(state.flipAngleDeg.toDouble())
+    val pitchCos = kotlin.math.cos(angleRad).toFloat()
+    val absPitch = kotlin.math.abs(pitchCos).coerceAtLeast(0.04f)
+
+    // Check which face is currently pointing toward the camera during continuous spin
+    val normalizedAngle = ((state.flipAngleDeg % 360f) + 360f) % 360f
+    val isFrontFacing = normalizedAngle in 0f..90f || normalizedAngle in 270f..360f
+    val showingHeads = if (isFrontFacing) state.isHeads else !state.isHeads
+
+    val coinW = baseRadius * 2f
+    val coinH = baseRadius * 2f * absPitch
+
+    val coinRect = RectF(cx - coinW / 2f, cy - coinH / 2f, cx + coinW / 2f, cy + coinH / 2f)
+
+    // 1. 3D Edge Rim (drawn when coin is at an angle)
+    if (absPitch < 0.85f) {
+        val edgeThickness = (scaleFactor * 7f * (1f - absPitch)).coerceAtLeast(scaleFactor * 1.5f)
+        val edgeRect = RectF(coinRect.left, coinRect.top + edgeThickness, coinRect.right, coinRect.bottom + edgeThickness)
+        val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(140, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+            style = Paint.Style.FILL
+        }
+        canvas.drawOval(edgeRect, edgePaint)
+    }
+
+    // 2. Coin Face Background
+    val coinFacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#F4F4F7") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(coinRect, coinFacePaint)
+
+    // 3. Ambient Accent Glow Layer
+    val accentGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(28, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(coinRect, accentGlowPaint)
+
+    // 4. Outer Accent Rim
+    val outerRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(90, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.5f
+    }
+    canvas.drawOval(coinRect, outerRimPaint)
+
+    // 5. Inner Concentric Ring
+    val innerInsetX = coinW * 0.11f
+    val innerInsetY = coinH * 0.11f
+    val innerRect = RectF(coinRect.left + innerInsetX, coinRect.top + innerInsetY, coinRect.right - innerInsetX, coinRect.bottom - innerInsetY)
+    val innerRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(45, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.5f
+    }
+    canvas.drawOval(innerRect, innerRimPaint)
+
+    // 6. Central Face Monogram & Symbol (Flattens gracefully with pitch)
+    if (absPitch > 0.18f) {
+        val letter = if (showingHeads) "H" else "T"
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            textSize = (baseRadius * 0.78f * absPitch).coerceAtLeast(scaleFactor * 6f)
+            typeface = getSlateFont(context, weight = 900)
+            textAlign = Paint.Align.CENTER
+        }
+        val fm = textPaint.fontMetrics
+        val textY = cy - (fm.ascent + fm.descent) / 2f
+        canvas.drawText(letter, cx, textY, textPaint)
+
+        // Subtle Top/Bottom Face Beads
+        val beadPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+        val beadR = scaleFactor * 2.2f * absPitch
+        val beadOffsetY = coinH * 0.32f
+        canvas.drawCircle(cx, cy - beadOffsetY, beadR, beadPaint)
+        canvas.drawCircle(cx, cy + beadOffsetY, beadR, beadPaint)
+    }
+
     return bitmap
 }
