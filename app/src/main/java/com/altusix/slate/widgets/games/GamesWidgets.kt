@@ -114,7 +114,8 @@ abstract class BaseGamesReceiver : AppWidgetProvider() {
 
 fun getGamesWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo(name = "Tic Tac Toe", category = "Games", sizeText = "2x2", receiverClass = GamesTicTacToeReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Tic Tac Toe", category = "Games", sizeText = "2x2", receiverClass = GamesTicTacToeReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "2048 Micro", category = "Games", sizeText = "2x2", receiverClass = Games2048Receiver::class.java, hasModeOption = true)
     )
 }
 
@@ -217,6 +218,233 @@ class GamesTicTacToeReceiver : BaseGamesReceiver() {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
         }
         views.setOnClickPendingIntent(R.id.btn_reset, PendingIntent.getBroadcast(context, widgetId * 100 + 22, resetIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+
+// --- 2048 GAME ENGINE ---
+private fun get2048State(context: Context, widgetId: Int): State2048 {
+    val prefs = context.getSharedPreferences("slate_2048_prefs", Context.MODE_PRIVATE)
+    val boardStr = prefs.getString("widget_${widgetId}_board", null)
+    val score = prefs.getInt("widget_${widgetId}_score", 0)
+    val bestScore = prefs.getInt("widget_${widgetId}_best_score", 0)
+
+    if (boardStr == null) {
+        val initialBoard = IntArray(16)
+        spawnRandomTile(initialBoard)
+        spawnRandomTile(initialBoard)
+        return State2048(board = initialBoard, score = 0, bestScore = bestScore)
+    }
+
+    val board = boardStr.split(",").map { it.trim().toIntOrNull() ?: 0 }.toIntArray()
+    val isGameOver = is2048GameOver(board)
+    val hasWon = board.any { it >= 2048 }
+
+    return State2048(board, score, bestScore, isGameOver, hasWon)
+}
+
+private fun save2048State(context: Context, widgetId: Int, state: State2048) {
+    val prefs = context.getSharedPreferences("slate_2048_prefs", Context.MODE_PRIVATE)
+    val boardStr = state.board.joinToString(",")
+    val newBest = maxOf(state.score, state.bestScore)
+    prefs.edit()
+        .putString("widget_${widgetId}_board", boardStr)
+        .putInt("widget_${widgetId}_score", state.score)
+        .putInt("widget_${widgetId}_best_score", newBest)
+        .apply()
+}
+
+private fun spawnRandomTile(board: IntArray) {
+    val emptyIndices = board.indices.filter { board[it] == 0 }
+    if (emptyIndices.isNotEmpty()) {
+        val target = emptyIndices.random()
+        board[target] = if (Math.random() < 0.9) 2 else 4
+    }
+}
+
+private fun is2048GameOver(board: IntArray): Boolean {
+    if (board.any { it == 0 }) return false
+    for (r in 0..3) {
+        for (c in 0..3) {
+            val v = board[r * 4 + c]
+            if (c < 3 && v == board[r * 4 + (c + 1)]) return false
+            if (r < 3 && v == board[(r + 1) * 4 + c]) return false
+        }
+    }
+    return true
+}
+
+private fun slideAndMergeRow(row: IntArray): Pair<IntArray, Int> {
+    val nonZero = row.filter { it != 0 }.toMutableList()
+    var addedScore = 0
+    val merged = ArrayList<Int>()
+
+    var i = 0
+    while (i < nonZero.size) {
+        if (i + 1 < nonZero.size && nonZero[i] == nonZero[i + 1]) {
+            val newVal = nonZero[i] * 2
+            merged.add(newVal)
+            addedScore += newVal
+            i += 2
+        } else {
+            merged.add(nonZero[i])
+            i += 1
+        }
+    }
+
+    while (merged.size < 4) merged.add(0)
+    return Pair(merged.toIntArray(), addedScore)
+}
+
+private fun process2048Move(currentState: State2048, direction: String): State2048 {
+    val board = currentState.board.clone()
+    var totalAddedScore = 0
+    var changed = false
+
+    when (direction) {
+        "LEFT" -> {
+            for (r in 0..3) {
+                val row = intArrayOf(board[r * 4], board[r * 4 + 1], board[r * 4 + 2], board[r * 4 + 3])
+                val (newRow, pts) = slideAndMergeRow(row)
+                totalAddedScore += pts
+                for (c in 0..3) {
+                    if (board[r * 4 + c] != newRow[c]) changed = true
+                    board[r * 4 + c] = newRow[c]
+                }
+            }
+        }
+        "RIGHT" -> {
+            for (r in 0..3) {
+                val row = intArrayOf(board[r * 4 + 3], board[r * 4 + 2], board[r * 4 + 1], board[r * 4])
+                val (newRow, pts) = slideAndMergeRow(row)
+                totalAddedScore += pts
+                for (c in 0..3) {
+                    if (board[r * 4 + (3 - c)] != newRow[c]) changed = true
+                    board[r * 4 + (3 - c)] = newRow[c]
+                }
+            }
+        }
+        "UP" -> {
+            for (c in 0..3) {
+                val col = intArrayOf(board[c], board[4 + c], board[8 + c], board[12 + c])
+                val (newCol, pts) = slideAndMergeRow(col)
+                totalAddedScore += pts
+                for (r in 0..3) {
+                    if (board[r * 4 + c] != newCol[r]) changed = true
+                    board[r * 4 + c] = newCol[r]
+                }
+            }
+        }
+        "DOWN" -> {
+            for (c in 0..3) {
+                val col = intArrayOf(board[12 + c], board[8 + c], board[4 + c], board[c])
+                val (newCol, pts) = slideAndMergeRow(col)
+                totalAddedScore += pts
+                for (r in 0..3) {
+                    if (board[(3 - r) * 4 + c] != newCol[r]) changed = true
+                    board[(3 - r) * 4 + c] = newCol[r]
+                }
+            }
+        }
+    }
+
+    if (changed) {
+        spawnRandomTile(board)
+    }
+
+    val newScore = currentState.score + totalAddedScore
+    val bestScore = maxOf(newScore, currentState.bestScore)
+    val isGameOver = is2048GameOver(board)
+    val hasWon = board.any { it >= 2048 }
+
+    return State2048(board, newScore, bestScore, isGameOver, hasWon)
+}
+
+// 2. 2048 MICRO INTERACTIVE (2x2)
+class Games2048Receiver : BaseGamesReceiver() {
+
+    fun renderWidgetBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val previewBoard = intArrayOf(
+            2, 4, 8, 16,
+            32, 64, 128, 256,
+            512, 1024, 2048, 0,
+            2, 4, 0, 0
+        )
+        return generate2048WidgetBitmap(context, config, false, wDp, hDp, -1, State2048(previewBoard, 3840, 5120))
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        when (intent.action) {
+            "com.altusix.slate.ACTION_2048_MOVE" -> {
+                val dir = intent.getStringExtra("MOVE_DIRECTION") ?: return
+                var state = get2048State(context, widgetId)
+                if (!state.isGameOver) {
+                    state = process2048Move(state, dir)
+                    save2048State(context, widgetId, state)
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateWidget(context, appWidgetManager, widgetId)
+                }
+            }
+            "com.altusix.slate.ACTION_2048_RESET" -> {
+                val current = get2048State(context, widgetId)
+                val newBoard = IntArray(16)
+                spawnRandomTile(newBoard)
+                spawnRandomTile(newBoard)
+                val freshState = State2048(newBoard, 0, current.bestScore)
+                save2048State(context, widgetId, freshState)
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                updateWidget(context, appWidgetManager, widgetId)
+            }
+        }
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) {
+        val views = RemoteViews(context.packageName, R.layout.widget_games_2048_layout)
+        val state = get2048State(context, widgetId)
+        val bitmap = generate2048WidgetBitmap(context, config, isResponsive, wDp, hDp, widgetId, state)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val directions = mapOf(
+            R.id.btn_left to "LEFT",
+            R.id.btn_up to "UP",
+            R.id.btn_down to "DOWN",
+            R.id.btn_right to "RIGHT"
+        )
+
+        for ((btnId, dir) in directions) {
+            val moveIntent = Intent(context, Games2048Receiver::class.java).apply {
+                action = "com.altusix.slate.ACTION_2048_MOVE"
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("MOVE_DIRECTION", dir)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + btnId,
+                moveIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(btnId, pendingIntent)
+        }
+
+        val resetIntent = Intent(context, Games2048Receiver::class.java).apply {
+            action = "com.altusix.slate.ACTION_2048_RESET"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_reset,
+            PendingIntent.getBroadcast(
+                context,
+                widgetId * 1000 + R.id.btn_reset,
+                resetIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
