@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_canvas_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <!-- Wide Search Action (Google logo and capsule body) -->
+        <FrameLayout
+            android:id="@+id/btn_google_search"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <!-- Speech / Mic Action (50dp width) -->
+        <FrameLayout
+            android:id="@+id/btn_google_mic"
+            android:layout_width="50dp"
+            android:layout_height="match_parent" />
+
+        <!-- Gemini Action (50dp width) -->
+        <FrameLayout
+            android:id="@+id/btn_google_gemini"
+            android:layout_width="50dp"
+            android:layout_height="match_parent" />
+
+        <!-- Lens Action (54dp width covering the right capsule curve) -->
+        <FrameLayout
+            android:id="@+id/btn_google_lens"
+            android:layout_width="54dp"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+</FrameLayout>

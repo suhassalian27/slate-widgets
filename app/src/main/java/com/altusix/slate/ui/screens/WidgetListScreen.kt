@@ -49,6 +49,7 @@ import com.altusix.slate.widgets.compass.getCompassWidgetsCatalog
 import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
 import com.altusix.slate.widgets.deviceinfo.getDeviceInfoWidgetsCatalog
 import com.altusix.slate.widgets.games.getGamesWidgetsCatalog
+import com.altusix.slate.widgets.google.getGoogleWidgetsCatalog
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -78,12 +79,13 @@ fun WidgetListScreen(
     val contactsWidgets = remember { getContactsWidgetsCatalog() }
     val deviceInfoWidgets = remember { getDeviceInfoWidgetsCatalog() }
     val gamesWidgets = remember { getGamesWidgetsCatalog() }
+    val googleWidgets = remember { getGoogleWidgetsCatalog() }
 
     val categories = remember {
         listOf(
             "All", "AI", "App Folder", "App Launcher", "Battery", "Bluetooth",
             "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital",
-            "Clock - Hybrid", "Compass", "Contacts", "Device", "Games"
+            "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google"
         )
     }
 
@@ -179,9 +181,11 @@ fun WidgetListScreen(
                     13 -> contactsWidgets
                     14 -> deviceInfoWidgets
                     15 -> gamesWidgets
+                    16 -> googleWidgets
                     else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
                             calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
-                            clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets + deviceInfoWidgets + gamesWidgets
+                            clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets +
+                            deviceInfoWidgets + gamesWidgets + googleWidgets
                 }
             }
 
@@ -307,7 +311,7 @@ fun SleekWidgetCard(
         Box(
             modifier = previewHeightModifier
                 .clip(innerShape)
-                .background(Color(0xFF41434B)),
+                .background(Color(0xFF5A5C65)),
             contentAlignment = Alignment.Center
         ) {
             SlateWidgetPreviewImage(

@@ -2632,6 +2632,15 @@
         </receiver>
 
 
+        <!-- ================================================================= -->
+        <!-- GOOGLE WIDGETS                                                    -->
+        <!-- ================================================================= -->
+
+        <!-- 1. Google Search Capsule (4x1) -->
+        <receiver android:name=".widgets.google.GoogleSearchCapsuleReceiver" android:exported="true" android:label="Slate Google Search Capsule">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
+        </receiver>
 
 
     </application>
