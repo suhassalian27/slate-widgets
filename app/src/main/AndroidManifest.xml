@@ -2641,6 +2641,23 @@
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_4x1" />
         </receiver>
+        <!-- 2. Google Workspace Quad (2x2) -->
+        <receiver android:name=".widgets.google.GoogleWorkspaceQuadReceiver" android:exported="true" android:label="Slate Workspace Hub">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 3. Google Trio Bento (2x2) -->
+        <receiver
+            android:name=".widgets.google.GoogleTrioReceiver"
+            android:exported="true"
+            android:label="Slate Google Trio">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>
