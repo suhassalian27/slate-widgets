@@ -15,6 +15,7 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import android.speech.RecognizerIntent
 
 fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -24,7 +25,8 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Google Mega Folder", "4x2", "Google", GoogleMegaFolderReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Media Discovery Capsule", "3x1", "Google", GoogleMediaCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Lightbar Horizon", "2x2", "Google", GoogleLightbarReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Lens Viewfinder", "2x2", "Google", GoogleLensReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Lens Viewfinder", "2x2", "Google", GoogleLensReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Search Action Dock", "3x2", "Google", GoogleSearchDockReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -37,7 +39,8 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleMegaFolderReceiver::class.java,
         GoogleMediaCapsuleReceiver::class.java,
         GoogleLightbarReceiver::class.java,
-        GoogleLensReceiver::class.java
+        GoogleLensReceiver::class.java,
+        GoogleSearchDockReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -553,7 +556,7 @@ class GoogleMediaCapsuleReceiver : BaseGoogleReceiver() {
     }
 }
 
-// 6. GOOGLE LIGHTBAR HORIZON / GEMINI LIVE AURA (2x2)
+// 6. GOOGLE LIGHTBAR HORIZON (2x2)
 class GoogleLightbarReceiver : BaseGoogleReceiver() {
 
     private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
@@ -586,54 +589,23 @@ class GoogleLightbarReceiver : BaseGoogleReceiver() {
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
 
-        // Single-container layout with whole-widget click
         val views = RemoteViews(context.packageName, R.layout.widget_image_container)
         val bitmap = generateGoogleLightbarBitmap(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        val liveVoiceIntent = getGeminiLiveVoiceIntent(context)
+        // Launches the Gemini Live Voice session directly
+        val geminiLiveVoiceIntent = Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
         val pendingIntent = PendingIntent.getActivity(
             context,
             widgetId,
-            liveVoiceIntent,
+            geminiLiveVoiceIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
 
         appWidgetManager.updateAppWidget(widgetId, views)
-    }
-
-    private fun getGeminiLiveVoiceIntent(context: Context): Intent {
-        val pm = context.packageManager
-
-        val directAssistantIntent = Intent(Intent.ACTION_ASSIST).apply {
-            setPackage("com.google.android.googlequicksearchbox")
-            putExtra("android.intent.extra.ASSIST_INPUT_HINT_KEYBOARD", false)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-        }
-
-        val opaVoiceIntent = Intent("com.google.android.googlequicksearchbox.action.OPA_VOICE_SEARCH").apply {
-            setPackage("com.google.android.googlequicksearchbox")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-
-        val voiceAssistIntent = Intent("android.intent.action.VOICE_ASSIST").apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-
-        val geminiAppIntent = pm.getLaunchIntentForPackage("com.google.android.apps.bard")?.apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-
-        return when {
-            directAssistantIntent.resolveActivity(pm) != null -> directAssistantIntent
-            opaVoiceIntent.resolveActivity(pm) != null -> opaVoiceIntent
-            voiceAssistIntent.resolveActivity(pm) != null -> voiceAssistIntent
-            geminiAppIntent != null -> geminiAppIntent
-            else -> Intent(Intent.ACTION_VIEW, Uri.parse("https://gemini.google.com")).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-        }
     }
 }
 
@@ -717,3 +689,102 @@ class GoogleLensReceiver : BaseGoogleReceiver() {
     }
 }
 
+// 8. GOOGLE SEARCH & ACTION DOCK (3x2)
+class GoogleSearchDockReceiver : BaseGoogleReceiver() {
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleSearchDockBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 260) ?: 260 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 260) ?: 260
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 130) ?: 130 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 130) ?: 130
+        val wDp = if (wDpRaw <= 0) 260 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 130 else hDpRaw
+
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_google_search_action_dock_layout)
+        val bitmap = generateGoogleSearchDockBitmap(context, config, false, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pm = context.packageManager
+
+        // 1. Text Search Intent (Search Pill Body)
+        val directSearchIntent = Intent().apply {
+            setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val fallbackSearchIntent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+            putExtra(SearchManager.QUERY, "")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val searchIntent = if (directSearchIntent.resolveActivity(pm) != null) directSearchIntent else fallbackSearchIntent
+
+        // 2. Bar Microphone: Widget 1 Voice Assistant Trigger
+        val voiceAssistIntent = Intent("android.intent.action.VOICE_ASSIST").apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val assistIntent = Intent(Intent.ACTION_ASSIST).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val googleOpaVoiceIntent = Intent("com.google.android.googlequicksearchbox.action.OPA_VOICE_SEARCH").apply {
+            setPackage("com.google.android.googlequicksearchbox")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val safeBarMicIntent = when {
+            voiceAssistIntent.resolveActivity(pm) != null -> voiceAssistIntent
+            assistIntent.resolveActivity(pm) != null -> assistIntent
+            googleOpaVoiceIntent.resolveActivity(pm) != null -> googleOpaVoiceIntent
+            else -> voiceAssistIntent
+        }
+
+        // 3. Bottom Disc 1 (Gemini Icon): Restored to the working Voice Intent
+        val geminiLiveVoiceIntent = Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        // 4. Bottom Disc 2 (Lens Icon)
+        val standaloneLens = Intent().apply {
+            setClassName("com.google.ar.lens", "com.google.vr.apps.ornament.app.lens.LensLauncherActivity")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val gsaLens = Intent().apply {
+            setClassName("com.google.android.googlequicksearchbox", "com.google.android.apps.search.lens.LensActivity")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val lensIntent = when {
+            standaloneLens.resolveActivity(pm) != null -> standaloneLens
+            gsaLens.resolveActivity(pm) != null -> gsaLens
+            else -> pm.getLaunchIntentForPackage("com.google.ar.lens") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://lens.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        }
+
+        // 5. Bottom Disc 3: Chrome Browser Launch Intent
+        val chromeIntent = pm.getLaunchIntentForPackage("com.android.chrome")?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        } ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+
+        views.setOnClickPendingIntent(
+            R.id.touch_slot_search_pill,
+            PendingIntent.getActivity(context, widgetId * 100 + 1, searchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+        views.setOnClickPendingIntent(
+            R.id.touch_slot_pill_mic,
+            PendingIntent.getActivity(context, widgetId * 100 + 2, safeBarMicIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+        views.setOnClickPendingIntent(
+            R.id.touch_slot_action_mic,
+            PendingIntent.getActivity(context, widgetId * 100 + 3, geminiLiveVoiceIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+        views.setOnClickPendingIntent(
+            R.id.touch_slot_action_lens,
+            PendingIntent.getActivity(context, widgetId * 100 + 4, lensIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+        views.setOnClickPendingIntent(
+            R.id.touch_slot_action_incognito,
+            PendingIntent.getActivity(context, widgetId * 100 + 5, chromeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}

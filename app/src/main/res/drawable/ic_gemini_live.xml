@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Gemini Sparkle (Top apex touches Y=0.0, centered over Bar 3 at X=18.4) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18.4,0 Q18.4,4 22.4,4 Q18.4,4 18.4,8 Q18.4,4 14.4,4 Q18.4,4 18.4,0 Z" />
+
+    <!-- Bar 1: Left Medium (3.0dp thick, centered at X=5.6, Y=14.0) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.1,11.0 A1.5,1.5 0 0,1 7.1,11.0 L7.1,17.0 A1.5,1.5 0 0,1 4.1,17.0 Z" />
+
+    <!-- Bar 2: Center Tall (3.0dp thick, dead-center at X=12.0, bottom touches Y=24.0) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.5,5.5 A1.5,1.5 0 0,1 13.5,5.5 L13.5,22.5 A1.5,1.5 0 0,1 10.5,22.5 Z" />
+
+    <!-- Bar 3: Right Short (3.0dp thick, centered at X=18.4, Y=14.0) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.9,13.0 A1.5,1.5 0 0,1 19.9,13.0 L19.9,15.0 A1.5,1.5 0 0,1 16.9,15.0 Z" />
+</vector>

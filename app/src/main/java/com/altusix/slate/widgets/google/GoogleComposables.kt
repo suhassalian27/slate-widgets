@@ -1013,3 +1013,119 @@ fun generateGoogleLensViewfinderBitmap(
 
     return bitmap
 }
+
+// 8. GOOGLE SEARCH & ACTION DOCK (3x2 / True Fixed Floating Dock)
+fun generateGoogleSearchDockBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. True Fixed Aspect Anchor (Fixed 2.08 ratio)
+    val baseContentW = 260f * scaleFactor
+    val baseContentH = 125f * scaleFactor
+    val contentRatio = baseContentW / baseContentH
+
+    val bounds = run {
+        var fitW = w
+        var fitH = fitW / contentRatio
+        if (fitH > h) {
+            fitH = h
+            fitW = fitH * contentRatio
+        }
+        val left = (w - fitW) / 2f
+        val top = (h - fitH) / 2f
+        RectF(left, top, left + fitW, top + fitH)
+    }
+
+    val scale = bounds.width() / baseContentW
+
+    // 2. Theme Background Fill with Opacity
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+
+    // 3. Search Pill
+    val pillH = 50f * scaleFactor * scale
+    val pillRect = RectF(bounds.left, bounds.top, bounds.right, bounds.top + pillH)
+    val pillRadius = pillH / 2f
+    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, tilePaint)
+
+    // Pill: Google 'G' Logo
+    val logoSize = (pillH * 0.48f).toInt()
+    val logoLeft = (pillRect.left + pillH * 0.32f).toInt()
+    val logoTop = (pillRect.centerY() - logoSize / 2f).toInt()
+    ContextCompat.getDrawable(context, R.drawable.ic_google_logo)?.mutate()?.apply {
+        setBounds(logoLeft, logoTop, logoLeft + logoSize, logoTop + logoSize)
+        draw(canvas)
+    }
+
+    // Pill: "Search Google" Prompt
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#66666E") else Color.parseColor("#9E9EA6")
+        textSize = 15f * scaleFactor * scale
+        typeface = getSlateFont(context, weight = 400)
+        textAlign = Paint.Align.LEFT
+    }
+    val textX = logoLeft + logoSize + (14f * scaleFactor * scale)
+    val fm = textPaint.fontMetrics
+    val textY = pillRect.centerY() - (fm.ascent + fm.descent) / 2f
+    canvas.drawText("Search Google", textX, textY, textPaint)
+
+    // Pill: Mic Glyph (Right)
+    val pillMicSize = (pillH * 0.48f).toInt()
+    val pillMicRight = (pillRect.right - pillH * 0.34f).toInt()
+    val pillMicTop = (pillRect.centerY() - pillMicSize / 2f).toInt()
+    ContextCompat.getDrawable(context, R.drawable.ic_mic)?.mutate()?.apply {
+        setTint(if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE)
+        setBounds(pillMicRight - pillMicSize, pillMicTop, pillMicRight, pillMicTop + pillMicSize)
+        draw(canvas)
+    }
+
+// 4. Bottom Action Discs (Gemini Live, Lens, Chrome)
+    val discDiameter = 54f * scaleFactor * scale
+    val discRadius = discDiameter / 2f
+    val gapBetweenPillAndDiscs = 16f * scaleFactor * scale
+    val discCenterY = pillRect.bottom + gapBetweenPillAndDiscs + discRadius
+
+    val actionIcons = listOf(
+        R.drawable.ic_gemini_live,
+        R.drawable.ic_google_lens,
+        R.drawable.ic_chrome
+    )
+
+    val discCenters = floatArrayOf(
+        bounds.left + (bounds.width() * 0.20f),
+        bounds.centerX(),
+        bounds.right - (bounds.width() * 0.20f)
+    )
+
+    for (i in 0..2) {
+        val cx = discCenters[i]
+        canvas.drawCircle(cx, discCenterY, discRadius, tilePaint)
+
+        val iconSize = (discDiameter * 0.54f).toInt()
+        val iconLeft = (cx - iconSize / 2f).toInt()
+        val iconTop = (discCenterY - iconSize / 2f).toInt()
+
+        ContextCompat.getDrawable(context, actionIcons[i])?.mutate()?.apply {
+            setTint(accentColorInt)
+            setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+            draw(canvas)
+        }
+    }
+
+    return bitmap
+}
