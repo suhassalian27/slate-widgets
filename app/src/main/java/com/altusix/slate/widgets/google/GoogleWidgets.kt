@@ -824,7 +824,7 @@ class GoogleGrid9Receiver : BaseGoogleReceiver() {
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
 
-        val views = RemoteViews(context.packageName, R.layout.grid_3x3_layout)
+        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_3x3_layout)
         val bitmap = generateGoogleGrid9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
