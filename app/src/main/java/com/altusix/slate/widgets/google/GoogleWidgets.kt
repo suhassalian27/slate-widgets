@@ -311,11 +311,18 @@ class GoogleTrioReceiver : BaseGoogleReceiver() {
         val config = loadSlateWidgetConfig(context, widgetId)
 
         val aspectRatio = wDp.toFloat() / hDp.toFloat()
-        val layoutResId = if (isResponsive && aspectRatio < 0.72f) {
-            val vLayout = context.resources.getIdentifier("widget_appfolder_grid3v_layout", "layout", context.packageName)
-            if (vLayout != 0) vLayout else R.layout.widget_appfolder_grid3_layout
-        } else {
-            R.layout.widget_appfolder_grid3_layout
+
+        // Adaptive layout selection matching canvas reflow
+        val layoutResId = when {
+            isResponsive && aspectRatio < 0.72f -> {
+                val vLayout = context.resources.getIdentifier("widget_appfolder_grid3v_layout", "layout", context.packageName)
+                if (vLayout != 0) vLayout else R.layout.widget_bento_trio_layout
+            }
+            isResponsive && aspectRatio > 1.65f -> {
+                val hLayout = context.resources.getIdentifier("widget_appfolder_grid3_layout", "layout", context.packageName)
+                if (hLayout != 0) hLayout else R.layout.widget_bento_trio_layout
+            }
+            else -> R.layout.widget_bento_trio_layout
         }
 
         val views = RemoteViews(context.packageName, layoutResId)
@@ -338,6 +345,9 @@ class GoogleTrioReceiver : BaseGoogleReceiver() {
         val photosIntent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.photos")
             ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://photos.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
 
+        // slot_0: Google (top banner / left tile / top column)
+        // slot_1: YouTube (bottom-left / center tile / middle column)
+        // slot_2: Photos (bottom-right / right tile / bottom column)
         val intents = listOf(safeSearchIntent, youtubeIntent, photosIntent)
         val slotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2)
 
