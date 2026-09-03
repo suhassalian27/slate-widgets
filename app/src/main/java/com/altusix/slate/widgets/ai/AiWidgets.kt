@@ -32,7 +32,7 @@ fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Mega Folder", "4x2", "AI", AiFolder10MegaReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Asymmetric Bento", "3x2", "AI", AiFolder7AsymmetricReceiver::class.java, hasModeOption = true)
     )
@@ -68,7 +68,7 @@ abstract class BaseAiReceiver : AppWidgetProvider() {
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 
-    private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
+    protected fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
         val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
         val bgKey = "widget_${widgetId}_bg_color"
 
@@ -97,7 +97,7 @@ abstract class BaseAiReceiver : AppWidgetProvider() {
         )
     }
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+    protected fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
         val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
         val modeKey = "widget_${widgetId}_mode"
         val isResponsiveKey = "widget_${widgetId}_is_responsive"
