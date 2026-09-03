@@ -636,3 +636,132 @@ fun generateGoogleMegaFolder10Bitmap(
 
     return bitmap
 }
+
+// 5. YOUTUBE & MEDIA DISCOVERY CAPSULE (3x1 / 4x1)
+fun generateGoogleMediaCapsuleBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Dual-Mode Geometry: 3.0f native aspect ratio for horizontal capsule
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 3.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspectRatio = cardW / cardH
+
+    // 2. Aspect Ratio Branching: Reflow into 1x3 vertical column when squeezed thin
+    val isVertical = isResponsive && aspectRatio < 0.85f
+    val cols = if (isVertical) 1 else 3
+    val rows = if (isVertical) 3 else 1
+
+    val pad = (minOf(cardW, cardH) * 0.055f).coerceAtLeast(scaleFactor * 6f)
+    val gap = (minOf(cardW, cardH) * 0.040f).coerceIn(scaleFactor * 5f, scaleFactor * 8f)
+
+    val availableW = cardW - (pad * 2f) - (gap * (cols - 1))
+    val availableH = cardH - (pad * 2f) - (gap * (rows - 1))
+
+    val tileW = availableW / cols
+    val tileH = availableH / rows
+
+    val outerR = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val innerR = (scaleFactor * 7f).coerceAtMost(minOf(tileW, tileH) * 0.22f)
+
+    val innerBgColor = if (isLight) Color.parseColor("#EAEAEF") else Color.parseColor("#161618")
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = innerBgColor }
+
+    // Center Discovery Tile Highlight (subtle luminous pulse plate)
+    val centerTileBgColor = if (isLight) Color.parseColor("#E0E0E6") else Color.parseColor("#1E1E22")
+    val centerTilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = centerTileBgColor }
+
+    val iconDrawables = listOf(
+        R.drawable.ic_youtube,
+        R.drawable.ic_sound_search,
+        R.drawable.ic_yt_music
+    )
+
+    val baseIconSize = (minOf(tileW, tileH) * 0.44f).toInt().coerceAtLeast((scaleFactor * 16f).toInt())
+
+    for (index in 0 until 3) {
+        val col = if (isVertical) 0 else index
+        val row = if (isVertical) index else 0
+
+        val left = cardRect.left + pad + col * (tileW + gap)
+        val top = cardRect.top + pad + row * (tileH + gap)
+        val tileRect = RectF(left, top, left + tileW, top + tileH)
+
+        // Asymmetric concentric radii mapping
+        val radii = if (!isVertical) {
+            when (index) {
+                0 -> floatArrayOf(outerR, outerR, innerR, innerR, innerR, innerR, outerR, outerR)
+                2 -> floatArrayOf(innerR, innerR, outerR, outerR, outerR, outerR, innerR, innerR)
+                else -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, innerR, innerR)
+            }
+        } else {
+            when (index) {
+                0 -> floatArrayOf(outerR, outerR, outerR, outerR, innerR, innerR, innerR, innerR)
+                2 -> floatArrayOf(innerR, innerR, innerR, innerR, outerR, outerR, outerR, outerR)
+                else -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, innerR, innerR)
+            }
+        }
+
+        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+        canvas.drawPath(tilePath, if (index == 1) centerTilePaint else innerPaint)
+
+        // Center Sound Search subtle boundary indicator
+        if (index == 1) {
+            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(35, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+                style = Paint.Style.STROKE
+                strokeWidth = scaleFactor * 1.2f
+            }
+            canvas.drawPath(tilePath, strokePaint)
+        }
+
+        val resId = iconDrawables[index]
+        val iconSize = if (index == 1) (baseIconSize * 1.06f).toInt() else baseIconSize
+
+        ContextCompat.getDrawable(context, resId)?.mutate()?.apply {
+            setTint(accentColorInt)
+            val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
+            val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
+            setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+            draw(canvas)
+        }
+    }
+
+    return bitmap
+}

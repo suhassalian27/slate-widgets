@@ -2670,6 +2670,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
+        <!-- 5. Media Discovery Capsule (3x1) -->
+        <receiver
+            android:name=".widgets.google.GoogleMediaCapsuleReceiver"
+            android:exported="true"
+            android:label="Slate Media Discovery">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_3x1" />
+        </receiver>
 
 
     </application>

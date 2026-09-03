@@ -21,7 +21,8 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Search Capsule", "4x1", "Google", GoogleSearchCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Workspace Hub", "2x2", "Google", GoogleWorkspaceQuadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Google Trio", "2x2", "Google", GoogleTrioReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Google Mega Folder", "4x2", "Google", GoogleMegaFolderReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Google Mega Folder", "4x2", "Google", GoogleMegaFolderReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Media Discovery Capsule", "3x1", "Google", GoogleMediaCapsuleReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -31,7 +32,8 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleSearchCapsuleReceiver::class.java,
         GoogleWorkspaceQuadReceiver::class.java,
         GoogleTrioReceiver::class.java,
-        GoogleMegaFolderReceiver::class.java
+        GoogleMegaFolderReceiver::class.java,
+        GoogleMediaCapsuleReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -442,6 +444,96 @@ class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
         )
 
         for (i in 0 until 10) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 5. YOUTUBE & MEDIA DISCOVERY CAPSULE (3x1 / 4x1)
+class GoogleMediaCapsuleReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleMediaCapsuleBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 220) ?: 220 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220) ?: 220
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 70) ?: 70 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 70) ?: 70
+        val wDp = if (wDpRaw <= 0) 220 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 70 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val aspectRatio = wDp.toFloat() / hDp.toFloat()
+        val layoutResId = if (isResponsive && aspectRatio < 0.85f) {
+            R.layout.widget_appfolder_grid3v_layout
+        } else {
+            R.layout.widget_appfolder_grid3_layout
+        }
+
+        val views = RemoteViews(context.packageName, layoutResId)
+        val bitmap = generateGoogleMediaCapsuleBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        // 1. YouTube Intent
+        val youtubeIntent = context.packageManager.getLaunchIntentForPackage("com.google.android.youtube")
+            ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+
+        // 2. Direct Google Sound Search Intent with robust fallbacks
+        val directMusicSearch = Intent("com.google.android.googlequicksearchbox.MUSIC_SEARCH").apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val voiceMusicSearch = Intent("android.intent.action.MAIN").apply {
+            setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
+            putExtra("android.speech.extra.SEARCH_TYPE", "music")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val fallbackSoundSearch = Intent(Intent.ACTION_WEB_SEARCH).apply {
+            putExtra(SearchManager.QUERY, "what song is this")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val safeSoundSearchIntent = when {
+            directMusicSearch.resolveActivity(context.packageManager) != null -> directMusicSearch
+            voiceMusicSearch.resolveActivity(context.packageManager) != null -> voiceMusicSearch
+            else -> fallbackSoundSearch
+        }
+
+        // 3. YouTube Music Intent
+        val ytMusicIntent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.youtube.music")
+            ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://music.youtube.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+
+        val intents = listOf(youtubeIntent, safeSoundSearchIntent, ytMusicIntent)
+        val slotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2)
+
+        for (i in 0..2) {
             views.setOnClickPendingIntent(
                 slotIds[i],
                 PendingIntent.getActivity(
