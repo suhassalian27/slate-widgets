@@ -3,6 +3,7 @@ package com.altusix.slate.widgets.google
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -13,6 +14,8 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import android.graphics.Shader
+import android.graphics.RadialGradient
 
 // 1. GOOGLE SEARCH CAPSULE (4x1)
 fun generateGoogleSearchCapsuleBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
@@ -765,3 +768,125 @@ fun generateGoogleMediaCapsuleBitmap(
 
     return bitmap
 }
+
+// 6. GOOGLE LIGHTBAR HORIZON (2x2 / Minimal Clean Horizon Arc)
+fun generateGoogleLightbarBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Dual-Mode Geometry
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+
+    val cardPath = Path().apply {
+        addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(cardPath)
+    canvas.drawPath(cardPath, bgPaint)
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val cx = cardRect.centerX()
+
+    // 2. Smooth Top Ambient Aura
+    val glowAlpha = if (isLight) 38 else 68
+    val auraColor = Color.argb(glowAlpha, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+    val midAuraColor = Color.argb((glowAlpha * 0.35f).toInt(), Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+
+    val glowRadius = cardH * 0.58f
+    val radialShader = RadialGradient(
+        cx, cardRect.top, glowRadius,
+        intArrayOf(auraColor, midAuraColor, Color.TRANSPARENT),
+        floatArrayOf(0.0f, 0.45f, 1.0f),
+        Shader.TileMode.CLAMP
+    )
+    val ambientGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = radialShader
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(cardRect, ambientGlowPaint)
+
+    // 3. Thick, Solid Rainbow Arc (No faux-glow stroke passes)
+    val arcStartX = cardRect.left
+    val arcEndX = cardRect.right
+    val arcStartY = cardRect.top + (cardH * 0.65f)
+    val arcDipY = cardRect.top + (cardH * 0.81f)
+
+    val arcPath = Path().apply {
+        moveTo(arcStartX, arcStartY)
+        quadTo(cx, arcDipY, arcEndX, arcStartY)
+    }
+
+    val googleColors = intArrayOf(
+        Color.parseColor("#4285F4"), // Blue
+        Color.parseColor("#EA4335"), // Red
+        Color.parseColor("#FBBC05"), // Yellow
+        Color.parseColor("#34A853")  // Green
+    )
+    val colorPositions = floatArrayOf(0.0f, 0.33f, 0.67f, 1.0f)
+    val arcShader = LinearGradient(
+        arcStartX, arcStartY, arcEndX, arcStartY,
+        googleColors, colorPositions, Shader.TileMode.CLAMP
+    )
+
+    // Single crisp, bolder stroke (increased from 1.8f to 3.8f)
+    val solidArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = arcShader
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 3.8f
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawPath(arcPath, solidArcPaint)
+    canvas.restore()
+
+    // 4. Hero Accent Sparkle
+    val sparkleSize = (cardH * 0.32f).coerceIn(scaleFactor * 44f, scaleFactor * 68f)
+    val iconCenterY = cardRect.top + (cardH * 0.42f)
+
+    ContextCompat.getDrawable(context, R.drawable.ic_gemini)?.mutate()?.apply {
+        setTint(accentColorInt)
+        setBounds(
+            (cx - sparkleSize / 2f).toInt(),
+            (iconCenterY - sparkleSize / 2f).toInt(),
+            (cx + sparkleSize / 2f).toInt(),
+            (iconCenterY + sparkleSize / 2f).toInt()
+        )
+        draw(canvas)
+    }
+
+    return bitmap
+}
+

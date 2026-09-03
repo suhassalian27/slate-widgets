@@ -22,7 +22,8 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Workspace Hub", "2x2", "Google", GoogleWorkspaceQuadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Google Trio", "2x2", "Google", GoogleTrioReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Google Mega Folder", "4x2", "Google", GoogleMegaFolderReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Media Discovery Capsule", "3x1", "Google", GoogleMediaCapsuleReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Media Discovery Capsule", "3x1", "Google", GoogleMediaCapsuleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Lightbar Horizon", "2x2", "Google", GoogleLightbarReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -33,7 +34,8 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleWorkspaceQuadReceiver::class.java,
         GoogleTrioReceiver::class.java,
         GoogleMegaFolderReceiver::class.java,
-        GoogleMediaCapsuleReceiver::class.java
+        GoogleMediaCapsuleReceiver::class.java,
+        GoogleLightbarReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -548,3 +550,88 @@ class GoogleMediaCapsuleReceiver : BaseGoogleReceiver() {
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
+
+// 6. GOOGLE LIGHTBAR HORIZON / GEMINI LIVE AURA (2x2)
+class GoogleLightbarReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleLightbarBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        // Single-container layout with whole-widget click
+        val views = RemoteViews(context.packageName, R.layout.widget_image_container)
+        val bitmap = generateGoogleLightbarBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val liveVoiceIntent = getGeminiLiveVoiceIntent(context)
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            widgetId,
+            liveVoiceIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+
+    private fun getGeminiLiveVoiceIntent(context: Context): Intent {
+        val pm = context.packageManager
+
+        val directAssistantIntent = Intent(Intent.ACTION_ASSIST).apply {
+            setPackage("com.google.android.googlequicksearchbox")
+            putExtra("android.intent.extra.ASSIST_INPUT_HINT_KEYBOARD", false)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+        }
+
+        val opaVoiceIntent = Intent("com.google.android.googlequicksearchbox.action.OPA_VOICE_SEARCH").apply {
+            setPackage("com.google.android.googlequicksearchbox")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        val voiceAssistIntent = Intent("android.intent.action.VOICE_ASSIST").apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        val geminiAppIntent = pm.getLaunchIntentForPackage("com.google.android.apps.bard")?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        return when {
+            directAssistantIntent.resolveActivity(pm) != null -> directAssistantIntent
+            opaVoiceIntent.resolveActivity(pm) != null -> opaVoiceIntent
+            voiceAssistIntent.resolveActivity(pm) != null -> voiceAssistIntent
+            geminiAppIntent != null -> geminiAppIntent
+            else -> Intent(Intent.ACTION_VIEW, Uri.parse("https://gemini.google.com")).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+    }
+}
+

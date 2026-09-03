@@ -2682,6 +2682,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_3x1" />
         </receiver>
+        <!-- 6. Google Lightbar Horizon (2x2) -->
+        <receiver
+            android:name=".widgets.google.GoogleLightbarReceiver"
+            android:exported="true"
+            android:label="Slate Lightbar Horizon">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>
