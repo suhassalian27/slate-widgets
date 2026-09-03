@@ -936,12 +936,27 @@ fun generateGoogleLensViewfinderBitmap(
     val cardH = cardRect.height()
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
+    val minDim = minOf(cardW, cardH)
 
-    // 2. Corner Viewfinder Brackets (Official 4 Google Accent Tints)
-    val bracketMargin = cardW * 0.11f
-    val bracketLength = cardW * 0.13f
-    val bracketRadius = cardCornerRadius * 0.45f
-    val strokeW = scaleFactor * 3.4f
+    // 2. Corner Viewfinder Brackets (Anchored to minDim to prevent distortion on wide aspects)
+    val cornerInset = (minDim * 0.13f).coerceIn(scaleFactor * 8f, scaleFactor * 20f)
+    val left = cardRect.left + cornerInset
+    val right = cardRect.right - cornerInset
+    val top = cardRect.top + cornerInset
+    val bottom = cardRect.bottom - cornerInset
+
+    val availW = (right - left).coerceAtLeast(scaleFactor * 12f)
+    val availH = (bottom - top).coerceAtLeast(scaleFactor * 12f)
+
+    // Guard arm length so opposing brackets never overlap in narrow axes
+    val bracketLength = (minDim * 0.22f)
+        .coerceIn(scaleFactor * 10f, scaleFactor * 26f)
+        .coerceAtMost(availH * 0.36f)
+        .coerceAtMost(availW * 0.36f)
+
+    // Radius is locked strictly smaller than arm length to prevent inverted bezier loops
+    val bracketRadius = (bracketLength * 0.48f).coerceAtMost(cardCornerRadius * 0.5f)
+    val strokeW = (scaleFactor * 3.4f).coerceAtMost(bracketRadius * 0.9f)
 
     val googleRed = Color.parseColor("#EA4335")
     val googleYellow = Color.parseColor("#FBBC05")
@@ -959,11 +974,6 @@ fun generateGoogleLensViewfinderBitmap(
         val path = Path().apply(block)
         canvas.drawPath(path, paint)
     }
-
-    val left = cardRect.left + bracketMargin
-    val right = cardRect.right - bracketMargin
-    val top = cardRect.top + bracketMargin
-    val bottom = cardRect.bottom - bracketMargin
 
     // Top-Left (Red)
     drawBracket(googleRed) {
@@ -998,7 +1008,7 @@ fun generateGoogleLensViewfinderBitmap(
     }
 
     // 3. Hero Centered Google Lens Glyph
-    val lensSize = (minOf(cardW, cardH) * 0.24f).coerceIn(scaleFactor * 32f, scaleFactor * 52f)
+    val lensSize = (minDim * 0.28f).coerceIn(scaleFactor * 26f, scaleFactor * 48f)
 
     ContextCompat.getDrawable(context, R.drawable.ic_google_lens)?.mutate()?.apply {
         setTint(accentColorInt)
