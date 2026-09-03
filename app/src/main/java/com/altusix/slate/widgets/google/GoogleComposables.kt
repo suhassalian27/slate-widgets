@@ -483,3 +483,156 @@ fun generateGoogleTrioBitmap(
 
     return bitmap
 }
+
+// 4. GOOGLE MEGA FOLDER (4x2 / 10 Google Apps Adaptive Bento)
+fun generateGoogleMegaFolder10Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Dual-Mode Geometry
+    val margin = scaleFactor * 1.5f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspectRatio = cardW / cardH
+
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val innerBgColor = if (isLight) Color.parseColor("#EAEAEF") else Color.parseColor("#161618")
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = innerBgColor }
+
+    val iconDrawables = listOf(
+        R.drawable.ic_google_logo,
+        R.drawable.ic_youtube,
+        R.drawable.ic_gmail,
+        R.drawable.ic_drive,
+        R.drawable.ic_photos,
+        R.drawable.ic_maps,
+        R.drawable.ic_calendar,
+        R.drawable.ic_chrome,
+        R.drawable.ic_playstore,
+        R.drawable.ic_google_gemini
+    )
+
+    if (aspectRatio >= 1.1f) {
+        // ================================================================
+        // 1. WIDE MODE (5 Columns x 2 Rows)
+        // ================================================================
+        val pad = cardH * 0.055f
+        val gap = cardH * 0.035f
+
+        val availW = cardW - (pad * 2f) - (gap * 4f)
+        val availH = cardH - (pad * 2f) - gap
+
+        val tileW = availW / 5f
+        val tileH = availH / 2f
+
+        val outerR = (cornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+        val innerR = scaleFactor * 6f
+        val iconSize = (minOf(tileW, tileH) * 0.44f).toInt().coerceAtLeast((scaleFactor * 14f).toInt())
+
+        for (index in 0 until 10) {
+            val col = index % 5
+            val row = index / 5
+            val left = cardRect.left + pad + col * (tileW + gap)
+            val top = cardRect.top + pad + row * (tileH + gap)
+            val tileRect = RectF(left, top, left + tileW, top + tileH)
+
+            val radii = when (index) {
+                0 -> floatArrayOf(outerR, outerR, innerR, innerR, innerR, innerR, innerR, innerR)
+                4 -> floatArrayOf(innerR, innerR, outerR, outerR, innerR, innerR, innerR, innerR)
+                5 -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, outerR, outerR)
+                9 -> floatArrayOf(innerR, innerR, innerR, innerR, outerR, outerR, innerR, innerR)
+                else -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, innerR, innerR)
+            }
+
+            val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+            canvas.drawPath(tilePath, innerPaint)
+
+            ContextCompat.getDrawable(context, iconDrawables[index])?.mutate()?.apply {
+                setTint(accentColorInt)
+                val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
+                val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
+                setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+                draw(canvas)
+            }
+        }
+    } else {
+        // ================================================================
+        // 2. TALL / VERTICAL MODE (2 Columns x 5 Rows)
+        // ================================================================
+        val pad = cardW * 0.055f
+        val gap = cardW * 0.035f
+
+        val availW = cardW - (pad * 2f) - gap
+        val availH = cardH - (pad * 2f) - (gap * 4f)
+
+        val tileW = availW / 2f
+        val tileH = availH / 5f
+
+        val outerR = (cornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+        val innerR = scaleFactor * 6f
+        val iconSize = (minOf(tileW, tileH) * 0.44f).toInt().coerceAtLeast((scaleFactor * 14f).toInt())
+
+        for (index in 0 until 10) {
+            val col = index % 2
+            val row = index / 2
+            val left = cardRect.left + pad + col * (tileW + gap)
+            val top = cardRect.top + pad + row * (tileH + gap)
+            val tileRect = RectF(left, top, left + tileW, top + tileH)
+
+            val radii = when (index) {
+                0 -> floatArrayOf(outerR, outerR, innerR, innerR, innerR, innerR, innerR, innerR)
+                1 -> floatArrayOf(innerR, innerR, outerR, outerR, innerR, innerR, innerR, innerR)
+                8 -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, outerR, outerR)
+                9 -> floatArrayOf(innerR, innerR, innerR, innerR, outerR, outerR, innerR, innerR)
+                else -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, innerR, innerR)
+            }
+
+            val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+            canvas.drawPath(tilePath, innerPaint)
+
+            ContextCompat.getDrawable(context, iconDrawables[index])?.mutate()?.apply {
+                setTint(accentColorInt)
+                val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
+                val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
+                setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+                draw(canvas)
+            }
+        }
+    }
+
+    return bitmap
+}

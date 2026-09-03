@@ -20,7 +20,8 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Search Capsule", "4x1", "Google", GoogleSearchCapsuleReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Workspace Hub", "2x2", "Google", GoogleWorkspaceQuadReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Google Trio", "2x2", "Google", GoogleTrioReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Google Trio", "2x2", "Google", GoogleTrioReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Google Mega Folder", "4x2", "Google", GoogleMegaFolderReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -29,7 +30,8 @@ fun updateAllGoogleWidgets(context: Context) {
     val receivers = listOf(
         GoogleSearchCapsuleReceiver::class.java,
         GoogleWorkspaceQuadReceiver::class.java,
-        GoogleTrioReceiver::class.java
+        GoogleTrioReceiver::class.java,
+        GoogleMegaFolderReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -352,6 +354,94 @@ class GoogleTrioReceiver : BaseGoogleReceiver() {
         val slotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2)
 
         for (i in 0..2) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 4. GOOGLE MEGA FOLDER (4x2 / 10 Apps)
+class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleMegaFolder10Bitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 260) ?: 260 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 260) ?: 260
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 130) ?: 130 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 130) ?: 130
+        val wDp = if (wDpRaw <= 0) 260 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 130 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val aspectRatio = wDp.toFloat() / hDp.toFloat()
+        val layoutResId = if (aspectRatio >= 1.1f) {
+            R.layout.widget_megafolder_10_layout
+        } else {
+            R.layout.widget_megafolder_10v_layout
+        }
+
+        val views = RemoteViews(context.packageName, layoutResId)
+        val bitmap = generateGoogleMegaFolder10Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val directSearchIntent = Intent().apply {
+            setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val fallbackSearchIntent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+            putExtra(SearchManager.QUERY, "")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val safeSearchIntent = if (directSearchIntent.resolveActivity(context.packageManager) != null) directSearchIntent else fallbackSearchIntent
+
+        val intents = listOf(
+            safeSearchIntent,
+            context.packageManager.getLaunchIntentForPackage("com.google.android.youtube") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.google.android.gm") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://mail.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.google.android.apps.docs") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://drive.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.google.android.apps.photos") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://photos.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.google.android.apps.maps") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.google.android.calendar") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://calendar.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.android.chrome") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/chrome")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.android.vending") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+            context.packageManager.getLaunchIntentForPackage("com.google.android.apps.bard") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://gemini.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        )
+
+        val slotIds = intArrayOf(
+            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3, R.id.touch_slot_4,
+            R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8, R.id.touch_slot_9
+        )
+
+        for (i in 0 until 10) {
             views.setOnClickPendingIntent(
                 slotIds[i],
                 PendingIntent.getActivity(
