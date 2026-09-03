@@ -1139,3 +1139,122 @@ fun generateGoogleSearchDockBitmap(
 
     return bitmap
 }
+
+// 9. GOOGLE 3x3 GRID FOLDER (2x2 / Responsive 9-App Hub)
+fun generateGoogleGrid9Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Outer Container Boundary
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    // 2. Uniform Tight Spacing & Maximum Fill
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val gap = (minDim * 0.035f).coerceIn(scaleFactor * 2.5f, scaleFactor * 6f)
+    // Uniform padding on all 4 sides keeps the tiles anchored close to the outer edges
+    val pad = (minDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 9f)
+
+    val availW = cardRect.width() - (pad * 2f)
+    val availH = cardRect.height() - (pad * 2f)
+    val tileW = (availW - (gap * 2f)) / 3f
+    val tileH = (availH - (gap * 2f)) / 3f
+
+    // 3. Concentric Corner Curvature
+    val minTileDim = minOf(tileW, tileH)
+    val baseTileRadius = minTileDim * 0.28f
+    val outerEdgeRadius = (cardCornerRadius - pad).coerceIn(baseTileRadius, minTileDim / 2f)
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(38, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    val googleIcons = listOf(
+        R.drawable.ic_google_logo,  // 0: Search
+        R.drawable.ic_chrome,       // 1: Chrome
+        R.drawable.ic_gmail,        // 2: Gmail
+        R.drawable.ic_maps,         // 3: Maps
+        R.drawable.ic_youtube,      // 4: YouTube
+        R.drawable.ic_photos,       // 5: Photos
+        R.drawable.ic_drive,        // 6: Drive
+        R.drawable.ic_calendar,     // 7: Calendar
+        R.drawable.ic_gemini_live   // 8: Gemini Live
+    )
+
+    for (row in 0..2) {
+        for (col in 0..2) {
+            val index = row * 3 + col
+            val tileLeft = cardRect.left + pad + col * (tileW + gap)
+            val tileTop = cardRect.top + pad + row * (tileH + gap)
+            val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
+
+            // The 4 outer corners curve concentrically with the widget card
+            val tl = if (row == 0 && col == 0) outerEdgeRadius else baseTileRadius
+            val tr = if (row == 0 && col == 2) outerEdgeRadius else baseTileRadius
+            val br = if (row == 2 && col == 2) outerEdgeRadius else baseTileRadius
+            val bl = if (row == 2 && col == 0) outerEdgeRadius else baseTileRadius
+
+            val radii = floatArrayOf(
+                tl, tl,
+                tr, tr,
+                br, br,
+                bl, bl
+            )
+            val tilePath = Path().apply {
+                addRoundRect(tileRect, radii, Path.Direction.CW)
+            }
+            canvas.drawPath(tilePath, tileBgPaint)
+
+            if (index < googleIcons.size) {
+                val iconDrawable = ContextCompat.getDrawable(context, googleIcons[index])?.mutate()
+                if (iconDrawable != null) {
+                    val iconSize = (minTileDim * 0.54f).toInt()
+                    val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
+                    val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
+
+                    iconDrawable.setTint(accentColorInt)
+                    iconDrawable.setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+                    iconDrawable.draw(canvas)
+                }
+            }
+        }
+    }
+
+    return bitmap
+}

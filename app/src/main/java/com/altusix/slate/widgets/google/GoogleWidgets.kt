@@ -26,7 +26,8 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Media Discovery Capsule", "3x1", "Google", GoogleMediaCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Lightbar Horizon", "2x2", "Google", GoogleLightbarReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Lens Viewfinder", "2x2", "Google", GoogleLensReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Search Action Dock", "3x2", "Google", GoogleSearchDockReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Search Action Dock", "3x2", "Google", GoogleSearchDockReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Google 3x3 Hub", "2x2", "Google", GoogleGrid9Receiver::class.java, hasModeOption = true)
     )
 }
 
@@ -40,7 +41,8 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleMediaCapsuleReceiver::class.java,
         GoogleLightbarReceiver::class.java,
         GoogleLensReceiver::class.java,
-        GoogleSearchDockReceiver::class.java
+        GoogleSearchDockReceiver::class.java,
+        GoogleGrid9Receiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -784,6 +786,108 @@ class GoogleSearchDockReceiver : BaseGoogleReceiver() {
             R.id.touch_slot_action_incognito,
             PendingIntent.getActivity(context, widgetId * 100 + 5, chromeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         )
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 9. GOOGLE 3x3 GRID FOLDER (2x2)
+class GoogleGrid9Receiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleGrid9Bitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.grid_3x3_layout)
+        val bitmap = generateGoogleGrid9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pm = context.packageManager
+        fun safeAppIntent(pkg: String, webUrl: String): Intent {
+            return pm.getLaunchIntentForPackage(pkg)?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            } ?: Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+
+        val intents = listOf(
+            // 0: Google Search
+            Intent().apply {
+                setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }.let { if (it.resolveActivity(pm) != null) it else safeAppIntent("com.google.android.googlequicksearchbox", "https://www.google.com") },
+
+            // 1: Chrome
+            safeAppIntent("com.android.chrome", "https://www.google.com/chrome"),
+
+            // 2: Gmail
+            safeAppIntent("com.google.android.gm", "https://mail.google.com"),
+
+            // 3: Maps
+            safeAppIntent("com.google.android.apps.maps", "https://maps.google.com"),
+
+            // 4: YouTube
+            safeAppIntent("com.google.android.youtube", "https://youtube.com"),
+
+            // 5: Photos
+            safeAppIntent("com.google.android.apps.photos", "https://photos.google.com"),
+
+            // 6: Drive
+            safeAppIntent("com.google.android.apps.docs", "https://drive.google.com"),
+
+            // 7: Calendar
+            safeAppIntent("com.google.android.calendar", "https://calendar.google.com"),
+
+            // 8: Gemini Live Voice Session
+            Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        )
+
+        val slotIds = intArrayOf(
+            R.id.slot_0, R.id.slot_1, R.id.slot_2,
+            R.id.slot_3, R.id.slot_4, R.id.slot_5,
+            R.id.slot_6, R.id.slot_7, R.id.slot_8
+        )
+
+        for (i in 0..8) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
