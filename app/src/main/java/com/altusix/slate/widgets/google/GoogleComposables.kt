@@ -890,3 +890,126 @@ fun generateGoogleLightbarBitmap(
     return bitmap
 }
 
+// 7. GOOGLE LENS VIEWFINDER (2x2 / Tactical Camera Reticle - Icon Only)
+fun generateGoogleLensViewfinderBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Dual-Mode Geometry
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
+
+    // 2. Corner Viewfinder Brackets (Official 4 Google Accent Tints)
+    val bracketMargin = cardW * 0.11f
+    val bracketLength = cardW * 0.13f
+    val bracketRadius = cardCornerRadius * 0.45f
+    val strokeW = scaleFactor * 3.4f
+
+    val googleRed = Color.parseColor("#EA4335")
+    val googleYellow = Color.parseColor("#FBBC05")
+    val googleBlue = Color.parseColor("#4285F4")
+    val googleGreen = Color.parseColor("#34A853")
+
+    fun drawBracket(color: Int, block: Path.() -> Unit) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = strokeW
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        val path = Path().apply(block)
+        canvas.drawPath(path, paint)
+    }
+
+    val left = cardRect.left + bracketMargin
+    val right = cardRect.right - bracketMargin
+    val top = cardRect.top + bracketMargin
+    val bottom = cardRect.bottom - bracketMargin
+
+    // Top-Left (Red)
+    drawBracket(googleRed) {
+        moveTo(left, top + bracketLength)
+        lineTo(left, top + bracketRadius)
+        quadTo(left, top, left + bracketRadius, top)
+        lineTo(left + bracketLength, top)
+    }
+
+    // Top-Right (Yellow)
+    drawBracket(googleYellow) {
+        moveTo(right - bracketLength, top)
+        lineTo(right - bracketRadius, top)
+        quadTo(right, top, right, top + bracketRadius)
+        lineTo(right, top + bracketLength)
+    }
+
+    // Bottom-Left (Blue)
+    drawBracket(googleBlue) {
+        moveTo(left, bottom - bracketLength)
+        lineTo(left, bottom - bracketRadius)
+        quadTo(left, bottom, left + bracketRadius, bottom)
+        lineTo(left + bracketLength, bottom)
+    }
+
+    // Bottom-Right (Green)
+    drawBracket(googleGreen) {
+        moveTo(right - bracketLength, bottom)
+        lineTo(right - bracketRadius, bottom)
+        quadTo(right, bottom, right, bottom - bracketRadius)
+        lineTo(right, bottom - bracketLength)
+    }
+
+    // 3. Hero Centered Google Lens Glyph
+    val lensSize = (minOf(cardW, cardH) * 0.24f).coerceIn(scaleFactor * 32f, scaleFactor * 52f)
+
+    ContextCompat.getDrawable(context, R.drawable.ic_google_lens)?.mutate()?.apply {
+        setTint(accentColorInt)
+        setBounds(
+            (cx - lensSize / 2f).toInt(),
+            (cy - lensSize / 2f).toInt(),
+            (cx + lensSize / 2f).toInt(),
+            (cy + lensSize / 2f).toInt()
+        )
+        draw(canvas)
+    }
+
+    return bitmap
+}

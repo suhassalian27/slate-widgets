@@ -2694,6 +2694,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 7. Google Lens Viewfinder (2x2) -->
+        <receiver
+            android:name=".widgets.google.GoogleLensReceiver"
+            android:exported="true"
+            android:label="Slate Lens Viewfinder">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

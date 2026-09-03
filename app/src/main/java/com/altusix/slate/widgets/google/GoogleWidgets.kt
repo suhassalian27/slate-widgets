@@ -23,7 +23,8 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Google Trio", "2x2", "Google", GoogleTrioReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Google Mega Folder", "4x2", "Google", GoogleMegaFolderReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Media Discovery Capsule", "3x1", "Google", GoogleMediaCapsuleReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Lightbar Horizon", "2x2", "Google", GoogleLightbarReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Lightbar Horizon", "2x2", "Google", GoogleLightbarReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Lens Viewfinder", "2x2", "Google", GoogleLensReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -35,7 +36,8 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleTrioReceiver::class.java,
         GoogleMegaFolderReceiver::class.java,
         GoogleMediaCapsuleReceiver::class.java,
-        GoogleLightbarReceiver::class.java
+        GoogleLightbarReceiver::class.java,
+        GoogleLensReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -629,6 +631,86 @@ class GoogleLightbarReceiver : BaseGoogleReceiver() {
             voiceAssistIntent.resolveActivity(pm) != null -> voiceAssistIntent
             geminiAppIntent != null -> geminiAppIntent
             else -> Intent(Intent.ACTION_VIEW, Uri.parse("https://gemini.google.com")).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+    }
+}
+
+// 7. GOOGLE LENS VIEWFINDER (2x2)
+class GoogleLensReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleLensViewfinderBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_image_container)
+        val bitmap = generateGoogleLensViewfinderBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val lensIntent = getDirectGoogleLensIntent(context)
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            widgetId,
+            lensIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+
+    private fun getDirectGoogleLensIntent(context: Context): Intent {
+        val pm = context.packageManager
+
+        // 1. Direct Google Lens Standalone Activity
+        val standaloneLens = Intent().apply {
+            setClassName("com.google.ar.lens", "com.google.vr.apps.ornament.app.lens.LensLauncherActivity")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        // 2. Google Search App Embedded Lens Camera Activity
+        val gsaLens = Intent().apply {
+            setClassName("com.google.android.googlequicksearchbox", "com.google.android.apps.search.lens.LensActivity")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        // 3. Fallback to package launcher or general camera query
+        val lensPackageLaunch = pm.getLaunchIntentForPackage("com.google.ar.lens")?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        return when {
+            standaloneLens.resolveActivity(pm) != null -> standaloneLens
+            gsaLens.resolveActivity(pm) != null -> gsaLens
+            lensPackageLaunch != null -> lensPackageLaunch
+            else -> Intent(Intent.ACTION_VIEW, Uri.parse("https://lens.google.com")).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
         }
