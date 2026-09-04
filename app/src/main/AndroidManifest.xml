@@ -2669,7 +2669,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 4. Google Mega Folder (4x2) -->
+        <!-- 4. Google 3x3 Grid Folder (2x2) -->
+        <receiver
+            android:name=".widgets.google.GoogleGrid9Receiver"
+            android:exported="true"
+            android:label="Slate Google 3x3 Hub">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 5. Google Mega Folder (4x2) -->
         <receiver
             android:name=".widgets.google.GoogleMegaFolderReceiver"
             android:exported="true"
@@ -2681,7 +2693,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-        <!-- 5. Media Discovery Capsule (3x1) -->
+        <!-- 6. Media Discovery Capsule (3x1) -->
         <receiver
             android:name=".widgets.google.GoogleMediaCapsuleReceiver"
             android:exported="true"
@@ -2693,7 +2705,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_3x1" />
         </receiver>
-        <!-- 6. Google Lightbar Horizon (2x2) -->
+        <!-- 7. Google Lightbar Horizon (2x2) -->
         <receiver
             android:name=".widgets.google.GoogleLightbarReceiver"
             android:exported="true"
@@ -2705,7 +2717,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 7. Google Lens Viewfinder (2x2) -->
+        <!-- 8. Google Lens Viewfinder (2x2) -->
         <receiver
             android:name=".widgets.google.GoogleLensReceiver"
             android:exported="true"
@@ -2717,7 +2729,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 8. Google Search Action Dock (3x2) -->
+        <!-- 9. Google Search Action Dock (3x2) -->
         <receiver
             android:name=".widgets.google.GoogleSearchDockReceiver"
             android:exported="true"
@@ -2728,18 +2740,6 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_3x2" />
-        </receiver>
-        <!-- 9. Google 3x3 Grid Folder (2x2) -->
-        <receiver
-            android:name=".widgets.google.GoogleGrid9Receiver"
-            android:exported="true"
-            android:label="Slate Google 3x3 Hub">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x2" />
         </receiver>
         <!-- 10. YOUTUBE "VINYL & VIEWFINDER" DUAL-DIAL (2x2)-->
         <receiver
