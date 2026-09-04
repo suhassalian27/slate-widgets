@@ -2765,6 +2765,30 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 12. Workspace Chronometer (2x2) -->
+        <receiver
+            android:name=".widgets.google.GoogleWorkspaceChronoReceiver"
+            android:exported="true"
+            android:label="Slate Workspace Chronometer">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 13. Drive Tape Reel & Cloud Vault (2x2) -->
+        <receiver
+            android:name=".widgets.google.GoogleDriveTapeReelReceiver"
+            android:exported="true"
+            android:label="Slate Drive Tape Reel &amp; Vault">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

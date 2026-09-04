@@ -29,7 +29,9 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Lens Viewfinder", "2x2", "Google", GoogleLensReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Search Action Dock", "3x2", "Google", GoogleSearchDockReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("YouTube Vinyl & Viewfinder", "2x2", "Google", GoogleYouTubeDualReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Maps Compass & Waypoint", "2x2", "Google", GoogleMapsCompassReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Maps Compass & Waypoint", "2x2", "Google", GoogleMapsCompassReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Workspace Chronometer", "2x2", "Google", GoogleWorkspaceChronoReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Drive Tape Reel & Vault", "2x2", "Google", GoogleDriveTapeReelReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -46,7 +48,9 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleSearchDockReceiver::class.java,
         GoogleGrid9Receiver::class.java,
         GoogleYouTubeDualReceiver::class.java,
-        GoogleMapsCompassReceiver::class.java
+        GoogleMapsCompassReceiver::class.java,
+        GoogleWorkspaceChronoReceiver::class.java,
+        GoogleDriveTapeReelReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -1088,3 +1092,183 @@ class GoogleMapsCompassReceiver : BaseGoogleReceiver() {
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
+
+// 12. GOOGLE WORKSPACE CHRONOMETER RECEIVER (2x2)
+class GoogleWorkspaceChronoReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleWorkspaceChronoBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_2x2)
+        val bitmap = generateGoogleWorkspaceChronoBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pm = context.packageManager
+
+        fun safeAppIntent(pkg: String, webUrl: String): Intent {
+            return pm.getLaunchIntentForPackage(pkg)?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            } ?: Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+
+        // Direct package launch to avoid email account chooser
+        val directMeetIntent = pm.getLaunchIntentForPackage("com.google.android.apps.meetings")
+            ?: pm.getLaunchIntentForPackage("com.google.android.apps.tachyon")
+            ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://meet.google.com")).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+
+        // Ordered by quadrant: slot_0, slot_1, slot_2, slot_3
+        val intents = listOf(
+            // Slot 0 (Top-Left): Google Calendar
+            safeAppIntent("com.google.android.calendar", "https://calendar.google.com"),
+
+            // Slot 1 (Top-Right): Gmail
+            safeAppIntent("com.google.android.gm", "https://mail.google.com"),
+
+            // Slot 2 (Bottom-Left): Google Meet
+            directMeetIntent,
+
+            // Slot 3 (Bottom-Right - Chronometer): System Clock / Alarms
+            Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }.let { if (it.resolveActivity(pm) != null) it else safeAppIntent("com.google.android.deskclock", "https://calendar.google.com") }
+        )
+
+        val slotIds = intArrayOf(
+            R.id.slot_0,
+            R.id.slot_1,
+            R.id.slot_2,
+            R.id.slot_3
+        )
+
+        for (i in 0..3) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 13. GOOGLE DRIVE & KEEP RECEIVER (2x2)
+class GoogleDriveTapeReelReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleDriveTapeReelBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_2x2)
+        val bitmap = generateGoogleDriveTapeReelBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pm = context.packageManager
+
+        fun safeAppIntent(pkg: String, webUrl: String): Intent {
+            return pm.getLaunchIntentForPackage(pkg)?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            } ?: Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+
+        // Ordered by quadrant: slot_0, slot_1, slot_2, slot_3
+        val intents = listOf(
+            // Slot 0 (Top-Left): Google Drive
+            safeAppIntent("com.google.android.apps.docs", "https://drive.google.com"),
+
+            // Slot 1 (Top-Right): Google Docs
+            safeAppIntent("com.google.android.apps.docs.editors.docs", "https://docs.google.com"),
+
+            // Slot 2 (Bottom-Left): Google Sheets
+            safeAppIntent("com.google.android.apps.docs.editors.sheets", "https://sheets.google.com"),
+
+            // Slot 3 (Bottom-Right): Google Keep (Notes)
+            safeAppIntent("com.google.android.keep", "https://keep.google.com")
+        )
+
+        val slotIds = intArrayOf(
+            R.id.slot_0,
+            R.id.slot_1,
+            R.id.slot_2,
+            R.id.slot_3
+        )
+
+        for (i in 0..3) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+

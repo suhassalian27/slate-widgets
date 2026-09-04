@@ -343,7 +343,7 @@ fun generateGoogleTrioBitmap(
             val r2 = floatArrayOf(innerR, innerR, innerR, innerR, outerR, outerR, outerR, outerR)
             canvas.drawPath(Path().apply { addRoundRect(tile2, r2, Path.Direction.CW) }, innerPaint)
 
-            ContextCompat.getDrawable(context, R.drawable.ic_photos)?.mutate()?.apply {
+            ContextCompat.getDrawable(context, R.drawable.ic_goolge_photos)?.mutate()?.apply {
                 setTint(accentColorInt)
                 val iconLeft = (tile2.centerX() - iconSize / 2f).toInt()
                 val iconTop = (tile2.centerY() - iconSize / 2f).toInt()
@@ -407,7 +407,7 @@ fun generateGoogleTrioBitmap(
             val r2 = floatArrayOf(innerR, innerR, outerR, outerR, outerR, outerR, innerR, innerR)
             canvas.drawPath(Path().apply { addRoundRect(tile2, r2, Path.Direction.CW) }, innerPaint)
 
-            ContextCompat.getDrawable(context, R.drawable.ic_photos)?.mutate()?.apply {
+            ContextCompat.getDrawable(context, R.drawable.ic_goolge_photos)?.mutate()?.apply {
                 setTint(accentColorInt)
                 val iconLeft = (tile2.centerX() - iconSize / 2f).toInt()
                 val iconTop = (tile2.centerY() - iconSize / 2f).toInt()
@@ -474,7 +474,7 @@ fun generateGoogleTrioBitmap(
             val bRightRadii = floatArrayOf(innerR, innerR, innerR, innerR, outerR, outerR, innerR, innerR)
             canvas.drawPath(Path().apply { addRoundRect(bRightRect, bRightRadii, Path.Direction.CW) }, innerPaint)
 
-            ContextCompat.getDrawable(context, R.drawable.ic_photos)?.mutate()?.apply {
+            ContextCompat.getDrawable(context, R.drawable.ic_goolge_photos)?.mutate()?.apply {
                 setTint(accentColorInt)
                 val iconLeft = (bRightRect.centerX() - iconSize / 2f).toInt()
                 val iconTop = (bRightRect.centerY() - iconSize / 2f).toInt()
@@ -558,7 +558,7 @@ fun generateGoogleGrid9Bitmap(
         R.drawable.ic_gmail,        // 2: Gmail
         R.drawable.ic_maps,         // 3: Maps
         R.drawable.ic_youtube,      // 4: YouTube
-        R.drawable.ic_photos,       // 5: Photos
+        R.drawable.ic_goolge_photos,       // 5: Photos
         R.drawable.ic_drive,        // 6: Drive
         R.drawable.ic_calendar,     // 7: Calendar
         R.drawable.ic_gemini_live   // 8: Gemini Live
@@ -660,7 +660,7 @@ fun generateGoogleMegaFolder10Bitmap(
         R.drawable.ic_youtube,
         R.drawable.ic_gmail,
         R.drawable.ic_drive,
-        R.drawable.ic_photos,
+        R.drawable.ic_goolge_photos,
         R.drawable.ic_maps,
         R.drawable.ic_calendar,
         R.drawable.ic_chrome,
@@ -1285,7 +1285,11 @@ fun generateYouTubeVinylViewfinderBitmap(
     val cardH = if (isResponsive) h - (margin * 2f) else cardSize
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val maxCardRadius = minOf(cardW, cardH) / 2f
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    // Restored original corner radius calculation
+    val maxCardRadius = effectiveDim / 2f
     val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
 
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
@@ -1295,8 +1299,8 @@ fun generateYouTubeVinylViewfinderBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = minOf(cardW, cardH) * 0.055f
-    val gap = minOf(cardW, cardH) * 0.04f
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
     val halfW = (cardW - (pad * 2f) - gap) / 2f
     val halfH = (cardH - (pad * 2f) - gap) / 2f
 
@@ -1306,6 +1310,7 @@ fun generateYouTubeVinylViewfinderBitmap(
     val qBottomLeft = RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
     val qBottomRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
 
+    // Restored original tile radii
     val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
     val vfInnerRad = scaleFactor * 8f
 
@@ -1316,18 +1321,15 @@ fun generateYouTubeVinylViewfinderBitmap(
 
     // 2. Quadrant Tile Backgrounds
     val vfRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
-    val vfPath = Path().apply { addRoundRect(qTopLeft, vfRadii, Path.Direction.CW) }
-    canvas.drawPath(vfPath, tileBgPaint)
+    canvas.drawPath(Path().apply { addRoundRect(qTopLeft, vfRadii, Path.Direction.CW) }, tileBgPaint)
 
     val shortsRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
-    val shortsPath = Path().apply { addRoundRect(qTopRight, shortsRadii, Path.Direction.CW) }
-    canvas.drawPath(shortsPath, tileBgPaint)
+    canvas.drawPath(Path().apply { addRoundRect(qTopRight, shortsRadii, Path.Direction.CW) }, tileBgPaint)
 
     val blRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
-    val blPath = Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }
-    canvas.drawPath(blPath, tileBgPaint)
+    canvas.drawPath(Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }, tileBgPaint)
 
-    // 3. Fluid Connecting Cable (Starts tucked under YouTube icon, terminates under Vinyl)
+    // 3. Fluid Connecting Cable
     val ytIconMaxDim = minOf(halfW, halfH) * 0.56f
     val ytIconStartX = qTopLeft.centerX() + (ytIconMaxDim * 0.36f)
     val ytIconStartY = qTopLeft.centerY()
@@ -1338,7 +1340,7 @@ fun generateYouTubeVinylViewfinderBitmap(
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(55, 0, 0, 0) else Color.argb(78, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 1.4f
+        strokeWidth = scaleFactor * 1.4f * uiScale
         strokeCap = Paint.Cap.ROUND
     }
 
@@ -1352,7 +1354,6 @@ fun generateYouTubeVinylViewfinderBitmap(
     }
     canvas.drawPath(orbitalPath, guidePaint)
 
-    // Helper: Draws and scales vector drawables preserving intrinsic aspect ratio
     fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
         val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
         if (tint != null) {
@@ -1387,17 +1388,17 @@ fun generateYouTubeVinylViewfinderBitmap(
         tint = accentColorInt
     )
 
-    // 5. Shared Typography for Sub-labels
+    // 5. Shared Typography
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-        textSize = (scaleFactor * 12f).coerceAtLeast(12f)
+        textSize = scaleFactor * 12f * uiScale
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
 
     // 6. TOP-RIGHT: Shorts Capsule
-    val topTextBaselineY = qTopRight.bottom - scaleFactor * 9f
-    val iconTopCenterY = (qTopRight.top + topTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+    val topTextBaselineY = qTopRight.bottom - (scaleFactor * 9f * uiScale)
+    val iconTopCenterY = (qTopRight.top + topTextBaselineY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
     drawVector(
         resId = R.drawable.ic_youtube_shorts,
         cx = qTopRight.centerX(),
@@ -1408,8 +1409,8 @@ fun generateYouTubeVinylViewfinderBitmap(
     canvas.drawText("Shorts", qTopRight.centerX(), topTextBaselineY, labelPaint)
 
     // 7. BOTTOM-LEFT: Liked Music / Mix Capsule
-    val botTextBaselineY = qBottomLeft.bottom - scaleFactor * 9f
-    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+    val botTextBaselineY = qBottomLeft.bottom - (scaleFactor * 9f * uiScale)
+    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
     drawVector(
         resId = R.drawable.ic_soundwave,
         cx = qBottomLeft.centerX(),
@@ -1427,17 +1428,15 @@ fun generateYouTubeVinylViewfinderBitmap(
     }
     canvas.drawCircle(vinylCx, vinylCy, vinylRadius, vinylBodyPaint)
 
-    // Fine Lathe Grooves
     val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(45, 255, 255, 255) else Color.argb(35, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 0.7f
+        strokeWidth = scaleFactor * 0.7f * uiScale
     }
     canvas.drawCircle(vinylCx, vinylCy, vinylRadius * 0.82f, groovePaint)
     canvas.drawCircle(vinylCx, vinylCy, vinylRadius * 0.66f, groovePaint)
     canvas.drawCircle(vinylCx, vinylCy, vinylRadius * 0.50f, groovePaint)
 
-    // Center Spindle Label
     val spindleRadius = vinylRadius * 0.42f
     val labelDiscPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -1445,7 +1444,6 @@ fun generateYouTubeVinylViewfinderBitmap(
     }
     canvas.drawCircle(vinylCx, vinylCy, spindleRadius, labelDiscPaint)
 
-    // Center YouTube Music Glyph
     val spindleIconColor = if (isLight) Color.WHITE else Color.BLACK
     drawVector(
         resId = R.drawable.ic_youtube_music,
@@ -1484,7 +1482,11 @@ fun generateGoogleMapsCompassBitmap(
     val cardH = if (isResponsive) h - (margin * 2f) else cardSize
     val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val maxCardRadius = minOf(cardW, cardH) / 2f
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    // Restored original corner radius calculation
+    val maxCardRadius = effectiveDim / 2f
     val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
 
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
@@ -1494,8 +1496,8 @@ fun generateGoogleMapsCompassBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = minOf(cardW, cardH) * 0.055f
-    val gap = minOf(cardW, cardH) * 0.04f
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
     val halfW = (cardW - (pad * 2f) - gap) / 2f
     val halfH = (cardH - (pad * 2f) - gap) / 2f
 
@@ -1505,6 +1507,7 @@ fun generateGoogleMapsCompassBitmap(
     val qBottomLeft = RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
     val qBottomRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
 
+    // Restored original tile radii
     val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
     val vfInnerRad = scaleFactor * 8f
 
@@ -1523,7 +1526,6 @@ fun generateGoogleMapsCompassBitmap(
     val blRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
     canvas.drawPath(Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }, tileBgPaint)
 
-    // Helper: Draws and scales vector drawables preserving intrinsic aspect ratio
     fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
         val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
         if (tint != null) {
@@ -1549,7 +1551,7 @@ fun generateGoogleMapsCompassBitmap(
         drawable.draw(canvas)
     }
 
-    // 3. Crisp Connecting Telemetry Path (Drawn from the tip of the map pin)
+    // 3. Telemetry Wire
     val pinSize = minOf(halfW, halfH) * 0.48f
     val pinHeadRadius = pinSize * 0.36f
     val pinTipX = qTopLeft.centerX()
@@ -1562,7 +1564,7 @@ fun generateGoogleMapsCompassBitmap(
     val wirePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(55, 0, 0, 0) else Color.argb(78, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 1.4f
+        strokeWidth = scaleFactor * 1.4f * uiScale
         strokeCap = Paint.Cap.ROUND
     }
 
@@ -1576,7 +1578,7 @@ fun generateGoogleMapsCompassBitmap(
     }
     canvas.drawPath(telemetryPath, wirePaint)
 
-    // 4. TOP-LEFT: Google Maps Location Pin (Drawn over the start of the wire)
+    // 4. TOP-LEFT: Google Maps Pin
     val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
@@ -1589,24 +1591,23 @@ fun generateGoogleMapsCompassBitmap(
     }
     canvas.drawPath(pinPath, pinPaint)
 
-    // Pin Hollow Center
     val pinHolePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(220, 242, 242, 247) else Color.parseColor("#1C1C1E")
         style = Paint.Style.FILL
     }
     canvas.drawCircle(qTopLeft.centerX(), qTopLeft.centerY() - (pinSize * 0.12f), pinSize * 0.15f, pinHolePaint)
 
-    // 5. Shared Typography for Labels
+    // 5. Shared Typography
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-        textSize = (scaleFactor * 12f).coerceAtLeast(12f)
+        textSize = scaleFactor * 12f * uiScale
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
 
-    // 6. TOP-RIGHT: Commute / Navigation Arrow Tile
-    val topTextBaselineY = qTopRight.bottom - scaleFactor * 9f
-    val iconTopCenterY = (qTopRight.top + topTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+    // 6. TOP-RIGHT: Commute
+    val topTextBaselineY = qTopRight.bottom - (scaleFactor * 9f * uiScale)
+    val iconTopCenterY = (qTopRight.top + topTextBaselineY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
 
     drawVector(
         resId = R.drawable.ic_arrow_turn_right,
@@ -1617,9 +1618,9 @@ fun generateGoogleMapsCompassBitmap(
     )
     canvas.drawText("Commute", qTopRight.centerX(), topTextBaselineY, labelPaint)
 
-    // 7. BOTTOM-LEFT: Home Destination Tile (Using ic_home drawable)
-    val botTextBaselineY = qBottomLeft.bottom - scaleFactor * 9f
-    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+    // 7. BOTTOM-LEFT: Home
+    val botTextBaselineY = qBottomLeft.bottom - (scaleFactor * 9f * uiScale)
+    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
 
     drawVector(
         resId = R.drawable.ic_home,
@@ -1630,26 +1631,24 @@ fun generateGoogleMapsCompassBitmap(
     )
     canvas.drawText("Home", qBottomLeft.centerX(), botTextBaselineY, labelPaint)
 
-    // 8. BOTTOM-RIGHT: Precision Navigational Compass Dial
+    // 8. BOTTOM-RIGHT: Compass Dial
     val compassBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#1C1C1E") else Color.parseColor("#0D0D0E")
         style = Paint.Style.FILL
     }
     canvas.drawCircle(compassCx, compassCy, compassRadius, compassBodyPaint)
 
-    // Bezel Calibration Ring
     val bezelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(45, 255, 255, 255) else Color.argb(35, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 0.8f
+        strokeWidth = scaleFactor * 0.8f * uiScale
     }
     canvas.drawCircle(compassCx, compassCy, compassRadius * 0.88f, bezelPaint)
 
-    // 30-Degree Azimuth Ticks
     val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(70, 255, 255, 255) else Color.argb(55, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 1.0f
+        strokeWidth = scaleFactor * 1.0f * uiScale
         strokeCap = Paint.Cap.ROUND
     }
     val tickStart = compassRadius * 0.80f
@@ -1668,23 +1667,20 @@ fun generateGoogleMapsCompassBitmap(
         canvas.drawLine(x1, y1, x2, y2, tickPaint)
     }
 
-    // Cardinal Heading Mark "N"
     val cardinalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
-        textSize = scaleFactor * 7.5f
+        textSize = scaleFactor * 7.5f * uiScale
         typeface = getSlateFont(context, weight = 800)
         textAlign = Paint.Align.CENTER
     }
     canvas.drawText("N", compassCx, compassCy - (compassRadius * 0.60f), cardinalPaint)
 
-    // Angled Dynamic Magnetic Needle (-32 degrees tactical heading)
     canvas.save()
     canvas.rotate(-32f, compassCx, compassCy)
 
     val needleLen = compassRadius * 0.68f
     val needleWidth = compassRadius * 0.16f
 
-    // North Magnetic Tip (Accent Color)
     val northNeedlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
         style = Paint.Style.FILL
@@ -1709,7 +1705,6 @@ fun generateGoogleMapsCompassBitmap(
     }
     canvas.drawPath(northFacetPath, northFacetPaint)
 
-    // South Magnetic Tip (Muted Silver)
     val southNeedlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#8E8E93")
         style = Paint.Style.FILL
@@ -1736,7 +1731,6 @@ fun generateGoogleMapsCompassBitmap(
 
     canvas.restore()
 
-    // Center Mechanical Pivot Hub
     val pivotRadius = compassRadius * 0.15f
     val pivotCapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.WHITE else Color.parseColor("#1C1C1E")
@@ -1749,6 +1743,482 @@ fun generateGoogleMapsCompassBitmap(
         style = Paint.Style.FILL
     }
     canvas.drawCircle(compassCx, compassCy, pivotRadius * 0.45f, pivotDotPaint)
+
+    return bitmap
+}
+
+// 12. WORKSPACE "CHRONOMETER & COCKPIT" DUAL-DIAL (2x2)
+fun generateGoogleWorkspaceChronoBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Slate Plate
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    // Restored original corner radius calculation
+    val maxCardRadius = effectiveDim / 2f
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
+    val halfW = (cardW - (pad * 2f) - gap) / 2f
+    val halfH = (cardH - (pad * 2f) - gap) / 2f
+
+    // Quadrant Bounds
+    val qTopLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.top + pad + halfH)
+    val qTopRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH)
+    val qBottomLeft = RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
+    val qBottomRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+    // Restored original tile radii
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // 2. Quadrant Tile Backgrounds
+    val tlRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(qTopLeft, tlRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val trRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(qTopRight, trRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val blRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    canvas.drawPath(Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }, tileBgPaint)
+
+    fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) {
+            drawable.setTint(tint)
+        }
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) {
+                drawH = maxDim / aspect
+            } else {
+                drawW = maxDim * aspect
+            }
+        }
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    // Shared typography
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 12f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // 3. TOP-LEFT: Google Calendar Tile (Slot 0)
+    val cal = java.util.Calendar.getInstance()
+    val dayOfWeekStr = java.text.SimpleDateFormat("EEE", java.util.Locale.getDefault()).format(cal.time).uppercase()
+    val dayOfMonthStr = java.text.SimpleDateFormat("dd", java.util.Locale.getDefault()).format(cal.time)
+
+    val calSubLabelY = qTopLeft.bottom - (scaleFactor * 9f * uiScale)
+    val calCenterY = (qTopLeft.top + calSubLabelY - (scaleFactor * 12f * uiScale)) / 2f
+
+    val calHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = scaleFactor * 11.5f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val calDayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 26f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    canvas.drawText(dayOfWeekStr, qTopLeft.centerX(), calCenterY - (scaleFactor * 4f * uiScale), calHeaderPaint)
+    canvas.drawText(dayOfMonthStr, qTopLeft.centerX(), calCenterY + (scaleFactor * 18f * uiScale), calDayPaint)
+    canvas.drawText("Calendar", qTopLeft.centerX(), calSubLabelY, labelPaint)
+
+    // 4. TOP-RIGHT: Gmail Tile (Slot 1)
+    val gmailSubLabelY = qTopRight.bottom - (scaleFactor * 9f * uiScale)
+    val gmailCenterY = (qTopRight.top + gmailSubLabelY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
+
+    drawVector(
+        resId = R.drawable.ic_gmail,
+        cx = qTopRight.centerX(),
+        cy = gmailCenterY,
+        maxDim = minOf(halfW, halfH) * 0.46f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Gmail", qTopRight.centerX(), gmailSubLabelY, labelPaint)
+
+    // 5. BOTTOM-LEFT: Google Meet Tile (Slot 2)
+    val botTextBaselineY = qBottomLeft.bottom - (scaleFactor * 9f * uiScale)
+    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
+
+    drawVector(
+        resId = R.drawable.ic_google_meet,
+        cx = qBottomLeft.centerX(),
+        cy = iconBotCenterY,
+        maxDim = minOf(halfW, halfH) * 0.46f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Meet", qBottomLeft.centerX(), botTextBaselineY, labelPaint)
+
+    // 6. BOTTOM-RIGHT: Cockpit 24-Hour Chronometer Dial (Slot 3)
+    val chronoRadius = (minOf(halfW, halfH) * 0.96f) / 2f
+    val chronoCx = qBottomRight.centerX()
+    val chronoCy = qBottomRight.centerY()
+
+    val chronoBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.parseColor("#0D0D0E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(chronoCx, chronoCy, chronoRadius, chronoBodyPaint)
+
+    val bezelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(45, 255, 255, 255) else Color.argb(35, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f * uiScale
+    }
+    canvas.drawCircle(chronoCx, chronoCy, chronoRadius * 0.88f, bezelPaint)
+
+    val indexPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = scaleFactor * 9.5f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(80, 255, 255, 255) else Color.argb(60, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.0f * uiScale
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val hourTexts = mapOf(
+        0 to "00",
+        6 to "06",
+        12 to "12",
+        18 to "18"
+    )
+
+    for (hStep in 0 until 24) {
+        val angleDeg = (hStep * 15.0) - 90.0
+        val rad = Math.toRadians(angleDeg)
+        if (hStep % 6 == 0) {
+            val textR = chronoRadius * 0.65f
+            val tx = chronoCx + (textR * Math.cos(rad)).toFloat()
+            val ty = chronoCy + (textR * Math.sin(rad)).toFloat() + (scaleFactor * 3.2f * uiScale)
+            canvas.drawText(hourTexts[hStep] ?: "", tx, ty, indexPaint)
+        } else if (hStep % 2 == 0) {
+            val rStart = chronoRadius * 0.78f
+            val rEnd = chronoRadius * 0.86f
+            val x1 = chronoCx + (rStart * Math.cos(rad)).toFloat()
+            val y1 = chronoCy + (rStart * Math.sin(rad)).toFloat()
+            val x2 = chronoCx + (rEnd * Math.cos(rad)).toFloat()
+            val y2 = chronoCy + (rEnd * Math.sin(rad)).toFloat()
+            canvas.drawLine(x1, y1, x2, y2, tickPaint)
+        }
+    }
+
+    // Dynamic 24-Hour Indicator Hand
+    val hourOfDay = cal.get(java.util.Calendar.HOUR_OF_DAY)
+    val minuteOfHour = cal.get(java.util.Calendar.MINUTE)
+    val currentDayFraction = (hourOfDay + (minuteOfHour / 60f)) / 24f
+    val handAngleDeg = (currentDayFraction * 360f) - 90f
+
+    canvas.save()
+    canvas.rotate(handAngleDeg, chronoCx, chronoCy)
+
+    val handLen = chronoRadius * 0.58f
+    val handWidth = chronoRadius * 0.12f
+
+    val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val chronoHandPath = Path().apply {
+        moveTo(chronoCx + handLen, chronoCy)
+        lineTo(chronoCx, chronoCy - handWidth / 2f)
+        lineTo(chronoCx - (handLen * 0.22f), chronoCy)
+        lineTo(chronoCx, chronoCy + handWidth / 2f)
+        close()
+    }
+    canvas.drawPath(chronoHandPath, handPaint)
+
+    val counterPivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.WHITE else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(chronoCx, chronoCy, chronoRadius * 0.14f, counterPivotPaint)
+
+    val centerPinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(chronoCx, chronoCy, chronoRadius * 0.06f, centerPinPaint)
+
+    canvas.restore()
+
+    return bitmap
+}
+
+// 13. GOOGLE DRIVE & KEEP (2x2)
+fun generateGoogleDriveTapeReelBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Slate Plate
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    val maxCardRadius = effectiveDim / 2f
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
+    val halfW = (cardW - (pad * 2f) - gap) / 2f
+    val halfH = (cardH - (pad * 2f) - gap) / 2f
+
+    // Quadrant Bounds
+    val qTopLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.top + pad + halfH)
+    val qTopRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH)
+    val qBottomLeft = RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
+    val qBottomRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // 2. Quadrant Tile Backgrounds (Slots 0, 1, 2)
+    val tlRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(qTopLeft, tlRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val trRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(qTopRight, trRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val blRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    canvas.drawPath(Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }, tileBgPaint)
+
+    fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) {
+            drawable.setTint(tint)
+        }
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) {
+                drawH = maxDim / aspect
+            } else {
+                drawW = maxDim * aspect
+            }
+        }
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    // Shared typography
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 12f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // 3. TOP-LEFT: Google Drive (Slot 0)
+    val driveSubLabelY = qTopLeft.bottom - (scaleFactor * 9f * uiScale)
+    val driveCenterY = (qTopLeft.top + driveSubLabelY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
+
+    drawVector(
+        resId = R.drawable.ic_drive,
+        cx = qTopLeft.centerX(),
+        cy = driveCenterY,
+        maxDim = minOf(halfW, halfH) * 0.46f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Drive", qTopLeft.centerX(), driveSubLabelY, labelPaint)
+
+    // 4. TOP-RIGHT: Google Docs (Slot 1)
+    val docsSubLabelY = qTopRight.bottom - (scaleFactor * 9f * uiScale)
+    val docsCenterY = (qTopRight.top + docsSubLabelY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
+
+    drawVector(
+        resId = R.drawable.ic_google_docs,
+        cx = qTopRight.centerX(),
+        cy = docsCenterY,
+        maxDim = minOf(halfW, halfH) * 0.46f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Docs", qTopRight.centerX(), docsSubLabelY, labelPaint)
+
+    // 5. BOTTOM-LEFT: Google Sheets (Slot 2)
+    val sheetsSubLabelY = qBottomLeft.bottom - (scaleFactor * 9f * uiScale)
+    val sheetsCenterY = (qBottomLeft.top + sheetsSubLabelY - (scaleFactor * 12f * uiScale)) / 2f + (scaleFactor * 2f * uiScale)
+
+    drawVector(
+        resId = R.drawable.ic_google_sheets,
+        cx = qBottomLeft.centerX(),
+        cy = sheetsCenterY,
+        maxDim = minOf(halfW, halfH) * 0.46f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Sheets", qBottomLeft.centerX(), sheetsSubLabelY, labelPaint)
+
+    // 6. BOTTOM-RIGHT: Google Keep Bulb (Slot 3 - Scaled to Block Height)
+    val kCx = qBottomRight.centerX()
+    val kCy = qBottomRight.centerY()
+
+// Match the full vertical height of the neighboring tile block
+    val bulbH = halfH * 0.8f
+    val bulbW = bulbH * 0.58f
+
+    val keepDrawableId = context.resources.getIdentifier("ic_google_keep", "drawable", context.packageName).takeIf { it != 0 }
+        ?: context.resources.getIdentifier("ic_keep", "drawable", context.packageName).takeIf { it != 0 }
+
+    if (keepDrawableId != null) {
+        drawVector(
+            resId = keepDrawableId,
+            cx = kCx,
+            cy = kCy,
+            maxDim = bulbH,
+            tint = accentColorInt
+        )
+    } else {
+        val domeR = bulbW / 2f
+        val domeCy = (kCy - bulbH / 2f) + domeR
+        val neckW = bulbW * 0.44f
+        val neckBottom = domeCy + (domeR * 1.15f)
+
+        val bulbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+
+        // Glass Envelope Dome & Taper
+        val bulbPath = Path().apply {
+            arcTo(
+                RectF(kCx - domeR, domeCy - domeR, kCx + domeR, domeCy + domeR),
+                140f,
+                260f,
+                false
+            )
+            lineTo(kCx + neckW / 2f, neckBottom)
+            lineTo(kCx - neckW / 2f, neckBottom)
+            close()
+        }
+        canvas.drawPath(bulbPath, bulbPaint)
+
+        // Base Screw Threads
+        val threadPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.STROKE
+            strokeWidth = scaleFactor * 2.8f * uiScale
+            strokeCap = Paint.Cap.ROUND
+        }
+        val spacing = scaleFactor * 5.0f * uiScale
+        val t1Y = neckBottom + spacing
+        val t2Y = t1Y + spacing
+        val t3Y = t2Y + spacing
+
+        canvas.drawLine(kCx - neckW * 0.42f, t1Y, kCx + neckW * 0.42f, t1Y, threadPaint)
+        canvas.drawLine(kCx - neckW * 0.32f, t2Y, kCx + neckW * 0.32f, t2Y, threadPaint)
+        canvas.drawLine(kCx - neckW * 0.18f, t3Y, kCx + neckW * 0.18f, t3Y, threadPaint)
+
+        // Inner Filament Cutout
+        val cutoutPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.WHITE else Color.parseColor("#1C1C1E")
+            style = Paint.Style.STROKE
+            strokeWidth = scaleFactor * 3.4f * uiScale
+            strokeCap = Paint.Cap.ROUND
+        }
+        val filamentPath = Path().apply {
+            val span = domeR * 0.35f
+            val fTop = domeCy - (domeR * 0.35f)
+            val fBot = domeCy + (domeR * 0.30f)
+            moveTo(kCx - span, fBot)
+            lineTo(kCx - span, fTop + span)
+            quadTo(kCx - span, fTop, kCx, fTop)
+            quadTo(kCx + span, fTop, kCx + span, fTop + span)
+            lineTo(kCx + span, fBot)
+        }
+        canvas.drawPath(filamentPath, cutoutPaint)
+    }
 
     return bitmap
 }
