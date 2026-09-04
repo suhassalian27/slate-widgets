@@ -149,6 +149,7 @@ fun generateAppFolderGridBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
+    // 1. Dual-Mode Geometry
     val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
@@ -166,7 +167,8 @@ fun generateAppFolderGridBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -175,8 +177,11 @@ fun generateAppFolderGridBitmap(
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
+    // 2. Proportional Padding & Edge Fill
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 9f)
+    val gap = (minDim * 0.035f).coerceIn(scaleFactor * 2.5f, scaleFactor * 6f)
+
     val availableW = cardRect.width() - (pad * 2f) - (gap * (cols - 1))
     val availableH = cardRect.height() - (pad * 2f) - (gap * (rows - 1))
     val tileW = availableW / cols
@@ -188,8 +193,10 @@ fun generateAppFolderGridBitmap(
         style = Paint.Style.FILL
     }
 
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val squircleRadius = (scaleFactor * 8f).coerceAtMost(minOf(tileW, tileH) * 0.22f)
+    // 3. Concentric Per-Corner Radius
+    val minTileDim = minOf(tileW, tileH)
+    val squircleRadius = minTileDim * 0.28f
+    val concentricRadius = (outerRadius - pad).coerceIn(squircleRadius, minTileDim / 2f)
 
     for (i in 0 until slotCount) {
         val col = i % cols
@@ -201,7 +208,7 @@ fun generateAppFolderGridBitmap(
 
         val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
 
-        // Concentric Corner Radii Mapping for Grid Edge Tiles
+        // Concentric Corner Radii Mapping for Edge Tiles
         val tl = if (col == 0 && row == 0) concentricRadius else squircleRadius
         val tr = if (col == cols - 1 && row == 0) concentricRadius else squircleRadius
         val br = if (col == cols - 1 && row == rows - 1) concentricRadius else squircleRadius
@@ -274,53 +281,100 @@ fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, isR
 fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
     generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 5, rows = 1)
 
-// 7. 6-APP CIRCLE DIAL (2x2)
-fun generateAppFolderCircle6Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+// 7. 6-APP CIRCLE DIAL (2x2 / Minimal Dial)
+fun generateAppFolderCircle6Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    folderConfig: AppFolderWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
+    // 1. Base Dial Plate
     val margin = scaleFactor * 1.5f
     val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
 
     val outerRadius = cardSize / 2f
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = Color.argb(
+            (config.opacity.coerceIn(0f, 1f) * 255).toInt(),
+            Color.red(bgColor),
+            Color.green(bgColor),
+            Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(cardRect.centerX(), cardRect.centerY(), outerRadius, bgPaint)
+    canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
-    val orbitRadius = outerRadius * 0.58f
-    val slotRadius = outerRadius * 0.26f
+    val orbitRadius = outerRadius * 0.62f
+    val tileRadius = outerRadius * 0.42f
+
+    // 2. Subtle Orbit Guide (Thin, low-contrast guide line)
+    val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
+
+    // 3. Minimal Accent Center Ring (A clean open ring instead of clutter)
+    val centerRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.4f
+    }
+    canvas.drawCircle(cx, cy, scaleFactor * 3.5f, centerRingPaint)
+
+    // 4. App Slots
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     for (i in 0 until 6) {
         val angle = Math.toRadians((i * 60.0) - 90.0)
-        val cx = cardRect.centerX() + (orbitRadius * Math.cos(angle)).toFloat()
-        val cy = cardRect.centerY() + (orbitRadius * Math.sin(angle)).toFloat()
-        val tileRect = RectF(cx - slotRadius, cy - slotRadius, cx + slotRadius, cy + slotRadius)
+        val slotX = cx + (orbitRadius * Math.cos(angle)).toFloat()
+        val slotY = cy + (orbitRadius * Math.sin(angle)).toFloat()
+
+        val tileRect = RectF(slotX - tileRadius, slotY - tileRadius, slotX + tileRadius, slotY + tileRadius)
         val tileConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
 
-        if (folderConfig.showTileBackground) {
-            val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
-                style = Paint.Style.FILL
-            }
-            canvas.drawCircle(cx, cy, slotRadius, tilePaint)
-        }
-
-        drawSlotContent(canvas, context, tileRect, tileConfig, false, isLight, scaleFactor, Color.WHITE, secondaryText, isMicro = true)
+        drawSlotContent(
+            canvas = canvas,
+            context = context,
+            tileRect = tileRect,
+            slotConfig = tileConfig,
+            showAppNames = false,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = Color.WHITE,
+            secondaryText = secondaryText,
+            isMicro = false
+        )
     }
+
     return bitmap
 }
 
-fun generateAppFolderCircle6Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+fun generateAppFolderCircle6Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 6)
     return generateAppFolderCircle6Bitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }

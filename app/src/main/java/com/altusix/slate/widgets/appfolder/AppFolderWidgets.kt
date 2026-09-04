@@ -87,16 +87,22 @@ abstract class BaseAppFolderGridReceiver(private val slotCount: Int, private val
         val views = RemoteViews(context.packageName, layoutResId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
+        // Maps both naming conventions (widget_base_grid_3x3 uses slot_x, older layouts use touch_slot_x)
         val touchSlotIds = intArrayOf(
+            R.id.slot_0, R.id.slot_1, R.id.slot_2,
+            R.id.slot_3, R.id.slot_4, R.id.slot_5,
+            R.id.slot_6, R.id.slot_7, R.id.slot_8
+        )
+        val legacyTouchSlotIds = intArrayOf(
             R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3,
             R.id.touch_slot_4, R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7,
             R.id.touch_slot_8, R.id.touch_slot_9
         )
+
         val folderConfig = AppFolderWidgetConfig.load(context, widgetId, slotCount)
 
         for (i in 0 until slotCount) {
             val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
-            val targetViewId = touchSlotIds.getOrNull(i) ?: continue
 
             val intent = if (!slotConfig.isConfigured) {
                 Intent(context, AppFolderWidgetConfigActivity::class.java).apply {
@@ -107,12 +113,41 @@ abstract class BaseAppFolderGridReceiver(private val slotCount: Int, private val
             } else {
                 context.packageManager.getLaunchIntentForPackage(slotConfig.packageName)?.apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                } ?: Intent()
+                } ?: Intent(context, AppFolderWidgetConfigActivity::class.java).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                    putExtra("extra_slot_index", i)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
             }
 
-            val pi = PendingIntent.getActivity(context, widgetId * 100 + i, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            views.setOnClickPendingIntent(targetViewId, pi)
+            val pi = PendingIntent.getActivity(
+                context,
+                widgetId * 100 + i,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Bind to whichever ID format is present in the layout
+            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
+            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
         }
+
+        // Global fallback: If no apps configured, tapping the background card opens config
+        if (folderConfig.slots.none { it.isConfigured }) {
+            val rootIntent = Intent(context, AppFolderWidgetConfigActivity::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("extra_slot_index", 0)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val rootPi = PendingIntent.getActivity(
+                context,
+                widgetId,
+                rootIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_image_view, rootPi)
+        }
+
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 
@@ -205,8 +240,15 @@ class AppFolderBento7Receiver : BaseAppFolderGridReceiver(7, R.layout.widget_app
 }
 
 // 9. 9-APP GRID (3x3)
-class AppFolderGrid9Receiver : BaseAppFolderGridReceiver(9, R.layout.widget_appfolder_grid9_layout) {
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolderGrid9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+class AppFolderGrid9Receiver : BaseAppFolderGridReceiver(9, R.layout.widget_base_grid_3x3_layout) {
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateAppFolderGrid9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 10. 10-APP BENTO LEFT BIG (4x2)
