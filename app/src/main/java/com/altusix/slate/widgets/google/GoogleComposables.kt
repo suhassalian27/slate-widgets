@@ -713,7 +713,7 @@ fun generateGoogleMediaCapsuleBitmap(
     val iconDrawables = listOf(
         R.drawable.ic_youtube,
         R.drawable.ic_sound_search,
-        R.drawable.ic_yt_music
+        R.drawable.ic_youtube_music
     )
 
     val baseIconSize = (minOf(tileW, tileH) * 0.44f).toInt().coerceAtLeast((scaleFactor * 16f).toInt())
@@ -1255,6 +1255,500 @@ fun generateGoogleGrid9Bitmap(
             }
         }
     }
+
+    return bitmap
+}
+
+// 10. YOUTUBE "VINYL & VIEWFINDER" DUAL-DIAL (2x2)
+fun generateYouTubeVinylViewfinderBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Slate Plate
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val maxCardRadius = minOf(cardW, cardH) / 2f
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = minOf(cardW, cardH) * 0.055f
+    val gap = minOf(cardW, cardH) * 0.04f
+    val halfW = (cardW - (pad * 2f) - gap) / 2f
+    val halfH = (cardH - (pad * 2f) - gap) / 2f
+
+    // Quadrant Bounds
+    val qTopLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.top + pad + halfH)
+    val qTopRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH)
+    val qBottomLeft = RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
+    val qBottomRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // 2. Quadrant Tile Backgrounds
+    val vfRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    val vfPath = Path().apply { addRoundRect(qTopLeft, vfRadii, Path.Direction.CW) }
+    canvas.drawPath(vfPath, tileBgPaint)
+
+    val shortsRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    val shortsPath = Path().apply { addRoundRect(qTopRight, shortsRadii, Path.Direction.CW) }
+    canvas.drawPath(shortsPath, tileBgPaint)
+
+    val blRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    val blPath = Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }
+    canvas.drawPath(blPath, tileBgPaint)
+
+    // 3. Fluid Connecting Cable (Starts tucked under YouTube icon, terminates under Vinyl)
+    val ytIconMaxDim = minOf(halfW, halfH) * 0.56f
+    val ytIconStartX = qTopLeft.centerX() + (ytIconMaxDim * 0.36f)
+    val ytIconStartY = qTopLeft.centerY()
+
+    val vinylCx = qBottomRight.centerX()
+    val vinylCy = qBottomRight.centerY()
+
+    val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(55, 0, 0, 0) else Color.argb(78, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.4f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val orbitalPath = Path().apply {
+        moveTo(ytIconStartX, ytIconStartY)
+        cubicTo(
+            qTopRight.centerX(), ytIconStartY,
+            qBottomLeft.centerX(), vinylCy,
+            vinylCx, vinylCy
+        )
+    }
+    canvas.drawPath(orbitalPath, guidePaint)
+
+    // Helper: Draws and scales vector drawables preserving intrinsic aspect ratio
+    fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) {
+            drawable.setTint(tint)
+        }
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) {
+                drawH = maxDim / aspect
+            } else {
+                drawW = maxDim * aspect
+            }
+        }
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    // 4. TOP-LEFT: YouTube Icon
+    drawVector(
+        resId = R.drawable.ic_youtube,
+        cx = qTopLeft.centerX(),
+        cy = qTopLeft.centerY(),
+        maxDim = ytIconMaxDim,
+        tint = accentColorInt
+    )
+
+    // 5. Shared Typography for Sub-labels
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = (scaleFactor * 12f).coerceAtLeast(12f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // 6. TOP-RIGHT: Shorts Capsule
+    val topTextBaselineY = qTopRight.bottom - scaleFactor * 9f
+    val iconTopCenterY = (qTopRight.top + topTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+    drawVector(
+        resId = R.drawable.ic_youtube_shorts,
+        cx = qTopRight.centerX(),
+        cy = iconTopCenterY,
+        maxDim = minOf(halfW, halfH) * 0.44f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Shorts", qTopRight.centerX(), topTextBaselineY, labelPaint)
+
+    // 7. BOTTOM-LEFT: Liked Music / Mix Capsule
+    val botTextBaselineY = qBottomLeft.bottom - scaleFactor * 9f
+    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+    drawVector(
+        resId = R.drawable.ic_soundwave,
+        cx = qBottomLeft.centerX(),
+        cy = iconBotCenterY,
+        maxDim = minOf(halfW, halfH) * 0.42f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Mix", qBottomLeft.centerX(), botTextBaselineY, labelPaint)
+
+    // 8. BOTTOM-RIGHT: Vinyl Record
+    val vinylRadius = (minOf(halfW, halfH) * 0.96f) / 2f
+    val vinylBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.parseColor("#0D0D0E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(vinylCx, vinylCy, vinylRadius, vinylBodyPaint)
+
+    // Fine Lathe Grooves
+    val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(45, 255, 255, 255) else Color.argb(35, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.7f
+    }
+    canvas.drawCircle(vinylCx, vinylCy, vinylRadius * 0.82f, groovePaint)
+    canvas.drawCircle(vinylCx, vinylCy, vinylRadius * 0.66f, groovePaint)
+    canvas.drawCircle(vinylCx, vinylCy, vinylRadius * 0.50f, groovePaint)
+
+    // Center Spindle Label
+    val spindleRadius = vinylRadius * 0.42f
+    val labelDiscPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(vinylCx, vinylCy, spindleRadius, labelDiscPaint)
+
+    // Center YouTube Music Glyph
+    val spindleIconColor = if (isLight) Color.WHITE else Color.BLACK
+    drawVector(
+        resId = R.drawable.ic_youtube_music,
+        cx = vinylCx,
+        cy = vinylCy,
+        maxDim = spindleRadius * 1.30f,
+        tint = spindleIconColor
+    )
+
+    return bitmap
+}
+
+// 11. GOOGLE MAPS "COMPASS & WAYPOINT" DUAL-DIAL (2x2)
+fun generateGoogleMapsCompassBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Slate Plate
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val maxCardRadius = minOf(cardW, cardH) / 2f
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = minOf(cardW, cardH) * 0.055f
+    val gap = minOf(cardW, cardH) * 0.04f
+    val halfW = (cardW - (pad * 2f) - gap) / 2f
+    val halfH = (cardH - (pad * 2f) - gap) / 2f
+
+    // Quadrant Bounds
+    val qTopLeft = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.top + pad + halfH)
+    val qTopRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH)
+    val qBottomLeft = RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
+    val qBottomRight = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // 2. Quadrant Tile Backgrounds
+    val tlRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(qTopLeft, tlRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val trRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(qTopRight, trRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val blRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    canvas.drawPath(Path().apply { addRoundRect(qBottomLeft, blRadii, Path.Direction.CW) }, tileBgPaint)
+
+    // Helper: Draws and scales vector drawables preserving intrinsic aspect ratio
+    fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) {
+            drawable.setTint(tint)
+        }
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) {
+                drawH = maxDim / aspect
+            } else {
+                drawW = maxDim * aspect
+            }
+        }
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    // 3. Crisp Connecting Telemetry Path (Drawn from the tip of the map pin)
+    val pinSize = minOf(halfW, halfH) * 0.48f
+    val pinHeadRadius = pinSize * 0.36f
+    val pinTipX = qTopLeft.centerX()
+    val pinTipY = qTopLeft.centerY() + (pinSize * 0.45f)
+
+    val compassRadius = (minOf(halfW, halfH) * 0.96f) / 2f
+    val compassCx = qBottomRight.centerX()
+    val compassCy = qBottomRight.centerY()
+
+    val wirePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(55, 0, 0, 0) else Color.argb(78, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.4f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val telemetryPath = Path().apply {
+        moveTo(pinTipX, pinTipY)
+        cubicTo(
+            qTopRight.centerX(), pinTipY,
+            qBottomLeft.centerX(), compassCy,
+            compassCx - (compassRadius * 0.4f), compassCy
+        )
+    }
+    canvas.drawPath(telemetryPath, wirePaint)
+
+    // 4. TOP-LEFT: Google Maps Location Pin (Drawn over the start of the wire)
+    val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val pinPath = Path().apply {
+        val headCy = qTopLeft.centerY() - (pinSize * 0.12f)
+        arcTo(RectF(pinTipX - pinHeadRadius, headCy - pinHeadRadius, pinTipX + pinHeadRadius, headCy + pinHeadRadius), 140f, 260f, false)
+        lineTo(pinTipX, pinTipY)
+        close()
+    }
+    canvas.drawPath(pinPath, pinPaint)
+
+    // Pin Hollow Center
+    val pinHolePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(220, 242, 242, 247) else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(qTopLeft.centerX(), qTopLeft.centerY() - (pinSize * 0.12f), pinSize * 0.15f, pinHolePaint)
+
+    // 5. Shared Typography for Labels
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = (scaleFactor * 12f).coerceAtLeast(12f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // 6. TOP-RIGHT: Commute / Navigation Arrow Tile
+    val topTextBaselineY = qTopRight.bottom - scaleFactor * 9f
+    val iconTopCenterY = (qTopRight.top + topTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+
+    drawVector(
+        resId = R.drawable.ic_arrow_turn_right,
+        cx = qTopRight.centerX(),
+        cy = iconTopCenterY,
+        maxDim = minOf(halfW, halfH) * 0.38f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Commute", qTopRight.centerX(), topTextBaselineY, labelPaint)
+
+    // 7. BOTTOM-LEFT: Home Destination Tile (Using ic_home drawable)
+    val botTextBaselineY = qBottomLeft.bottom - scaleFactor * 9f
+    val iconBotCenterY = (qBottomLeft.top + botTextBaselineY - scaleFactor * 12f) / 2f + scaleFactor * 2f
+
+    drawVector(
+        resId = R.drawable.ic_home,
+        cx = qBottomLeft.centerX(),
+        cy = iconBotCenterY,
+        maxDim = minOf(halfW, halfH) * 0.38f,
+        tint = accentColorInt
+    )
+    canvas.drawText("Home", qBottomLeft.centerX(), botTextBaselineY, labelPaint)
+
+    // 8. BOTTOM-RIGHT: Precision Navigational Compass Dial
+    val compassBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.parseColor("#0D0D0E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(compassCx, compassCy, compassRadius, compassBodyPaint)
+
+    // Bezel Calibration Ring
+    val bezelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(45, 255, 255, 255) else Color.argb(35, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawCircle(compassCx, compassCy, compassRadius * 0.88f, bezelPaint)
+
+    // 30-Degree Azimuth Ticks
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(70, 255, 255, 255) else Color.argb(55, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.0f
+        strokeCap = Paint.Cap.ROUND
+    }
+    val tickStart = compassRadius * 0.80f
+    val tickEnd = compassRadius * 0.86f
+    val cardTickStart = compassRadius * 0.74f
+
+    for (i in 0 until 12) {
+        val angleDeg = i * 30.0
+        val rad = Math.toRadians(angleDeg)
+        val isCardinal = i % 3 == 0
+        val sR = if (isCardinal) cardTickStart else tickStart
+        val x1 = compassCx + (sR * Math.cos(rad)).toFloat()
+        val y1 = compassCy + (sR * Math.sin(rad)).toFloat()
+        val x2 = compassCx + (tickEnd * Math.cos(rad)).toFloat()
+        val y2 = compassCy + (tickEnd * Math.sin(rad)).toFloat()
+        canvas.drawLine(x1, y1, x2, y2, tickPaint)
+    }
+
+    // Cardinal Heading Mark "N"
+    val cardinalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = scaleFactor * 7.5f
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("N", compassCx, compassCy - (compassRadius * 0.60f), cardinalPaint)
+
+    // Angled Dynamic Magnetic Needle (-32 degrees tactical heading)
+    canvas.save()
+    canvas.rotate(-32f, compassCx, compassCy)
+
+    val needleLen = compassRadius * 0.68f
+    val needleWidth = compassRadius * 0.16f
+
+    // North Magnetic Tip (Accent Color)
+    val northNeedlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val northPath = Path().apply {
+        moveTo(compassCx, compassCy - needleLen)
+        lineTo(compassCx + needleWidth / 2f, compassCy)
+        lineTo(compassCx, compassCy - (needleLen * 0.18f))
+        close()
+    }
+    canvas.drawPath(northPath, northNeedlePaint)
+
+    val northFacetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(180, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+    val northFacetPath = Path().apply {
+        moveTo(compassCx, compassCy - needleLen)
+        lineTo(compassCx - needleWidth / 2f, compassCy)
+        lineTo(compassCx, compassCy - (needleLen * 0.18f))
+        close()
+    }
+    canvas.drawPath(northFacetPath, northFacetPaint)
+
+    // South Magnetic Tip (Muted Silver)
+    val southNeedlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#8E8E93")
+        style = Paint.Style.FILL
+    }
+    val southPath = Path().apply {
+        moveTo(compassCx, compassCy + needleLen)
+        lineTo(compassCx + needleWidth / 2f, compassCy)
+        lineTo(compassCx, compassCy + (needleLen * 0.18f))
+        close()
+    }
+    canvas.drawPath(southPath, southNeedlePaint)
+
+    val southFacetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#C7C7CC") else Color.parseColor("#636366")
+        style = Paint.Style.FILL
+    }
+    val southFacetPath = Path().apply {
+        moveTo(compassCx, compassCy + needleLen)
+        lineTo(compassCx - needleWidth / 2f, compassCy)
+        lineTo(compassCx, compassCy + (needleLen * 0.18f))
+        close()
+    }
+    canvas.drawPath(southFacetPath, southFacetPaint)
+
+    canvas.restore()
+
+    // Center Mechanical Pivot Hub
+    val pivotRadius = compassRadius * 0.15f
+    val pivotCapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.WHITE else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(compassCx, compassCy, pivotRadius, pivotCapPaint)
+
+    val pivotDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(compassCx, compassCy, pivotRadius * 0.45f, pivotDotPaint)
 
     return bitmap
 }

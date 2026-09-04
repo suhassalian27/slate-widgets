@@ -2741,6 +2741,30 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 10. YOUTUBE "VINYL & VIEWFINDER" DUAL-DIAL (2x2)-->
+        <receiver
+            android:name=".widgets.google.GoogleYouTubeDualReceiver"
+            android:exported="true"
+            android:label="Slate YouTube Vinyl &amp; Viewfinder">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 11. GOOGLE MAPS COMPASS & WAYPOINT RECEIVER (2x2)-->
+        <receiver
+            android:name=".widgets.google.GoogleMapsCompassReceiver"
+            android:exported="true"
+            android:label="Slate Maps Compass &amp; Waypoint">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

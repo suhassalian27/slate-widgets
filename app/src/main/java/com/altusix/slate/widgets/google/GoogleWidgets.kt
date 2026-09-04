@@ -27,7 +27,9 @@ fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Lightbar Horizon", "2x2", "Google", GoogleLightbarReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Lens Viewfinder", "2x2", "Google", GoogleLensReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Search Action Dock", "3x2", "Google", GoogleSearchDockReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Google 3x3 Hub", "2x2", "Google", GoogleGrid9Receiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Google 3x3 Hub", "2x2", "Google", GoogleGrid9Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("YouTube Vinyl & Viewfinder", "2x2", "Google", GoogleYouTubeDualReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Maps Compass & Waypoint", "2x2", "Google", GoogleMapsCompassReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -42,7 +44,9 @@ fun updateAllGoogleWidgets(context: Context) {
         GoogleLightbarReceiver::class.java,
         GoogleLensReceiver::class.java,
         GoogleSearchDockReceiver::class.java,
-        GoogleGrid9Receiver::class.java
+        GoogleGrid9Receiver::class.java,
+        GoogleYouTubeDualReceiver::class.java,
+        GoogleMapsCompassReceiver::class.java
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
@@ -878,6 +882,198 @@ class GoogleGrid9Receiver : BaseGoogleReceiver() {
         )
 
         for (i in 0..8) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 10. YOUTUBE DUAL-DIAL RECEIVER (2x2)
+class GoogleYouTubeDualReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateYouTubeVinylViewfinderBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_2x2)
+        val bitmap = generateYouTubeVinylViewfinderBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pm = context.packageManager
+        fun safeAppIntent(pkg: String, webUrl: String): Intent {
+            return pm.getLaunchIntentForPackage(pkg)?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            } ?: Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+
+        // Ordered by reading direction: slot_0, slot_1, slot_2, slot_3
+        val intents = listOf(
+            // Slot 0 (Top-Left): YouTube Feed
+            safeAppIntent("com.google.android.youtube", "https://youtube.com"),
+
+            // Slot 1 (Top-Right): YouTube Shorts
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/shorts")).apply {
+                setPackage("com.google.android.youtube")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }.let { if (it.resolveActivity(pm) != null) it else safeAppIntent("com.google.android.youtube", "https://youtube.com/shorts") },
+
+            // Slot 2 (Bottom-Left): Liked Music / Mix
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://music.youtube.com/playlist?list=LM")).apply {
+                setPackage("com.google.android.apps.youtube.music")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }.let { if (it.resolveActivity(pm) != null) it else safeAppIntent("com.google.android.apps.youtube.music", "https://music.youtube.com") },
+
+            // Slot 3 (Bottom-Right): YouTube Music App
+            safeAppIntent("com.google.android.apps.youtube.music", "https://music.youtube.com")
+        )
+
+        val slotIds = intArrayOf(
+            R.id.slot_0,
+            R.id.slot_1,
+            R.id.slot_2,
+            R.id.slot_3
+        )
+
+        for (i in 0..3) {
+            views.setOnClickPendingIntent(
+                slotIds[i],
+                PendingIntent.getActivity(
+                    context,
+                    widgetId * 100 + i,
+                    intents[i],
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 11. GOOGLE MAPS COMPASS & WAYPOINT RECEIVER (2x2)
+class GoogleMapsCompassReceiver : BaseGoogleReceiver() {
+
+    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        return generateGoogleMapsCompassBitmap(context, config, false, wDp, hDp, appWidgetId)
+    }
+
+    override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_2x2)
+        val bitmap = generateGoogleMapsCompassBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val pm = context.packageManager
+        val isMapsInstalled = pm.getLaunchIntentForPackage("com.google.android.apps.maps") != null
+
+        fun safeMapsIntent(uri: Uri): Intent {
+            return Intent(Intent.ACTION_VIEW, uri).apply {
+                if (isMapsInstalled) {
+                    setPackage("com.google.android.apps.maps")
+                }
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+
+        // Slot 2: Dedicated native navigation intent to the account's saved Home
+        val homeIntent = if (isMapsInstalled) {
+            Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=Home")).apply {
+                setPackage("com.google.android.apps.maps")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        } else {
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/dir/?api=1&destination=Home")).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        }
+
+        val intents = listOf(
+            // Slot 0 (Top-Left): Google Maps App
+            pm.getLaunchIntentForPackage("com.google.android.apps.maps")?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            } ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com")).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            },
+
+            // Slot 1 (Top-Right): Direct Commute & Route Planner
+            safeMapsIntent(Uri.parse("https://www.google.com/maps/dir/?api=1")),
+
+            // Slot 2 (Bottom-Left): Native Directions to Saved Home
+            homeIntent,
+
+            // Slot 3 (Bottom-Right): Explore Nearby
+            safeMapsIntent(Uri.parse("https://www.google.com/maps/search/?api=1&query=Explore+nearby"))
+        )
+
+        val slotIds = intArrayOf(
+            R.id.slot_0,
+            R.id.slot_1,
+            R.id.slot_2,
+            R.id.slot_3
+        )
+
+        for (i in 0..3) {
             views.setOnClickPendingIntent(
                 slotIds[i],
                 PendingIntent.getActivity(
