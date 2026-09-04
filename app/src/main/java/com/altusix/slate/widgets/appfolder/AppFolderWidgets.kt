@@ -164,10 +164,11 @@ fun getAppFolderWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "4-App Row", sizeText = "4x1", category = "App Folders", receiverClass = AppFolderRow4Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "5-App Row", sizeText = "5x1", category = "App Folders", receiverClass = AppFolderRow5Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "6-App Circle Dial", sizeText = "2x2", category = "App Folders", receiverClass = AppFolderCircle6Receiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "4-App Triangle Folder", sizeText = "2x2", category = "App Folders", receiverClass = AppFolderTriangle4Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "7-App Bento Folder", sizeText = "2x2", category = "App Folders", receiverClass = AppFolderBento7Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "9-App Grid Folder", sizeText = "3x3", category = "App Folders", receiverClass = AppFolderGrid9Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "10-App Bento Left", sizeText = "4x2", category = "App Folders", receiverClass = AppFolderBento10LeftReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "10-App Bento Top", sizeText = "4x2", category = "App Folders", receiverClass = AppFolderBento10TopReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "10-App Bento Top", sizeText = "4x2", category = "App Folders", receiverClass = AppFolderBento10TopReceiver::class.java, hasModeOption = true),
     )
 }
 
@@ -184,7 +185,8 @@ fun updateAllAppFolderWidgets(context: Context) {
         AppFolderBento7Receiver::class.java,
         AppFolderGrid9Receiver::class.java,
         AppFolderBento10LeftReceiver::class.java,
-        AppFolderBento10TopReceiver::class.java
+        AppFolderBento10TopReceiver::class.java,
+        AppFolderTriangle4Receiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -261,3 +263,14 @@ class AppFolderBento10TopReceiver : BaseAppFolderGridReceiver(10, R.layout.widge
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolderBento10TopBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
+// 12. 4-APP TRIANGLE FOLDER (2x2)
+class AppFolderTriangle4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_base_triangle4) {
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateAppFolderTriangle4Bitmap(context, config, false, wDp, hDp, widgetId)
+}

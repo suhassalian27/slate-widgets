@@ -291,6 +291,7 @@ private fun AppFolderConfigSheetContent(
         ) {
             val previewBitmap = remember(folderConfig, slateConfig, isResponsive, widgetClassName) {
                 when {
+                    widgetClassName.contains("Triangle4") -> generateAppFolderTriangle4Bitmap(context, slateConfig, folderConfig, false, 140, 140, 0)
                     widgetClassName.contains("Horizontal3") -> generateAppFolderHorizontal3Bitmap(context, slateConfig, folderConfig, isResponsive, 180, 80, 0)
                     widgetClassName.contains("Vertical3") -> generateAppFolderVertical3Bitmap(context, slateConfig, folderConfig, isResponsive, 80, 180, 0)
                     widgetClassName.contains("Row4") -> generateAppFolderRow4Bitmap(context, slateConfig, folderConfig, isResponsive, 220, 80, 0)

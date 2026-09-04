@@ -15,6 +15,7 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import android.graphics.PointF
 
 fun getAppIconBitmap(context: Context, packageName: String, size: Int): Bitmap? {
     return try {
@@ -231,6 +232,55 @@ fun generateAppFolderGridBitmap(
         canvas.restore()
     }
     return bitmap
+}
+
+private fun buildRoundedTrianglePath(
+    p0: PointF,
+    p1: PointF,
+    p2: PointF,
+    r0: Float,
+    r1: Float,
+    r2: Float
+): Path {
+    val pts = arrayOf(p0, p1, p2)
+    val radii = floatArrayOf(r0, r1, r2)
+    val path = Path()
+
+    val tStart = Array(3) { PointF() }
+    val tEnd = Array(3) { PointF() }
+
+    for (i in 0 until 3) {
+        val prev = pts[(i + 2) % 3]
+        val curr = pts[i]
+        val next = pts[(i + 1) % 3]
+
+        val vPrevX = prev.x - curr.x
+        val vPrevY = prev.y - curr.y
+        val lenPrev = Math.hypot(vPrevX.toDouble(), vPrevY.toDouble()).toFloat().coerceAtLeast(0.001f)
+
+        val vNextX = next.x - curr.x
+        val vNextY = next.y - curr.y
+        val lenNext = Math.hypot(vNextX.toDouble(), vNextY.toDouble()).toFloat().coerceAtLeast(0.001f)
+
+        val maxD = minOf(lenPrev, lenNext) * 0.45f
+        val d = radii[i].coerceIn(0f, maxD)
+
+        tStart[i] = PointF(curr.x + (vPrevX / lenPrev) * d, curr.y + (vPrevY / lenPrev) * d)
+        tEnd[i] = PointF(curr.x + (vNextX / lenNext) * d, curr.y + (vNextY / lenNext) * d)
+    }
+
+    path.moveTo(tEnd[0].x, tEnd[0].y)
+    path.lineTo(tStart[1].x, tStart[1].y)
+    path.quadTo(pts[1].x, pts[1].y, tEnd[1].x, tEnd[1].y)
+
+    path.lineTo(tStart[2].x, tStart[2].y)
+    path.quadTo(pts[2].x, pts[2].y, tEnd[2].x, tEnd[2].y)
+
+    path.lineTo(tStart[0].x, tStart[0].y)
+    path.quadTo(pts[0].x, pts[0].y, tEnd[0].x, tEnd[0].y)
+
+    path.close()
+    return path
 }
 
 // 1. 4-APP FOLDER (2x2)
@@ -681,3 +731,168 @@ fun generateAppFolderBento10TopBitmap(context: Context, config: SlateWidgetConfi
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 10)
     return generateAppFolderBento10TopBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
+
+// 12. 4-APP TRIANGLE / TRIFORCE FOLDER (2x2 - Fixed Proportional Geometry)
+fun generateAppFolderTriangle4Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    folderConfig: AppFolderWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+
+    // 1. Uniform Proportional Bounding Box (Strict Equilateral Geometry: H = sqrt(3)/2 * W)
+    val margin = scaleFactor * 0.75f
+    val availW = w - (margin * 2f)
+    val availH = h - (margin * 2f)
+    val equilateralRatio = 0.8660254f
+
+    var triW = availW
+    var triH = triW * equilateralRatio
+    if (triH > availH) {
+        triH = availH
+        triW = triH / equilateralRatio
+    }
+
+    val leftX = (w - triW) / 2f
+    val topY = (h - triH) / 2f
+    val rightX = leftX + triW
+    val bottomY = topY + triH
+    val cx = (leftX + rightX) / 2f
+
+    // Outer Triangle Vertices
+    val outerApex = PointF(cx, topY)
+    val outerBL = PointF(leftX, bottomY)
+    val outerBR = PointF(rightX, bottomY)
+
+    // 2. Base Container Plate (Tighter corner radii prevent the apex from sagging downward)
+    val outerCornerRadius = (minOf(triW, triH) * 0.11f).coerceIn(scaleFactor * 8f, scaleFactor * 18f)
+    val outerPath = buildRoundedTrianglePath(
+        outerApex, outerBL, outerBR,
+        outerCornerRadius, outerCornerRadius, outerCornerRadius
+    )
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(outerPath, bgPaint)
+
+    // 3. Triforce Subdivisions (Tightened margins for maximum interior tile scale)
+    val pad = (minOf(triW, triH) * 0.038f).coerceIn(scaleFactor * 3.5f, scaleFactor * 8f)
+    val gap = (minOf(triW, triH) * 0.026f).coerceIn(scaleFactor * 2.5f, scaleFactor * 5.5f)
+
+    val mainCentroid = PointF(cx, (topY + bottomY + bottomY) / 3f)
+    val scalePad = (1f - (3f * pad / triH)).coerceAtLeast(0.1f)
+
+    fun insetPoint(pt: PointF): PointF =
+        PointF(mainCentroid.x + (pt.x - mainCentroid.x) * scalePad, mainCentroid.y + (pt.y - mainCentroid.y) * scalePad)
+
+    val inApex = insetPoint(outerApex)
+    val inBL = insetPoint(outerBL)
+    val inBR = insetPoint(outerBR)
+
+    val mAB = PointF((inApex.x + inBL.x) / 2f, (inApex.y + inBL.y) / 2f)
+    val mAC = PointF((inApex.x + inBR.x) / 2f, (inApex.y + inBR.y) / 2f)
+    val mBC = PointF((inBL.x + inBR.x) / 2f, (inBL.y + inBR.y) / 2f)
+
+    val subTriangles = listOf(
+        // Slot 0: Top (Apex)
+        Triple(inApex, mAB, mAC),
+        // Slot 1: Bottom-Left
+        Triple(mAB, inBL, mBC),
+        // Slot 2: Center (Inverted)
+        Triple(mAC, mBC, mAB),
+        // Slot 3: Bottom-Right
+        Triple(mAC, mBC, inBR)
+    )
+
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
+
+    val subH = triH * scalePad / 2f
+    val shrinkFactor = (1f - (1.2f * gap / subH)).coerceIn(0.6f, 0.98f)
+    val outerRad = (outerCornerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val innerRad = (gap * 1.2f).coerceIn(scaleFactor * 3.5f, scaleFactor * 8f)
+
+    for (i in 0..3) {
+        val (v0, v1, v2) = subTriangles[i]
+        val cX = (v0.x + v1.x + v2.x) / 3f
+        val cY = (v0.y + v1.y + v2.y) / 3f
+        val centroid = PointF(cX, cY)
+
+        fun shrink(pt: PointF): PointF =
+            PointF(centroid.x + (pt.x - centroid.x) * shrinkFactor, centroid.y + (pt.y - centroid.y) * shrinkFactor)
+
+        val q0 = shrink(v0)
+        val q1 = shrink(v1)
+        val q2 = shrink(v2)
+
+        val (r0, r1, r2) = when (i) {
+            0 -> Triple(outerRad, innerRad, innerRad)
+            1 -> Triple(innerRad, outerRad, innerRad)
+            2 -> Triple(innerRad, innerRad, innerRad)
+            else -> Triple(innerRad, innerRad, outerRad)
+        }
+
+        val tilePath = buildRoundedTrianglePath(q0, q1, q2, r0, r1, r2)
+
+        if (folderConfig.showTileBackground) {
+            canvas.drawPath(tilePath, tilePaint)
+        }
+
+        val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
+        val tileBoxSize = subH * shrinkFactor * 0.82f
+        val slotRect = RectF(
+            centroid.x - tileBoxSize / 2f,
+            centroid.y - tileBoxSize / 2f,
+            centroid.x + tileBoxSize / 2f,
+            centroid.y + tileBoxSize / 2f
+        )
+
+        canvas.save()
+        canvas.clipPath(tilePath)
+        drawSlotContent(
+            canvas = canvas,
+            context = context,
+            tileRect = slotRect,
+            slotConfig = slotConfig,
+            showAppNames = folderConfig.showAppNames,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            isMicro = false
+        )
+        canvas.restore()
+    }
+
+    return bitmap
+}
+
+fun generateAppFolderTriangle4Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 4)
+    return generateAppFolderTriangle4Bitmap(context, config, folderConfig, false, wDp, hDp, widgetId)
+}
+
