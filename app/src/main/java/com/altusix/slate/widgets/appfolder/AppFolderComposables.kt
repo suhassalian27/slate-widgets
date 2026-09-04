@@ -347,7 +347,6 @@ fun generateAppFolderCircle6Bitmap(
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
-    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     // 1. Base Dial Plate
     val margin = scaleFactor * 1.5f
@@ -370,10 +369,11 @@ fun generateAppFolderCircle6Bitmap(
     }
     canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
-    val orbitRadius = outerRadius * 0.62f
-    val tileRadius = outerRadius * 0.42f
+    // 2. Proportional Geometry (Tightened to eliminate the center void)
+    val orbitRadius = outerRadius * 0.60f
+    val tileRadius = outerRadius * 0.40f
 
-    // 2. Subtle Orbit Guide (Thin, low-contrast guide line)
+    // 3. Subtle Orbit Track
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -381,15 +381,15 @@ fun generateAppFolderCircle6Bitmap(
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
-    // 3. Minimal Accent Center Ring (A clean open ring instead of clutter)
-    val centerRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColorInt
-        style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 1.4f
+    // 4. Frosted Neutral Hub (Grounds the center subtly without clashing colors)
+    val hubRadius = outerRadius * 0.14f
+    val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        style = Paint.Style.FILL
     }
-    canvas.drawCircle(cx, cy, scaleFactor * 3.5f, centerRingPaint)
+    canvas.drawCircle(cx, cy, hubRadius, hubPaint)
 
-    // 4. App Slots
+    // 5. App Slots
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     for (i in 0 until 6) {
