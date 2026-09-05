@@ -2857,6 +2857,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
+        <!-- 5. Health & Fitness: 8-Glass Hydration Matrix (2x2) -->
+        <receiver
+            android:name=".widgets.health.HealthEightGlassMatrixReceiver"
+            android:exported="true"
+            android:label="Slate 8-Glass Hydration Matrix">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.health.ADD_WATER_250" />
+                <action android:name="com.altusix.slate.health.SUB_WATER_250" />
+                <action android:name="com.altusix.slate.health.RESET_WATER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

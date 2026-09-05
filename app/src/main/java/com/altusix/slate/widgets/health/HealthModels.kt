@@ -27,8 +27,20 @@ object HealthStorageKeys {
     const val KEY_WATER_DATE = "water_date_key"
 
     const val ACTION_ADD_WATER_250 = "com.altusix.slate.health.ADD_WATER_250"
+    const val ACTION_SUB_WATER_250 = "com.altusix.slate.health.SUB_WATER_250"
     const val ACTION_ADD_WATER_500 = "com.altusix.slate.health.ADD_WATER_500"
     const val ACTION_RESET_WATER = "com.altusix.slate.health.RESET_WATER"
+}
+
+fun subHydrationMl(context: Context, delta: Int) {
+    val prefs = context.getSharedPreferences(HealthStorageKeys.PREFS_NAME, Context.MODE_PRIVATE)
+    val today = getTodayDateKey()
+    val current = getHydrationMl(context)
+    val next = (current - delta).coerceAtLeast(0)
+    prefs.edit()
+        .putString(HealthStorageKeys.KEY_WATER_DATE, today)
+        .putInt(HealthStorageKeys.KEY_WATER_CURRENT, next)
+        .apply()
 }
 
 private fun getTodayDateKey(): String =

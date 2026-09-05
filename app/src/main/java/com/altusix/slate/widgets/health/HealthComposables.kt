@@ -640,3 +640,233 @@ fun generateHealthWeeklyMatrixBitmap(context: Context, config: SlateWidgetConfig
 
     return bitmap
 }
+
+// 5. 8-GLASS HYDRATION MATRIX (2x2 - MINIMAL WAVE GLASSWARE)
+fun generateHealthEightGlassMatrixBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Plate
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(effectiveDim / 2f)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
+    val currentMl = getHydrationMl(context)
+    val targetMl = 2000
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // 2. Top Bento Plate
+    val topTileH = (cardH - (pad * 2f) - gap) * 0.67f
+    val topTileRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + topTileH)
+    val topTileRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(topTileRect, topTileRadii, Path.Direction.CW) }, tileBgPaint)
+
+    // Header Telemetry (Collision-guarded)
+    val padX = scaleFactor * 12f * uiScale
+    val headerY = topTileRect.top + (scaleFactor * 16f * uiScale)
+    val availHeaderW = topTileRect.width() - (padX * 2f)
+
+    val headerTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = (scaleFactor * 9f * uiScale).coerceIn(scaleFactor * 7.5f, scaleFactor * 13f)
+        typeface = getSlateFont(context, weight = 800)
+    }
+
+    val volumePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = (scaleFactor * 8.5f * uiScale).coerceIn(scaleFactor * 7f, scaleFactor * 12f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val titleStr = "HYDRATION"
+    val fullVolStr = "$currentMl / $targetMl ML"
+    val shortVolStr = "$currentMl ML"
+
+    val titleW = headerTitlePaint.measureText(titleStr)
+    val fullVolW = volumePaint.measureText(fullVolStr)
+    val minGap = scaleFactor * 8f * uiScale
+
+    canvas.drawText(titleStr, topTileRect.left + padX, headerY, headerTitlePaint)
+    val volToDraw = if (titleW + fullVolW + minGap <= availHeaderW) fullVolStr else shortVolStr
+    canvas.drawText(volToDraw, topTileRect.right - padX, headerY, volumePaint)
+
+    // 3. 8 Glasses Grid (Clamped by both cell width & height to prevent overlap)
+    val gridTopY = headerY + (scaleFactor * 6f * uiScale)
+    val gridBotY = topTileRect.bottom - (scaleFactor * 6f * uiScale)
+    val gridH = (gridBotY - gridTopY).coerceAtLeast(scaleFactor * 20f)
+    val gridW = (topTileRect.width() - (padX * 2f)).coerceAtLeast(scaleFactor * 20f)
+
+    val cellW = gridW / 4f
+    val cellH = gridH / 2f
+
+    // Constrain by both width and height with guaranteed minimum margin
+    val maxFitW = cellW * 0.72f
+    val maxFitH = cellH * 0.78f
+    val glassMaxDim = minOf(maxFitW, maxFitH).coerceAtLeast(scaleFactor * 10f)
+
+    fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) drawable.setTint(tint)
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) drawH = maxDim / aspect else drawW = maxDim * aspect
+        }
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    val waveResId = context.resources.getIdentifier("ic_glass_wave", "drawable", context.packageName).takeIf { it != 0 }
+    val emptyResId = context.resources.getIdentifier("ic_glass_empty", "drawable", context.packageName).takeIf { it != 0 }
+    val emptyTint = if (isLight) Color.argb(45, 0, 0, 0) else Color.argb(40, 255, 255, 255)
+
+    val fallbackFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val fallbackEmptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = emptyTint
+        style = Paint.Style.STROKE
+        strokeWidth = (scaleFactor * 1.3f * uiScale).coerceIn(1f, scaleFactor * 2.2f)
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    for (row in 0..1) {
+        for (col in 0..3) {
+            val index = row * 4 + col
+            val cCx = topTileRect.left + padX + (col * cellW) + (cellW / 2f)
+            val cCy = gridTopY + (row * cellH) + (cellH / 2f)
+            val isFilled = currentMl >= (index + 1) * 250
+
+            if (isFilled) {
+                if (waveResId != null) {
+                    drawVector(waveResId, cCx, cCy, glassMaxDim, accentColorInt)
+                } else {
+                    val gH = glassMaxDim
+                    val gW = gH * 0.65f
+                    val wT = gW * 0.90f
+                    val wB = gW * 0.62f
+                    val tY = cCy - gH / 2f
+                    val bY = cCy + gH / 2f
+
+                    val framePath = Path().apply {
+                        moveTo(cCx - wT / 2f, tY)
+                        lineTo(cCx + wT / 2f, tY)
+                        lineTo(cCx + wB / 2f, bY)
+                        lineTo(cCx - wB / 2f, bY)
+                        close()
+                    }
+                    fallbackFillPaint.style = Paint.Style.STROKE
+                    fallbackFillPaint.strokeWidth = (scaleFactor * 1.4f * uiScale).coerceIn(1f, scaleFactor * 2.2f)
+                    canvas.drawPath(framePath, fallbackFillPaint)
+
+                    val fluidPath = Path().apply {
+                        val fTopL = tY + gH * 0.28f
+                        val fTopR = tY + gH * 0.20f
+                        moveTo(cCx - wT * 0.40f, fTopL)
+                        quadTo(cCx - wT * 0.10f, fTopL + gH * 0.08f, cCx, tY + gH * 0.24f)
+                        quadTo(cCx + wT * 0.25f, fTopR - gH * 0.08f, cCx + wT * 0.40f, fTopR)
+                        lineTo(cCx + wB * 0.38f, bY - scaleFactor * 1.5f)
+                        lineTo(cCx - wB * 0.38f, bY - scaleFactor * 1.5f)
+                        close()
+                    }
+                    fallbackFillPaint.style = Paint.Style.FILL
+                    canvas.drawPath(fluidPath, fallbackFillPaint)
+                }
+            } else {
+                if (emptyResId != null) {
+                    drawVector(emptyResId, cCx, cCy, glassMaxDim, emptyTint)
+                } else {
+                    val gH = glassMaxDim
+                    val gW = gH * 0.65f
+                    val wT = gW * 0.90f
+                    val wB = gW * 0.62f
+                    val tY = cCy - gH / 2f
+                    val bY = cCy + gH / 2f
+
+                    val framePath = Path().apply {
+                        moveTo(cCx - wT / 2f, tY)
+                        lineTo(cCx + wT / 2f, tY)
+                        lineTo(cCx + wB / 2f, bY)
+                        lineTo(cCx - wB / 2f, bY)
+                        close()
+                    }
+                    canvas.drawPath(framePath, fallbackEmptyPaint)
+                }
+            }
+        }
+    }
+
+    // 4. Bottom Tactile Action Buttons
+    val btnH = cardRect.bottom - pad - (topTileRect.bottom + gap)
+    val btnW = (cardW - (pad * 2f) - gap) / 2f
+    val btnTopY = topTileRect.bottom + gap
+
+    val leftBtnRect = RectF(cardRect.left + pad, btnTopY, cardRect.left + pad + btnW, cardRect.bottom - pad)
+    val leftBtnRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    canvas.drawPath(Path().apply { addRoundRect(leftBtnRect, leftBtnRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val rightBtnRect = RectF(cardRect.right - pad - btnW, btnTopY, cardRect.right - pad, cardRect.bottom - pad)
+    val rightBtnRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(rightBtnRect, rightBtnRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val btnValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = minOf(scaleFactor * 13f * uiScale, btnH * 0.36f, btnW * 0.24f).coerceAtLeast(scaleFactor * 9f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val btnSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = minOf(scaleFactor * 7.5f * uiScale, btnH * 0.22f, btnW * 0.16f).coerceAtLeast(scaleFactor * 6f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val btnTextSpacing = btnValPaint.textSize * 0.50f
+    canvas.drawText("−250", leftBtnRect.centerX(), leftBtnRect.centerY() - (btnTextSpacing * 0.15f), btnValPaint)
+    canvas.drawText("ML", leftBtnRect.centerX(), leftBtnRect.centerY() + btnTextSpacing + (scaleFactor * 3f * uiScale), btnSubPaint)
+
+    canvas.drawText("+250", rightBtnRect.centerX(), rightBtnRect.centerY() - (btnTextSpacing * 0.15f), btnValPaint)
+    canvas.drawText("ML", rightBtnRect.centerX(), rightBtnRect.centerY() + btnTextSpacing + (scaleFactor * 3f * uiScale), btnSubPaint)
+
+    return bitmap
+}
