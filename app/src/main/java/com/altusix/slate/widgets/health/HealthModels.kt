@@ -25,11 +25,48 @@ object HealthStorageKeys {
     const val PREFS_NAME = "slate_health_widget_prefs"
     const val KEY_WATER_CURRENT = "current_water_ml"
     const val KEY_WATER_DATE = "water_date_key"
+    const val KEY_LAST_SIP_TIMESTAMP = "last_sip_timestamp"
 
     const val ACTION_ADD_WATER_250 = "com.altusix.slate.health.ADD_WATER_250"
     const val ACTION_SUB_WATER_250 = "com.altusix.slate.health.SUB_WATER_250"
     const val ACTION_ADD_WATER_500 = "com.altusix.slate.health.ADD_WATER_500"
     const val ACTION_RESET_WATER = "com.altusix.slate.health.RESET_WATER"
+    const val ACTION_SIP_CHRONO = "com.altusix.slate.health.SIP_CHRONO"
+}
+
+data class HydroReminderStatus(
+    val isDue: Boolean,
+    val minutesRemaining: Int,
+    val label: String
+)
+
+fun getLastSipTimestamp(context: Context): Long {
+    val prefs = context.getSharedPreferences(HealthStorageKeys.PREFS_NAME, Context.MODE_PRIVATE)
+    return prefs.getLong(HealthStorageKeys.KEY_LAST_SIP_TIMESTAMP, System.currentTimeMillis())
+}
+
+fun logSip(context: Context, deltaMl: Int = 250) {
+    val prefs = context.getSharedPreferences(HealthStorageKeys.PREFS_NAME, Context.MODE_PRIVATE)
+    val today = getTodayDateKey()
+    val current = getHydrationMl(context)
+    val next = (current + deltaMl).coerceIn(0, 5000)
+    prefs.edit()
+        .putString(HealthStorageKeys.KEY_WATER_DATE, today)
+        .putInt(HealthStorageKeys.KEY_WATER_CURRENT, next)
+        .putLong(HealthStorageKeys.KEY_LAST_SIP_TIMESTAMP, System.currentTimeMillis())
+        .apply()
+}
+
+fun getHydroReminderStatus(context: Context, intervalMinutes: Int = 90): HydroReminderStatus {
+    val lastSip = getLastSipTimestamp(context)
+    val now = System.currentTimeMillis()
+    val elapsedMinutes = ((now - lastSip) / 60000L).toInt()
+    val remaining = intervalMinutes - elapsedMinutes
+    return if (remaining <= 0) {
+        HydroReminderStatus(isDue = true, minutesRemaining = 0, label = "HYDRATE NOW")
+    } else {
+        HydroReminderStatus(isDue = false, minutesRemaining = remaining, label = "DUE IN ${remaining}M")
+    }
 }
 
 fun subHydrationMl(context: Context, delta: Int) {

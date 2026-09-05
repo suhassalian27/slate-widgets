@@ -2872,6 +2872,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 6. Health & Fitness: Pure Circle Hydro-Chrono (2x2) -->
+        <receiver
+            android:name=".widgets.health.HealthHydroChronoReceiver"
+            android:exported="true"
+            android:label="Slate Pure Circle Hydro-Chrono">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.health.SIP_CHRONO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>

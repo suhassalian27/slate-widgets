@@ -870,3 +870,156 @@ fun generateHealthEightGlassMatrixBitmap(context: Context, config: SlateWidgetCo
 
     return bitmap
 }
+
+// 6. PURE CIRCLE HYDRO-CHRONO (2x2 - FIXED CIRCLE REMINDER)
+fun generateHealthHydroChronoBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Circular Plate
+    val margin = scaleFactor * 1.5f
+    val size = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
+    val radius = size / 2f
+    val uiScale = (size / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    val currentMl = getHydrationMl(context)
+    val targetMl = 2000
+    val fillFraction = (currentMl.toFloat() / targetMl).coerceIn(0f, 1f)
+    val reminder = getHydroReminderStatus(context)
+
+    // 2. Thick Edge-Mounted Ring Gauge
+    val strokeWidth = scaleFactor * 13.5f * uiScale
+    val ringPad = scaleFactor * 3.5f * uiScale
+    val trackR = radius - (strokeWidth / 2f) - ringPad
+    val arcRect = RectF(cx - trackR, cy - trackR, cx + trackR, cy + trackR)
+
+    // Background Inactive Track
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawCircle(cx, cy, trackR, trackPaint)
+
+    // Active Solid Sweep Arc
+    if (fillFraction > 0f) {
+        val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.STROKE
+            this.strokeWidth = strokeWidth
+            strokeCap = Paint.Cap.ROUND
+        }
+        val sweepAngle = (360f * fillFraction).coerceIn(2f, 360f)
+        canvas.drawArc(arcRect, -90f, sweepAngle, false, arcPaint)
+
+        // Precision Start Anchor Dot (white inner eye on the 12 o'clock anchor cap)
+        val startAnchorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(180, 255, 255, 255) else Color.argb(210, 255, 255, 255)
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy - trackR, strokeWidth * 0.22f, startAnchorPaint)
+    }
+
+    // 3. Center Telemetry & Droplet Icon
+    val innerRadius = trackR - (strokeWidth / 2f)
+
+    fun drawVector(resId: Int, vx: Float, vy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) drawable.setTint(tint)
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) drawH = maxDim / aspect else drawW = maxDim * aspect
+        }
+        val l = (vx - drawW / 2f).toInt()
+        val t = (vy - drawH / 2f).toInt()
+        val r = (vx + drawW / 2f).toInt()
+        val b = (vy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    val dropCy = cy - (innerRadius * 0.44f)
+    drawVector(R.drawable.ic_water_drop, cx, dropCy, scaleFactor * 15f * uiScale, accentColorInt)
+
+    // Primary Intake Volume
+    val volValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 24f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("$currentMl", cx, cy + (scaleFactor * 5f * uiScale), volValPaint)
+
+    // Sub-goal Text
+    val goalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#8E8E93")
+        textSize = scaleFactor * 7.5f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("OF $targetMl ML", cx, cy + (scaleFactor * 15f * uiScale), goalPaint)
+
+    // 4. Reminder Status Capsule
+    val badgeH = scaleFactor * 15f * uiScale
+    val badgeY = cy + (innerRadius * 0.54f)
+
+    val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = scaleFactor * 7.5f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val badgeText = reminder.label
+    val textW = badgeTextPaint.measureText(badgeText)
+    val badgeW = textW + (scaleFactor * 14f * uiScale)
+    val badgeRect = RectF(cx - badgeW / 2f, badgeY - badgeH / 2f, cx + badgeW / 2f, badgeY + badgeH / 2f)
+
+    if (reminder.isDue) {
+        val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(badgeRect, badgeH / 2f, badgeH / 2f, badgeBgPaint)
+
+        val r = Color.red(accentColorInt) / 255f
+        val g = Color.green(accentColorInt) / 255f
+        val b = Color.blue(accentColorInt) / 255f
+        val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+        badgeTextPaint.color = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+    } else {
+        val badgeBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(40, 0, 0, 0) else Color.argb(45, 255, 255, 255)
+            style = Paint.Style.STROKE
+            this.strokeWidth = scaleFactor * 1.0f * uiScale
+        }
+        canvas.drawRoundRect(badgeRect, badgeH / 2f, badgeH / 2f, badgeBorderPaint)
+        badgeTextPaint.color = accentColorInt
+    }
+
+    canvas.drawText(badgeText, cx, badgeY + (scaleFactor * 2.6f * uiScale), badgeTextPaint)
+
+    return bitmap
+}
