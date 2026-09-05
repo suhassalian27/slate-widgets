@@ -24,7 +24,9 @@ fun getHealthWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "8-Glass Hydration Matrix", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthEightGlassMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Pure Circle Hydro-Chrono", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroChronoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Hydro Arc Droplet", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroArcDropletReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Landscape Ridge Pedometer", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthLandscapeRidgeReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Landscape Ridge Pedometer", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthLandscapeRidgeReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Dash Chrono Pedometer", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthDashPedometerReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Mechanical Odometer", sizeText = "3x1", category = "Health & Fitness", receiverClass = HealthOdometerReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -38,7 +40,9 @@ fun updateAllHealthWidgets(context: Context) {
         HealthEightGlassMatrixReceiver::class.java,
         HealthHydroChronoReceiver::class.java,
         HealthHydroArcDropletReceiver::class.java,
-        HealthLandscapeRidgeReceiver::class.java
+        HealthLandscapeRidgeReceiver::class.java,
+        HealthDashPedometerReceiver::class.java,
+        HealthOdometerReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -377,4 +381,47 @@ class HealthHydroArcDropletReceiver : BaseHealthReceiver() {
 class HealthLandscapeRidgeReceiver : BaseHealthReceiver() {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateHealthLandscapeRidgeBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+// 9. DASH CHRONO PEDOMETER (2x2)
+class HealthDashPedometerReceiver : BaseHealthReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateHealthDashPedometerBitmap(context, config, wDp, hDp, widgetId)
+}
+
+// 10. MECHANICAL ODOMETER PEDOMETER (3x1)
+class HealthOdometerReceiver : BaseHealthReceiver() {
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateHealthOdometerBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+
+    override fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
+        val options = appWidgetManager.getAppWidgetOptions(widgetId)
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 250) ?: 250 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250) ?: 250
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 80) ?: 80 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 80) ?: 80
+        val wDp = if (wDpRaw <= 0) 250 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 80 else hDpRaw
+
+        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val config = loadSlateWidgetConfig(context, widgetId)
+
+        val views = RemoteViews(context.packageName, R.layout.widget_image_container)
+        val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val clickIntent = if (!StepSensorManager.hasPermission(context)) {
+            Intent(context, HealthPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        } else {
+            val pm = context.packageManager
+            pm.getLaunchIntentForPackage("com.google.android.apps.fitness")
+                ?: pm.getLaunchIntentForPackage("com.sec.android.app.shealth")
+                ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://fit.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        }
+
+        val pendingIntent = PendingIntent.getActivity(context, widgetId, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
 }

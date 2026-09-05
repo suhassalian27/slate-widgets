@@ -1442,3 +1442,291 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
 
     return bitmap
 }
+
+// 9. DASH CHRONO PEDOMETER (2x2 - PURE CIRCLE RADIAL DASH RING)
+fun generateHealthDashPedometerBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryTextColor = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryTextColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#8E8E93")
+
+    // 1. Base Circular Plate
+    val margin = scaleFactor * 1.5f
+    val size = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
+    val radius = size / 2f
+    val uiScale = (size / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    val activity = getDailyActivitySummary(context)
+    val stepGoal = 10000
+    val progressFraction = (activity.steps.toFloat() / stepGoal).coerceIn(0f, 1f)
+
+    // 2. 36-Segmented Radial Dash Ring
+    val totalDashes = 36
+    val activeDashes = (progressFraction * totalDashes).toInt().coerceIn(0, totalDashes)
+
+    val dashStroke = scaleFactor * 3.4f * uiScale
+    val outerR = radius - (scaleFactor * 8f * uiScale)
+    val innerR = outerR - (scaleFactor * 6.5f * uiScale)
+
+    val activeDashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        strokeWidth = dashStroke
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val inactiveDashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(35, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        strokeWidth = dashStroke
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    for (i in 0 until totalDashes) {
+        val angleDeg = -90.0 + (i * (360.0 / totalDashes))
+        val angleRad = Math.toRadians(angleDeg)
+        val cosA = Math.cos(angleRad).toFloat()
+        val sinA = Math.sin(angleRad).toFloat()
+
+        val x1 = cx + (innerR * cosA)
+        val y1 = cy + (innerR * sinA)
+        val x2 = cx + (outerR * cosA)
+        val y2 = cy + (outerR * sinA)
+
+        val paint = if (i < activeDashes) activeDashPaint else inactiveDashPaint
+        canvas.drawLine(x1, y1, x2, y2, paint)
+    }
+
+    // 3. Center Footsteps Icon (Shifted higher to create breathing room)
+    val iconCy = cy - (innerR * 0.5f)
+    val iconDim = scaleFactor * 25f * uiScale
+
+    fun drawVector(resName: String, vx: Float, vy: Float, maxDim: Float, tint: Int? = null) {
+        val resId = context.resources.getIdentifier(resName, "drawable", context.packageName).takeIf { it != 0 } ?: return
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) drawable.setTint(tint)
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) drawH = maxDim / aspect else drawW = maxDim * aspect
+        }
+        val l = (vx - drawW / 2f).toInt()
+        val t = (vy - drawH / 2f).toInt()
+        val r = (vx + drawW / 2f).toInt()
+        val b = (vy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    val footstepsResId = context.resources.getIdentifier("ic_footsteps", "drawable", context.packageName).takeIf { it != 0 }
+    if (footstepsResId != null) {
+        drawVector("ic_footsteps", cx, iconCy, iconDim, accentColorInt)
+    } else {
+        val footPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.FILL
+        }
+        val fScale = iconDim / 24f
+
+        fun drawFoot(offsetX: Float, offsetY: Float, rotDeg: Float) {
+            canvas.save()
+            canvas.translate(cx + offsetX, iconCy + offsetY)
+            canvas.rotate(rotDeg)
+
+            val soleRect = RectF(-3.2f * fScale, -7f * fScale, 3.2f * fScale, 1.5f * fScale)
+            canvas.drawRoundRect(soleRect, 3.2f * fScale, 3.2f * fScale, footPaint)
+
+            val heelRect = RectF(-2.6f * fScale, 3f * fScale, 2.6f * fScale, 7.5f * fScale)
+            canvas.drawRoundRect(heelRect, 2.6f * fScale, 2.6f * fScale, footPaint)
+            canvas.restore()
+        }
+
+        drawFoot(-4.5f * fScale, 2.5f * fScale, -8f)
+        drawFoot(4.5f * fScale, -2.5f * fScale, 8f)
+    }
+
+    // 4. Primary Steps Counter (Positioned with clear vertical separation)
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = (scaleFactor * 40f * uiScale).coerceAtMost(innerR * 0.65f)
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+    val stepsFormatted = String.format(java.util.Locale.US, "%,d", activity.steps)
+    val numY = cy + (scaleFactor * 14f * uiScale)
+    canvas.drawText(stepsFormatted, cx, numY, numPaint)
+
+    // 5. "steps" Secondary Label
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = scaleFactor * 11.5f * uiScale
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("steps", cx, numY + (scaleFactor * 14.5f * uiScale), labelPaint)
+
+    return bitmap
+}
+
+// 10. MECHANICAL ODOMETER PEDOMETER (3x1 - 5-DRUM ANALOG TALLY REELS)
+fun generateHealthOdometerBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Locked 5-Digit Data Formatting (00,000 to 99,999)
+    val activity = getDailyActivitySummary(context)
+    val steps = activity.steps.coerceIn(0, 99999)
+    val digitsStr = String.format(java.util.Locale.US, "%05d", steps)
+    val numDrums = 5
+
+    // 2. Base Plate Geometry (Tuned for 3x1 Aspect Ratio)
+    val margin = scaleFactor * 1.5f
+    val idealAspect = 3.25f
+
+    val cardRect = if (isResponsive) {
+        val cardW = w - (margin * 2f)
+        val cardH = h - (margin * 2f)
+        RectF(margin, margin, margin + cardW, margin + cardH)
+    } else {
+        val maxW = w - (margin * 2f)
+        val maxH = h - (margin * 2f)
+        var cW = maxW
+        var cH = cW / idealAspect
+        if (cH > maxH) {
+            cH = maxH
+            cW = cH * idealAspect
+        }
+        val leftX = (w - cW) / 2f
+        val topY = (h - cH) / 2f
+        RectF(leftX, topY, leftX + cW, topY + cH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val uiScale = (cardH / (60f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(cardH / 2f)
+
+    // Housing Base Plate
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val housingBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, housingBgPaint)
+
+    // 3. 5-Drum Concentric Grid
+    val pad = (cardH * 0.08f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+    val drumGap = (scaleFactor * 3.5f * uiScale).coerceIn(scaleFactor * 2f, scaleFactor * 6f)
+
+    val availW = cardW - (pad * 2f) - (drumGap * (numDrums - 1))
+    val drumW = availW / numDrums
+    val drumH = cardH - (pad * 2f)
+
+    val innerR = (scaleFactor * 4.5f * uiScale).coerceIn(scaleFactor * 3f, scaleFactor * 7f)
+    val maxAllowedOuterR = minOf(drumH / 2f, drumW - innerR)
+    val outerR = (cardCornerRadius - pad).coerceIn(innerR, maxAllowedOuterR)
+
+    val drumBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    val drumStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(25, 0, 0, 0) else Color.argb(25, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.0f * uiScale
+    }
+
+    val cylinderShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    val maxTextByH = drumH * 0.60f
+    val maxTextByW = drumW * 0.70f
+    val finalFontSize = minOf(maxTextByH, maxTextByW).coerceAtLeast(scaleFactor * 10f)
+
+    val digitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = finalFontSize
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val firstActiveIndex = digitsStr.indexOfFirst { it != '0' }.let { if (it == -1) numDrums - 1 else it }
+
+    for (i in 0 until numDrums) {
+        val drumLeft = cardRect.left + pad + (i * (drumW + drumGap))
+        val drumTop = cardRect.top + pad
+        val drumRect = RectF(drumLeft, drumTop, drumLeft + drumW, drumTop + drumH)
+
+        // Drum 0 (leftmost) and Drum 4 (rightmost) match outer card radii
+        val radii = when (i) {
+            0 -> floatArrayOf(outerR, outerR, innerR, innerR, innerR, innerR, outerR, outerR)
+            numDrums - 1 -> floatArrayOf(innerR, innerR, outerR, outerR, outerR, outerR, innerR, innerR)
+            else -> floatArrayOf(innerR, innerR, innerR, innerR, innerR, innerR, innerR, innerR)
+        }
+
+        val drumPath = Path().apply { addRoundRect(drumRect, radii, Path.Direction.CW) }
+
+        canvas.drawPath(drumPath, drumBgPaint)
+        canvas.drawPath(drumPath, drumStrokePaint)
+
+        // Cylindrical Depth Shading
+        canvas.save()
+        canvas.clipPath(drumPath)
+
+        cylinderShadowPaint.shader = android.graphics.LinearGradient(
+            drumLeft, drumTop, drumLeft, drumTop + drumH * 0.20f,
+            Color.argb(55, 0, 0, 0), Color.TRANSPARENT,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(drumRect.left, drumRect.top, drumRect.right, drumTop + drumH * 0.20f, cylinderShadowPaint)
+
+        cylinderShadowPaint.shader = android.graphics.LinearGradient(
+            drumLeft, drumTop + drumH * 0.80f, drumLeft, drumTop + drumH,
+            Color.TRANSPARENT, Color.argb(55, 0, 0, 0),
+            android.graphics.Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(drumRect.left, drumTop + drumH * 0.80f, drumRect.right, drumTop + drumH, cylinderShadowPaint)
+        canvas.restore()
+
+        // Numerals
+        val digitChar = digitsStr[i].toString()
+        val isLeadingZero = i < firstActiveIndex
+
+        if (isLeadingZero) {
+            digitPaint.color = Color.argb(70, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        } else {
+            digitPaint.color = accentColorInt
+        }
+
+        val fontMetrics = digitPaint.fontMetrics
+        val baselineY = drumRect.centerY() - ((fontMetrics.ascent + fontMetrics.descent) / 2f)
+        canvas.drawText(digitChar, drumRect.centerX(), baselineY, digitPaint)
+    }
+
+    return bitmap
+}

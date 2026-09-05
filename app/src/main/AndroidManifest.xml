@@ -2910,6 +2910,30 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 9. Health & Fitness: Dash Chrono Pedometer (2x2) -->
+        <receiver
+            android:name=".widgets.health.HealthDashPedometerReceiver"
+            android:exported="true"
+            android:label="Slate Dash Chrono Pedometer">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 10. Health & Fitness: Mechanical Odometer Pedometer (3x1) -->
+        <receiver
+            android:name=".widgets.health.HealthOdometerReceiver"
+            android:exported="true"
+            android:label="Slate Mechanical Odometer">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_3x1" />
+        </receiver>
 
 
     </application>
