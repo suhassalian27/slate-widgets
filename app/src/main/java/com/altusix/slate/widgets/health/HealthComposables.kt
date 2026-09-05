@@ -1,0 +1,642 @@
+package com.altusix.slate.widgets.health
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.DashPathEffect
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import androidx.core.content.ContextCompat
+import com.altusix.slate.R
+import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.utils.createSupersampledCanvas
+import com.altusix.slate.utils.getSafeBgColor
+import com.altusix.slate.utils.getSlateFont
+import com.altusix.slate.utils.getStandardCornerRadius
+
+// 1. KINETIC TRI-RING (2x2 - PURE CIRCLE)
+fun generateHealthKineticTriRingBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val size = minOf(w, h)
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
+    val radius = size / 2f
+    val uiScale = (size / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val activity = getDailyActivitySummary(context)
+
+    val ringStroke = scaleFactor * 7.5f * uiScale
+    val ringGap = scaleFactor * 4.5f * uiScale
+
+    val rOuter = radius * 0.80f
+    val rMid = rOuter - ringStroke - ringGap
+    val rInner = rMid - ringStroke - ringGap
+
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(25, 0, 0, 0) else Color.argb(35, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    // Outer Ring: Steps
+    val stepFraction = if (activity.stepTarget > 0) (activity.steps.toFloat() / activity.stepTarget).coerceIn(0f, 1f) else 0f
+    trackPaint.strokeWidth = ringStroke
+    canvas.drawCircle(cx, cy, rOuter, trackPaint)
+    arcPaint.strokeWidth = ringStroke
+    arcPaint.color = accentColorInt
+    if (stepFraction > 0f) {
+        canvas.drawArc(RectF(cx - rOuter, cy - rOuter, cx + rOuter, cy + rOuter), -90f, 360f * stepFraction, false, arcPaint)
+    }
+
+    // Middle Ring: Active Burn (500 kcal target)
+    val burnFraction = (activity.activeKcal.toFloat() / 500f).coerceIn(0f, 1f)
+    trackPaint.strokeWidth = ringStroke
+    canvas.drawCircle(cx, cy, rMid, trackPaint)
+    arcPaint.strokeWidth = ringStroke
+    arcPaint.color = if (isLight) Color.parseColor("#FF9500") else Color.parseColor("#FF9F0A")
+    if (burnFraction > 0f) {
+        canvas.drawArc(RectF(cx - rMid, cy - rMid, cx + rMid, cy + rMid), -90f, 360f * burnFraction, false, arcPaint)
+    }
+
+    // Inner Ring: Active Time (45 min target)
+    val timeFraction = (activity.activeMinutes.toFloat() / activity.activeTargetMinutes).coerceIn(0f, 1f)
+    trackPaint.strokeWidth = ringStroke
+    canvas.drawCircle(cx, cy, rInner, trackPaint)
+    arcPaint.strokeWidth = ringStroke
+    arcPaint.color = if (isLight) Color.parseColor("#34C759") else Color.parseColor("#30D158")
+    if (timeFraction > 0f) {
+        canvas.drawArc(RectF(cx - rInner, cy - rInner, cx + rInner, cy + rInner), -90f, 360f * timeFraction, false, arcPaint)
+    }
+
+    // Center Readout
+    if (!activity.isPermissionGranted) {
+        val alertPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            textSize = scaleFactor * 9.5f * uiScale
+            typeface = getSlateFont(context, weight = 800)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("TAP TO", cx, cy - (scaleFactor * 2f * uiScale), alertPaint)
+        canvas.drawText("ACTIVATE", cx, cy + (scaleFactor * 10f * uiScale), alertPaint)
+    } else {
+        val stepNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+            textSize = scaleFactor * 20f * uiScale
+            typeface = getSlateFont(context, weight = 800)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("${activity.steps}", cx, cy + (scaleFactor * 2f * uiScale), stepNumPaint)
+
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            textSize = scaleFactor * 7.5f * uiScale
+            typeface = getSlateFont(context, weight = 800)
+            textAlign = Paint.Align.CENTER
+        }
+        val pct = (stepFraction * 100).toInt()
+        canvas.drawText("$pct% • STEPS", cx, cy + (scaleFactor * 13f * uiScale), labelPaint)
+    }
+
+    return bitmap
+}
+
+// 2. PEDOMETER CHRONOGRAPH (2x2)
+fun generateHealthPedometerChronoBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(effectiveDim / 2f)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val cx = cardRect.centerX()
+    val topSectionCy = cardRect.top + (cardH * 0.44f)
+    val activity = getDailyActivitySummary(context)
+
+    val arcRadius = effectiveDim * 0.36f
+    val arcRect = RectF(cx - arcRadius, topSectionCy - arcRadius, cx + arcRadius, topSectionCy + arcRadius)
+
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(25, 0, 0, 0) else Color.argb(35, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 4.2f * uiScale
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawArc(arcRect, 150f, 240f, false, trackPaint)
+
+    val arcProgressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 4.2f * uiScale
+        strokeCap = Paint.Cap.ROUND
+    }
+    val stepFraction = if (activity.stepTarget > 0) (activity.steps.toFloat() / activity.stepTarget).coerceIn(0f, 1f) else 0f
+    if (stepFraction > 0f) {
+        canvas.drawArc(arcRect, 150f, 240f * stepFraction, false, arcProgressPaint)
+    }
+
+    val runnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, topSectionCy - arcRadius * 0.62f, scaleFactor * 2.8f * uiScale, runnerPaint)
+
+    val stepCountPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 25f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("${activity.steps}", cx, topSectionCy + (scaleFactor * 7f * uiScale), stepCountPaint)
+
+    val goalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#8E8E93")
+        textSize = scaleFactor * 7.5f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("GOAL ${activity.stepTarget}", cx, topSectionCy + (scaleFactor * 17f * uiScale), goalPaint)
+
+    // Bottom Telemetry Cards with Concentric Corner Radii
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
+    val bH = effectiveDim * 0.22f
+    val bY = cardRect.bottom - pad - bH
+    val bW = (cardW - (pad * 2f) - gap) / 2f
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // Left Tile (Bottom-Left corner matches outer widget curve)
+    val leftTileRect = RectF(cardRect.left + pad, bY, cardRect.left + pad + bW, bY + bH)
+    val leftTileRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    canvas.drawPath(Path().apply { addRoundRect(leftTileRect, leftTileRadii, Path.Direction.CW) }, tileBgPaint)
+
+    // Right Tile (Bottom-Right corner matches outer widget curve)
+    val rightTileRect = RectF(cardRect.right - pad - bW, bY, cardRect.right - pad, bY + bH)
+    val rightTileRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(rightTileRect, rightTileRadii, Path.Direction.CW) }, tileBgPaint)
+
+    val subValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 11.5f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val subLblPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = scaleFactor * 6.5f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    canvas.drawText("${activity.distanceKm} KM", leftTileRect.centerX(), leftTileRect.centerY() - (scaleFactor * 0.5f * uiScale), subValPaint)
+    canvas.drawText("DISTANCE", leftTileRect.centerX(), leftTileRect.centerY() + (scaleFactor * 8.5f * uiScale), subLblPaint)
+
+    canvas.drawText("${activity.activeKcal}", rightTileRect.centerX(), rightTileRect.centerY() - (scaleFactor * 0.5f * uiScale), subValPaint)
+    canvas.drawText("KCAL BURN", rightTileRect.centerX(), rightTileRect.centerY() + (scaleFactor * 8.5f * uiScale), subLblPaint)
+
+    return bitmap
+}
+
+// 3. INTERACTIVE HYDRATION CELL (2x2)
+fun generateHealthHydrationBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(effectiveDim / 2f)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val pad = effectiveDim * 0.055f
+    val gap = effectiveDim * 0.04f
+    val currentMl = getHydrationMl(context)
+    val targetMl = 2500
+    val fillFraction = (currentMl.toFloat() / targetMl).coerceIn(0f, 1f)
+
+    val halfW = (cardW - (pad * 2f) - gap) / 2f
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val capBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    val capsuleRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.bottom - pad)
+    val capRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    val capPath = Path().apply { addRoundRect(capsuleRect, capRadii, Path.Direction.CW) }
+    canvas.drawPath(capPath, capBgPaint)
+
+    canvas.save()
+    canvas.clipPath(capPath)
+    val liquidH = capsuleRect.height() * fillFraction
+    val liquidTop = capsuleRect.bottom - liquidH
+    val liquidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(110, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(capsuleRect.left, liquidTop, capsuleRect.right, capsuleRect.bottom, liquidPaint)
+
+    if (fillFraction in 0.01f..0.99f) {
+        val crestPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.STROKE
+            strokeWidth = scaleFactor * 2.0f * uiScale
+        }
+        canvas.drawLine(capsuleRect.left, liquidTop, capsuleRect.right, liquidTop, crestPaint)
+    }
+    canvas.restore()
+
+    fun drawVector(resId: Int, cx: Float, cy: Float, maxDim: Float, tint: Int? = null) {
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) drawable.setTint(tint)
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        var drawW = maxDim
+        var drawH = maxDim
+        if (intrinsicW > 0f && intrinsicH > 0f) {
+            val aspect = intrinsicW / intrinsicH
+            if (aspect > 1f) drawH = maxDim / aspect else drawW = maxDim * aspect
+        }
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+        drawable.draw(canvas)
+    }
+
+    val dropCx = capsuleRect.centerX()
+    val dropCy = capsuleRect.top + (scaleFactor * 26f * uiScale)
+    val dropDim = scaleFactor * 16f * uiScale
+    drawVector(R.drawable.ic_water_drop, dropCx, dropCy, dropDim, accentColorInt)
+
+    val mlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 16f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("$currentMl", dropCx, capsuleRect.centerY() + (scaleFactor * 3f * uiScale), mlPaint)
+
+    val capSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#AEAEB2")
+        textSize = scaleFactor * 7.5f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("OF 2,500 ML", dropCx, capsuleRect.centerY() + (scaleFactor * 13f * uiScale), capSubPaint)
+
+    val btnH = (capsuleRect.height() - gap) / 2f
+    val topBtnRect = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + btnH)
+    val botBtnRect = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + btnH + gap, cardRect.right - pad, cardRect.bottom - pad)
+
+    val topBtnRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(topBtnRect, topBtnRadii, Path.Direction.CW) }, capBgPaint)
+
+    val botBtnRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(botBtnRect, botBtnRadii, Path.Direction.CW) }, capBgPaint)
+
+    val btnValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = scaleFactor * 14f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val btnSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 8.5f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    canvas.drawText("+250", topBtnRect.centerX(), topBtnRect.centerY() - (scaleFactor * 1f * uiScale), btnValPaint)
+    canvas.drawText("ML", topBtnRect.centerX(), topBtnRect.centerY() + (scaleFactor * 10f * uiScale), btnSubPaint)
+
+    canvas.drawText("+500", botBtnRect.centerX(), botBtnRect.centerY() - (scaleFactor * 1f * uiScale), btnValPaint)
+    canvas.drawText("ML", botBtnRect.centerX(), botBtnRect.centerY() + (scaleFactor * 10f * uiScale), btnSubPaint)
+
+    return bitmap
+}
+
+// 4. WEEKLY ACTIVITY MATRIX (4x2 BENTO DASHBOARD)
+fun generateHealthWeeklyMatrixBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Plate
+    val margin = scaleFactor * 1.5f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 2.0f
+        var targetH = h - (margin * 2f)
+        var targetW = targetH * targetRatio
+        if (targetW > w - (margin * 2f)) {
+            targetW = w - (margin * 2f)
+            targetH = targetW / targetRatio
+        }
+        val leftX = (w - targetW) / 2f
+        val topY = (h - targetH) / 2f
+        RectF(leftX, topY, leftX + targetW, topY + targetH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (140f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(effectiveDim / 2f)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    // Dynamic split ratio based on width availability
+    val pad = effectiveDim * 0.06f
+    val gap = effectiveDim * 0.04f
+    val isNarrow = (cardW / cardH) < 1.35f
+    val leftSplitRatio = if (isNarrow) 0.38f else 0.34f
+    val leftW = (cardW - (pad * 2f) - gap) * leftSplitRatio
+    val rightW = (cardW - (pad * 2f) - gap) - leftW
+
+    val vfOuterRad = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val vfInnerRad = scaleFactor * 8f
+
+    val bentoBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+
+    // 2. Left Bento Hero Tile
+    val leftRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + leftW, cardRect.bottom - pad)
+    val leftRadii = floatArrayOf(vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad, vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad)
+    canvas.drawPath(Path().apply { addRoundRect(leftRect, leftRadii, Path.Direction.CW) }, bentoBgPaint)
+
+    val activity = getDailyActivitySummary(context)
+    val lCx = leftRect.centerX()
+
+    // Gauge geometry fits available tile height & width
+    val gaugeCy = leftRect.top + (leftRect.height() * 0.40f)
+    val gaugeR = minOf(leftRect.width() * 0.36f, leftRect.height() * 0.24f)
+
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(25, 0, 0, 0) else Color.argb(35, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 3.8f * uiScale
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawCircle(lCx, gaugeCy, gaugeR, trackPaint)
+
+    val stepFraction = if (activity.stepTarget > 0) (activity.steps.toFloat() / activity.stepTarget).coerceIn(0f, 1f) else 0f
+    if (stepFraction > 0f) {
+        val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.STROKE
+            strokeWidth = scaleFactor * 3.8f * uiScale
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawArc(RectF(lCx - gaugeR, gaugeCy - gaugeR, lCx + gaugeR, gaugeCy + gaugeR), -90f, 360f * stepFraction, false, arcPaint)
+    }
+
+    val heroStepPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = (gaugeR * 0.62f).coerceIn(scaleFactor * 10f, scaleFactor * 22f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("${activity.steps}", lCx, gaugeCy + (heroStepPaint.textSize * 0.22f), heroStepPaint)
+
+    val heroSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = (gaugeR * 0.28f).coerceIn(scaleFactor * 5.5f, scaleFactor * 10f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("STEPS", lCx, gaugeCy + (gaugeR * 0.65f), heroSubPaint)
+
+    // Left Sub-telemetry: auto-adapts between single-line and stacked lines
+    val maxLeftTextW = leftRect.width() - (scaleFactor * 8f * uiScale)
+    val subMetricPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#AEAEB2")
+        textSize = scaleFactor * 7.5f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val fullMetricText = "${activity.activeKcal} KCAL • ${activity.distanceKm} KM"
+    val singleLineFits = subMetricPaint.measureText(fullMetricText) <= maxLeftTextW
+
+    if (singleLineFits) {
+        canvas.drawText(fullMetricText, lCx, leftRect.bottom - (scaleFactor * 8f * uiScale), subMetricPaint)
+    } else {
+        val line1 = "${activity.activeKcal} KCAL"
+        val line2 = "${activity.distanceKm} KM"
+        val longestLine = maxOf(subMetricPaint.measureText(line1), subMetricPaint.measureText(line2))
+        if (longestLine > maxLeftTextW && longestLine > 0f) {
+            subMetricPaint.textSize *= (maxLeftTextW / longestLine) * 0.95f
+        }
+        val lineSpacing = subMetricPaint.textSize * 1.22f
+        val line2Y = leftRect.bottom - (scaleFactor * 7f * uiScale)
+        val line1Y = line2Y - lineSpacing
+        canvas.drawText(line1, lCx, line1Y, subMetricPaint)
+        canvas.drawText(line2, lCx, line2Y, subMetricPaint)
+    }
+
+    // 3. Right Bento Matrix Tile
+    val rightRect = RectF(leftRect.right + gap, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+    val rightRadii = floatArrayOf(vfInnerRad, vfInnerRad, vfOuterRad, vfOuterRad, vfOuterRad, vfOuterRad, vfInnerRad, vfInnerRad)
+    canvas.drawPath(Path().apply { addRoundRect(rightRect, rightRadii, Path.Direction.CW) }, bentoBgPaint)
+
+    val chartPadX = (rightRect.width() * 0.06f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
+    val availableHeaderW = rightRect.width() - (chartPadX * 2f)
+
+    // Header Collision Engine
+    val chartHeaderY = rightRect.top + (scaleFactor * 15f * uiScale)
+    val chartTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = (scaleFactor * 9f * uiScale).coerceAtLeast(scaleFactor * 7.5f)
+        typeface = getSlateFont(context, weight = 800)
+    }
+
+    val avgSteps = activity.steps / 7
+    val avgPillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = (scaleFactor * 7.5f * uiScale).coerceAtLeast(scaleFactor * 6.5f)
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val fullTitle = "WEEKLY ACTIVITY"
+    val shortTitle = "ACTIVITY"
+    val pillText = "AVG ${avgSteps}/D"
+    val minGap = scaleFactor * 6f * uiScale
+
+    val fullTitleW = chartTitlePaint.measureText(fullTitle)
+    val shortTitleW = chartTitlePaint.measureText(shortTitle)
+    val pillW = avgPillPaint.measureText(pillText)
+
+    when {
+        fullTitleW + pillW + minGap <= availableHeaderW -> {
+            canvas.drawText(fullTitle, rightRect.left + chartPadX, chartHeaderY, chartTitlePaint)
+            canvas.drawText(pillText, rightRect.right - chartPadX, chartHeaderY, avgPillPaint)
+        }
+        shortTitleW + pillW + minGap <= availableHeaderW -> {
+            canvas.drawText(shortTitle, rightRect.left + chartPadX, chartHeaderY, chartTitlePaint)
+            canvas.drawText(pillText, rightRect.right - chartPadX, chartHeaderY, avgPillPaint)
+        }
+        else -> {
+            // Drop pill entirely when narrow to prevent text smash
+            val displayTitle = if (shortTitleW <= availableHeaderW) shortTitle else fullTitle
+            val titleTextW = chartTitlePaint.measureText(displayTitle)
+            if (titleTextW > availableHeaderW && titleTextW > 0f) {
+                chartTitlePaint.textSize *= (availableHeaderW / titleTextW) * 0.95f
+            }
+            canvas.drawText(displayTitle, rightRect.left + chartPadX, chartHeaderY, chartTitlePaint)
+        }
+    }
+
+    // 7-Day Bar Matrix Setup
+    val days = getWeeklyStepStats(context)
+    val labelBaselineY = rightRect.bottom - (scaleFactor * 8f * uiScale)
+    val chartBottom = labelBaselineY - (scaleFactor * 10f * uiScale)
+    val chartTop = chartHeaderY + (scaleFactor * 10f * uiScale)
+    val chartHeight = (chartBottom - chartTop).coerceAtLeast(scaleFactor * 16f)
+
+    val chartAreaW = rightRect.width() - (chartPadX * 2f)
+    val barSlotWidth = chartAreaW / days.size
+    val barWidth = (barSlotWidth * 0.44f).coerceIn(scaleFactor * 3.5f, scaleFactor * 12f)
+    val barCorner = barWidth / 2f
+
+    // Dashed Target Baseline across chart
+    val targetFraction = (10000f / 14000f).coerceIn(0.1f, 0.95f)
+    val targetLineY = chartBottom - (chartHeight * targetFraction)
+    val targetLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(40, 0, 0, 0) else Color.argb(40, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f * uiScale
+        pathEffect = DashPathEffect(floatArrayOf(scaleFactor * 2.5f * uiScale, scaleFactor * 2.5f * uiScale), 0f)
+    }
+    canvas.drawLine(rightRect.left + chartPadX, targetLineY, rightRect.right - chartPadX, targetLineY, targetLinePaint)
+
+    // Bar Slot Tracks & Live Fills
+    val pillarTrackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val activeBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    val dayLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = (barSlotWidth * 0.44f).coerceIn(scaleFactor * 5.5f, scaleFactor * 8.5f)
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+
+    for (i in days.indices) {
+        val stat = days[i]
+        val barCenterX = rightRect.left + chartPadX + (i * barSlotWidth) + (barSlotWidth / 2f)
+
+        // Architectural Track Pillar
+        val trackRect = RectF(barCenterX - barWidth / 2f, chartTop, barCenterX + barWidth / 2f, chartBottom)
+        canvas.drawRoundRect(trackRect, barCorner, barCorner, pillarTrackPaint)
+
+        // Step Fill
+        if (stat.steps > 0) {
+            val fillFraction = (stat.steps.toFloat() / 14000f).coerceIn(0.08f, 1f)
+            val fillHeight = (chartHeight * fillFraction).coerceAtLeast(barWidth)
+            val fillTop = chartBottom - fillHeight
+            val fillRect = RectF(barCenterX - barWidth / 2f, fillTop, barCenterX + barWidth / 2f, chartBottom)
+
+            activeBarPaint.color = if (stat.isToday) accentColorInt else if (isLight) Color.argb(80, 0, 0, 0) else Color.argb(110, 255, 255, 255)
+            canvas.drawRoundRect(fillRect, barCorner, barCorner, activeBarPaint)
+        } else if (stat.isToday) {
+            val dotRect = RectF(barCenterX - barWidth / 2f, chartBottom - barWidth, barCenterX + barWidth / 2f, chartBottom)
+            activeBarPaint.color = Color.argb(120, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+            canvas.drawRoundRect(dotRect, barCorner, barCorner, activeBarPaint)
+        }
+
+        // Day Indicator
+        dayLabelPaint.color = if (stat.isToday) accentColorInt else if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#8E8E93")
+        canvas.drawText(stat.dayLabel, barCenterX, labelBaselineY, dayLabelPaint)
+    }
+
+    return bitmap
+}
