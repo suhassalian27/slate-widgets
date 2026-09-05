@@ -22,7 +22,8 @@ fun getHealthWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Interactive Hydration Cell", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydrationReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weekly Activity Matrix", sizeText = "4x2", category = "Health & Fitness", receiverClass = HealthWeeklyMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "8-Glass Hydration Matrix", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthEightGlassMatrixReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Pure Circle Hydro-Chrono", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroChronoReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Pure Circle Hydro-Chrono", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroChronoReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Hydro Arc Droplet", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroArcDropletReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -34,7 +35,8 @@ fun updateAllHealthWidgets(context: Context) {
         HealthHydrationReceiver::class.java,
         HealthWeeklyMatrixReceiver::class.java,
         HealthEightGlassMatrixReceiver::class.java,
-        HealthHydroChronoReceiver::class.java
+        HealthHydroChronoReceiver::class.java,
+        HealthHydroArcDropletReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -309,6 +311,53 @@ class HealthHydroChronoReceiver : BaseHealthReceiver() {
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             widgetId * 300,
+            sipIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        views.setOnClickPendingIntent(R.id.slot_0, pendingIntent)
+        views.setOnClickPendingIntent(R.id.slot_1, pendingIntent)
+        views.setOnClickPendingIntent(R.id.slot_2, pendingIntent)
+        views.setOnClickPendingIntent(R.id.slot_3, pendingIntent)
+
+        appWidgetManager.updateAppWidget(widgetId, views)
+    }
+}
+
+// 7. HYDRO ARC DROPLET (2x2)
+class HealthHydroArcDropletReceiver : BaseHealthReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == HealthStorageKeys.ACTION_SIP_CHRONO) {
+            logSip(context, 250)
+            updateAllHealthWidgets(context)
+            return
+        }
+        super.onReceive(context, intent)
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateHealthHydroArcDropletBitmap(context, config, wDp, hDp, widgetId)
+
+    override fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
+        val options = appWidgetManager.getAppWidgetOptions(widgetId)
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
+        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
+        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+
+        val config = loadSlateWidgetConfig(context, widgetId)
+        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_2x2)
+        val bitmap = renderBitmapForWidget(context, config, false, wDp, hDp, widgetId)
+        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        val sipIntent = Intent(context, HealthHydroArcDropletReceiver::class.java).apply {
+            action = HealthStorageKeys.ACTION_SIP_CHRONO
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            widgetId * 350,
             sipIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

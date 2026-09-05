@@ -1023,3 +1023,189 @@ fun generateHealthHydroChronoBitmap(context: Context, config: SlateWidgetConfig,
 
     return bitmap
 }
+
+// 7. HYDRO ARC DROPLET (2x2 - HORSESHOE ARC GAUGE WITH DYNAMIC WAVE SLOSH)
+fun generateHealthHydroArcDropletBitmap(context: Context, config: SlateWidgetConfig, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    // 1. Base Circular Plate
+    val margin = scaleFactor * 1.5f
+    val size = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = (w - size) / 2f
+    val topY = (h - size) / 2f
+    val cardRect = RectF(leftX, topY, leftX + size, topY + size)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawOval(cardRect, bgPaint)
+
+    val cx = cardRect.centerX()
+    val cy = cardRect.centerY()
+    val radius = size / 2f
+    val uiScale = (size / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+
+    val currentMl = getHydrationMl(context)
+    val targetMl = 2500
+    val fillFraction = (currentMl.toFloat() / targetMl).coerceIn(0f, 1f)
+
+    // 2. Concentric Horseshoe Arc Track
+    val strokeWidth = scaleFactor * 14f * uiScale
+    val arcMargin = scaleFactor * 5f * uiScale
+    val trackR = radius - (strokeWidth / 2f) - arcMargin
+    val arcRect = RectF(cx - trackR, cy - trackR, cx + trackR, cy + trackR)
+
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawArc(arcRect, 140f, 260f, false, trackPaint)
+
+    if (fillFraction > 0f) {
+        val arcProgressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColorInt
+            style = Paint.Style.STROKE
+            this.strokeWidth = strokeWidth
+            strokeCap = Paint.Cap.ROUND
+        }
+        val sweepAngle = (260f * fillFraction).coerceIn(2f, 260f)
+        canvas.drawArc(arcRect, 140f, sweepAngle, false, arcProgressPaint)
+    }
+
+    // 3. Radial Calibration Ticks
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(45, 0, 0, 0) else Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        this.strokeWidth = scaleFactor * 1.3f * uiScale
+        strokeCap = Paint.Cap.ROUND
+    }
+    val tickOuterR = trackR - (strokeWidth / 2f) - (scaleFactor * 3.5f * uiScale)
+    val tickLen = scaleFactor * 3.2f * uiScale
+    for (deg in 140..400 step 26) {
+        val angleRad = Math.toRadians(deg.toDouble())
+        val x1 = cx + ((tickOuterR - tickLen) * Math.cos(angleRad)).toFloat()
+        val y1 = cy + ((tickOuterR - tickLen) * Math.sin(angleRad)).toFloat()
+        val x2 = cx + (tickOuterR * Math.cos(angleRad)).toFloat()
+        val y2 = cy + (tickOuterR * Math.sin(angleRad)).toFloat()
+        canvas.drawLine(x1, y1, x2, y2, tickPaint)
+    }
+
+    // 4. Teardrop Reservoir (Slightly larger and lifted for bottom room)
+    val dropTargetH = trackR * 0.98f
+    val dropScale = dropTargetH / 222.55f
+    val dropCy = cy - (scaleFactor * 8f * uiScale)
+
+    val dropPath = try {
+        androidx.core.graphics.PathParser.createPathFromPathData(
+            "M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75z"
+        )
+    } catch (e: Exception) {
+        Path().apply {
+            moveTo(128f, 9.45f)
+            cubicTo(145f, 25f, 216f, 90f, 216f, 144f)
+            arcTo(RectF(40f, 56f, 216f, 232f), 0f, 180f, false)
+            cubicTo(40f, 90f, 111f, 25f, 128f, 9.45f)
+            close()
+        }
+    }
+
+    val transformMatrix = android.graphics.Matrix().apply {
+        postTranslate(-128f, -121f)
+        postScale(dropScale, dropScale)
+        postTranslate(cx, dropCy)
+    }
+    dropPath.transform(transformMatrix)
+
+    val dropBounds = RectF()
+    dropPath.computeBounds(dropBounds, true)
+    val dropBotY = dropBounds.bottom
+    val dropH = dropBounds.height()
+    val dropW = dropBounds.width()
+
+    val dropBackingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(dropPath, dropBackingPaint)
+
+    // Dynamic Wave Shading
+    canvas.save()
+    canvas.clipPath(dropPath)
+
+    val fluidLevelY = dropBotY - (dropH * fillFraction)
+    val waveW = dropW * 1.5f
+
+    val sipIndex = currentMl / 250
+    if (sipIndex % 2 != 0) {
+        canvas.scale(-1f, 1f, cx, fluidLevelY)
+    }
+
+    val waveAmp1 = scaleFactor * (4.2f + ((sipIndex % 3) * 0.6f)) * uiScale
+    val waveAmp2 = scaleFactor * (3.8f + (((sipIndex + 1) % 3) * 0.5f)) * uiScale
+
+    val backWavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(120, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
+        style = Paint.Style.FILL
+    }
+    val backWavePath = Path().apply {
+        moveTo(cx - waveW, dropBotY + scaleFactor * 10f)
+        lineTo(cx - waveW, fluidLevelY - scaleFactor * 2f * uiScale)
+        quadTo(cx - dropW * 0.35f, fluidLevelY - waveAmp1, cx + dropW * 0.12f, fluidLevelY)
+        quadTo(cx + dropW * 0.55f, fluidLevelY + waveAmp2, cx + waveW, fluidLevelY)
+        lineTo(cx + waveW, dropBotY + scaleFactor * 10f)
+        close()
+    }
+    canvas.drawPath(backWavePath, backWavePaint)
+
+    val frontWavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    val frontWavePath = Path().apply {
+        moveTo(cx - waveW, dropBotY + scaleFactor * 10f)
+        lineTo(cx - waveW, fluidLevelY)
+        quadTo(cx - dropW * 0.35f, fluidLevelY + waveAmp1, cx, fluidLevelY)
+        quadTo(cx + dropW * 0.35f, fluidLevelY - waveAmp1, cx + waveW, fluidLevelY)
+        lineTo(cx + waveW, dropBotY + scaleFactor * 10f)
+        close()
+    }
+    canvas.drawPath(frontWavePath, frontWavePaint)
+    canvas.restore()
+
+    val dropOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(32, 0, 0, 0) else Color.argb(40, 255, 255, 255)
+        style = Paint.Style.STROKE
+        this.strokeWidth = scaleFactor * 1.2f * uiScale
+    }
+    canvas.drawPath(dropPath, dropOutlinePaint)
+
+    // 5. Lower Amount Telemetry (Shifted further down into opening)
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+        textSize = scaleFactor * 22f * uiScale
+        typeface = getSlateFont(context, weight = 800)
+        textAlign = Paint.Align.CENTER
+    }
+    val numY = cy + (trackR * 0.77f)
+    canvas.drawText("$currentMl", cx, numY, numPaint)
+
+    val goalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#8E8E93")
+        textSize = scaleFactor * 8.5f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("/$targetMl ML", cx, numY + (scaleFactor * 10f * uiScale), goalPaint)
+
+    return bitmap
+}

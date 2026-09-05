@@ -2885,6 +2885,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 7. Health & Fitness: Hydro Arc Droplet (2x2) -->
+        <receiver
+            android:name=".widgets.health.HealthHydroArcDropletReceiver"
+            android:exported="true"
+            android:label="Slate Hydro Arc Droplet">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.health.SIP_CHRONO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
 
     </application>
