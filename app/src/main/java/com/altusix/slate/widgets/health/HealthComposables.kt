@@ -1209,3 +1209,236 @@ fun generateHealthHydroArcDropletBitmap(context: Context, config: SlateWidgetCon
 
     return bitmap
 }
+
+// 8. LANDSCAPE RIDGE PEDOMETER (2x2 - SCANDINAVIAN MOUNTAIN ELEVATION)
+fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryTextColor = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryTextColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#AEAEB2")
+
+    // 1. Base Plate Geometry
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+    val leftX = if (isResponsive) margin else (w - cardSize) / 2f
+    val topY = if (isResponsive) margin else (h - cardSize) / 2f
+    val cardW = if (isResponsive) w - (margin * 2f) else cardSize
+    val cardH = if (isResponsive) h - (margin * 2f) else cardSize
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(effectiveDim / 2f)
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val padX = cardW * 0.10f
+    val padY = cardH * 0.10f
+    val bottomBarH = scaleFactor * 26f * uiScale
+    val hillBaseY = cardRect.bottom - bottomBarH
+
+    // 2. Smooth Topographic Mountain Ridges
+    canvas.save()
+    val cardClipPath = Path().apply { addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW) }
+    canvas.clipPath(cardClipPath)
+
+    val rR = Color.red(accentColorInt)
+    val rG = Color.green(accentColorInt)
+    val rB = Color.blue(accentColorInt)
+    val cL = cardRect.left
+    val cR = cardRect.right
+
+    // Layer 1: Background Tall Mountain Summit
+    val backHillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(if (isLight) 60 else 45, rR, rG, rB)
+        style = Paint.Style.FILL
+    }
+    val backHillPath = Path().apply {
+        moveTo(cL, hillBaseY)
+        cubicTo(
+            cL + cardW * 0.28f, hillBaseY - cardH * 0.02f,
+            cL + cardW * 0.44f, hillBaseY - cardH * 0.14f,
+            cL + cardW * 0.58f, hillBaseY - cardH * 0.20f
+        )
+        cubicTo(
+            cL + cardW * 0.68f, hillBaseY - cardH * 0.26f,
+            cL + cardW * 0.74f, hillBaseY - cardH * 0.54f,
+            cL + cardW * 0.82f, hillBaseY - cardH * 0.54f
+        )
+        cubicTo(
+            cL + cardW * 0.90f, hillBaseY - cardH * 0.54f,
+            cL + cardW * 0.95f, hillBaseY - cardH * 0.36f,
+            cR, hillBaseY - cardH * 0.30f
+        )
+        lineTo(cR, hillBaseY)
+        close()
+    }
+    canvas.drawPath(backHillPath, backHillPaint)
+
+    // Layer 2: Mid-Range Rolling Ridge
+    val midHillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(if (isLight) 115 else 90, rR, rG, rB)
+        style = Paint.Style.FILL
+    }
+    val midHillPath = Path().apply {
+        moveTo(cL, hillBaseY)
+        cubicTo(
+            cL + cardW * 0.16f, hillBaseY - cardH * 0.04f,
+            cL + cardW * 0.26f, hillBaseY - cardH * 0.12f,
+            cL + cardW * 0.38f, hillBaseY - cardH * 0.14f
+        )
+        cubicTo(
+            cL + cardW * 0.48f, hillBaseY - cardH * 0.16f,
+            cL + cardW * 0.56f, hillBaseY - cardH * 0.30f,
+            cL + cardW * 0.68f, hillBaseY - cardH * 0.32f
+        )
+        cubicTo(
+            cL + cardW * 0.78f, hillBaseY - cardH * 0.34f,
+            cL + cardW * 0.86f, hillBaseY - cardH * 0.18f,
+            cR, hillBaseY - cardH * 0.18f
+        )
+        lineTo(cR, hillBaseY)
+        close()
+    }
+    canvas.drawPath(midHillPath, midHillPaint)
+
+    // Layer 3: Foreground Low Slope
+    val foreHillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(if (isLight) 190 else 160, rR, rG, rB)
+        style = Paint.Style.FILL
+    }
+    val foreHillPath = Path().apply {
+        moveTo(cL, hillBaseY)
+        cubicTo(
+            cL + cardW * 0.12f, hillBaseY - cardH * 0.02f,
+            cL + cardW * 0.24f, hillBaseY - cardH * 0.08f,
+            cL + cardW * 0.34f, hillBaseY - cardH * 0.09f
+        )
+        cubicTo(
+            cL + cardW * 0.44f, hillBaseY - cardH * 0.10f,
+            cL + cardW * 0.52f, hillBaseY - cardH * 0.04f,
+            cL + cardW * 0.64f, hillBaseY - cardH * 0.06f
+        )
+        cubicTo(
+            cL + cardW * 0.74f, hillBaseY - cardH * 0.08f,
+            cL + cardW * 0.86f, hillBaseY - cardH * 0.16f,
+            cR, hillBaseY - cardH * 0.06f
+        )
+        lineTo(cR, hillBaseY)
+        close()
+    }
+    canvas.drawPath(foreHillPath, foreHillPaint)
+    canvas.restore()
+
+    // 3. Aspect-Preserving Vector Helper
+    fun drawVector(resName: String, cx: Float, cy: Float, maxDim: Float, tint: Int? = null, flipX: Boolean = false, forcedAspect: Float? = null) {
+        val resId = context.resources.getIdentifier(resName, "drawable", context.packageName).takeIf { it != 0 } ?: return
+        val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+        if (tint != null) drawable.setTint(tint)
+        val intrinsicW = drawable.intrinsicWidth.toFloat()
+        val intrinsicH = drawable.intrinsicHeight.toFloat()
+        val aspect = forcedAspect ?: if (intrinsicW > 0f && intrinsicH > 0f) intrinsicW / intrinsicH else 1.0f
+
+        var drawW = maxDim
+        var drawH = maxDim
+        if (aspect > 1f) {
+            drawH = maxDim / aspect
+        } else {
+            drawW = maxDim * aspect
+        }
+
+        val l = (cx - drawW / 2f).toInt()
+        val t = (cy - drawH / 2f).toInt()
+        val r = (cx + drawW / 2f).toInt()
+        val b = (cy + drawH / 2f).toInt()
+        drawable.setBounds(l, t, r, b)
+
+        canvas.save()
+        if (flipX) {
+            canvas.scale(-1f, 1f, cx, cy)
+        }
+        drawable.draw(canvas)
+        canvas.restore()
+    }
+
+    // 4. Circular Badge with Dynamic Contrast Shoe Tint
+    val badgeR = scaleFactor * 15f * uiScale
+    val badgeCx = cardRect.left + padX + badgeR
+    val badgeCy = cardRect.top + padY + badgeR
+
+    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(badgeCx, badgeCy, badgeR, badgePaint)
+
+    // Dynamic contrast calculation for shoe icon against accent plate
+    val badgeLum = (0.2126f * (rR / 255f)) + (0.7152f * (rG / 255f)) + (0.0722f * (rB / 255f))
+    val shoeTint = if (badgeLum > 0.58f) Color.parseColor("#121214") else Color.WHITE
+
+    val shoeSize = badgeR * 1.25f
+    drawVector(
+        resName = "ic_sport_shoe",
+        cx = badgeCx,
+        cy = badgeCy,
+        maxDim = shoeSize,
+        tint = shoeTint,
+        flipX = true
+    )
+
+    // 5. Step Count & Label
+    val activity = getDailyActivitySummary(context)
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = (scaleFactor * 25f * uiScale).coerceAtMost(cardW * 0.22f)
+        typeface = getSlateFont(context, weight = 800)
+    }
+    val stepsFormatted = String.format(java.util.Locale.US, "%,d", activity.steps)
+    val numY = badgeCy + badgeR + (numPaint.textSize * 1.05f)
+    canvas.drawText(stepsFormatted, cardRect.left + padX, numY, numPaint)
+
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = scaleFactor * 10f * uiScale
+        typeface = getSlateFont(context, weight = 600)
+    }
+    canvas.drawText("steps", cardRect.left + padX, numY + (scaleFactor * 12.5f * uiScale), labelPaint)
+
+    // 6. Bottom Telemetry Bar
+    val bottomBarCenterY = hillBaseY + (bottomBarH / 2f)
+
+    val distPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColorInt
+        textSize = scaleFactor * 10f * uiScale
+        typeface = getSlateFont(context, weight = 700)
+    }
+    val fontMetrics = distPaint.fontMetrics
+    val textBaselineY = bottomBarCenterY - ((fontMetrics.ascent + fontMetrics.descent) / 2f)
+    canvas.drawText("${activity.distanceKm} km", cardRect.left + padX, textBaselineY, distPaint)
+
+    // Proportional Map Marker (Forced 384:512 ratio safeguard)
+    val markerH = scaleFactor * 13f * uiScale
+    val markerW = markerH * (384f / 512f)
+    val markerCx = cardRect.right - padX - (markerW / 2f)
+    drawVector(
+        resName = "ic_map_marker_alt",
+        cx = markerCx,
+        cy = bottomBarCenterY,
+        maxDim = markerH,
+        tint = accentColorInt,
+        flipX = false,
+        forcedAspect = (384f / 512f)
+    )
+
+    return bitmap
+}

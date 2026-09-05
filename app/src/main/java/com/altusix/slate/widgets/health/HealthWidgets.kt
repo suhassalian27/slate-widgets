@@ -23,7 +23,8 @@ fun getHealthWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Weekly Activity Matrix", sizeText = "4x2", category = "Health & Fitness", receiverClass = HealthWeeklyMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "8-Glass Hydration Matrix", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthEightGlassMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Pure Circle Hydro-Chrono", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroChronoReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Hydro Arc Droplet", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroArcDropletReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Hydro Arc Droplet", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthHydroArcDropletReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Landscape Ridge Pedometer", sizeText = "2x2", category = "Health & Fitness", receiverClass = HealthLandscapeRidgeReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -36,7 +37,8 @@ fun updateAllHealthWidgets(context: Context) {
         HealthWeeklyMatrixReceiver::class.java,
         HealthEightGlassMatrixReceiver::class.java,
         HealthHydroChronoReceiver::class.java,
-        HealthHydroArcDropletReceiver::class.java
+        HealthHydroArcDropletReceiver::class.java,
+        HealthLandscapeRidgeReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -369,4 +371,10 @@ class HealthHydroArcDropletReceiver : BaseHealthReceiver() {
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
+}
+
+// 8. LANDSCAPE RIDGE PEDOMETER (2x2)
+class HealthLandscapeRidgeReceiver : BaseHealthReceiver() {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateHealthLandscapeRidgeBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
