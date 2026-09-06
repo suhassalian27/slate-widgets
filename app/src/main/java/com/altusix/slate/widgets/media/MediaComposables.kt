@@ -1337,7 +1337,7 @@ fun generateSpectrumBitmap(
 }
 
 // =========================================================================
-// 7. EDITORIAL MEDIA CARD (2x2)
+// 7. EDITORIAL MEDIA CARD (2x2 - RESPONSIVE & FIXED)
 // =========================================================================
 fun generateEditorialBitmap(
     context: Context,
@@ -1358,11 +1358,30 @@ fun generateEditorialBitmap(
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    // 1. Smart Aspect Ratio Engine (Prevents extreme aspect ratio distortion)
+    val cardRect = if (isResponsive) {
+        val minAspect = 0.78f
+        val maxAspect = 1.50f
+        var cW = w
+        var cH = h
+        if (cW / cH > maxAspect) {
+            cW = cH * maxAspect
+        } else if (cW / cH < minAspect) {
+            cH = cW / minAspect
+        }
+        val leftX = (w - cW) / 2f
+        val topY = (h - cH) / 2f
+        RectF(leftX, topY, leftX + cW, topY + cH)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(cardH / 2f)
+    val effectiveDim = minOf(cardW, cardH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.55f, 2.2f)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
@@ -1370,72 +1389,74 @@ fun generateEditorialBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.width() * 0.10f
+    val padX = cardW * 0.10f
+    val padY = cardH * 0.10f
+    val textStartX = cardRect.left + padX
+    val maxTextW = cardW - (padX * 2f)
 
-    // 1. Editorial Header Tag
-    val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = cardRect.height() * 0.052f
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText("NOW PLAYING — SLATE", cardRect.left + pad, cardRect.top + pad * 1.4f, tagPaint)
+    // 2. Playback Controls Deck (Elevated Bottom-Up Positioning)
+    val ctrlY = cardRect.bottom - (cardH * 0.22f)
+    val btnR = scaleFactor * 12.0f * uiScale
+    val playBtnR = btnR * 1.25f
+    val ctrlSpacing = minOf(cardW * 0.26f, scaleFactor * 44f * uiScale)
 
-    // 2. Large Stylized Title (Multiple lines or giant font)
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = cardRect.height() * 0.125f
-        typeface = getSlateFont(context, 700)
-    }
-    val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.065f
-        typeface = getSlateFont(context, 400)
-    }
-
-    val maxTextW = cardRect.width() - pad * 2f
-    val titleDisplay = if (titlePaint.measureText(state.title) > maxTextW) {
-        var t = state.title
-        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
-        "$t…"
-    } else state.title
-
-    val titleY = cardRect.top + cardRect.height() * 0.38f
-    canvas.drawText(titleDisplay, cardRect.left + pad, titleY, titlePaint)
-    canvas.drawText(state.artist.take(30), cardRect.left + pad, titleY + cardRect.height() * 0.10f, artistPaint)
-
-    // Hairline Divider
-    val lineY = titleY + cardRect.height() * 0.18f
-    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFD1D1D6).toArgb() else Color(0x25FFFFFF).toArgb()
-        strokeWidth = 1.2f * scaleFactor
-    }
-    canvas.drawLine(cardRect.left + pad, lineY, cardRect.right - pad, lineY, divPaint)
-
-    // 3. Mini Progress Arc or Strip
-    val progressW = (cardRect.width() - pad * 2f) * state.progress
-    val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        strokeWidth = 2f * scaleFactor
-    }
-    canvas.drawLine(cardRect.left + pad, lineY, cardRect.left + pad + progressW, lineY, progPaint)
-
-    // 4. Controls at bottom
-    val ctrlY = cardRect.bottom - pad * 1.4f
-    val btnR = cardRect.width() * 0.075f
-    val ctrlSpacing = cardRect.width() * 0.26f
+    val rR = android.graphics.Color.red(accentColor)
+    val rG = android.graphics.Color.green(accentColor)
+    val rB = android.graphics.Color.blue(accentColor)
+    val playLum = (0.2126f * (rR / 255f)) + (0.7152f * (rG / 255f)) + (0.0722f * (rB / 255f))
+    val playIconColor = if (playLum > 0.55f) android.graphics.Color.BLACK else android.graphics.Color.WHITE
 
     drawSkipIcon(canvas, cardRect.centerX() - ctrlSpacing, ctrlY, btnR, isNext = false, color = secondaryTextColor)
     drawPlayPauseIcon(
         canvas,
         cardRect.centerX(),
         ctrlY,
-        btnR * 1.15f,
+        playBtnR,
         isPlaying = state.isPlaying,
-        color = if (isLight) Color.White.toArgb() else Color.Black.toArgb(),
+        color = playIconColor,
         fillCircleBg = true,
         circleBgColor = accentColor
     )
     drawSkipIcon(canvas, cardRect.centerX() + ctrlSpacing, ctrlY, btnR, isNext = true, color = secondaryTextColor)
+
+    // 3. Editorial Tag
+    val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = (scaleFactor * 7.5f * uiScale).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
+        typeface = getSlateFont(context, 700)
+    }
+    val tagY = cardRect.top + padY + tagPaint.textSize
+    canvas.drawText("NOW PLAYING — SLATE", textStartX, tagY, tagPaint)
+
+    // 4. Stylized Headline & Subtitle (Evenly distributed in upper section)
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = (cardH * 0.12f).coerceIn(scaleFactor * 11f, scaleFactor * 24f)
+        typeface = getSlateFont(context, 700)
+    }
+    val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = (cardH * 0.072f).coerceIn(scaleFactor * 8.5f, scaleFactor * 16f)
+        typeface = getSlateFont(context, 400)
+    }
+
+    val titleDisplay = if (titlePaint.measureText(state.title) > maxTextW) {
+        var t = state.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
+        "$t…"
+    } else state.title
+
+    val artistDisplay = if (artistPaint.measureText(state.artist) > maxTextW) {
+        var a = state.artist
+        while (a.isNotEmpty() && artistPaint.measureText("$a…") > maxTextW) a = a.dropLast(1)
+        "$a…"
+    } else state.artist
+
+    val titleY = tagY + (cardH * 0.16f)
+    val artistY = titleY + (artistPaint.textSize * 1.35f)
+
+    canvas.drawText(titleDisplay, textStartX, titleY, titlePaint)
+    canvas.drawText(artistDisplay, textStartX, artistY, artistPaint)
 
     return bitmap
 }

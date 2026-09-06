@@ -343,7 +343,7 @@ class MediaEditorialReceiver : BaseMediaReceiver(R.layout.widget_media_2x2_layou
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
         val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
         return generateEditorialBitmap(context, state, art, config, isResponsive, wDp, hDp)
     }
 }
