@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Canvas Surface for Background, Album Art & Dynamic Audio Visuals -->
+    <ImageView
+        android:id="@+id/widget_canvas_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:contentDescription="Media Canvas Surface" />
+
+    <!-- Interactive Touch Overlays (Split Horizontal: Left Album Art / Right Controls) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <!-- Left Half: Album Art / Cassette Spool (Tap to open active player) -->
+        <FrameLayout
+            android:id="@+id/btn_media_open_app"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Right Half: Track Info & Playback Controls -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- Upper area: Track Info / Equalizer (Tap to open active player) -->
+            <FrameLayout
+                android:id="@+id/btn_media_track_info"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.62"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- Lower area: Prev / Play-Pause / Next Controls -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.38"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:id="@+id/btn_media_prev"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <FrameLayout
+                    android:id="@+id/btn_media_play_pause"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1.2"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <FrameLayout
+                    android:id="@+id/btn_media_next"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

@@ -51,6 +51,7 @@ import com.altusix.slate.widgets.deviceinfo.getDeviceInfoWidgetsCatalog
 import com.altusix.slate.widgets.games.getGamesWidgetsCatalog
 import com.altusix.slate.widgets.google.getGoogleWidgetsCatalog
 import com.altusix.slate.widgets.health.getHealthWidgetsCatalog
+import com.altusix.slate.widgets.media.getMediaWidgetsCatalog
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -82,12 +83,13 @@ fun WidgetListScreen(
     val gamesWidgets = remember { getGamesWidgetsCatalog() }
     val googleWidgets = remember { getGoogleWidgetsCatalog() }
     val healthWidgets = remember { getHealthWidgetsCatalog()}
+    val mediaWidgets = remember { getMediaWidgetsCatalog() }
 
     val categories = remember {
         listOf(
             "All", "AI", "App Folder", "App Launcher", "Battery", "Bluetooth",
             "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital",
-            "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google", "Health & Fitness"
+            "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google", "Health & Fitness", "Music & Media"
         )
     }
 
@@ -185,10 +187,11 @@ fun WidgetListScreen(
                     15 -> gamesWidgets
                     16 -> googleWidgets
                     17 -> healthWidgets
+                    18 -> mediaWidgets
                     else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
                             calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
                             clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets +
-                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets
+                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets
                 }
             }
 

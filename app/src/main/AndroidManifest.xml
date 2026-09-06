@@ -15,6 +15,11 @@
         <package android:name="com.deepseek.chat" />
         <package android:name="com.microsoft.copilot" />
         <package android:name="com.facebook.stella" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <package android:name="com.apple.android.music" />
+        <package android:name="com.soundcloud.android" />
+        <package android:name="com.shazam.android" />
     </queries>
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -66,6 +71,23 @@
             android:name=".widgets.health.HealthPermissionActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Media Permission Activity -->
+        <activity
+            android:name=".widgets.media.MediaPermissionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Slate Media Notification Listener Service -->
+        <service
+            android:name=".widgets.media.SlateMediaNotificationService"
+            android:label="Slate Media Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <!-- Real-time Battery Service -->
         <service
@@ -2935,6 +2957,112 @@
                 android:resource="@xml/widget_info_3x1" />
         </receiver>
 
+        <!-- ================================================================= -->
+        <!-- MUSIC & MEDIA WIDGETS                                             -->
+        <!-- ================================================================= -->
+        <!-- 1. Vinyl Turntable (2x2) -->
+        <receiver
+            android:name=".widgets.media.MediaVinylReceiver"
+            android:exported="true"
+            android:label="Vinyl Turntable">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 2. Bento Media Player (4x2) -->
+        <receiver
+            android:name=".widgets.media.MediaBentoReceiver"
+            android:exported="true"
+            android:label="Bento Media Player">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 3. Media Capsule Pill (4x1) -->
+        <receiver
+            android:name=".widgets.media.MediaCapsulePillReceiver"
+            android:exported="true"
+            android:label="Media Capsule Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 4. Media Mini Capsule (2x1) -->
+        <receiver
+            android:name=".widgets.media.MediaMiniCapsuleReceiver"
+            android:exported="true"
+            android:label="Media Mini Capsule">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 5. Retro Cassette Tape (4x2) -->
+        <receiver
+            android:name=".widgets.media.MediaCassetteReceiver"
+            android:exported="true"
+            android:label="Retro Cassette Tape">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 6. Spectrum Soundwave (2x2) -->
+        <receiver
+            android:name=".widgets.media.MediaSpectrumReceiver"
+            android:exported="true"
+            android:label="Spectrum Soundwave">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 7. Editorial Media Card (2x2) -->
+        <receiver
+            android:name=".widgets.media.MediaEditorialReceiver"
+            android:exported="true"
+            android:label="Editorial Media Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. Media Streaming Dock (4x1) -->
+        <receiver
+            android:name=".widgets.media.MediaDockReceiver"
+            android:exported="true"
+            android:label="Media Streaming Dock">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
 
     </application>
 </manifest>
