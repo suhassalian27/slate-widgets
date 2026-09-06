@@ -541,7 +541,7 @@ fun generateBentoMediaBitmap(
 }
 
 // =========================================================================
-// 3. CAPSULE PILL PLAYER (4x1)
+// 3. CAPSULE PILL PLAYER (4x1 - FIXED RATIO)
 // =========================================================================
 fun generateCapsulePillBitmap(
     context: Context,
@@ -562,25 +562,29 @@ fun generateCapsulePillBitmap(
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 4f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    // 1. Locked 4x1 Aspect Ratio (3.9:1) Centered Base Plate
+    val idealAspect = 3.90f
+    var cardW = w
+    var cardH = cardW / idealAspect
+    if (cardH > h) {
+        cardH = h
+        cardW = cardH * idealAspect
     }
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    // Pill full round cap
-    val pillRadius = cardRect.height() / 2f
+    val pillRadius = cardH / 2f
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
 
-    val pad = cardRect.height() * 0.15f
+    val pad = cardH * 0.13f
 
-    // 1. Circular Album Art
-    val artR = cardRect.height() / 2f - pad
+    // 2. Circular Album Art
+    val artR = (cardH / 2f) - pad
     val artCx = cardRect.left + pillRadius
     val artCy = cardRect.centerY()
 
@@ -601,7 +605,6 @@ fun generateCapsulePillBitmap(
         canvas.drawText("♪", artCx, artCy + artR * 0.32f, glyphPaint)
     }
 
-    // Accent ring on art
     val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(0x30FFFFFF).toArgb()
         style = Paint.Style.STROKE
@@ -609,41 +612,50 @@ fun generateCapsulePillBitmap(
     }
     canvas.drawCircle(artCx, artCy, artR, ringPaint)
 
-    // 2. Controls on Right Side
-    val rightEdge = cardRect.right - pillRadius * 0.65f
-    val btnR = cardRect.height() * 0.22f
-    val ctrlSpacing = cardRect.height() * 0.52f
+    // 3. Media Controls Deck (Synchronized 1:1 to XML 58% / 42% Split)
+    val colLeft = cardRect.left + cardW * 0.58f
+    val colW = cardW * 0.42f
 
-    val nextX = rightEdge
-    val playX = nextX - ctrlSpacing
-    val prevX = playX - ctrlSpacing
+    // Button centers at 1/3.1, 1.55/3.1, and 2.6/3.1 of the controls column
+    val prevCx = colLeft + (colW * (0.50f / 3.1f))
+    val playCx = colLeft + (colW * (1.55f / 3.1f))
+    val nextCx = colLeft + (colW * (2.60f / 3.1f))
+    val controlsCy = cardRect.centerY()
 
-    drawSkipIcon(canvas, nextX, artCy, btnR, isNext = true, color = secondaryTextColor)
+    val skipBtnR = cardH * 0.17f
+    val playBtnR = cardH * 0.25f
+
+    // Prev Button
+    drawSkipIcon(canvas, prevCx, controlsCy, skipBtnR, isNext = false, color = secondaryTextColor)
+
+    // Play / Pause Circle
     drawPlayPauseIcon(
         canvas,
-        playX,
-        artCy,
-        btnR * 1.25f,
+        playCx,
+        controlsCy,
+        playBtnR,
         isPlaying = state.isPlaying,
         color = if (isLight) Color.White.toArgb() else Color.Black.toArgb(),
         fillCircleBg = true,
         circleBgColor = accentColor
     )
-    drawSkipIcon(canvas, prevX, artCy, btnR, isNext = false, color = secondaryTextColor)
 
-    // 3. Track Info (Middle)
-    val textLeft = artCx + artR + pad * 1.2f
-    val textRight = prevX - pad * 1.5f
+    // Next Button
+    drawSkipIcon(canvas, nextCx, controlsCy, skipBtnR, isNext = true, color = secondaryTextColor)
+
+    // 4. Reduced Typography & Middle Track Info
+    val textLeft = artCx + artR + (cardH * 0.14f)
+    val textRight = colLeft - (cardH * 0.08f)
     val maxTextW = (textRight - textLeft).coerceAtLeast(10f)
 
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.24f
+        textSize = cardH * 0.18f
         typeface = getSlateFont(context, 700)
     }
     val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardRect.height() * 0.17f
+        textSize = cardH * 0.13f
         typeface = getSlateFont(context, 400)
     }
 
@@ -659,9 +671,11 @@ fun generateCapsulePillBitmap(
         "$a…"
     } else state.artist
 
-    val titleY = artCy - cardRect.height() * 0.04f
+    val titleY = artCy - (cardH * 0.03f)
+    val artistY = titleY + (titlePaint.textSize * 0.85f) + (scaleFactor * 3.5f)
+
     canvas.drawText(titleDisplay, textLeft, titleY, titlePaint)
-    canvas.drawText(artistDisplay, textLeft, titleY + cardRect.height() * 0.25f, artistPaint)
+    canvas.drawText(artistDisplay, textLeft, artistY, artistPaint)
 
     return bitmap
 }

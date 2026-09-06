@@ -19,7 +19,7 @@ fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Vinyl Turntable", "2x2", "Music & Media", MediaVinylReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Bento Media Player", "4x2", "Music & Media", MediaBentoReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Media Mini Capsule", "2x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
@@ -299,8 +299,8 @@ class MediaCapsulePillReceiver : BaseMediaReceiver(R.layout.widget_media_4x1_lay
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
         val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateCapsulePillBitmap(context, state, art, config, isResponsive, wDp, hDp)
+        // Permanently false: Capsule Pill adheres to fixed 3.9:1 geometry
+        return generateCapsulePillBitmap(context, state, art, config, isResponsive = false, wDp, hDp)
     }
 }
 
