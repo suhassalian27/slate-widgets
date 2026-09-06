@@ -681,7 +681,7 @@ fun generateCapsulePillBitmap(
 }
 
 // =========================================================================
-// 4. MINI CAPSULE (2x1)
+// 4. IMMERSIVE ARTWORK CANVAS (4x1 - RESPONSIVE & FIXED)
 // =========================================================================
 fun generateMiniCapsuleBitmap(
     context: Context,
@@ -698,72 +698,191 @@ fun generateMiniCapsuleBitmap(
 
     val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val isLight = slateConfig.themeMode == "LIGHT"
-    val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
-    }
+    // Base card bounds
+    val margin = scaleFactor * 1.5f
+    val availW = w - (margin * 2f)
+    val availH = h - (margin * 2f)
 
-    val pillRadius = cardRect.height() / 2f
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
-
-    val pad = cardRect.height() * 0.16f
-    val artR = cardRect.height() / 2f - pad
-    val artCx = cardRect.left + pillRadius
-    val artCy = cardRect.centerY()
-
-    if (artwork != null && !artwork.isRecycled) {
-        drawCircularBitmap(canvas, artwork, artCx, artCy, artR)
+    val cardRect = if (isResponsive) {
+        // Responsive: Card takes full widget canvas
+        RectF(margin, margin, margin + availW, margin + availH)
     } else {
-        val artBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
+        val idealAspect = 3f
+        var cW = availW
+        var cH = cW / idealAspect
+        if (cH > availH) {
+            cH = availH
+            cW = cH * idealAspect
+        }
+        val leftX = (w - cW) / 2f
+        val topY = (h - cH) / 2f
+        RectF(leftX, topY, leftX + cW, topY + cH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(cardH / 2f)
+    val uiScale = (cardH / (70f * scaleFactor)).coerceIn(0.55f, 2.2f)
+
+    val cardClipPath = Path().apply {
+        addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
+    }
+
+    canvas.save()
+    canvas.clipPath(cardClipPath)
+
+    // Full-Bleed Edge-to-Edge Art within Card Bounds
+    if (artwork != null && !artwork.isRecycled) {
+        val srcW = artwork.width.toFloat()
+        val srcH = artwork.height.toFloat()
+        val scale = maxOf(cardW / srcW, cardH / srcH)
+        val dx = cardRect.left + (cardW - srcW * scale) / 2f
+        val dy = cardRect.top + (cardH - srcH * scale) / 2f
+
+        val matrix = Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(dx, dy)
+        }
+        val artPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = BitmapShader(artwork, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+                setLocalMatrix(matrix)
+            }
+        }
+        canvas.drawRect(cardRect, artPaint)
+    } else {
+        val fallbackBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = bgColor
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(artCx, artCy, artR, artBgPaint)
-        val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) Color.White.toArgb() else Color.Black.toArgb()
-            textSize = artR * 0.9f
+        canvas.drawRect(cardRect, fallbackBgPaint)
+
+        val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(40, 255, 255, 255)
+            textSize = cardH * 0.70f
             textAlign = Paint.Align.CENTER
-            typeface = getSlateFont(context, 700)
+            typeface = getSlateFont(context, 800)
         }
-        canvas.drawText("♫", artCx, artCy + artR * 0.32f, glyphPaint)
+        canvas.drawText("♪", cardRect.centerX(), cardRect.centerY() + (cardH * 0.24f), notePaint)
     }
 
-    // Play/Pause button on Right
-    val btnR = cardRect.height() * 0.22f
-    val playX = cardRect.right - pillRadius * 0.75f
+    // Scrim overlay
+    val scrimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            cardRect.left, 0f, cardRect.right, 0f,
+            intArrayOf(
+                android.graphics.Color.argb(235, 10, 10, 14),
+                android.graphics.Color.argb(180, 10, 10, 14),
+                android.graphics.Color.argb(110, 10, 10, 14),
+                android.graphics.Color.argb(145, 10, 10, 14)
+            ),
+            floatArrayOf(0.0f, 0.44f, 0.68f, 1.0f),
+            Shader.TileMode.CLAMP
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(cardRect, scrimPaint)
+
+    // Border highlight
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, strokePaint)
+
+    // Right Controls
+    val colW = cardW * 0.40f
+    val colLeft = cardRect.right - colW
+    val slotW = colW / 3f
+    val controlsCy = cardRect.centerY()
+
+    val prevCx = colLeft + (slotW * 0.5f)
+    val playCx = colLeft + (slotW * 1.5f)
+    val nextCx = colLeft + (slotW * 2.5f)
+
+    val playBtnR = minOf(cardH * 0.24f, slotW * 0.38f, scaleFactor * 22f * uiScale).coerceAtLeast(scaleFactor * 8f)
+    val skipBtnR = playBtnR * 0.62f
+    val skipBackplateR = skipBtnR * 1.30f
+
+    val glassDiscPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(35, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val glassDiscStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+
+    // Prev Button
+    canvas.drawCircle(prevCx, controlsCy, skipBackplateR, glassDiscPaint)
+    canvas.drawCircle(prevCx, controlsCy, skipBackplateR, glassDiscStroke)
+    drawSkipIcon(canvas, prevCx, controlsCy, skipBtnR, isNext = false, color = android.graphics.Color.WHITE)
+
+    // Play/Pause Button
+    val rR = android.graphics.Color.red(accentColor)
+    val rG = android.graphics.Color.green(accentColor)
+    val rB = android.graphics.Color.blue(accentColor)
+    val playLum = (0.2126f * (rR / 255f)) + (0.7152f * (rG / 255f)) + (0.0722f * (rB / 255f))
+    val playIconColor = if (playLum > 0.55f) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+
     drawPlayPauseIcon(
         canvas,
-        playX,
-        artCy,
-        btnR * 1.25f,
+        playCx,
+        controlsCy,
+        playBtnR,
         isPlaying = state.isPlaying,
-        color = if (isLight) Color.White.toArgb() else Color.Black.toArgb(),
+        color = playIconColor,
         fillCircleBg = true,
         circleBgColor = accentColor
     )
 
-    // Text in middle
-    val textLeft = artCx + artR + pad * 1.2f
-    val maxTextW = (playX - btnR * 1.5f - textLeft).coerceAtLeast(10f)
+    // Next Button
+    canvas.drawCircle(nextCx, controlsCy, skipBackplateR, glassDiscPaint)
+    canvas.drawCircle(nextCx, controlsCy, skipBackplateR, glassDiscStroke)
+    drawSkipIcon(canvas, nextCx, controlsCy, skipBtnR, isNext = true, color = android.graphics.Color.WHITE)
+
+    // Left Metadata
+    val padLeft = (cardH * 0.16f).coerceIn(scaleFactor * 8f, scaleFactor * 24f)
+    val textLeft = cardRect.left + padLeft
+    val maxTextW = (colLeft - textLeft - (scaleFactor * 8f * uiScale)).coerceAtLeast(scaleFactor * 30f)
+
+    val eqBarCount = 4
+    val eqBarW = scaleFactor * 1.8f * uiScale
+    val eqGap = scaleFactor * 2.0f * uiScale
+    val eqStartX = textLeft
+    val eqBaselineY = cardRect.top + (cardH * 0.32f)
+
+    val eqPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+    val eqHeights = if (state.isPlaying) floatArrayOf(0.6f, 1.0f, 0.45f, 0.85f) else floatArrayOf(0.2f, 0.2f, 0.2f, 0.2f)
+    for (i in 0 until eqBarCount) {
+        val bH = scaleFactor * 7.5f * uiScale * eqHeights[i]
+        val bX = eqStartX + i * (eqBarW + eqGap)
+        canvas.drawRoundRect(
+            RectF(bX, eqBaselineY - bH, bX + eqBarW, eqBaselineY),
+            eqBarW * 0.5f, eqBarW * 0.5f, eqPaint
+        )
+    }
+
+    val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(175, 255, 255, 255)
+        textSize = (scaleFactor * 6.5f * uiScale).coerceIn(scaleFactor * 5.5f, scaleFactor * 10f)
+        typeface = getSlateFont(context, 700)
+    }
+    canvas.drawText("NOW PLAYING", eqStartX + (eqBarCount * (eqBarW + eqGap)) + (scaleFactor * 4f), eqBaselineY, tagPaint)
 
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = cardRect.height() * 0.24f
+        color = android.graphics.Color.WHITE
+        textSize = (cardH * 0.20f).coerceIn(scaleFactor * 9f, scaleFactor * 16f)
         typeface = getSlateFont(context, 700)
     }
     val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.17f
+        color = android.graphics.Color.argb(190, 255, 255, 255)
+        textSize = (cardH * 0.14f).coerceIn(scaleFactor * 7f, scaleFactor * 13f)
         typeface = getSlateFont(context, 400)
     }
 
@@ -779,9 +898,13 @@ fun generateMiniCapsuleBitmap(
         "$a…"
     } else state.artist
 
-    val titleY = artCy - cardRect.height() * 0.04f
+    val titleY = eqBaselineY + (titlePaint.textSize * 1.12f)
+    val artistY = titleY + (artistPaint.textSize * 1.25f)
+
     canvas.drawText(titleDisplay, textLeft, titleY, titlePaint)
-    canvas.drawText(artistDisplay, textLeft, titleY + cardRect.height() * 0.25f, artistPaint)
+    canvas.drawText(artistDisplay, textLeft, artistY, artistPaint)
+
+    canvas.restore()
 
     return bitmap
 }

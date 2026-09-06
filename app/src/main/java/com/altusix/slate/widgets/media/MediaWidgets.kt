@@ -20,7 +20,7 @@ fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Vinyl Turntable", "2x2", "Music & Media", MediaVinylReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Bento Media Player", "4x2", "Music & Media", MediaBentoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Media Mini Capsule", "2x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Immersive Canvas", "3x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true),
@@ -93,19 +93,22 @@ private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetC
 private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
     val modeKey = "widget_${widgetId}_mode"
-    val isResponsiveKey = "widget_${widgetId}_is_responsive"
+    val isRespKey = "widget_${widgetId}_is_responsive"
 
     if (widgetPrefs.contains(modeKey)) {
-        return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        val mode = widgetPrefs.getString(modeKey, "RESPONSIVE")
+        val isResp = mode == "RESPONSIVE"
+        widgetPrefs.edit().putBoolean(isRespKey, isResp).apply()
+        return isResp
     }
-    if (widgetPrefs.contains(isResponsiveKey)) {
-        return widgetPrefs.getBoolean(isResponsiveKey, true)
+    if (widgetPrefs.contains(isRespKey)) {
+        return widgetPrefs.getBoolean(isRespKey, true)
     }
 
     val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-    val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
-    widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
-    return defaultResponsive
+    val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+    widgetPrefs.edit().putBoolean(isRespKey, defaultResp).apply()
+    return defaultResp
 }
 
 abstract class BaseMediaReceiver(private val layoutResId: Int) : AppWidgetProvider() {
@@ -304,12 +307,13 @@ class MediaCapsulePillReceiver : BaseMediaReceiver(R.layout.widget_media_4x1_lay
     }
 }
 
-// 4. Media Mini Capsule (2x1)
+// 4. Immersive Artwork Canvas (4x1)
 class MediaMiniCapsuleReceiver : BaseMediaReceiver(R.layout.widget_media_2x1_layout) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
         val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
+        // Fixed mode inside catalog preview card; respects user preference on home screen
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
         return generateMiniCapsuleBitmap(context, state, art, config, isResponsive, wDp, hDp)
     }
 }

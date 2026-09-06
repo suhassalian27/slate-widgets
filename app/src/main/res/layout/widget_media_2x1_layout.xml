@@ -3,21 +3,21 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Canvas Surface for Background & Compact Pill Visuals -->
+    <!-- Canvas Surface (fitCenter ensures Fixed Mode maintains 3.8:1 without distortion) -->
     <ImageView
         android:id="@+id/widget_canvas_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY"
+        android:scaleType="fitCenter"
         android:contentDescription="Media Canvas Surface" />
 
-    <!-- Interactive Touch Overlays (Compact Pill Layout) -->
+    <!-- Synchronized Touch Overlay (60% Left / 40% Right) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal">
 
-        <!-- Left 60%: Album Art Thumbnail & Song Title (Tap to open player) -->
+        <!-- Left 60%: Metadata & Album Art Area -->
         <FrameLayout
             android:id="@+id/btn_media_open_app"
             android:layout_width="0dp"
@@ -26,7 +26,7 @@
             android:clickable="true"
             android:focusable="true" />
 
-        <!-- Right 40%: Controls (Play/Pause, Next) -->
+        <!-- Right 40%: Controls (Prev, Play/Pause, Next) -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -34,10 +34,18 @@
             android:orientation="horizontal">
 
             <FrameLayout
+                android:id="@+id/btn_media_prev"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <FrameLayout
                 android:id="@+id/btn_media_play_pause"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_weight="1.0"
                 android:clickable="true"
                 android:focusable="true" />
 
@@ -45,7 +53,7 @@
                 android:id="@+id/btn_media_next"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_weight="1.0"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>

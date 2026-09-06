@@ -2981,7 +2981,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 2. Bento Media Player (4x2) -->
         <receiver
             android:name=".widgets.media.MediaBentoReceiver"
@@ -2994,7 +2993,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 3. Media Capsule Pill (4x1) -->
         <receiver
             android:name=".widgets.media.MediaCapsulePillReceiver"
@@ -3007,20 +3005,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x1" />
         </receiver>
-
-        <!-- 4. Media Mini Capsule (2x1) -->
+        <!-- 4. Media: Immersive Artwork Canvas (4x1) -->
         <receiver
             android:name=".widgets.media.MediaMiniCapsuleReceiver"
             android:exported="true"
-            android:label="Media Mini Capsule">
+            android:label="Slate Immersive Canvas">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x1" />
+                android:resource="@xml/widget_info_3x1" />
         </receiver>
-
         <!-- 5. Retro Cassette Tape (4x2) -->
         <receiver
             android:name=".widgets.media.MediaCassetteReceiver"
@@ -3033,7 +3029,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 6. Spectrum Soundwave (2x2) -->
         <receiver
             android:name=".widgets.media.MediaSpectrumReceiver"
@@ -3046,7 +3041,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 7. Editorial Media Card (2x2) -->
         <receiver
             android:name=".widgets.media.MediaEditorialReceiver"
@@ -3059,7 +3053,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 8. Media Streaming Dock (4x1) -->
         <receiver
             android:name=".widgets.media.MediaDockReceiver"
