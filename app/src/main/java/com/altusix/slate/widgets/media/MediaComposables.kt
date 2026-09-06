@@ -173,10 +173,12 @@ fun generateVinylPlayerBitmap(
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
     val isLight = slateConfig.themeMode == "LIGHT"
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
+    val secondaryTextColor = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0xFFA1A1A6).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
@@ -189,32 +191,68 @@ fun generateVinylPlayerBitmap(
 
     val contentW = cardRect.width()
     val contentH = cardRect.height()
+    val effectiveDim = minOf(contentW, contentH)
+    val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 2.5f)
     val pad = contentW * 0.07f
 
-    // Upper Section: Vinyl Record & Tonearm
-    val vinylCenterY = cardRect.top + contentH * 0.40f
-    val vinylCenterX = cardRect.centerX() - contentW * 0.05f
-    val vinylRadius = contentW * 0.32f
+    // 1. Bottom-Up Controls & Compact Typography
+    val btnR = scaleFactor * 11.5f * uiScale
+    val ctrlY = cardRect.bottom - (scaleFactor * 16f * uiScale)
+    val ctrlSpacing = minOf(contentW * 0.26f, scaleFactor * 42f * uiScale)
 
-    // 1. Outer Vinyl Body (Matte black grooved vinyl)
+    val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = scaleFactor * 8.2f * uiScale
+        typeface = getSlateFont(context, 400)
+    }
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = scaleFactor * 10.8f * uiScale
+        typeface = getSlateFont(context, 700)
+    }
+
+    val artistY = ctrlY - (btnR * 1.30f) - (scaleFactor * 5f * uiScale)
+    val titleY = artistY - artistPaint.textSize - (scaleFactor * 3.5f * uiScale)
+
+    // 2. Horizontally Centered & Enlarged Vinyl Stage
+    val availableVinylTop = cardRect.top + (scaleFactor * 8f * uiScale)
+    val availableVinylBottom = titleY - titlePaint.textSize - (scaleFactor * 6f * uiScale)
+    val vinylCenterY = (availableVinylTop + availableVinylBottom) / 2f
+    val vinylCenterX = cardRect.centerX()
+
+    val maxRadiusByH = (availableVinylBottom - availableVinylTop) / 2f
+    val maxRadiusByW = (contentW / 2f) - (pad * 0.7f)
+    val vinylRadius = minOf(maxRadiusByH, maxRadiusByW).coerceAtLeast(scaleFactor * 26f)
+
+    // 3. Rotating Grooves (Grooves rotate while Center Art stays straight)
+    val vinylRotation = if (state.isPlaying && state.positionMs > 0L) {
+        ((state.positionMs / 1000f) * 45f) % 360f
+    } else {
+        0f
+    }
+
+    // Rotated vinyl outer body & grooves
+    canvas.save()
+    canvas.rotate(vinylRotation, vinylCenterX, vinylCenterY)
+
     val vinylPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFF202024).toArgb() else Color(0xFF111113).toArgb()
         style = Paint.Style.FILL
     }
     canvas.drawCircle(vinylCenterX, vinylCenterY, vinylRadius, vinylPaint)
 
-    // Grooves
     val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x33FFFFFF).toArgb() else Color(0x18FFFFFF).toArgb()
+        color = if (isLight) Color(0x28FFFFFF).toArgb() else Color(0x15FFFFFF).toArgb()
         style = Paint.Style.STROKE
-        strokeWidth = 1.2f * scaleFactor
+        strokeWidth = 1.0f * scaleFactor
     }
     for (i in 1..4) {
         val r = vinylRadius * (0.42f + i * 0.12f)
         canvas.drawCircle(vinylCenterX, vinylCenterY, r, groovePaint)
     }
+    canvas.restore()
 
-    // 2. Center Vinyl Label (Album Art or Stylized Disc Sticker)
+    // 4. Straight Center Vinyl Label (Unrotated)
     val labelRadius = vinylRadius * 0.42f
     if (artwork != null && !artwork.isRecycled) {
         drawCircularBitmap(canvas, artwork, vinylCenterX, vinylCenterY, labelRadius)
@@ -239,27 +277,29 @@ fun generateVinylPlayerBitmap(
         color = if (isLight) Color.White.toArgb() else Color.Black.toArgb()
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(vinylCenterX, vinylCenterY, labelRadius * 0.22f, holePaint)
+    canvas.drawCircle(vinylCenterX, vinylCenterY, labelRadius * 0.20f, holePaint)
 
-    // 3. Tonearm (Stylus needle on the right side)
+    // 5. Reactive Tonearm
     val armPivotX = cardRect.right - pad * 1.1f
-    val armPivotY = cardRect.top + pad * 1.3f
+    val armPivotY = cardRect.top + pad * 1.2f
+
     val pivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(0xFF6E6E73).toArgb()
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(armPivotX, armPivotY, vinylRadius * 0.14f, pivotPaint)
+    canvas.drawCircle(armPivotX, armPivotY, vinylRadius * 0.12f, pivotPaint)
 
     val armPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color(0xFFA1A1A6).toArgb()
         style = Paint.Style.STROKE
-        strokeWidth = 2f * scaleFactor
+        strokeWidth = 1.8f * scaleFactor
         strokeCap = Paint.Cap.ROUND
     }
-    val armTargetX = vinylCenterX + vinylRadius * 0.72f
-    val armTargetY = vinylCenterY + vinylRadius * 0.35f
-    val armMidX = armPivotX - vinylRadius * 0.15f
-    val armMidY = armPivotY + vinylRadius * 0.55f
+
+    val armTargetX = if (state.isPlaying) vinylCenterX + vinylRadius * 0.60f else armPivotX - vinylRadius * 0.12f
+    val armTargetY = if (state.isPlaying) vinylCenterY + vinylRadius * 0.35f else armPivotY + vinylRadius * 0.75f
+    val armMidX = if (state.isPlaying) armPivotX - vinylRadius * 0.18f else armPivotX - vinylRadius * 0.05f
+    val armMidY = if (state.isPlaying) armPivotY + vinylRadius * 0.50f else armPivotY + vinylRadius * 0.45f
 
     val armPath = Path().apply {
         moveTo(armPivotX, armPivotY)
@@ -268,31 +308,23 @@ fun generateVinylPlayerBitmap(
     }
     canvas.drawPath(armPath, armPaint)
 
-    // Stylus head cartridge
     val cartPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(
-        RectF(armTargetX - 4f * scaleFactor, armTargetY - 2f * scaleFactor, armTargetX + 8f * scaleFactor, armTargetY + 6f * scaleFactor),
-        2f * scaleFactor, 2f * scaleFactor, cartPaint
+        RectF(
+            armTargetX - 3.5f * scaleFactor,
+            armTargetY - 2.5f * scaleFactor,
+            armTargetX + 7.5f * scaleFactor,
+            armTargetY + 5.5f * scaleFactor
+        ),
+        1.5f * scaleFactor, 1.5f * scaleFactor, cartPaint
     )
 
-    // 4. Track Info Typography
-    val textY1 = cardRect.top + contentH * 0.75f
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = contentH * 0.075f
-        typeface = getSlateFont(context, 700)
-    }
-    val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = contentH * 0.055f
-        typeface = getSlateFont(context, 400)
-    }
-
-    // Clip text width
+    // 6. Track Info Typography
     val maxTextW = contentW - pad * 2f
+
     val titleDisplay = if (titlePaint.measureText(state.title) > maxTextW) {
         var t = state.title
         while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
@@ -305,18 +337,12 @@ fun generateVinylPlayerBitmap(
         "$a…"
     } else state.artist
 
-    canvas.drawText(titleDisplay, cardRect.left + pad, textY1, titlePaint)
-    canvas.drawText(artistDisplay, cardRect.left + pad, textY1 + contentH * 0.070f, artistPaint)
+    canvas.drawText(titleDisplay, cardRect.left + pad, titleY, titlePaint)
+    canvas.drawText(artistDisplay, cardRect.left + pad, artistY, artistPaint)
 
-    // 5. Control Strip at Bottom (Prev, Play/Pause, Next)
-    val ctrlY = cardRect.bottom - pad * 1.5f
-    val ctrlSpacing = contentW * 0.26f
-    val btnR = contentW * 0.075f
-
-    // Prev Button
+    // 7. Controls Deck
     drawSkipIcon(canvas, cardRect.centerX() - ctrlSpacing, ctrlY, btnR, isNext = false, color = secondaryTextColor)
 
-    // Play/Pause Button
     drawPlayPauseIcon(
         canvas,
         cardRect.centerX(),
@@ -328,7 +354,6 @@ fun generateVinylPlayerBitmap(
         circleBgColor = accentColor
     )
 
-    // Next Button
     drawSkipIcon(canvas, cardRect.centerX() + ctrlSpacing, ctrlY, btnR, isNext = true, color = secondaryTextColor)
 
     return bitmap
