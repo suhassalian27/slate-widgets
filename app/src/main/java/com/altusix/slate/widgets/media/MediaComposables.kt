@@ -1254,10 +1254,10 @@ fun generateSpectrumBitmap(
 
     val pad = cardRect.width() * 0.08f
 
-    // 1. Equalizer Spectrum Bars (Upper 45%)
+    // 1. Equalizer Spectrum Bars (Shifted slightly upward)
     val barCount = 14
-    val spectrumBottom = cardRect.top + cardRect.height() * 0.48f
-    val spectrumMaxH = cardRect.height() * 0.32f
+    val spectrumBottom = cardRect.top + cardRect.height() * 0.44f
+    val spectrumMaxH = cardRect.height() * 0.28f
     val totalSpectrumW = cardRect.width() - pad * 2f
     val barSpacing = totalSpectrumW / barCount
     val barW = barSpacing * 0.55f
@@ -1267,7 +1267,6 @@ fun generateSpectrumBitmap(
         style = Paint.Style.FILL
     }
 
-    // Patterned heights representing a soundwave
     val wavePattern = floatArrayOf(0.35f, 0.65f, 0.95f, 0.50f, 0.80f, 1.00f, 0.70f, 0.90f, 0.60f, 0.85f, 0.45f, 0.75f, 0.55f, 0.30f)
     for (i in 0 until barCount) {
         val mult = if (state.isPlaying) wavePattern[i % wavePattern.size] else 0.15f
@@ -1289,12 +1288,12 @@ fun generateSpectrumBitmap(
     // 2. Track Title & Artist
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.080f
+        textSize = cardRect.height() * 0.078f
         typeface = getSlateFont(context, 700)
     }
     val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardRect.height() * 0.055f
+        textSize = cardRect.height() * 0.054f
         typeface = getSlateFont(context, 400)
     }
 
@@ -1311,14 +1310,15 @@ fun generateSpectrumBitmap(
         "$a…"
     } else state.artist
 
-    val textY1 = spectrumBottom + cardRect.height() * 0.13f
+    val textY1 = spectrumBottom + cardRect.height() * 0.115f
+    val textY2 = textY1 + cardRect.height() * 0.070f
     canvas.drawText(titleDisplay, cardRect.left + pad, textY1, titlePaint)
-    canvas.drawText(artistDisplay, cardRect.left + pad, textY1 + cardRect.height() * 0.075f, artistPaint)
+    canvas.drawText(artistDisplay, cardRect.left + pad, textY2, artistPaint)
 
-    // 3. Playback Controls at Bottom
-    val ctrlY = cardRect.bottom - pad * 1.5f
+    // 3. Playback Controls (Elevated with ample bottom breathing room)
+    val ctrlY = cardRect.bottom - (cardRect.height() * 0.185f)
     val ctrlSpacing = cardRect.width() * 0.26f
-    val btnR = cardRect.width() * 0.075f
+    val btnR = cardRect.width() * 0.074f
 
     drawSkipIcon(canvas, cardRect.centerX() - ctrlSpacing, ctrlY, btnR, isNext = false, color = secondaryTextColor)
     drawPlayPauseIcon(
