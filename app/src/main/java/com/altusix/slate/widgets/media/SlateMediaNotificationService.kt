@@ -62,7 +62,20 @@ class SlateMediaNotificationService : NotificationListenerService() {
         }
 
         fun openActivePlayer(context: Context) {
-            val controller = activeController
+            // 1. Recover active controller if the static in-memory reference was cleared
+            var controller = activeController
+            if (controller == null) {
+                try {
+                    val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+                    val component = ComponentName(context, SlateMediaNotificationService::class.java)
+                    val controllers = sessionManager?.getActiveSessions(component)
+                    controller = controllers?.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+                        ?: controllers?.firstOrNull()
+                    if (controller != null) activeController = controller
+                } catch (_: Exception) {}
+            }
+
+            // 2. Launch directly via session activity (deep link into the player's UI)
             if (controller?.sessionActivity != null) {
                 try {
                     controller.sessionActivity?.send()
@@ -70,17 +83,18 @@ class SlateMediaNotificationService : NotificationListenerService() {
                 } catch (_: Exception) {}
             }
 
-            val savedState = MediaStateManager.loadState(context)
-            if (!savedState.packageName.isNullOrBlank()) {
-                val launchIntent = context.packageManager.getLaunchIntentForPackage(savedState.packageName)
+            // 3. Fallback: Launch whichever app is actively broadcasting media
+            val targetPkg = controller?.packageName ?: MediaStateManager.loadState(context).packageName
+            if (!targetPkg.isNullOrBlank()) {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(targetPkg)
                 if (launchIntent != null) {
-                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                     context.startActivity(launchIntent)
                     return
                 }
             }
 
-            // Fallback: Open general music player or Spotify/YT Music if present
+            // 4. Default media app fallbacks
             val defaultPackages = listOf(
                 "com.spotify.music",
                 "com.google.android.apps.youtube.music",

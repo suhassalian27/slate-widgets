@@ -78,6 +78,15 @@
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <activity
+            android:name=".widgets.media.MediaTrampolineActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
         <!-- Slate Media Notification Listener Service -->
         <service
             android:name=".widgets.media.SlateMediaNotificationService"

@@ -360,7 +360,7 @@ fun generateVinylPlayerBitmap(
 }
 
 // =========================================================================
-// 2. BENTO MEDIA PLAYER (4x2)
+// 2. BENTO MEDIA PLAYER (4x2 - FIXED RATIO)
 // =========================================================================
 fun generateBentoMediaBitmap(
     context: Context,
@@ -381,13 +381,20 @@ fun generateBentoMediaBitmap(
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    // 1. Fixed Aspect Ratio (2.1:1) Centered Base Plate
+    val idealAspect = 2.10f
+    var cardW = w
+    var cardH = cardW / idealAspect
+    if (cardH > h) {
+        cardH = h
+        cardW = cardH * idealAspect
     }
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
+
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(cardH / 2f)
+    val uiScale = (cardH / (130f * scaleFactor)).coerceIn(0.55f, 2.5f)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
@@ -395,73 +402,94 @@ fun generateBentoMediaBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.height() * 0.12f
+    // 2. Left Cell: Full-Bleed Square Album Art
+    val artSize = cardH
+    val artRect = RectF(cardRect.left, cardRect.top, cardRect.left + artSize, cardRect.bottom)
+    val artRadii = floatArrayOf(
+        cardCornerRadius, cardCornerRadius, // Top-Left
+        0f, 0f,                             // Top-Right
+        0f, 0f,                             // Bottom-Right
+        cardCornerRadius, cardCornerRadius  // Bottom-Left
+    )
+    val artClipPath = Path().apply { addRoundRect(artRect, artRadii, Path.Direction.CW) }
 
-    // Bento Left Cell: Square Album Art Cover
-    val artSize = cardRect.height() - pad * 2f
-    val artRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + artSize, cardRect.bottom - pad)
-    val innerCornerRadius = cardCornerRadius * 0.65f
-
+    canvas.save()
+    canvas.clipPath(artClipPath)
     if (artwork != null && !artwork.isRecycled) {
-        drawRoundedBitmap(canvas, artwork, artRect, innerCornerRadius)
+        val srcW = artwork.width.toFloat()
+        val srcH = artwork.height.toFloat()
+        val scale = maxOf(artRect.width() / srcW, artRect.height() / srcH)
+        val dx = artRect.left + (artRect.width() - srcW * scale) / 2f
+        val dy = artRect.top + (artRect.height() - srcH * scale) / 2f
+
+        val matrix = Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(dx, dy)
+        }
+        val artPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = BitmapShader(artwork, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+                setLocalMatrix(matrix)
+            }
+        }
+        canvas.drawRect(artRect, artPaint)
     } else {
-        // Placeholder Art with gradient / stylish vinyl logo
         val artBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF1E1E22).toArgb()
             style = Paint.Style.FILL
         }
-        canvas.drawRoundRect(artRect, innerCornerRadius, innerCornerRadius, artBgPaint)
+        canvas.drawRect(artRect, artBgPaint)
 
-        // Musical note glyph
         val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColor
-            textSize = artSize * 0.38f
+            textSize = artSize * 0.36f
             textAlign = Paint.Align.CENTER
             typeface = getSlateFont(context, 700)
         }
-        canvas.drawText("♫", artRect.centerX(), artRect.centerY() + artSize * 0.13f, glyphPaint)
+        canvas.drawText("♫", artRect.centerX(), artRect.centerY() + artSize * 0.12f, glyphPaint)
     }
+    canvas.restore()
 
-    // Bento Right Cell: Track Info, Equalizer, Progress, and Controls
-    val rightLeft = artRect.right + pad * 1.1f
-    val rightRight = cardRect.right - pad
+    // 3. Right Cell: Top Equalizer & Full-Width Metadata
+    val padRight = scaleFactor * 16f * uiScale
+    val rightLeft = artRect.right + padRight
+    val rightRight = cardRect.right - padRight
     val availableW = rightRight - rightLeft
 
-    // 1. Equalizer Bars (top right)
+    // Equalizer: Top Right
     val eqBarCount = 5
-    val eqBarW = 3f * scaleFactor
+    val eqBarW = scaleFactor * 2.4f * uiScale
     val eqStartX = rightRight - (eqBarCount * eqBarW * 2f)
-    val eqY = cardRect.top + pad * 1.4f
+    val eqBaselineY = cardRect.top + (cardH * 0.22f)
+
     val eqPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
     val eqHeights = if (state.isPlaying) floatArrayOf(0.7f, 1.0f, 0.45f, 0.85f, 0.6f) else floatArrayOf(0.2f, 0.2f, 0.2f, 0.2f, 0.2f)
     for (i in 0 until eqBarCount) {
-        val barH = 16f * scaleFactor * eqHeights[i]
-        val barX = eqStartX + i * eqBarW * 2f
+        val bH = scaleFactor * 10f * uiScale * eqHeights[i]
+        val bX = eqStartX + i * eqBarW * 2f
         canvas.drawRoundRect(
-            RectF(barX, eqY - barH, barX + eqBarW, eqY),
+            RectF(bX, eqBaselineY - bH, bX + eqBarW, eqBaselineY),
             eqBarW * 0.5f, eqBarW * 0.5f, eqPaint
         )
     }
 
-    // 2. Song Title & Artist
+    // Title & Artist
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.14f
+        textSize = scaleFactor * 12.5f * uiScale
         typeface = getSlateFont(context, 700)
     }
     val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardRect.height() * 0.10f
+        textSize = scaleFactor * 9.5f * uiScale
         typeface = getSlateFont(context, 400)
     }
 
-    val titleMaxW = availableW - (eqBarCount * eqBarW * 2.2f)
-    val titleDisplay = if (titlePaint.measureText(state.title) > titleMaxW) {
+    val titleDisplay = if (titlePaint.measureText(state.title) > availableW) {
         var t = state.title
-        while (t.isNotEmpty() && titlePaint.measureText("$t…") > titleMaxW) t = t.dropLast(1)
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > availableW) t = t.dropLast(1)
         "$t…"
     } else state.title
 
@@ -471,68 +499,43 @@ fun generateBentoMediaBitmap(
         "$a…"
     } else state.artist
 
-    val titleY = cardRect.top + pad * 1.45f
+    val titleY = cardRect.top + (cardH * 0.38f)
+    val artistY = titleY + (scaleFactor * 13.5f * uiScale)
+
     canvas.drawText(titleDisplay, rightLeft, titleY, titlePaint)
-    canvas.drawText(artistDisplay, rightLeft, titleY + cardRect.height() * 0.13f, artistPaint)
+    canvas.drawText(artistDisplay, rightLeft, artistY, artistPaint)
 
-    // 3. Playback Progress Line
-    val progressY = titleY + cardRect.height() * 0.26f
-    val progressH = 3.5f * scaleFactor
-    val progressBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFD1D1D6).toArgb() else Color(0x30FFFFFF).toArgb()
-        style = Paint.Style.FILL
-    }
-    val progressFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(
-        RectF(rightLeft, progressY, rightRight, progressY + progressH),
-        progressH * 0.5f, progressH * 0.5f, progressBgPaint
-    )
-    val fillW = (availableW * state.progress).coerceIn(0f, availableW)
-    if (fillW > 0f) {
-        canvas.drawRoundRect(
-            RectF(rightLeft, progressY, rightLeft + fillW, progressY + progressH),
-            progressH * 0.5f, progressH * 0.5f, progressFillPaint
-        )
-    }
+    // 4. Media Controls Deck (1:1 Synchronized to XML 1/3 Partitions)
+    val colLeft = artRect.right
+    val colRight = cardRect.right
+    val colW = colRight - colLeft
 
-    // Time Labels (Elapsed & Duration)
-    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.075f
-        typeface = getSlateFont(context, 400)
-    }
-    val elapsedText = formatTime(state.positionMs)
-    val totalText = formatTime(state.durationMs)
-    canvas.drawText(elapsedText, rightLeft, progressY + progressH + cardRect.height() * 0.10f, timePaint)
-    val totalW = timePaint.measureText(totalText)
-    canvas.drawText(totalText, rightRight - totalW, progressY + progressH + cardRect.height() * 0.10f, timePaint)
+    // Button centers at 1/6, 3/6, and 5/6 of the controls column
+    val prevCx = colLeft + (colW * (1f / 6f))
+    val playCx = colLeft + (colW * (3f / 6f))
+    val nextCx = colLeft + (colW * (5f / 6f))
+    val controlsCenterY = cardRect.top + (cardH * 0.73f)
 
-    // 4. Media Controls Deck
-    val controlsCenterY = cardRect.bottom - pad * 1.4f
-    val ctrlCenter = (rightLeft + rightRight) / 2f
-    val ctrlSpacing = availableW * 0.28f
-    val btnR = cardRect.height() * 0.12f
+    val playBtnR = scaleFactor * 15.5f * uiScale
+    val skipBtnR = scaleFactor * 13.0f * uiScale
 
-    // Prev
-    drawSkipIcon(canvas, ctrlCenter - ctrlSpacing, controlsCenterY, btnR, isNext = false, color = secondaryTextColor)
+    // Prev Button (Centered inside btn_media_prev slot)
+    drawSkipIcon(canvas, prevCx, controlsCenterY, skipBtnR, isNext = false, color = secondaryTextColor)
 
-    // Play / Pause Circle
+    // Play / Pause Circle (Centered inside btn_media_play_pause slot)
     drawPlayPauseIcon(
         canvas,
-        ctrlCenter,
+        playCx,
         controlsCenterY,
-        btnR * 1.25f,
+        playBtnR,
         isPlaying = state.isPlaying,
         color = if (isLight) Color.White.toArgb() else Color.Black.toArgb(),
         fillCircleBg = true,
         circleBgColor = accentColor
     )
 
-    // Next
-    drawSkipIcon(canvas, ctrlCenter + ctrlSpacing, controlsCenterY, btnR, isNext = true, color = secondaryTextColor)
+    // Next Button (Centered inside btn_media_next slot)
+    drawSkipIcon(canvas, nextCx, controlsCenterY, skipBtnR, isNext = true, color = secondaryTextColor)
 
     return bitmap
 }

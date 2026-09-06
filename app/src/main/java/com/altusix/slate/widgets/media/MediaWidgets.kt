@@ -208,17 +208,44 @@ abstract class BaseMediaReceiver(private val layoutResId: Int) : AppWidgetProvid
     }
 
     protected open fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        // Open Player
-        val openIntent = Intent(context, this.javaClass).apply {
-            action = ACTION_OPEN_PLAYER
-            data = Uri.parse("slate_media://$appWidgetId/open")
-        }
-        val openPi = PendingIntent.getBroadcast(context, (appWidgetId * 31 + 1), openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        views.setOnClickPendingIntent(R.id.btn_media_open_app, openPi)
+        // 1. Resolve direct launch PendingIntent for the currently playing app
+        val controller = SlateMediaNotificationService.getActiveController()
+        val sessionPi = controller?.sessionActivity
+        val savedState = MediaStateManager.loadState(context)
+        val targetPkg = controller?.packageName ?: savedState.packageName
 
-        // Track info region if present in layout
+        val directAppPi: PendingIntent? = sessionPi ?: if (!targetPkg.isNullOrBlank()) {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(targetPkg)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+            if (launchIntent != null) {
+                PendingIntent.getActivity(
+                    context,
+                    (appWidgetId * 31 + 1),
+                    launchIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else null
+        } else null
+
+        // 2. Fallback to isolated Trampoline Activity only if target cannot be resolved ahead of time
+        val finalOpenPi = directAppPi ?: run {
+            val openIntent = Intent(context, MediaTrampolineActivity::class.java).apply {
+                action = ACTION_OPEN_PLAYER
+                data = Uri.parse("slate_media://$appWidgetId/open")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            PendingIntent.getActivity(
+                context,
+                (appWidgetId * 31 + 1),
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        views.setOnClickPendingIntent(R.id.btn_media_open_app, finalOpenPi)
         try {
-            views.setOnClickPendingIntent(R.id.btn_media_track_info, openPi)
+            views.setOnClickPendingIntent(R.id.btn_media_track_info, finalOpenPi)
         } catch (_: Exception) {}
 
         // Play / Pause
@@ -262,8 +289,8 @@ class MediaBentoReceiver : BaseMediaReceiver(R.layout.widget_media_4x2_layout) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
         val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
-        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generateBentoMediaBitmap(context, state, art, config, isResponsive, wDp, hDp)
+        // Always false: Bento Media Player strictly adheres to 2.1:1 card geometry
+        return generateBentoMediaBitmap(context, state, art, config, isResponsive = false, wDp, hDp)
     }
 }
 

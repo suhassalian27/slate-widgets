@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Canvas Surface for Background, Album Art & Dynamic Audio Visuals -->
+    <!-- Canvas Surface for Background, Album Art & Visuals -->
     <ImageView
         android:id="@+id/widget_canvas_surface"
         android:layout_width="match_parent"
@@ -11,42 +11,42 @@
         android:scaleType="fitXY"
         android:contentDescription="Media Canvas Surface" />
 
-    <!-- Interactive Touch Overlays (Split Horizontal: Left Album Art / Right Controls) -->
+    <!-- Synchronized Touch Overlay -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal">
 
-        <!-- Left Half: Album Art / Cassette Spool (Tap to open active player) -->
+        <!-- Left Column (48%): Full-Bleed Album Art -->
         <FrameLayout
             android:id="@+id/btn_media_open_app"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_weight="0.48"
             android:clickable="true"
             android:focusable="true" />
 
-        <!-- Right Half: Track Info & Playback Controls -->
+        <!-- Right Column (52%): Metadata & Controls -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_weight="0.52"
             android:orientation="vertical">
 
-            <!-- Upper area: Track Info / Equalizer (Tap to open active player) -->
+            <!-- Upper Area (46%): Metadata & Equalizer -->
             <FrameLayout
                 android:id="@+id/btn_media_track_info"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="0.62"
+                android:layout_weight="0.46"
                 android:clickable="true"
                 android:focusable="true" />
 
-            <!-- Lower area: Prev / Play-Pause / Next Controls -->
+            <!-- Lower Area (54%): 3 Equal-Width Touch Slots (1:1:1) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="0.38"
+                android:layout_weight="0.54"
                 android:orientation="horizontal">
 
                 <FrameLayout
@@ -61,7 +61,7 @@
                     android:id="@+id/btn_media_play_pause"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="1.2"
+                    android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true" />
 
