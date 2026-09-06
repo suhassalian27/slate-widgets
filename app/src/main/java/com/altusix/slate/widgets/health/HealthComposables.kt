@@ -1235,9 +1235,23 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
     val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 3.0f)
     val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(effectiveDim / 2f)
 
+    // Helper: Blend solid colors to eliminate translucent overlapping seams
+    fun blendColors(baseColor: Int, overlayColor: Int, factor: Float): Int {
+        val f = factor.coerceIn(0f, 1f)
+        val r = (Color.red(baseColor) * (1f - f) + Color.red(overlayColor) * f).toInt()
+        val g = (Color.green(baseColor) * (1f - f) + Color.green(overlayColor) * f).toInt()
+        val b = (Color.blue(baseColor) * (1f - f) + Color.blue(overlayColor) * f).toInt()
+        return Color.rgb(r, g, b)
+    }
+
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val layerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = alphaInt }
+
+    // Composite in a dedicated layer so opacity applies uniformly without cross-layer bleed
+    canvas.saveLayer(cardRect, layerPaint)
+
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
@@ -1247,91 +1261,101 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
     val bottomBarH = scaleFactor * 26f * uiScale
     val hillBaseY = cardRect.bottom - bottomBarH
 
-    // 2. Smooth Topographic Mountain Ridges
+    // 2. Scandinavian Mountain Ridges (Opaque blended layers, smooth continuous peaks)
     canvas.save()
     val cardClipPath = Path().apply { addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW) }
     canvas.clipPath(cardClipPath)
 
-    val rR = Color.red(accentColorInt)
-    val rG = Color.green(accentColorInt)
-    val rB = Color.blue(accentColorInt)
     val cL = cardRect.left
     val cR = cardRect.right
 
-    // Layer 1: Background Tall Mountain Summit
+    // Layer 1: Background Peak (Tall, sweeping dome on the right)
+    val backColor = blendColors(bgColor, accentColorInt, if (isLight) 0.24f else 0.30f)
     val backHillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(if (isLight) 60 else 45, rR, rG, rB)
+        color = backColor
         style = Paint.Style.FILL
     }
     val backHillPath = Path().apply {
         moveTo(cL, hillBaseY)
         cubicTo(
-            cL + cardW * 0.28f, hillBaseY - cardH * 0.02f,
-            cL + cardW * 0.44f, hillBaseY - cardH * 0.14f,
-            cL + cardW * 0.58f, hillBaseY - cardH * 0.20f
+            cL + cardW * 0.25f, hillBaseY - cardH * 0.02f,
+            cL + cardW * 0.45f, hillBaseY - cardH * 0.12f,
+            cL + cardW * 0.60f, hillBaseY - cardH * 0.22f
         )
         cubicTo(
-            cL + cardW * 0.68f, hillBaseY - cardH * 0.26f,
-            cL + cardW * 0.74f, hillBaseY - cardH * 0.54f,
-            cL + cardW * 0.82f, hillBaseY - cardH * 0.54f
+            cL + cardW * 0.70f, hillBaseY - cardH * 0.30f,
+            cL + cardW * 0.76f, hillBaseY - cardH * 0.58f,
+            cL + cardW * 0.84f, hillBaseY - cardH * 0.58f
         )
         cubicTo(
-            cL + cardW * 0.90f, hillBaseY - cardH * 0.54f,
-            cL + cardW * 0.95f, hillBaseY - cardH * 0.36f,
-            cR, hillBaseY - cardH * 0.30f
+            cL + cardW * 0.92f, hillBaseY - cardH * 0.58f,
+            cL + cardW * 0.96f, hillBaseY - cardH * 0.36f,
+            cR, hillBaseY - cardH * 0.26f
         )
         lineTo(cR, hillBaseY)
         close()
     }
     canvas.drawPath(backHillPath, backHillPaint)
 
-    // Layer 2: Mid-Range Rolling Ridge
+    // Layer 2: Mid-Range Rolling Ridge (Dual-crest undulation covering layer 1)
+    val midColor = blendColors(bgColor, accentColorInt, if (isLight) 0.50f else 0.58f)
     val midHillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(if (isLight) 115 else 90, rR, rG, rB)
+        color = midColor
         style = Paint.Style.FILL
     }
     val midHillPath = Path().apply {
         moveTo(cL, hillBaseY)
         cubicTo(
-            cL + cardW * 0.16f, hillBaseY - cardH * 0.04f,
-            cL + cardW * 0.26f, hillBaseY - cardH * 0.12f,
-            cL + cardW * 0.38f, hillBaseY - cardH * 0.14f
+            cL + cardW * 0.12f, hillBaseY - cardH * 0.04f,
+            cL + cardW * 0.24f, hillBaseY - cardH * 0.16f,
+            cL + cardW * 0.36f, hillBaseY - cardH * 0.16f
         )
         cubicTo(
-            cL + cardW * 0.48f, hillBaseY - cardH * 0.16f,
-            cL + cardW * 0.56f, hillBaseY - cardH * 0.30f,
-            cL + cardW * 0.68f, hillBaseY - cardH * 0.32f
+            cL + cardW * 0.46f, hillBaseY - cardH * 0.16f,
+            cL + cardW * 0.54f, hillBaseY - cardH * 0.10f,
+            cL + cardW * 0.62f, hillBaseY - cardH * 0.18f
         )
         cubicTo(
-            cL + cardW * 0.78f, hillBaseY - cardH * 0.34f,
-            cL + cardW * 0.86f, hillBaseY - cardH * 0.18f,
-            cR, hillBaseY - cardH * 0.18f
+            cL + cardW * 0.68f, hillBaseY - cardH * 0.26f,
+            cL + cardW * 0.74f, hillBaseY - cardH * 0.35f,
+            cL + cardW * 0.80f, hillBaseY - cardH * 0.35f
+        )
+        cubicTo(
+            cL + cardW * 0.88f, hillBaseY - cardH * 0.35f,
+            cL + cardW * 0.94f, hillBaseY - cardH * 0.22f,
+            cR, hillBaseY - cardH * 0.20f
         )
         lineTo(cR, hillBaseY)
         close()
     }
     canvas.drawPath(midHillPath, midHillPaint)
 
-    // Layer 3: Foreground Low Slope
+    // Layer 3: Foreground Low Slope (Gentle rolling terrain covering layer 2)
+    val foreColor = blendColors(bgColor, accentColorInt, if (isLight) 0.78f else 0.85f)
     val foreHillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(if (isLight) 190 else 160, rR, rG, rB)
+        color = foreColor
         style = Paint.Style.FILL
     }
     val foreHillPath = Path().apply {
         moveTo(cL, hillBaseY)
         cubicTo(
-            cL + cardW * 0.12f, hillBaseY - cardH * 0.02f,
-            cL + cardW * 0.24f, hillBaseY - cardH * 0.08f,
-            cL + cardW * 0.34f, hillBaseY - cardH * 0.09f
+            cL + cardW * 0.10f, hillBaseY - cardH * 0.01f,
+            cL + cardW * 0.22f, hillBaseY - cardH * 0.06f,
+            cL + cardW * 0.32f, hillBaseY - cardH * 0.11f
         )
         cubicTo(
-            cL + cardW * 0.44f, hillBaseY - cardH * 0.10f,
-            cL + cardW * 0.52f, hillBaseY - cardH * 0.04f,
-            cL + cardW * 0.64f, hillBaseY - cardH * 0.06f
+            cL + cardW * 0.40f, hillBaseY - cardH * 0.15f,
+            cL + cardW * 0.48f, hillBaseY - cardH * 0.15f,
+            cL + cardW * 0.56f, hillBaseY - cardH * 0.09f
         )
         cubicTo(
-            cL + cardW * 0.74f, hillBaseY - cardH * 0.08f,
-            cL + cardW * 0.86f, hillBaseY - cardH * 0.16f,
+            cL + cardW * 0.64f, hillBaseY - cardH * 0.03f,
+            cL + cardW * 0.72f, hillBaseY - cardH * 0.03f,
+            cL + cardW * 0.78f, hillBaseY - cardH * 0.08f
+        )
+        cubicTo(
+            cL + cardW * 0.84f, hillBaseY - cardH * 0.13f,
+            cL + cardW * 0.92f, hillBaseY - cardH * 0.13f,
             cR, hillBaseY - cardH * 0.06f
         )
         lineTo(cR, hillBaseY)
@@ -1382,7 +1406,9 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
     }
     canvas.drawCircle(badgeCx, badgeCy, badgeR, badgePaint)
 
-    // Dynamic contrast calculation for shoe icon against accent plate
+    val rR = Color.red(accentColorInt)
+    val rG = Color.green(accentColorInt)
+    val rB = Color.blue(accentColorInt)
     val badgeLum = (0.2126f * (rR / 255f)) + (0.7152f * (rG / 255f)) + (0.0722f * (rB / 255f))
     val shoeTint = if (badgeLum > 0.58f) Color.parseColor("#121214") else Color.WHITE
 
@@ -1414,7 +1440,7 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
     }
     canvas.drawText("steps", cardRect.left + padX, numY + (scaleFactor * 12.5f * uiScale), labelPaint)
 
-    // 6. Bottom Telemetry Bar
+    // 6. Bottom Telemetry Bar (Distance Text & Proportional Map Marker)
     val bottomBarCenterY = hillBaseY + (bottomBarH / 2f)
 
     val distPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1426,7 +1452,6 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
     val textBaselineY = bottomBarCenterY - ((fontMetrics.ascent + fontMetrics.descent) / 2f)
     canvas.drawText("${activity.distanceKm} km", cardRect.left + padX, textBaselineY, distPaint)
 
-    // Proportional Map Marker (Forced 384:512 ratio safeguard)
     val markerH = scaleFactor * 13f * uiScale
     val markerW = markerH * (384f / 512f)
     val markerCx = cardRect.right - padX - (markerW / 2f)
@@ -1439,6 +1464,8 @@ fun generateHealthLandscapeRidgeBitmap(context: Context, config: SlateWidgetConf
         flipX = false,
         forcedAspect = (384f / 512f)
     )
+
+    canvas.restore()
 
     return bitmap
 }

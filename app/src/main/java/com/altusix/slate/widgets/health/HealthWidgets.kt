@@ -7,13 +7,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Bundle
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.data.local.loadSlateWidgetConfig
+
+const val ACTION_REFRESH_STEPS = "com.altusix.slate.widgets.health.ACTION_REFRESH_STEPS"
 
 fun getHealthWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -72,6 +73,16 @@ abstract class BaseHealthReceiver : AppWidgetProvider() {
 
     abstract fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap
 
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_REFRESH_STEPS) {
+            StepSensorManager.pollCurrentHardwareSteps(context) {
+                updateAllHealthWidgets(context)
+            }
+            return
+        }
+        super.onReceive(context, intent)
+    }
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
         StepSensorManager.pollCurrentHardwareSteps(context) {
@@ -100,16 +111,17 @@ abstract class BaseHealthReceiver : AppWidgetProvider() {
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        val clickIntent = if (!StepSensorManager.hasPermission(context)) {
-            Intent(context, HealthPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        // Step widgets: if permission missing, tap requests permission; otherwise refreshes data
+        val pendingIntent = if (!StepSensorManager.hasPermission(context)) {
+            val permIntent = Intent(context, HealthPermissionActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            PendingIntent.getActivity(context, widgetId, permIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else {
-            val pm = context.packageManager
-            pm.getLaunchIntentForPackage("com.google.android.apps.fitness")
-                ?: pm.getLaunchIntentForPackage("com.sec.android.app.shealth")
-                ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://fit.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val refreshIntent = Intent(context, javaClass).apply { action = ACTION_REFRESH_STEPS }
+            PendingIntent.getBroadcast(context, widgetId, refreshIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 
-        val pendingIntent = PendingIntent.getActivity(context, widgetId, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         views.setOnClickPendingIntent(R.id.slot_0, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_1, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_2, pendingIntent)
@@ -172,13 +184,7 @@ class HealthHydrationReceiver : BaseHealthReceiver() {
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        val pm = context.packageManager
-        val fitnessIntent = pm.getLaunchIntentForPackage("com.google.android.apps.fitness")
-            ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://fit.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-        val openPending = PendingIntent.getActivity(context, widgetId * 10, fitnessIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        views.setOnClickPendingIntent(R.id.slot_0, openPending)
-        views.setOnClickPendingIntent(R.id.slot_2, openPending)
-
+        // Water: no external app opens; only dedicated action buttons respond
         val add250Intent = Intent(context, HealthHydrationReceiver::class.java).apply { action = HealthStorageKeys.ACTION_ADD_WATER_250 }
         views.setOnClickPendingIntent(R.id.slot_1, PendingIntent.getBroadcast(context, widgetId * 10 + 1, add250Intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
@@ -210,15 +216,15 @@ class HealthWeeklyMatrixReceiver : BaseHealthReceiver() {
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        val clickIntent = if (!StepSensorManager.hasPermission(context)) {
-            Intent(context, HealthPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        val pendingIntent = if (!StepSensorManager.hasPermission(context)) {
+            val permIntent = Intent(context, HealthPermissionActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            PendingIntent.getActivity(context, widgetId, permIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else {
-            val pm = context.packageManager
-            pm.getLaunchIntentForPackage("com.google.android.apps.fitness")
-                ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://fit.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val refreshIntent = Intent(context, javaClass).apply { action = ACTION_REFRESH_STEPS }
+            PendingIntent.getBroadcast(context, widgetId, refreshIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
-
-        val pendingIntent = PendingIntent.getActivity(context, widgetId, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
 
         appWidgetManager.updateAppWidget(widgetId, views)
@@ -266,13 +272,7 @@ class HealthEightGlassMatrixReceiver : BaseHealthReceiver() {
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        val pm = context.packageManager
-        val fitnessIntent = pm.getLaunchIntentForPackage("com.google.android.apps.fitness")
-            ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://fit.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-        val openPending = PendingIntent.getActivity(context, widgetId * 10, fitnessIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        views.setOnClickPendingIntent(R.id.slot_0, openPending)
-        views.setOnClickPendingIntent(R.id.slot_1, openPending)
-
+        // Water: glass body does nothing; bottom buttons adjust intake
         val sub250Intent = Intent(context, HealthEightGlassMatrixReceiver::class.java).apply { action = HealthStorageKeys.ACTION_SUB_WATER_250 }
         views.setOnClickPendingIntent(R.id.slot_2, PendingIntent.getBroadcast(context, widgetId * 10 + 2, sub250Intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
@@ -321,6 +321,8 @@ class HealthHydroChronoReceiver : BaseHealthReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Bind across background and grid slots to guarantee full-surface tap detection
+        views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_0, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_1, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_2, pendingIntent)
@@ -368,6 +370,8 @@ class HealthHydroArcDropletReceiver : BaseHealthReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Bind across background and grid slots to guarantee full-surface tap detection
+        views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_0, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_1, pendingIntent)
         views.setOnClickPendingIntent(R.id.slot_2, pendingIntent)
@@ -410,16 +414,15 @@ class HealthOdometerReceiver : BaseHealthReceiver() {
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        val clickIntent = if (!StepSensorManager.hasPermission(context)) {
-            Intent(context, HealthPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        val pendingIntent = if (!StepSensorManager.hasPermission(context)) {
+            val permIntent = Intent(context, HealthPermissionActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            PendingIntent.getActivity(context, widgetId, permIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else {
-            val pm = context.packageManager
-            pm.getLaunchIntentForPackage("com.google.android.apps.fitness")
-                ?: pm.getLaunchIntentForPackage("com.sec.android.app.shealth")
-                ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://fit.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val refreshIntent = Intent(context, javaClass).apply { action = ACTION_REFRESH_STEPS }
+            PendingIntent.getBroadcast(context, widgetId, refreshIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
-
-        val pendingIntent = PendingIntent.getActivity(context, widgetId, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
 
         appWidgetManager.updateAppWidget(widgetId, views)
