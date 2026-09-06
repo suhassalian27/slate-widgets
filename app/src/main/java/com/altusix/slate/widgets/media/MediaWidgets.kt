@@ -21,7 +21,7 @@ fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Bento Media Player", "4x2", "Music & Media", MediaBentoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Immersive Canvas", "3x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Media Streaming Dock", "4x1", "Music & Media", MediaDockReceiver::class.java, hasModeOption = true)
@@ -318,13 +318,13 @@ class MediaMiniCapsuleReceiver : BaseMediaReceiver(R.layout.widget_media_2x1_lay
     }
 }
 
-// 5. Retro Cassette Tape (4x2)
-class MediaCassetteReceiver : BaseMediaReceiver(R.layout.widget_media_4x2_layout) {
+// 5. Retro Cassette Tape (4x2 - Fixed Ratio Only)
+class MediaCassetteReceiver : BaseMediaReceiver(R.layout.widget_media_cassette_layout) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
         val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateCassetteTapeBitmap(context, state, art, config, isResponsive, wDp, hDp)
+        // Permanently false: Cassette adheres strictly to fixed 1.62:1 tape geometry
+        return generateCassetteTapeBitmap(context, state, art, config, isResponsive = false, wDp, hDp)
     }
 }
 

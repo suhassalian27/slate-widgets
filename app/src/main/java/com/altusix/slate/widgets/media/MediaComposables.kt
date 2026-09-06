@@ -910,7 +910,7 @@ fun generateMiniCapsuleBitmap(
 }
 
 // =========================================================================
-// 5. RETRO CASSETTE TAPE (4x2)
+// 5. RETRO CASSETTE TAPE (4x2 - FIXED RATIO)
 // =========================================================================
 fun generateCassetteTapeBitmap(
     context: Context,
@@ -931,129 +931,286 @@ fun generateCassetteTapeBitmap(
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    // 1. Fixed Aspect Ratio (1.65:1) Centered Tape Shell
+    val idealAspect = 1.65f
+    var cardW = w
+    var cardH = cardW / idealAspect
+    if (cardH > h) {
+        cardH = h
+        cardW = cardH * idealAspect
     }
+    val leftX = (w - cardW) / 2f
+    val topY = (h - cardH) / 2f
+    val cassetteRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val uiScale = (cardH / (130f * scaleFactor)).coerceIn(0.55f, 2.2f)
+    val shellCornerR = scaleFactor * 12f * uiScale
+
+    // 2. Cassette Shell (Theme bgColor)
+    val shellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+    canvas.drawRoundRect(cassetteRect, shellCornerR, shellCornerR, shellPaint)
 
-    val pad = cardRect.height() * 0.09f
+    // Outer Contour Ridge Stroke
+    val shellBevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(35, 0, 0, 0) else android.graphics.Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawRoundRect(cassetteRect, shellCornerR, shellCornerR, shellBevelPaint)
 
-    // 1. Inner Cassette Body
-    val cassetteRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFECECEF).toArgb() else Color(0xFF18181B).toArgb()
+    // Side Grip Cutouts
+    val gripPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(30, 0, 0, 0) else android.graphics.Color.argb(35, 255, 255, 255)
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cassetteRect, cardCornerRadius * 0.7f, cardCornerRadius * 0.7f, bodyPaint)
+    val gripW = scaleFactor * 3.5f * uiScale
+    val gripH = cardH * 0.26f
+    val gripY = cassetteRect.centerY() - (gripH * 0.20f)
+    canvas.drawRect(cassetteRect.left, gripY, cassetteRect.left + gripW, gripY + gripH, gripPaint)
+    canvas.drawRect(cassetteRect.right - gripW, gripY, cassetteRect.right, gripY + gripH, gripPaint)
 
-    // Corner Screws
-    val screwPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFB0B0B5).toArgb() else Color(0xFF333338).toArgb()
+    // 4 Corner Screws (+)
+    val screwHeadPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(120, 0, 0, 0) else android.graphics.Color.argb(140, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+        strokeCap = Paint.Cap.ROUND
+    }
+    val screwHolePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(40, 0, 0, 0) else android.graphics.Color.argb(60, 0, 0, 0)
         style = Paint.Style.FILL
     }
-    val screwR = 3.5f * scaleFactor
-    val sPad = pad * 1.5f
-    canvas.drawCircle(cassetteRect.left + sPad, cassetteRect.top + sPad, screwR, screwPaint)
-    canvas.drawCircle(cassetteRect.right - sPad, cassetteRect.top + sPad, screwR, screwPaint)
-    canvas.drawCircle(cassetteRect.left + sPad, cassetteRect.bottom - sPad, screwR, screwPaint)
-    canvas.drawCircle(cassetteRect.right - sPad, cassetteRect.bottom - sPad, screwR, screwPaint)
-
-    // 2. Center Cassette Sticker Label
-    val stickerRect = RectF(
-        cassetteRect.left + pad * 1.2f,
-        cassetteRect.top + pad * 1.1f,
-        cassetteRect.right - pad * 1.2f,
-        cassetteRect.top + cassetteRect.height() * 0.58f
+    val screwR = scaleFactor * 3.0f * uiScale
+    val sPadX = scaleFactor * 8.0f * uiScale
+    val sPadY = scaleFactor * 8.0f * uiScale
+    val screwPositions = floatArrayOf(
+        cassetteRect.left + sPadX, cassetteRect.top + sPadY,
+        cassetteRect.right - sPadX, cassetteRect.top + sPadY,
+        cassetteRect.left + sPadX, cassetteRect.bottom - sPadY,
+        cassetteRect.right - sPadX, cassetteRect.bottom - sPadY
     )
-    val stickerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFFFFFFF).toArgb() else Color(0xFF222227).toArgb()
+    for (i in screwPositions.indices step 2) {
+        val sx = screwPositions[i]
+        val sy = screwPositions[i + 1]
+        canvas.drawCircle(sx, sy, screwR, screwHolePaint)
+        canvas.drawLine(sx - screwR * 0.55f, sy, sx + screwR * 0.55f, sy, screwHeadPaint)
+        canvas.drawLine(sx, sy - screwR * 0.55f, sx, sy + screwR * 0.55f, screwHeadPaint)
+    }
+
+    // 3. Bottom Trapezoid Head Plate
+    val trapWBottom = cardW * 0.74f
+    val trapWTop = cardW * 0.62f
+    val trapH = cardH * 0.22f
+    val trapBottom = cassetteRect.bottom - (scaleFactor * 2.5f)
+    val trapTop = trapBottom - trapH
+    val trapLeftBottom = cassetteRect.centerX() - (trapWBottom / 2f)
+    val trapRightBottom = cassetteRect.centerX() + (trapWBottom / 2f)
+    val trapLeftTop = cassetteRect.centerX() - (trapWTop / 2f)
+    val trapRightTop = cassetteRect.centerX() + (trapWTop / 2f)
+
+    val trapPath = Path().apply {
+        moveTo(trapLeftBottom, trapBottom)
+        lineTo(trapLeftTop, trapTop)
+        lineTo(trapRightTop, trapTop)
+        lineTo(trapRightBottom, trapBottom)
+        close()
+    }
+    val trapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(20, 0, 0, 0) else android.graphics.Color.argb(25, 255, 255, 255)
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(stickerRect, 8f * scaleFactor, 8f * scaleFactor, stickerPaint)
+    canvas.drawPath(trapPath, trapPaint)
+    canvas.drawPath(trapPath, shellBevelPaint)
 
-    // Accent line on sticker
+    // 4 Capstan & Guide Holes
+    val holeY = trapTop + (trapH * 0.50f)
+    val holeOuterR = scaleFactor * 3.6f * uiScale
+    val holeInnerR = scaleFactor * 2.6f * uiScale
+    val outerHoleDist = trapWBottom * 0.35f
+    val innerHoleDist = trapWBottom * 0.15f
+    val cX = cassetteRect.centerX()
+
+    canvas.drawCircle(cX - outerHoleDist, holeY, holeOuterR, screwHolePaint)
+    canvas.drawCircle(cX + outerHoleDist, holeY, holeOuterR, screwHolePaint)
+    canvas.drawCircle(cX - innerHoleDist, holeY, holeInnerR, screwHolePaint)
+    canvas.drawCircle(cX + innerHoleDist, holeY, holeInnerR, screwHolePaint)
+
+    // 4. Adhesive Label Sticker
+    val stickerMarginX = cardW * 0.07f
+    val stickerTop = cassetteRect.top + (scaleFactor * 7.5f * uiScale)
+    val stickerBottom = cassetteRect.top + (cardH * 0.65f)
+    val stickerRect = RectF(cassetteRect.left + stickerMarginX, stickerTop, cassetteRect.right - stickerMarginX, stickerBottom)
+    val stickerCornerR = scaleFactor * 7f * uiScale
+
+    val stickerBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(245, 255, 255, 255) else android.graphics.Color.argb(26, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val stickerStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(40, 0, 0, 0) else android.graphics.Color.argb(40, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawRoundRect(stickerRect, stickerCornerR, stickerCornerR, stickerBgPaint)
+    canvas.drawRoundRect(stickerRect, stickerCornerR, stickerCornerR, stickerStrokePaint)
+
+    // Dynamic Duration Header (Actual Song Time)
+    val durationText = if (state.durationMs > 0L) formatTime(state.durationMs) else "--:--"
+    val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = scaleFactor * 6.5f * uiScale
+        typeface = getSlateFont(context, 700)
+    }
+    canvas.drawText("SIDE A  •  $durationText", stickerRect.left + (scaleFactor * 10f * uiScale), stickerTop + (scaleFactor * 11f * uiScale), tagPaint)
+
+    val hifiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = scaleFactor * 6.0f * uiScale
+        typeface = getSlateFont(context, 400)
+        textAlign = Paint.Align.RIGHT
+    }
+    canvas.drawText("TYPE I  HIGH BIAS", stickerRect.right - (scaleFactor * 10f * uiScale), stickerTop + (scaleFactor * 11f * uiScale), hifiPaint)
+
+    // Centered Track Title
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = scaleFactor * 11.5f * uiScale
+        typeface = getSlateFont(context, 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = scaleFactor * 8.5f * uiScale
+        typeface = getSlateFont(context, 400)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val maxTitleW = stickerRect.width() - (scaleFactor * 24f * uiScale)
+    val titleDisplay = if (titlePaint.measureText(state.title) > maxTitleW) {
+        var t = state.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else state.title
+
+    val artistDisplay = if (artistPaint.measureText(state.artist) > maxTitleW) {
+        var a = state.artist
+        while (a.isNotEmpty() && artistPaint.measureText("$a…") > maxTitleW) a = a.dropLast(1)
+        "$a…"
+    } else state.artist
+
+    val titleY = stickerTop + (cardH * 0.22f)
+    canvas.drawText(titleDisplay, stickerRect.centerX(), titleY, titlePaint)
+
+    // Horizontal Accent Stripe (Full Sticker Width)
+    val stripeY = titleY + (scaleFactor * 5f * uiScale)
+    val stripeH = scaleFactor * 3.0f * uiScale
     val stripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
-    canvas.drawRect(stickerRect.left, stickerRect.top + stickerRect.height() * 0.42f, stickerRect.right, stickerRect.top + stickerRect.height() * 0.46f, stripePaint)
+    canvas.drawRect(stickerRect.left, stripeY, stickerRect.right, stripeY + stripeH, stripePaint)
 
-    // SIDE A badge
-    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = stickerRect.height() * 0.22f
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText("SIDE A", stickerRect.left + pad * 0.8f, stickerRect.top + stickerRect.height() * 0.32f, badgePaint)
+    // Centered Artist
+    val artistY = stripeY + stripeH + (scaleFactor * 11f * uiScale)
+    canvas.drawText(artistDisplay, stickerRect.centerX(), artistY, artistPaint)
 
-    // Track Title on Sticker
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = stickerRect.height() * 0.24f
-        typeface = getSlateFont(context, 700)
-    }
-    val titleDisplay = state.title.take(28)
-    canvas.drawText(titleDisplay, stickerRect.left + pad * 0.8f, stickerRect.bottom - pad * 0.6f, titlePaint)
+    // 5. Central Magnetic Tape Window
+    val winW = cardW * 0.62f
+    val winH = cardH * 0.35f
+    val winLeft = cassetteRect.centerX() - (winW / 2f)
+    val winTop = cassetteRect.top + (cardH * 0.49f)
+    val winRect = RectF(winLeft, winTop, winLeft + winW, winTop + winH)
+    val winCornerR = scaleFactor * 8f * uiScale
 
-    // 3. Central Magnetic Tape Spools Window
-    val windowRect = RectF(
-        cassetteRect.left + cassetteRect.width() * 0.22f,
-        cassetteRect.top + cassetteRect.height() * 0.62f,
-        cassetteRect.right - cassetteRect.width() * 0.22f,
-        cassetteRect.bottom - pad * 1.2f
-    )
-    val winPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFDCDCE0).toArgb() else Color(0xFF0D0D10).toArgb()
+    val winBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(240, 228, 228, 232) else android.graphics.Color.argb(235, 14, 14, 18)
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(windowRect, 6f * scaleFactor, 6f * scaleFactor, winPaint)
+    val winStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(45, 0, 0, 0) else android.graphics.Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawRoundRect(winRect, winCornerR, winCornerR, winBgPaint)
+    canvas.drawRoundRect(winRect, winCornerR, winCornerR, winStrokePaint)
 
-    // Spools (Left and Right)
-    val spoolR = windowRect.height() * 0.38f
-    val leftSpoolX = windowRect.left + windowRect.width() * 0.26f
-    val rightSpoolX = windowRect.right - windowRect.width() * 0.26f
-    val spoolY = windowRect.centerY()
+    // 6. Magnetic Tape Spools & Play Button
+    val spoolCenterY = winRect.centerY()
+    val spoolSpacing = winW * 0.31f
+    val leftSpoolX = winRect.centerX() - spoolSpacing
+    val rightSpoolX = winRect.centerX() + spoolSpacing
 
-    val spoolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.White.toArgb() else Color(0xFF26262C).toArgb()
+    val minSpoolHubR = winH * 0.33f
+    val maxTapePackR = winH * 0.45f
+
+    val progress = state.progress.coerceIn(0f, 1f)
+    val leftTapeR = minSpoolHubR + ((maxTapePackR - minSpoolHubR) * (1.0f - progress))
+    val rightTapeR = minSpoolHubR + ((maxTapePackR - minSpoolHubR) * progress)
+
+    val tapePackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(190, 70, 50, 45) else android.graphics.Color.argb(240, 32, 25, 22)
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(leftSpoolX, spoolY, spoolR, spoolPaint)
-    canvas.drawCircle(rightSpoolX, spoolY, spoolR, spoolPaint)
+    canvas.drawCircle(leftSpoolX, spoolCenterY, leftTapeR, tapePackPaint)
+    canvas.drawCircle(rightSpoolX, spoolCenterY, rightTapeR, tapePackPaint)
 
-    // Spool Cog Teeth
-    val cogPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val spoolRotation = if (state.isPlaying && state.positionMs > 0L) {
+        ((state.positionMs / 1000f) * 60f) % 360f
+    } else 0f
+
+    val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.WHITE else android.graphics.Color.argb(235, 38, 38, 44)
+        style = Paint.Style.FILL
+    }
+    val cogToothPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
-    for (ang in 0 until 360 step 60) {
-        val rad = Math.toRadians(ang.toDouble()).toFloat()
-        val cxL = leftSpoolX + cos(rad) * (spoolR * 0.6f)
-        val cyL = spoolY + sin(rad) * (spoolR * 0.6f)
-        canvas.drawCircle(cxL, cyL, 2.5f * scaleFactor, cogPaint)
 
-        val cxR = rightSpoolX + cos(rad) * (spoolR * 0.6f)
-        val cyR = spoolY + sin(rad) * (spoolR * 0.6f)
-        canvas.drawCircle(cxR, cyR, 2.5f * scaleFactor, cogPaint)
+    // Left Spool (Prev)
+    canvas.drawCircle(leftSpoolX, spoolCenterY, minSpoolHubR, hubPaint)
+    canvas.save()
+    canvas.rotate(spoolRotation, leftSpoolX, spoolCenterY)
+    for (deg in 0 until 360 step 60) {
+        val rad = Math.toRadians(deg.toDouble()).toFloat()
+        val toothX = leftSpoolX + kotlin.math.cos(rad) * (minSpoolHubR * 0.68f)
+        val toothY = spoolCenterY + kotlin.math.sin(rad) * (minSpoolHubR * 0.68f)
+        canvas.drawCircle(toothX, toothY, scaleFactor * 1.8f * uiScale, cogToothPaint)
     }
+    canvas.restore()
+    drawSkipIcon(canvas, leftSpoolX, spoolCenterY, minSpoolHubR * 0.65f, isNext = false, color = primaryTextColor)
 
-    // Play/Pause icon in center of window
+    // Right Spool (Next)
+    canvas.drawCircle(rightSpoolX, spoolCenterY, minSpoolHubR, hubPaint)
+    canvas.save()
+    canvas.rotate(spoolRotation, rightSpoolX, spoolCenterY)
+    for (deg in 0 until 360 step 60) {
+        val rad = Math.toRadians(deg.toDouble()).toFloat()
+        val toothX = rightSpoolX + kotlin.math.cos(rad) * (minSpoolHubR * 0.68f)
+        val toothY = spoolCenterY + kotlin.math.sin(rad) * (minSpoolHubR * 0.68f)
+        canvas.drawCircle(toothX, toothY, scaleFactor * 1.8f * uiScale, cogToothPaint)
+    }
+    canvas.restore()
+    drawSkipIcon(canvas, rightSpoolX, spoolCenterY, minSpoolHubR * 0.65f, isNext = true, color = primaryTextColor)
+
+    // Center Play / Pause Accent Disc
+    val playBtnR = minSpoolHubR * 1.10f
+    val rR = android.graphics.Color.red(accentColor)
+    val rG = android.graphics.Color.green(accentColor)
+    val rB = android.graphics.Color.blue(accentColor)
+    val playLum = (0.2126f * (rR / 255f)) + (0.7152f * (rG / 255f)) + (0.0722f * (rB / 255f))
+    val playIconColor = if (playLum > 0.55f) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+
     drawPlayPauseIcon(
         canvas,
-        windowRect.centerX(),
-        spoolY,
-        spoolR * 0.75f,
+        winRect.centerX(),
+        spoolCenterY,
+        playBtnR,
         isPlaying = state.isPlaying,
-        color = if (isLight) Color.White.toArgb() else Color.Black.toArgb(),
+        color = playIconColor,
         fillCircleBg = true,
         circleBgColor = accentColor
     )
