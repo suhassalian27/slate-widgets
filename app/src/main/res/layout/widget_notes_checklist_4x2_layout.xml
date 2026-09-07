@@ -3,73 +3,79 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Canvas Surface -->
     <ImageView
         android:id="@+id/widget_canvas_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY"
-        android:contentDescription="Notes Canvas Surface" />
+        android:scaleType="fitCenter"
+        android:contentDescription="Checklist Canvas Surface" />
 
+    <!-- Synchronized Touch Overlay -->
     <LinearLayout
+        android:id="@+id/layout_checklist_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top Header & Add Button: Opens Note Editor -->
+        <!-- Header: Title + Progress Count (1.25 weight) -->
         <FrameLayout
             android:id="@+id/btn_note_open_edit"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.22"
+            android:layout_weight="1.25"
             android:clickable="true"
             android:focusable="true" />
 
-        <!-- 5 Interactive Checklist Rows -->
-        <LinearLayout
+        <!-- Row 0 -->
+        <FrameLayout
+            android:id="@+id/btn_check_item_0"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.78"
-            android:orientation="vertical">
+            android:layout_weight="1.0"
+            android:clickable="true"
+            android:focusable="true" />
 
-            <FrameLayout
-                android:id="@+id/btn_check_item_0"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+        <!-- Row 1 -->
+        <FrameLayout
+            android:id="@+id/btn_check_item_1"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0"
+            android:clickable="true"
+            android:focusable="true" />
 
-            <FrameLayout
-                android:id="@+id/btn_check_item_1"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+        <!-- Row 2 -->
+        <FrameLayout
+            android:id="@+id/btn_check_item_2"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0"
+            android:clickable="true"
+            android:focusable="true" />
 
-            <FrameLayout
-                android:id="@+id/btn_check_item_2"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+        <!-- Row 3 -->
+        <FrameLayout
+            android:id="@+id/btn_check_item_3"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0"
+            android:clickable="true"
+            android:focusable="true" />
 
-            <FrameLayout
-                android:id="@+id/btn_check_item_3"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+        <!-- Row 4 -->
+        <FrameLayout
+            android:id="@+id/btn_check_item_4"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0"
+            android:clickable="true"
+            android:focusable="true" />
 
-            <FrameLayout
-                android:id="@+id/btn_check_item_4"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
-        </LinearLayout>
+        <!-- Bottom Safe Inset: Prevents clipping against rounded corners (0.55 weight) -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.55" />
     </LinearLayout>
 </RelativeLayout>

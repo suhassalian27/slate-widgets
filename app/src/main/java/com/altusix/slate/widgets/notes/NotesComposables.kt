@@ -451,7 +451,9 @@ fun generateChecklistBitmap(
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val aspect = 2f
         val cardW = minOf(w, h * aspect)
         val cardH = cardW / aspect
@@ -464,56 +466,88 @@ fun generateChecklistBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.height() * 0.10f
+    val padX = 18f * scaleFactor
+    val fScale = note.fontScaleMultiplier
 
-    // 1. Header (Title + Progress Badge + Add Button)
-    val headerY = cardRect.top + pad * 1.5f
+    // 1. Proportional Header Band & Bottom Inset (Total Weight 6.8f)
+    val totalWeight = 6.8f
+    val headerBandH = cardRect.height() * (1.25f / totalWeight)
+    val bottomMarginH = cardRect.height() * (0.55f / totalWeight)
+    val rowStartY = cardRect.top + headerBandH
+    val rowTotalH = cardRect.height() - headerBandH - bottomMarginH
+    val slotH = rowTotalH / 5f
+
+    // Typography
+    val titleTextSize = 15.5f * scaleFactor * fScale
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.125f
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
-    canvas.drawText(note.title.take(22), cardRect.left + pad, headerY, titlePaint)
 
-    // Progress Pill Badge ("3/5 Done")
-    val badgeText = "${note.completedCount}/${note.totalCount} Done"
+    val titleMetrics = titlePaint.fontMetrics
+    val titleCenterY = cardRect.top + (headerBandH * 0.52f)
+    val titleY = titleCenterY - ((titleMetrics.ascent + titleMetrics.descent) / 2f)
+
+    // A. Render Vector Edit Icon (ic_pencil_alt) without circular background
+    val iconSize = (14f * scaleFactor * fScale).coerceIn(12f * scaleFactor, 18f * scaleFactor)
+    val iconRight = cardRect.right - padX
+    val iconLeft = iconRight - iconSize
+    val iconTop = titleCenterY - (iconSize / 2f)
+    val iconBottom = iconTop + iconSize
+
+    androidx.core.content.ContextCompat.getDrawable(context, com.altusix.slate.R.drawable.ic_pencil_alt)?.let { drawable ->
+        val mutated = drawable.mutate()
+        mutated.setTint(accentColor)
+        mutated.setBounds(iconLeft.toInt(), iconTop.toInt(), iconRight.toInt(), iconBottom.toInt())
+        mutated.draw(canvas)
+    }
+
+    // B. Progress Count Badge (Placed to the left of the Edit Icon)
     val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.082f
+        textSize = (11f * scaleFactor * fScale).coerceIn(10f * scaleFactor, 15f * scaleFactor)
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText(badgeText, cardRect.right - pad * 2.2f, headerY, badgePaint)
+    val badgeText = "${note.completedCount}/${note.totalCount}"
+    val badgeGap = 8f * scaleFactor
+    val badgeX = iconLeft - badgeGap
+    canvas.drawText(badgeText, badgeX, titleY, badgePaint)
+    val badgeWidth = badgePaint.measureText(badgeText)
 
-    // Add / Edit Button icon at top right
-    val plusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.11f
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.RIGHT
-    }
-    canvas.drawText("+", cardRect.right - pad, headerY, plusPaint)
+    // C. Note Title (Fills remaining width)
+    val titleStartX = cardRect.left + padX
+    val maxTitleW = (badgeX - badgeWidth - (10f * scaleFactor)) - titleStartX
+    val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
+        var t = note.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title
 
-    // 2. Checklist Rows (Up to 5 rows)
-    val rowStartY = headerY + pad * 0.9f
-    val rowH = (cardRect.bottom - pad * 0.8f - rowStartY) / 5f
-    val checkR = rowH * 0.28f
+    canvas.drawText(displayTitle, titleStartX, titleY, titlePaint)
 
+    // 2. Proportional Checklist Rows
+    val checkR = (8.5f * scaleFactor * fScale).coerceAtMost(slotH * 0.32f)
+    val checkCx = cardRect.left + padX + checkR
+
+    val itemTextSize = (13f * scaleFactor * fScale).coerceAtMost(slotH * 0.48f)
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = rowH * 0.52f
+        textSize = itemTextSize
         typeface = getSlateFont(context, 500)
     }
 
-    val maxItemCount = minOf(5, note.items.size)
-    for (i in 0 until 5) {
-        val cy = rowStartY + i * rowH + rowH / 2f
-        val cx = cardRect.left + pad + checkR
+    val textLeft = checkCx + checkR + (10f * scaleFactor)
+    val maxTextW = cardRect.right - padX - textLeft
 
-        if (i < maxItemCount) {
+    for (i in 0 until 5) {
+        val cy = rowStartY + (i * slotH) + (slotH / 2f)
+
+        if (i < note.items.size) {
             val item = note.items[i]
             drawCheckbox(
                 canvas = canvas,
-                cx = cx,
+                cx = checkCx,
                 cy = cy,
                 radius = checkR,
                 isDone = item.isDone,
@@ -522,10 +556,6 @@ fun generateChecklistBitmap(
                 scaleFactor = scaleFactor
             )
 
-            // Task Text
-            val textLeft = cx + checkR + pad * 0.8f
-            val maxTextW = cardRect.width() - textLeft - pad
-
             textPaint.color = if (item.isDone) secondaryTextColor else primaryTextColor
             val displayText = if (textPaint.measureText(item.text) > maxTextW) {
                 var t = item.text
@@ -533,31 +563,31 @@ fun generateChecklistBitmap(
                 "$t…"
             } else item.text
 
-            val textBaseY = cy + rowH * 0.18f
+            val textBaseY = cy + (itemTextSize * 0.35f)
             canvas.drawText(displayText, textLeft, textBaseY, textPaint)
 
-            // Strikethrough line if done
             if (item.isDone) {
                 val measuredW = textPaint.measureText(displayText)
                 val strikePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = secondaryTextColor
-                    strokeWidth = 1.5f * scaleFactor
+                    strokeWidth = 1.4f * scaleFactor
                 }
                 canvas.drawLine(textLeft, cy, textLeft + measuredW, cy, strikePaint)
             }
         } else {
             // Empty placeholder row
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isLight) Color(0x30000000).toArgb() else Color(0x20FFFFFF).toArgb()
+                color = if (isLight) Color(0x22000000).toArgb() else Color(0x20FFFFFF).toArgb()
                 style = Paint.Style.FILL
             }
-            canvas.drawCircle(cx, cy, 3f * scaleFactor, dotPaint)
+            canvas.drawCircle(checkCx, cy, 2.5f * scaleFactor, dotPaint)
+
             val placeholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isLight) Color(0x40000000).toArgb() else Color(0x25FFFFFF).toArgb()
-                textSize = rowH * 0.44f
+                color = if (isLight) Color(0x35000000).toArgb() else Color(0x25FFFFFF).toArgb()
+                textSize = itemTextSize * 0.90f
                 typeface = getSlateFont(context, 400)
             }
-            canvas.drawText("Tap to add item...", cx + checkR + pad * 0.8f, cy + rowH * 0.15f, placeholderPaint)
+            canvas.drawText("Tap to add item...", textLeft, cy + (itemTextSize * 0.35f), placeholderPaint)
         }
     }
 
