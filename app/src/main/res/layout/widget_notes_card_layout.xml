@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Canvas Surface for Background, Texture, Lines & Note Content -->
+    <ImageView
+        android:id="@+id/widget_canvas_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:contentDescription="Notes Canvas Surface" />
+
+    <!-- Whole-card touch target to open editor -->
+    <FrameLayout
+        android:id="@+id/btn_note_open_edit"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:focusable="true" />
+</RelativeLayout>

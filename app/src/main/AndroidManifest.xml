@@ -78,6 +78,12 @@
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- Note Edit Activity -->
+        <activity
+            android:name=".widgets.notes.NoteEditActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Slate" />
+
         <activity
             android:name=".widgets.media.MediaTrampolineActivity"
             android:exported="false"
@@ -3088,6 +3094,139 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- ================================================================= -->
+        <!-- NOTES WIDGETS                                                     -->
+        <!-- ================================================================= -->
+        <!-- 1. Sticky Note Pad (2x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesStickyPadReceiver"
+            android:exported="true"
+            android:label="Sticky Note Pad">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 2. Checklist Tasks (4x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesChecklistReceiver"
+            android:exported="true"
+            android:label="Checklist Tasks">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 3. Checklist Mini (2x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesChecklist2x2Receiver"
+            android:exported="true"
+            android:label="Checklist Mini">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 4. Classic Legal Pad (4x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesLegalPadReceiver"
+            android:exported="true"
+            android:label="Classic Legal Pad">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 5. Quick Thought Strip (4x1) -->
+        <receiver
+            android:name=".widgets.notes.NotesQuickThoughtReceiver"
+            android:exported="true"
+            android:label="Quick Thought Strip">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 6. Mini Thought Capsule (2x1) -->
+        <receiver
+            android:name=".widgets.notes.NotesMiniThoughtReceiver"
+            android:exported="true"
+            android:label="Mini Thought Capsule">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 7. Bento Notes & Tasks (4x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesBentoReceiver"
+            android:exported="true"
+            android:label="Bento Notes &amp; Tasks">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 8. Torn Receipt Log (2x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesTornReceiptReceiver"
+            android:exported="true"
+            android:label="Torn Receipt Log">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 9. Dot Grid Scratchpad (2x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesDotGridReceiver"
+            android:exported="true"
+            android:label="Dot Grid Scratchpad">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 10. Multi-Note Stack (2x2) -->
+        <receiver
+            android:name=".widgets.notes.NotesStackReceiver"
+            android:exported="true"
+            android:label="Multi-Note Stack">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
         </receiver>
 
     </application>
