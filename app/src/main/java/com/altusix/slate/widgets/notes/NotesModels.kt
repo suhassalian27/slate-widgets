@@ -32,11 +32,19 @@ data class SlateNoteData(
     val content: String = "Tap here to start writing your thoughts...",
     val items: List<SlateChecklistItem> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val category: String = "Memo"
+    val category: String = "Memo",
+    val fontSize: String = "MEDIUM" // "SMALL", "MEDIUM", "LARGE"
 ) {
     val completedCount: Int get() = items.count { it.isDone }
     val totalCount: Int get() = items.size
     val progress: Float get() = if (totalCount > 0) completedCount.toFloat() / totalCount.toFloat() else 0f
+
+    val fontScaleMultiplier: Float
+        get() = when (fontSize) {
+            "SMALL" -> 1f   // Compact: fits maximum lines and tasks
+            "LARGE" -> 1.60f   // Large: bold, prominent, and easy to read at a glance
+            else -> 1.30f      // "MEDIUM": comfortable standard reading scale
+        }
 
     fun toJson(): String {
         val json = JSONObject()
@@ -45,6 +53,7 @@ data class SlateNoteData(
         json.put("content", content)
         json.put("updatedAt", updatedAt)
         json.put("category", category)
+        json.put("fontSize", fontSize)
 
         val arr = JSONArray()
         for (item in items) {
@@ -74,7 +83,8 @@ data class SlateNoteData(
                     content = json.optString("content", "Tap here to start writing..."),
                     items = itemsList,
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
-                    category = json.optString("category", "Memo")
+                    category = json.optString("category", "Memo"),
+                    fontSize = json.optString("fontSize", "MEDIUM")
                 )
             } catch (_: Exception) {
                 getDefaultNote()
@@ -92,7 +102,8 @@ data class SlateNoteData(
                     SlateChecklistItem(text = "Theme studio sync", isDone = false),
                     SlateChecklistItem(text = "Review responsive layout", isDone = false)
                 ),
-                category = "Slate"
+                category = "Slate",
+                fontSize = "MEDIUM"
             )
         }
     }

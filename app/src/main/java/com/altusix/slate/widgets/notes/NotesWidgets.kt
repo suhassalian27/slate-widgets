@@ -18,7 +18,7 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 fun getNotesWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Sticky Note Pad", "2x2", "Notes", NotesStickyPadReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Desk Memo Pad", "4x2", "Notes", NotesDeskMemoReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Desk Memo Pad", "4x2", "Notes", NotesDeskMemoReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Checklist Tasks", "4x2", "Notes", NotesChecklistReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Checklist Mini", "2x2", "Notes", NotesChecklist2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Classic Legal Pad", "4x2", "Notes", NotesLegalPadReceiver::class.java, hasModeOption = true),
@@ -121,7 +121,11 @@ abstract class BaseNotesReceiver(private val layoutResId: Int) : AppWidgetProvid
         const val ACTION_CYCLE_PAGE = "com.altusix.slate.notes.ACTION_CYCLE_PAGE"
         const val EXTRA_ITEM_INDEX = "extra_item_index"
         const val EXTRA_DELTA = "extra_delta"
+        const val EXTRA_EDIT_MODE = "extra_edit_mode"
     }
+
+    // Default mode is TEXT_ONLY; overridden to CHECKLIST_ONLY in checklist receivers
+    protected open val widgetEditMode: String = "TEXT_ONLY"
 
     abstract fun renderWidgetBitmap(
         context: Context,
@@ -136,8 +140,10 @@ abstract class BaseNotesReceiver(private val layoutResId: Int) : AppWidgetProvid
 
         when (intent.action) {
             ACTION_EDIT_NOTE -> {
+                val mode = intent.getStringExtra(EXTRA_EDIT_MODE) ?: widgetEditMode
                 val editIntent = Intent(context, NoteEditActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    putExtra(EXTRA_EDIT_MODE, mode)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
                 context.startActivity(editIntent)
@@ -198,6 +204,7 @@ abstract class BaseNotesReceiver(private val layoutResId: Int) : AppWidgetProvid
         val editIntent = Intent(context, this.javaClass).apply {
             action = ACTION_EDIT_NOTE
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra(EXTRA_EDIT_MODE, widgetEditMode)
             data = Uri.parse("slate_notes://$appWidgetId/edit")
         }
         val editPi = PendingIntent.getBroadcast(
@@ -217,6 +224,7 @@ abstract class BaseNotesReceiver(private val layoutResId: Int) : AppWidgetProvid
 
 // 1. Sticky Note Pad (2x2 - Dog-Ear Corner)
 class NotesStickyPadReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
+    override val widgetEditMode: String = "TEXT_ONLY"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val note = if (appWidgetId == -1) SlateNoteData.getDefaultNote() else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Sticky Note")
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
@@ -226,9 +234,11 @@ class NotesStickyPadReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layo
 
 // 1b. Desk Memo Pad (4x2 - Taped Ruled Pad)
 class NotesDeskMemoReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
+    override val widgetEditMode: String = "TEXT_ONLY"
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val note = if (appWidgetId == -1) SlateNoteData.getDefaultNote() else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Desk Memo")
-        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
         return generateDeskMemoBitmap(context, note, config, isResponsive, wDp, hDp)
     }
 }

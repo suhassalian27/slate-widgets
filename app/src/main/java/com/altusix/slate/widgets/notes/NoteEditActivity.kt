@@ -2,29 +2,33 @@ package com.altusix.slate.widgets.notes
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +45,8 @@ class NoteEditActivity : ComponentActivity() {
             AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
+        val editMode = intent?.getStringExtra(BaseNotesReceiver.EXTRA_EDIT_MODE) ?: "TEXT_ONLY"
+
         val existingNote = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             NotesStorageManager.getNoteForWidget(this, widgetId)
         } else {
@@ -52,199 +58,285 @@ class NoteEditActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    background = Color(0xFF0C0B0E),
-                    surface = Color(0xFF16151A)
+                    background = Color(0xFF0C0C0E),
+                    surface = Color(0xFF16161B)
                 )
             ) {
                 var title by remember { mutableStateOf(existingNote.title) }
                 var content by remember { mutableStateOf(existingNote.content) }
                 var category by remember { mutableStateOf(existingNote.category) }
-                var isChecklistMode by remember { mutableStateOf(existingNote.items.isNotEmpty()) }
+                var fontSize by remember { mutableStateOf(existingNote.fontSize) }
+
+                val isChecklistOnly = editMode == "CHECKLIST_ONLY"
+                val isTextOnly = editMode == "TEXT_ONLY"
+                var isChecklistMode by remember {
+                    mutableStateOf(if (isChecklistOnly) true else if (isTextOnly) false else existingNote.items.isNotEmpty())
+                }
                 var checklistItems by remember { mutableStateOf(existingNote.items) }
                 var newItemText by remember { mutableStateOf("") }
+                var categoryMenuExpanded by remember { mutableStateOf(false) }
 
                 val accentColor = themePrefs.accentColor
 
-                Box(
+                fun saveAndFinish() {
+                    val finalItems = if (!isChecklistMode) emptyList() else checklistItems
+                    val updatedNote = SlateNoteData(
+                        id = existingNote.id,
+                        title = if (title.isBlank()) "Untitled Note" else title.trim(),
+                        content = content.trim(),
+                        items = finalItems,
+                        category = category,
+                        fontSize = fontSize,
+                        updatedAt = System.currentTimeMillis()
+                    )
+
+                    if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                        NotesStorageManager.saveNoteForWidget(this@NoteEditActivity, widgetId, updatedNote)
+                    }
+                    updateAllNotesWidgets(this@NoteEditActivity)
+                    setResult(Activity.RESULT_OK)
+                    finish()
+                }
+
+                Surface(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF0A0A0C))
+                        .background(Color(0xFF0C0C0E))
                         .statusBarsPadding()
                         .navigationBarsPadding()
+                        .imePadding(),
+                    color = Color(0xFF0C0C0E)
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp)
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        // Header Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Edit Slate Note",
-                                color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            IconButton(
-                                onClick = { finish() },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF1C1C20))
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Category Chips Row
-                        val categories = listOf("Memo", "Focus", "Checklist", "Ideas", "Log")
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            categories.forEach { cat ->
-                                val isSelected = category.equals(cat, ignoreCase = true)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected) accentColor else Color(0xFF1C1C20))
-                                        .clickable { category = cat }
-                                        .padding(horizontal = 14.dp, vertical = 7.dp)
-                                ) {
-                                    Text(
-                                        text = cat,
-                                        color = if (isSelected) Color.Black else Color(0xFF8E8E93),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Title Input
-                        OutlinedTextField(
-                            value = title,
-                            onValueChange = { title = it },
-                            label = { Text("Note Title", color = Color(0xFF8E8E93)) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = accentColor,
-                                unfocusedBorderColor = Color(0xFF2C2C30),
-                                focusedContainerColor = Color(0xFF141418),
-                                unfocusedContainerColor = Color(0xFF141418)
-                            ),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Mode Switcher (Notes vs Checklist)
+                        // 1. Top Bar: Back, Clear Category Dropdown, Save Action
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF141418))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (!isChecklistMode) Color(0xFF24242A) else Color.Transparent)
-                                    .clickable { isChecklistMode = false }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(
-                                    text = "Text Note",
-                                    color = if (!isChecklistMode) Color.White else Color(0xFF8E8E93),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                IconButton(
+                                    onClick = { finish() },
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1A1A20))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+
+                                // High-Contrast Category Dropdown Pill
+                                Box {
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(Color(0xFF18181F))
+                                            .border(1.dp, Color(0xFF262630), RoundedCornerShape(20.dp))
+                                            .clickable { categoryMenuExpanded = true }
+                                            .padding(horizontal = 13.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "# $category",
+                                            color = accentColor,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Select Category",
+                                            tint = accentColor.copy(alpha = 0.85f),
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = categoryMenuExpanded,
+                                        onDismissRequest = { categoryMenuExpanded = false },
+                                        modifier = Modifier.background(Color(0xFF1E1E26))
+                                    ) {
+                                        listOf("Memo", "Focus", "Ideas", "Checklist", "Log", "Personal").forEach { cat ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        cat,
+                                                        color = if (category.equals(cat, ignoreCase = true)) accentColor else Color.White,
+                                                        fontWeight = if (category.equals(cat, ignoreCase = true)) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                onClick = {
+                                                    category = cat
+                                                    categoryMenuExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isChecklistMode) Color(0xFF24242A) else Color.Transparent)
-                                    .clickable { isChecklistMode = true }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+
+                            // Done Button
+                            Button(
+                                onClick = { saveAndFinish() },
+                                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                                shape = RoundedCornerShape(20.dp),
+                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
+                                modifier = Modifier.height(38.dp)
                             ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Checklist (${checklistItems.size})",
-                                    color = if (isChecklistMode) Color.White else Color(0xFF8E8E93),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium
+                                    text = "Done",
+                                    color = Color.Black,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Body Content or Checklist Column
+                        // 2. Focused Document Canvas
                         if (!isChecklistMode) {
-                            OutlinedTextField(
-                                value = content,
-                                onValueChange = { content = it },
-                                label = { Text("Note Content", color = Color(0xFF8E8E93)) },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = accentColor,
-                                    unfocusedBorderColor = Color(0xFF2C2C30),
-                                    focusedContainerColor = Color(0xFF141418),
-                                    unfocusedContainerColor = Color(0xFF141418)
-                                ),
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                maxLines = 12
-                            )
-                        } else {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f)
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 20.dp)
                             ) {
-                                // Add item field
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                TextField(
+                                    value = title,
+                                    onValueChange = { title = it },
+                                    placeholder = {
+                                        Text(
+                                            "Title",
+                                            color = Color(0xFF3E3E44),
+                                            fontSize = 26.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    textStyle = TextStyle(
+                                        color = Color.White,
+                                        fontSize = 26.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        cursorColor = accentColor
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                TextField(
+                                    value = content,
+                                    onValueChange = { content = it },
+                                    placeholder = {
+                                        Text(
+                                            "Write your thoughts...",
+                                            color = Color(0xFF4C4C54),
+                                            fontSize = 16.sp,
+                                            lineHeight = 24.sp
+                                        )
+                                    },
+                                    textStyle = TextStyle(
+                                        color = Color(0xFFE2E2E6),
+                                        fontSize = 16.sp,
+                                        lineHeight = 24.sp
+                                    ),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        cursorColor = accentColor
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .defaultMinSize(minHeight = 350.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        } else {
+                            // Checklist Mode
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(horizontal = 20.dp)
+                            ) {
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                TextField(
+                                    value = title,
+                                    onValueChange = { title = it },
+                                    placeholder = {
+                                        Text(
+                                            "Checklist Title",
+                                            color = Color(0xFF3E3E44),
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    textStyle = TextStyle(
+                                        color = Color.White,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        cursorColor = accentColor
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF16161C))
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    OutlinedTextField(
+                                    TextField(
                                         value = newItemText,
                                         onValueChange = { newItemText = it },
-                                        placeholder = { Text("Add task item...", color = Color(0xFF6C6C70)) },
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = Color.White,
-                                            unfocusedTextColor = Color.White,
-                                            focusedBorderColor = accentColor,
-                                            unfocusedBorderColor = Color(0xFF2C2C30),
-                                            focusedContainerColor = Color(0xFF141418),
-                                            unfocusedContainerColor = Color(0xFF141418)
+                                        placeholder = { Text("Add task item...", color = Color(0xFF5A5A62), fontSize = 14.sp) },
+                                        colors = TextFieldDefaults.colors(
+                                            focusedContainerColor = Color.Transparent,
+                                            unfocusedContainerColor = Color.Transparent,
+                                            focusedIndicatorColor = Color.Transparent,
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            cursorColor = accentColor
                                         ),
-                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.weight(1f),
                                         singleLine = true
                                     )
@@ -257,20 +349,25 @@ class NoteEditActivity : ComponentActivity() {
                                             }
                                         },
                                         modifier = Modifier
-                                            .size(48.dp)
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .size(34.dp)
+                                            .clip(CircleShape)
                                             .background(accentColor)
                                     ) {
-                                        Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Black)
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add",
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(18.dp)
+                                        )
                                     }
                                 }
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                // Checklist List
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    contentPadding = PaddingValues(bottom = 16.dp)
                                 ) {
                                     itemsIndexed(checklistItems) { index, item ->
                                         Row(
@@ -278,10 +375,9 @@ class NoteEditActivity : ComponentActivity() {
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(Color(0xFF141418))
-                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                .padding(horizontal = 14.dp, vertical = 12.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Checkbox box
                                             Box(
                                                 modifier = Modifier
                                                     .size(22.dp)
@@ -295,7 +391,12 @@ class NoteEditActivity : ComponentActivity() {
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 if (item.isDone) {
-                                                    Icon(Icons.Default.Check, contentDescription = "Done", tint = Color.Black, modifier = Modifier.size(16.dp))
+                                                    Icon(
+                                                        Icons.Default.Check,
+                                                        contentDescription = "Done",
+                                                        tint = Color.Black,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
                                                 }
                                             }
 
@@ -303,7 +404,7 @@ class NoteEditActivity : ComponentActivity() {
 
                                             Text(
                                                 text = item.text,
-                                                color = if (item.isDone) Color(0xFF6C6C70) else Color.White,
+                                                color = if (item.isDone) Color(0xFF5A5A62) else Color.White,
                                                 fontSize = 14.sp,
                                                 modifier = Modifier.weight(1f)
                                             )
@@ -316,7 +417,12 @@ class NoteEditActivity : ComponentActivity() {
                                                 },
                                                 modifier = Modifier.size(28.dp)
                                             ) {
-                                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFF8E8E93), modifier = Modifier.size(18.dp))
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Delete",
+                                                    tint = Color(0xFF7A7A82),
+                                                    modifier = Modifier.size(17.dp)
+                                                )
                                             }
                                         }
                                     }
@@ -324,39 +430,67 @@ class NoteEditActivity : ComponentActivity() {
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Save Button
-                        Button(
-                            onClick = {
-                                val updatedNote = SlateNoteData(
-                                    id = existingNote.id,
-                                    title = if (title.isBlank()) "Untitled" else title.trim(),
-                                    content = content.trim(),
-                                    items = checklistItems,
-                                    category = category,
-                                    updatedAt = System.currentTimeMillis()
+                        // 3. Bottom Accessory Bar (Aa Typography Indicator + S/M/L)
+                        Surface(
+                            color = Color(0xFF121216),
+                            tonalElevation = 6.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val wordCount = if (content.isBlank()) 0 else content.trim().split("\\s+".toRegex()).size
+                                val lineCount = if (content.isBlank()) 0 else content.lines().size
+                                Text(
+                                    text = if (isChecklistMode) "${checklistItems.size} items" else "$wordCount words • $lineCount lines",
+                                    color = Color(0xFF6E6E76),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
                                 )
 
-                                if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                                    NotesStorageManager.saveNoteForWidget(this@NoteEditActivity, widgetId, updatedNote)
+                                // Typography Scale Control
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Aa",
+                                        color = Color(0xFF8E8E98),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFF1E1E26))
+                                            .padding(2.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        listOf("SMALL" to "S", "MEDIUM" to "M", "LARGE" to "L").forEach { (key, label) ->
+                                            val isSelected = fontSize == key
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isSelected) accentColor else Color.Transparent)
+                                                    .clickable { fontSize = key }
+                                                    .padding(horizontal = 11.dp, vertical = 5.dp)
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = if (isSelected) Color.Black else Color(0xFF8E8E93),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
-                                updateAllNotesWidgets(this@NoteEditActivity)
-                                setResult(Activity.RESULT_OK)
-                                finish()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                        ) {
-                            Text(
-                                text = "Save Note",
-                                color = Color.Black,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            }
                         }
                     }
                 }

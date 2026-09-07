@@ -14,7 +14,8 @@ import com.altusix.slate.utils.getStandardCornerRadius
 // =========================================================================
 
 /**
- * Helper to wrap and draw multi-line text cleanly within bounds
+ * Helper to wrap and draw multi-line text cleanly within bounds,
+ * supporting both explicit maxLines and dynamic bottomLimit clamping.
  */
 private fun drawWrappedText(
     canvas: Canvas,
@@ -24,35 +25,66 @@ private fun drawWrappedText(
     maxWidth: Float,
     paint: Paint,
     lineSpacing: Float,
-    maxLines: Int = 4
+    maxLines: Int = Int.MAX_VALUE,
+    bottomLimit: Float = Float.MAX_VALUE
 ): Float {
+    if (text.isBlank() || maxLines <= 0) return startY
     val lines = text.split("\n")
     var currentY = startY
     var linesDrawn = 0
 
-    for (rawLine in lines) {
-        if (linesDrawn >= maxLines) break
+    for (rawIndex in lines.indices) {
+        if (linesDrawn >= maxLines || currentY > bottomLimit) break
 
-        val words = rawLine.split(" ")
+        val rawLine = lines[rawIndex]
+        val isLastRawLine = rawIndex == lines.size - 1
+
+        val words = if (rawLine.isEmpty()) listOf("") else rawLine.split(" ")
         var currentLine = ""
 
         for (word in words) {
             val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+
             if (paint.measureText(testLine) <= maxWidth) {
                 currentLine = testLine
             } else {
                 if (currentLine.isNotEmpty()) {
-                    canvas.drawText(currentLine, x, currentY, paint)
-                    currentY += lineSpacing
-                    linesDrawn++
-                    if (linesDrawn >= maxLines) break
+                    val isFinalLine = (linesDrawn == maxLines - 1) || (currentY + lineSpacing > bottomLimit)
+                    if (isFinalLine) {
+                        var truncated = currentLine
+                        while (truncated.isNotEmpty() && paint.measureText("$truncated…") > maxWidth) {
+                            truncated = truncated.dropLast(1)
+                        }
+                        canvas.drawText("$truncated…", x, currentY, paint)
+                        linesDrawn++
+                        return currentY + lineSpacing
+                    } else {
+                        canvas.drawText(currentLine, x, currentY, paint)
+                        currentY += lineSpacing
+                        linesDrawn++
+                    }
                 }
                 currentLine = word
             }
         }
 
-        if (currentLine.isNotEmpty() && linesDrawn < maxLines) {
-            canvas.drawText(currentLine, x, currentY, paint)
+        if (currentLine.isNotEmpty()) {
+            val isFinalLine = (linesDrawn == maxLines - 1 && !isLastRawLine) || (currentY + lineSpacing > bottomLimit && !isLastRawLine)
+            if (isFinalLine) {
+                var truncated = currentLine
+                while (truncated.isNotEmpty() && paint.measureText("$truncated…") > maxWidth) {
+                    truncated = truncated.dropLast(1)
+                }
+                canvas.drawText("$truncated…", x, currentY, paint)
+                linesDrawn++
+                return currentY + lineSpacing
+            } else {
+                canvas.drawText(currentLine, x, currentY, paint)
+            }
+            currentY += lineSpacing
+            linesDrawn++
+        } else if (rawLine.isEmpty()) {
+            if (currentY + lineSpacing > bottomLimit || linesDrawn >= maxLines) return currentY
             currentY += lineSpacing
             linesDrawn++
         }
@@ -127,36 +159,19 @@ fun generateStickyNoteBitmap(
     val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
     val isLight = slateConfig.themeMode == "LIGHT"
-    val primaryTextColor = if (isLight) Color(0xFF1C1C1E).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF5A5A5E).toArgb() else Color(0xFFA1A1A6).toArgb()
+    val secondaryTextColor = if (isLight) Color(0xFF4A4A4E).toArgb() else Color(0xFFD1D1D6).toArgb()
 
-    // 1. Aspect Ratio Clamping (Square 1:1 Note Geometry)
-    val cardRect = if (isResponsive) {
-        val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
-    } else {
+    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
-    val cardCornerRadius = scaleFactor * 8f
-    val foldSize = cardRect.width() * 0.17f
-    val uiScale = (cardRect.width() / (160f * scaleFactor)).coerceIn(0.5f, 2.5f)
+    val cardCornerRadius = 8f * scaleFactor
 
-    // 2. Background Layer Exposed Behind the Peel (Revealed Wall / Undersheet)
-    val revealPath = Path().apply {
-        moveTo(cardRect.right - foldSize, cardRect.top)
-        lineTo(cardRect.right, cardRect.top)
-        lineTo(cardRect.right, cardRect.top + foldSize)
-        close()
-    }
-    val revealPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x35000000).toArgb() else Color(0x22FFFFFF).toArgb()
-        style = Paint.Style.FILL
-    }
-    canvas.drawPath(revealPath, revealPaint)
+    // 1. Fixed Proportional Dog-Ear Fold
+    val foldSize = (26f * scaleFactor).coerceAtMost(minOf(cardRect.width(), cardRect.height()) * 0.22f)
 
-    // 3. Main Sticky Note Paper Sheet (Cut at Top-Right by Fold)
+    // Main Paper Body (Cut diagonally at top-right corner)
     val paperPath = Path().apply {
         moveTo(cardRect.left + cardCornerRadius, cardRect.top)
         lineTo(cardRect.right - foldSize, cardRect.top)
@@ -176,116 +191,91 @@ fun generateStickyNoteBitmap(
     }
     canvas.drawPath(paperPath, paperPaint)
 
-    // Subtle paper border outline
-    val paperStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x18000000).toArgb() else Color(0x1AFFFFFF).toArgb()
-        style = Paint.Style.STROKE
+    // Fold Crease Line
+    val creasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0x20000000).toArgb() else Color(0x30000000).toArgb()
         strokeWidth = 1.0f * scaleFactor
     }
-    canvas.drawPath(paperPath, paperStroke)
+    canvas.drawLine(cardRect.right - foldSize, cardRect.top, cardRect.right, cardRect.top + foldSize, creasePaint)
 
-    // 4. Fold Crease Drop Shadow (Cast diagonally onto the paper face)
-    val shadowPath = Path().apply {
-        moveTo(cardRect.right - foldSize, cardRect.top)
-        lineTo(cardRect.right, cardRect.top + foldSize)
-        lineTo(cardRect.right - foldSize * 0.72f, cardRect.top + foldSize * 1.28f)
-        lineTo(cardRect.right - foldSize * 1.28f, cardRect.top + foldSize * 0.72f)
-        close()
-    }
-    val foldShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = LinearGradient(
-            cardRect.right - foldSize, cardRect.top,
-            cardRect.right - foldSize * 1.15f, cardRect.top + foldSize * 1.15f,
-            intArrayOf(Color(0x38000000).toArgb(), Color.Transparent.toArgb()),
-            null,
-            Shader.TileMode.CLAMP
-        )
-    }
-    canvas.drawPath(shadowPath, foldShadowPaint)
-
-    // 5. Dog-Ear Fold Flap (The turned-down corner triangle)
+    // Dog-Ear Fold Flap
     val flapPath = Path().apply {
         moveTo(cardRect.right - foldSize, cardRect.top)
         lineTo(cardRect.right - foldSize, cardRect.top + foldSize)
         lineTo(cardRect.right, cardRect.top + foldSize)
         close()
     }
+
     val flapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        // Slightly elevated tint for underside of paper
-        color = if (isLight) Color(0xFFECE5D8).toArgb() else Color(0xFF2C2A28).toArgb()
+        shader = LinearGradient(
+            cardRect.right - foldSize, cardRect.top,
+            cardRect.right, cardRect.top + foldSize,
+            intArrayOf(
+                if (isLight) Color(0xFFF2ECE1).toArgb() else Color(0xFF34343A).toArgb(),
+                if (isLight) Color(0xFFDFD6C6).toArgb() else Color(0xFF222226).toArgb()
+            ),
+            null,
+            Shader.TileMode.CLAMP
+        )
         style = Paint.Style.FILL
     }
     canvas.drawPath(flapPath, flapPaint)
 
     val flapStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x25000000).toArgb() else Color(0x35FFFFFF).toArgb()
+        color = if (isLight) Color(0x20000000).toArgb() else Color(0x28FFFFFF).toArgb()
         style = Paint.Style.STROKE
         strokeWidth = 1.0f * scaleFactor
     }
     canvas.drawPath(flapPath, flapStroke)
 
-    val pad = cardRect.width() * 0.095f
+    // 2. Fixed Dimension Padding (Independent of widget width/height changes)
+    val padX = 20f * scaleFactor
+    val padTop = 20f * scaleFactor
+    val padBottom = 14f * scaleFactor
+    val titleToBodyGap = 10f * scaleFactor
 
-    // 6. Sticky Note Typography (Unruled, Clean Flow)
+    val fScale = note.fontScaleMultiplier
+
+    // 3. Accent Note Title
+    val titleTextSize = 16f * scaleFactor * fScale
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = (cardRect.height() * 0.095f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        color = accentColor
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
 
-    val maxTitleW = cardRect.width() - (pad * 2f) - foldSize * 0.6f
+    val maxTitleW = cardRect.width() - (padX * 2f) - foldSize
     val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
         var t = note.title
         while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
         "$t…"
     } else note.title
 
-    val titleY = cardRect.top + pad * 1.5f
-    canvas.drawText(displayTitle, cardRect.left + pad, titleY, titlePaint)
+    val titleY = cardRect.top + padTop + (titleTextSize * 0.85f)
+    canvas.drawText(displayTitle, cardRect.left + padX, titleY, titlePaint)
 
+    // 4. Body Text Flow
+    val bodyTextSize = 13.5f * scaleFactor * fScale
     val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = (cardRect.height() * 0.072f).coerceIn(scaleFactor * 8.5f, scaleFactor * 14f)
+        textSize = bodyTextSize
         typeface = getSlateFont(context, 400)
     }
-    val lineSpacing = cardRect.height() * 0.11f
+
+    val lineSpacing = bodyTextSize * 1.42f
+    val startY = titleY + titleToBodyGap + (bodyTextSize * 0.85f)
+    val bottomLimit = cardRect.bottom - padBottom
+
     drawWrappedText(
         canvas = canvas,
         text = note.content,
-        x = cardRect.left + pad,
-        startY = titleY + pad * 0.95f,
-        maxWidth = cardRect.width() - pad * 2f,
+        x = cardRect.left + padX,
+        startY = startY,
+        maxWidth = cardRect.width() - (padX * 2f),
         paint = contentPaint,
         lineSpacing = lineSpacing,
-        maxLines = 4
+        bottomLimit = bottomLimit
     )
-
-    // 7. Floating Action Puck (Bottom Right)
-    val puckR = scaleFactor * 13f * uiScale
-    val puckCx = cardRect.right - pad * 1.25f
-    val puckCy = cardRect.bottom - pad * 1.25f
-
-    // Puck Drop Shadow
-    val puckShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color(0x30000000).toArgb()
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(puckCx, puckCy + 1.2f * scaleFactor, puckR, puckShadowPaint)
-
-    // Puck Surface
-    val puckBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.White.toArgb() else Color(0xFF26262B).toArgb()
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(puckCx, puckCy, puckR, puckBgPaint)
-
-    val puckIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = puckR * 0.88f
-        textAlign = Paint.Align.CENTER
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText("✦", puckCx, puckCy + puckR * 0.32f, puckIconPaint)
 
     return bitmap
 }
@@ -312,7 +302,9 @@ fun generateDeskMemoBitmap(
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val aspect = 2f
         val cardW = minOf(w, h * aspect)
         val cardH = cardW / aspect
@@ -325,16 +317,19 @@ fun generateDeskMemoBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.height() * 0.10f
+    val padX = 18f * scaleFactor
+    val fScale = note.fontScaleMultiplier
 
-    // 1. Frosted Adhesive Tape Strip at Top Center
-    val tapeW = cardRect.width() * 0.24f
-    val tapeH = 13f * scaleFactor
+    // 1. Frosted Adhesive Tape Strip
+    val tapeW = (cardRect.width() * 0.22f).coerceIn(60f * scaleFactor, 110f * scaleFactor)
+    val tapeH = 10f * scaleFactor
+    val tapeTop = cardRect.top + 2f * scaleFactor
+    val tapeBottom = tapeTop + tapeH
     val tapeRect = RectF(
         cardRect.centerX() - tapeW / 2f,
-        cardRect.top + pad * 0.25f,
+        tapeTop,
         cardRect.centerX() + tapeW / 2f,
-        cardRect.top + pad * 0.25f + tapeH
+        tapeBottom
     )
     val tapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0x35000000).toArgb() else Color(0x28FFFFFF).toArgb()
@@ -342,62 +337,94 @@ fun generateDeskMemoBitmap(
     }
     canvas.drawRoundRect(tapeRect, 3f * scaleFactor, 3f * scaleFactor, tapePaint)
 
-    // 2. Note Title & Category Tag
+    // 2. Dynamic Title Clearance & Baseline Anchor
+    val titleTextSize = 15.5f * scaleFactor * fScale
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.11f
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
-    val titleY = cardRect.top + pad * 1.9f
-    canvas.drawText(note.title.take(32), cardRect.left + pad, titleY, titlePaint)
 
     val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.070f
+        textSize = (10f * scaleFactor * fScale).coerceIn(9f * scaleFactor, 14f * scaleFactor)
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText(note.category.uppercase(), cardRect.right - pad, titleY, catPaint)
 
-    // 3. Ruled Horizontal Lines
-    val lineStartY = titleY + pad * 0.8f
-    val lineSpacing = cardRect.height() * 0.13f
+// Top cap-height stays locked at a comfortable distance below tape & card top
+    val titleTopClearance = maxOf(tapeBottom + (5f * scaleFactor), cardRect.top + (16f * scaleFactor))
+    val titleMetrics = titlePaint.fontMetrics
+    val titleY = titleTopClearance - titleMetrics.ascent // ascent is negative
+
+// Category tag on the right
+    val catText = note.category.uppercase()
+    val catWidth = catPaint.measureText(catText)
+    canvas.drawText(catText, cardRect.right - padX, titleY, catPaint)
+
+// Pencil icon paint & measurements (placed first)
+    val editIconSize = 11.5f * scaleFactor * fScale
+    val editPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = editIconSize
+        typeface = getSlateFont(context, 700)
+    }
+    val editIconText = "✎"
+    val editIconW = editPaint.measureText(editIconText)
+    val editGap = 6f * scaleFactor
+
+// Draw pencil icon before the title
+    val pencilX = cardRect.left + padX
+    canvas.drawText(editIconText, pencilX, titleY - 1.5f * scaleFactor, editPaint)
+
+// Calculate remaining width and draw the title
+    val titleStartX = pencilX + editIconW + editGap
+    val maxTitleW = cardRect.right - padX - catWidth - (12f * scaleFactor) - titleStartX
+    val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
+        var t = note.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title
+
+    canvas.drawText(displayTitle, titleStartX, titleY, titlePaint)
+
+    // 3. Dynamic Ruled Horizontal Lines
+    // Starts below the lowest descending character (g, j, p, q, y)
+    val lineStartY = titleY + maxOf(titleMetrics.descent + (4f * scaleFactor), 10f * scaleFactor)
+    val lineSpacing = 21.5f * scaleFactor * fScale
+    val bottomLimit = cardRect.bottom - (12f * scaleFactor)
+    val availableHeight = (bottomLimit - lineStartY).coerceAtLeast(0f)
+    val numLines = (availableHeight / lineSpacing).toInt().coerceAtLeast(2)
+
     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x18FFFFFF).toArgb()
         strokeWidth = 1f * scaleFactor
     }
 
-    val numLines = 4
     for (i in 0 until numLines) {
-        val y = lineStartY + i * lineSpacing
-        canvas.drawLine(cardRect.left + pad, y, cardRect.right - pad, y, linePaint)
+        val lineY = lineStartY + i * lineSpacing
+        canvas.drawLine(cardRect.left + padX, lineY, cardRect.right - padX, lineY, linePaint)
     }
 
     // 4. Note Content Typography
+    val bodyTextSize = 12.5f * scaleFactor * fScale
     val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFF2C2C2E).toArgb() else Color(0xFFD1D1D6).toArgb()
-        textSize = cardRect.height() * 0.082f
+        textSize = bodyTextSize
         typeface = getSlateFont(context, 400)
     }
+
     drawWrappedText(
         canvas = canvas,
         text = note.content,
-        x = cardRect.left + pad,
-        startY = lineStartY + lineSpacing * 0.72f,
-        maxWidth = cardRect.width() - pad * 2.8f,
+        x = cardRect.left + padX,
+        startY = lineStartY + (lineSpacing * 0.72f),
+        maxWidth = cardRect.width() - (padX * 2f),
         paint = contentPaint,
         lineSpacing = lineSpacing,
-        maxLines = 4
+        maxLines = numLines,
+        bottomLimit = bottomLimit
     )
-
-    // 5. Edit Pencil Indicator at Bottom Right
-    val editPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = cardRect.height() * 0.085f
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.RIGHT
-    }
-    canvas.drawText("✎", cardRect.right - pad, cardRect.bottom - pad * 0.8f, editPaint)
 
     return bitmap
 }
