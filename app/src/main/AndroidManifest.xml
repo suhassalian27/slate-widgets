@@ -3053,17 +3053,17 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-        <!-- 8. Media Streaming Dock (4x1) -->
+        <!-- 8. Media: Vinyl Disc (2x2) -->
         <receiver
             android:name=".widgets.media.MediaDockReceiver"
             android:exported="true"
-            android:label="Media Streaming Dock">
+            android:label="Slate Vinyl Disc">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x1" />
+                android:resource="@xml/widget_info_2x2" />
         </receiver>
 
     </application>

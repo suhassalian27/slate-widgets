@@ -24,7 +24,7 @@ fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Media Streaming Dock", "4x1", "Music & Media", MediaDockReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Vinyl Disc", "2x2", "Music & Media", MediaDockReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -348,35 +348,63 @@ class MediaEditorialReceiver : BaseMediaReceiver(R.layout.widget_media_2x2_layou
     }
 }
 
-// 8. Media Streaming Dock (4x1)
-class MediaDockReceiver : BaseMediaReceiver(R.layout.widget_media_dock_layout) {
+// 8. Vinyl Disc Player (2x2 - Fixed Ratio Only)
+class MediaDockReceiver : BaseMediaReceiver(R.layout.widget_media_vinyl_disc_layout) {
+
+    companion object {
+        // Caches the exact dimensions rendered by BaseMediaReceiver
+        private val widgetDimensions = java.util.concurrent.ConcurrentHashMap<Int, Pair<Int, Int>>()
+    }
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateMediaDockBitmap(context, config, isResponsive, wDp, hDp)
+        widgetDimensions[appWidgetId] = Pair(wDp, hDp)
+        val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
+        val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
+        return generateVinylDiscBitmap(context, state, art, config, isResponsive = false, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val apps = listOf(
-            Pair(R.id.btn_dock_spotify, "com.spotify.music"),
-            Pair(R.id.btn_dock_ytmusic, "com.google.android.apps.youtube.music"),
-            Pair(R.id.btn_dock_applemusic, "com.apple.android.music"),
-            Pair(R.id.btn_dock_soundcloud, "com.soundcloud.android"),
-            Pair(R.id.btn_dock_shazam, "com.shazam.android")
-        )
-
-        for ((viewId, pkg) in apps) {
-            val intent = Intent(context, this.javaClass).apply {
-                action = ACTION_LAUNCH_APP
-                putExtra(EXTRA_PKG, pkg)
-                data = Uri.parse("slate_dock://$appWidgetId/$viewId")
+        try {
+            // Retrieve exact rendered dimensions, with a fallback query if not yet cached
+            val (wDp, hDp) = widgetDimensions[appWidgetId] ?: run {
+                val manager = AppWidgetManager.getInstance(context)
+                val options = manager.getAppWidgetOptions(appWidgetId)
+                val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val w = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+                val h = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
+                Pair(if (w <= 0) 160 else w, if (h <= 0) 160 else h)
             }
-            val pi = PendingIntent.getBroadcast(
-                context,
-                (appWidgetId * 37 + viewId),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(viewId, pi)
+
+            val density = context.resources.displayMetrics.density
+            val padH = if (wDp > hDp) (((wDp - hDp) / 2f) * density).toInt() else 0
+            val padV = if (hDp > wDp) (((hDp - wDp) / 2f) * density).toInt() else 0
+
+            // Letterbox the touch grid to the exact center square of the vinyl disc
+            views.setViewPadding(R.id.layout_vinyl_controls, padH, padV, padH, padV)
+        } catch (_: Exception) {}
+
+        super.setupTouchTargets(context, views, appWidgetId)
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val w = if (isLandscape) {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160
+        } else {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
         }
+        val h = if (isLandscape) {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
+        } else {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
+        }
+
+        widgetDimensions[appWidgetId] = Pair(if (w <= 0) 160 else w, if (h <= 0) 160 else h)
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
 }

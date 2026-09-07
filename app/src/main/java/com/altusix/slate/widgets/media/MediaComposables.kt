@@ -1462,10 +1462,12 @@ fun generateEditorialBitmap(
 }
 
 // =========================================================================
-// 8. MEDIA STREAMING DOCK (4x1)
+// 8. VINYL DISC PLAYER (2x2 - FIXED RATIO)
 // =========================================================================
-fun generateMediaDockBitmap(
+fun generateVinylDiscBitmap(
     context: Context,
+    state: SlateMediaState,
+    artwork: Bitmap?,
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
@@ -1479,56 +1481,183 @@ fun generateMediaDockBitmap(
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
     val isLight = slateConfig.themeMode == "LIGHT"
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 4f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
-    }
+    // 1. Strict 1:1 Fixed Aspect Ratio (Centered Disc)
+    val size = minOf(w, h)
+    val cx = w / 2f
+    val cy = h / 2f
+    val vinylRadius = (size / 2f) - (scaleFactor * 3.5f)
 
-    val pillRadius = cardRect.height() / 2f
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // 2. Vinyl Body (Theme Background Color)
+    val vinylBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
+    canvas.drawCircle(cx, cy, vinylRadius, vinylBodyPaint)
 
-    val slotCount = 5
-    val slotW = cardRect.width() / slotCount
-    val cy = cardRect.centerY()
-    val iconR = cardRect.height() * 0.28f
+    // Outer Rim Bevel
+    val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(35, 0, 0, 0) else android.graphics.Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawCircle(cx, cy, vinylRadius, rimPaint)
 
-    val appNames = listOf("Spotify", "YT Music", "Apple", "SoundCloud", "Shazam")
-    val appLetters = listOf("S", "▶", "", "☁", "⚡")
+    val labelRadius = vinylRadius * 0.44f
 
-    for (i in 0 until slotCount) {
-        val cx = cardRect.left + i * slotW + slotW / 2f
+    // 3. Rotating Grooves (Grooves spin beneath stationary ambient light)
+    val vinylRotation = if (state.isPlaying && state.positionMs > 0L) {
+        ((state.positionMs / 1000f) * 45f) % 360f
+    } else 0f
 
-        // Squircle / Circle App Background
-        val iconBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (i == 0) accentColor else (if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF222226).toArgb())
+    canvas.save()
+    canvas.rotate(vinylRotation, cx, cy)
+
+    val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(26, 0, 0, 0) else android.graphics.Color.argb(24, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    for (i in 1..7) {
+        val r = labelRadius + (vinylRadius - labelRadius) * (i / 8f)
+        canvas.drawCircle(cx, cy, r, groovePaint)
+    }
+    canvas.restore()
+
+    // 4. Stationary Specular Highlights (Permanently centered over Prev and Next)
+    val discBounds = RectF(cx - vinylRadius, cy - vinylRadius, cx + vinylRadius, cy + vinylRadius)
+    val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(18, 255, 255, 255) else android.graphics.Color.argb(16, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    // Left highlight over Prev touch zone (centered at 180°)
+    canvas.drawArc(discBounds, 160f, 40f, true, sheenPaint)
+    // Right highlight over Next touch zone (centered at 0°)
+    canvas.drawArc(discBounds, -20f, 40f, true, sheenPaint)
+
+    // 5. Center Label: Full Circular Album Cover
+    val labelRect = RectF(cx - labelRadius, cy - labelRadius, cx + labelRadius, cy + labelRadius)
+    if (artwork != null && !artwork.isRecycled) {
+        canvas.save()
+        val labelPath = Path().apply { addCircle(cx, cy, labelRadius, Path.Direction.CW) }
+        canvas.clipPath(labelPath)
+
+        val srcW = artwork.width.toFloat()
+        val srcH = artwork.height.toFloat()
+        val scale = maxOf((labelRadius * 2f) / srcW, (labelRadius * 2f) / srcH)
+        val dx = cx - (srcW * scale) / 2f
+        val dy = cy - (srcH * scale) / 2f
+
+        val matrix = Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(dx, dy)
+        }
+        val artPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = BitmapShader(artwork, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+                setLocalMatrix(matrix)
+            }
+        }
+        canvas.drawRect(labelRect, artPaint)
+        canvas.restore()
+    } else {
+        val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF202024).toArgb()
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(cx, cy - cardRect.height() * 0.06f, iconR, iconBgPaint)
-
-        // Glyph
-        val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (i == 0) (if (isLight) Color.White.toArgb() else Color.Black.toArgb()) else (if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb())
-            textSize = iconR * 0.95f
+        canvas.drawCircle(cx, cy, labelRadius, labelBgPaint)
+        val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
+            textSize = labelRadius * 0.70f
             textAlign = Paint.Align.CENTER
             typeface = getSlateFont(context, 700)
         }
-        canvas.drawText(appLetters[i], cx, cy - cardRect.height() * 0.06f + iconR * 0.35f, glyphPaint)
-
-        // Label below
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
-            textSize = cardRect.height() * 0.12f
-            textAlign = Paint.Align.CENTER
-            typeface = getSlateFont(context, 500)
-        }
-        canvas.drawText(appNames[i], cx, cardRect.bottom - cardRect.height() * 0.12f, labelPaint)
+        canvas.drawText("♪", cx, cy + labelRadius * 0.26f, notePaint)
     }
+
+    // Label Rim Border
+    val labelRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(80, 0, 0, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.8f * scaleFactor
+    }
+    canvas.drawCircle(cx, cy, labelRadius, labelRimPaint)
+
+    // 6. Ultra-Faint Micro-Chevrons (Debossed into the wax inside the sheen zones)
+    val trackDist = vinylRadius * 0.74f
+    val prevCx = cx - trackDist
+    val nextCx = cx + trackDist
+
+    val cW = vinylRadius * 0.044f
+    val cH = vinylRadius * 0.066f
+
+    // Deboss groove shadow (creates tactile stamped depth)
+    val shadowEtchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(18, 255, 255, 255) else android.graphics.Color.argb(32, 0, 0, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    // Ultra-faint rim stroke (~9% opacity)
+    val microEtchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(24, 0, 0, 0) else android.graphics.Color.argb(24, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    // Left Micro-Chevron (<)
+    val leftPath = Path().apply {
+        moveTo(prevCx + cW, cy - cH)
+        lineTo(prevCx - cW, cy)
+        lineTo(prevCx + cW, cy + cH)
+    }
+    canvas.save()
+    canvas.translate(0f, 0.6f * scaleFactor)
+    canvas.drawPath(leftPath, shadowEtchPaint)
+    canvas.restore()
+    canvas.drawPath(leftPath, microEtchPaint)
+
+    // Right Micro-Chevron (>)
+    val rightPath = Path().apply {
+        moveTo(nextCx - cW, cy - cH)
+        lineTo(nextCx + cW, cy)
+        lineTo(nextCx - cW, cy + cH)
+    }
+    canvas.save()
+    canvas.translate(0f, 0.6f * scaleFactor)
+    canvas.drawPath(rightPath, shadowEtchPaint)
+    canvas.restore()
+    canvas.drawPath(rightPath, microEtchPaint)
+
+    // 7. Compact Center Stabilizer Puck (Play / Pause)
+    val playBtnR = vinylRadius * 0.155f
+
+    val puckShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(90, 0, 0, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * scaleFactor
+    }
+    canvas.drawCircle(cx, cy, playBtnR + 0.8f * scaleFactor, puckShadowPaint)
+
+    val rR = android.graphics.Color.red(accentColor)
+    val rG = android.graphics.Color.green(accentColor)
+    val rB = android.graphics.Color.blue(accentColor)
+    val playLum = (0.2126f * (rR / 255f)) + (0.7152f * (rG / 255f)) + (0.0722f * (rB / 255f))
+    val playIconColor = if (playLum > 0.55f) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+
+    drawPlayPauseIcon(
+        canvas,
+        cx,
+        cy,
+        playBtnR,
+        isPlaying = state.isPlaying,
+        color = playIconColor,
+        fillCircleBg = true,
+        circleBgColor = accentColor
+    )
 
     return bitmap
 }

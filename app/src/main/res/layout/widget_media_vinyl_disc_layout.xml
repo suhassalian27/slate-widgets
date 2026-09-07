@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Transparent Canvas Surface -->
+    <ImageView
+        android:id="@+id/widget_canvas_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="Vinyl Disc Surface" />
+
+    <!-- Full Disc / Background Touch to Open Active Player App -->
+    <FrameLayout
+        android:id="@+id/btn_media_open_app"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Dynamic Centered Controls Container -->
+    <LinearLayout
+        android:id="@+id/layout_vinyl_controls"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <!-- Top Spacer (35%) -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.35" />
+
+        <!-- Middle Controls Row (30%): Seamless 1:1:1 Touch Targets -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.30"
+            android:orientation="horizontal">
+
+            <!-- Previous Track (Covers Left 33% of Disc) -->
+            <FrameLayout
+                android:id="@+id/btn_media_prev"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- Play / Pause (Covers Center 34% of Disc) -->
+            <FrameLayout
+                android:id="@+id/btn_media_play_pause"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- Next Track (Covers Right 33% of Disc) -->
+            <FrameLayout
+                android:id="@+id/btn_media_next"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+
+        <!-- Bottom Spacer (35%) -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.35" />
+    </LinearLayout>
+</RelativeLayout>
