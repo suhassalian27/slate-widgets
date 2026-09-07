@@ -18,13 +18,13 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Vinyl Turntable", "2x2", "Music & Media", MediaVinylReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Vinyl Disc", "2x2", "Music & Media", MediaDockReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Bento Media Player", "4x2", "Music & Media", MediaBentoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Immersive Canvas", "3x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Vinyl Disc", "2x2", "Music & Media", MediaDockReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true)
     )
 }
 
