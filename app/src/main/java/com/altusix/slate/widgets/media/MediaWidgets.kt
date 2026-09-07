@@ -19,13 +19,15 @@ fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Vinyl Turntable", "2x2", "Music & Media", MediaVinylReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Vinyl Disc", "2x2", "Music & Media", MediaDockReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Vinyl Sleeve Showcase", sizeText = "4x2", category = "Music & Media", receiverClass = MediaSleeveVinylReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Retro Turntable Deck", sizeText = "2x2", category = "Music & Media", receiverClass = MediaRetroDeckReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Bento Media Player", "4x2", "Music & Media", MediaBentoReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Immersive Canvas", "3x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Immersive Canvas", "3x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Media Capsule Pill", "4x1", "Music & Media", MediaCapsulePillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Retro Turntable Deck", sizeText = "2x2", category = "Music & Media", receiverClass = MediaRetroDeckReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true)
+
     )
 }
 
@@ -40,7 +42,8 @@ fun updateAllMediaWidgets(context: Context) {
         MediaSpectrumReceiver::class.java,
         MediaEditorialReceiver::class.java,
         MediaDockReceiver::class.java,
-        MediaRetroDeckReceiver::class.java
+        MediaRetroDeckReceiver::class.java,
+        MediaSleeveVinylReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -201,7 +204,14 @@ abstract class BaseMediaReceiver(private val layoutResId: Int) : AppWidgetProvid
 
             val bitmap = renderWidgetBitmap(context, id, config, wDp, hDp)
             val views = RemoteViews(context.packageName, layoutResId)
-            views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
+
+            // Direct bitmap to the correct ImageView ID based on layout
+            val targetImageViewId = if (layoutResId == R.layout.widget_canvas_container) {
+                R.id.widget_canvas_image
+            } else {
+                R.id.widget_canvas_surface
+            }
+            views.setImageViewBitmap(targetImageViewId, bitmap)
 
             // Setup Touch Target PendingIntents
             setupTouchTargets(context, views, id)
@@ -464,6 +474,73 @@ class MediaRetroDeckReceiver : BaseMediaReceiver(R.layout.widget_media_turntable
             newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
         }
         widgetDimensions[appWidgetId] = Pair(if (w <= 0) 160 else w, if (h <= 0) 160 else h)
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+    }
+}
+
+// 10. Vinyl Sleeve Showcase (4x2 - Pure Artwork Showcase)
+class MediaSleeveVinylReceiver : BaseMediaReceiver(R.layout.widget_media_sleeve_vinyl_layout) {
+
+    companion object {
+        private val widgetDimensions = java.util.concurrent.ConcurrentHashMap<Int, Pair<Int, Int>>()
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        widgetDimensions[appWidgetId] = Pair(wDp, hDp)
+        val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
+        val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
+        return generateSleeveVinylBitmap(context, state, art, config, isResponsive = false, wDp, hDp)
+    }
+
+    override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
+        try {
+            val (wDp, hDp) = widgetDimensions[appWidgetId] ?: run {
+                val manager = AppWidgetManager.getInstance(context)
+                val options = manager.getAppWidgetOptions(appWidgetId)
+                val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val w = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 260) ?: 260 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 260) ?: 260
+                val h = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150) ?: 150 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150) ?: 150
+                Pair(if (w <= 0) 260 else w, if (h <= 0) 150 else h)
+            }
+
+            val density = context.resources.displayMetrics.density
+            val targetAspect = 1.62f
+            val currentAspect = wDp.toFloat() / hDp.toFloat()
+
+            val padH = if (currentAspect > targetAspect) {
+                val contentW = hDp * targetAspect
+                (((wDp - contentW) / 2f) * density).toInt()
+            } else 0
+
+            val padV = if (currentAspect < targetAspect) {
+                val contentH = wDp / targetAspect
+                (((hDp - contentH) / 2f) * density).toInt()
+            } else 0
+
+            views.setViewPadding(R.id.layout_sleeve_touch_zones, padH, padV, padH, padV)
+        } catch (_: Exception) {}
+
+        super.setupTouchTargets(context, views, appWidgetId)
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val w = if (isLandscape) {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 260) ?: 260
+        } else {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 260) ?: 260
+        }
+        val h = if (isLandscape) {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150) ?: 150
+        } else {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150) ?: 150
+        }
+        widgetDimensions[appWidgetId] = Pair(if (w <= 0) 260 else w, if (h <= 0) 150 else h)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
 }

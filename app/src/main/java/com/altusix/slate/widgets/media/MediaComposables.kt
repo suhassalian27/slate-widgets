@@ -2083,3 +2083,313 @@ fun generateTurntableDeckBitmap(
 
     return bitmap
 }
+
+// =========================================================================
+// 10. VINYL SLEEVE SHOWCASE (4x2 - PURE ARTWORK SHOWCASE)
+// =========================================================================
+fun generateSleeveVinylBitmap(
+    context: Context,
+    state: SlateMediaState,
+    artwork: Bitmap?,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
+
+    // 1. Clamped Aspect Ratio (Ideal 1.62:1 Landscape Proportion)
+    val targetAspect = 1.62f
+    val cardW = minOf(w, h * targetAspect)
+    val cardH = cardW / targetAspect
+    val cardRect = RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(cardH / 2f)
+    val uiScale = (cardH / (150f * scaleFactor)).coerceIn(0.5f, 2.5f)
+
+    // Optional deck base plate if opacity > 0
+    if (slateConfig.opacity > 0.05f) {
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = bgColor
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+    }
+
+    val cardClip = Path().apply {
+        addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(cardClip)
+
+    val sleeveMargin = cardH * 0.06f
+    val sleeveSize = cardH - (sleeveMargin * 2f)
+    val sleeveRect = RectF(
+        cardRect.left + sleeveMargin,
+        cardRect.top + sleeveMargin,
+        cardRect.left + sleeveMargin + sleeveSize,
+        cardRect.top + sleeveMargin + sleeveSize
+    )
+    val sleeveCornerR = scaleFactor * 7f * uiScale
+
+    // 2. Vinyl Disc Sliding Out From Behind the Sleeve
+    val vinylRadius = sleeveSize * 0.48f
+    val vinylCenterY = sleeveRect.centerY()
+    val vinylCenterX = sleeveRect.right + (vinylRadius * 0.12f)
+
+    val vinylRotation = if (state.isPlaying && state.positionMs > 0L) {
+        ((state.positionMs / 1000f) * 45f) % 360f
+    } else 0f
+
+    // Rotating Vinyl Body & Grooves
+    canvas.save()
+    canvas.rotate(vinylRotation, vinylCenterX, vinylCenterY)
+
+    val vinylPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF1C1C1F).toArgb() else Color(0xFF101012).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(vinylCenterX, vinylCenterY, vinylRadius, vinylPaint)
+
+    val rimHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(35, 255, 255, 255) else android.graphics.Color.argb(25, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawCircle(vinylCenterX, vinylCenterY, vinylRadius, rimHighlight)
+
+    val labelRadius = vinylRadius * 0.40f
+    val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(24, 255, 255, 255) else android.graphics.Color.argb(20, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 0.9f * scaleFactor
+    }
+    for (i in 1..6) {
+        val r = labelRadius + (vinylRadius - labelRadius) * (i / 7f)
+        canvas.drawCircle(vinylCenterX, vinylCenterY, r, groovePaint)
+    }
+    canvas.restore()
+
+    // Stationary Lighting Sheen over exposed grooves
+    val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(16, 255, 255, 255) else android.graphics.Color.argb(14, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val discBounds = RectF(vinylCenterX - vinylRadius, vinylCenterY - vinylRadius, vinylCenterX + vinylRadius, vinylCenterY + vinylRadius)
+    canvas.drawArc(discBounds, -35f, 40f, true, sheenPaint)
+    canvas.drawArc(discBounds, 145f, 40f, true, sheenPaint)
+
+    // Center Paper Label (Vintage editorial styling)
+    val paperColor = if (isLight) Color(0xFFF0E8D7).toArgb() else Color(0xFF262420).toArgb()
+    val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = paperColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(vinylCenterX, vinylCenterY, labelRadius, labelBgPaint)
+
+    val labelRim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(45, 0, 0, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawCircle(vinylCenterX, vinylCenterY, labelRadius, labelRim)
+
+    // Editorial Center Text (Track name & catalog code)
+    val labelTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF2C2A29).toArgb() else Color(0xFFE5DECF).toArgb()
+        textSize = (scaleFactor * 6.8f * uiScale).coerceIn(scaleFactor * 5.5f, scaleFactor * 10f)
+        typeface = getSlateFont(context, 700)
+        textAlign = Paint.Align.CENTER
+    }
+    val labelSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF7A7366).toArgb() else Color(0xFF9E9687).toArgb()
+        textSize = (scaleFactor * 5.2f * uiScale).coerceIn(scaleFactor * 4.2f, scaleFactor * 8f)
+        typeface = getSlateFont(context, 400)
+        textAlign = Paint.Align.CENTER
+    }
+
+    canvas.drawText(state.title.take(12), vinylCenterX, vinylCenterY - labelRadius * 0.28f, labelTextPaint)
+    canvas.drawText(state.artist.take(14), vinylCenterX, vinylCenterY - labelRadius * 0.08f, labelSubPaint)
+    canvas.drawText("SLATE • 33⅓ RPM", vinylCenterX, vinylCenterY + labelRadius * 0.45f, labelSubPaint)
+
+    // Center Spindle Hole
+    val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(vinylCenterX, vinylCenterY, labelRadius * 0.16f, holePaint)
+
+    // 3. Realistic Drop Shadow Cast from Sleeve Edge onto Disc
+    val shadowWidth = scaleFactor * 14f * uiScale
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            sleeveRect.right, 0f,
+            sleeveRect.right + shadowWidth, 0f,
+            intArrayOf(android.graphics.Color.argb(120, 0, 0, 0), android.graphics.Color.TRANSPARENT),
+            null,
+            Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawRect(sleeveRect.right, sleeveRect.top, sleeveRect.right + shadowWidth, sleeveRect.bottom, shadowPaint)
+
+    // 4. Album Sleeve Jacket (Square Cover Art on the Left)
+    val jacketPath = Path().apply {
+        addRoundRect(sleeveRect, sleeveCornerR, sleeveCornerR, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(jacketPath)
+
+    if (artwork != null && !artwork.isRecycled) {
+        val srcW = artwork.width.toFloat()
+        val srcH = artwork.height.toFloat()
+        val scale = maxOf(sleeveSize / srcW, sleeveSize / srcH)
+        val dx = sleeveRect.left + (sleeveSize - srcW * scale) / 2f
+        val dy = sleeveRect.top + (sleeveSize - srcH * scale) / 2f
+
+        val matrix = Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(dx, dy)
+        }
+        val artPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = BitmapShader(artwork, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+                setLocalMatrix(matrix)
+            }
+        }
+        canvas.drawRect(sleeveRect, artPaint)
+    } else {
+        val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF242428).toArgb()
+            style = Paint.Style.FILL
+        }
+        canvas.drawRect(sleeveRect, fallbackPaint)
+
+        val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            textSize = sleeveSize * 0.35f
+            textAlign = Paint.Align.CENTER
+            typeface = getSlateFont(context, 700)
+        }
+        canvas.drawText("♪", sleeveRect.centerX(), sleeveRect.centerY() + sleeveSize * 0.12f, notePaint)
+    }
+
+    // Spine Crease & Sleeve Bevel Lines
+    val sleeveStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(30, 0, 0, 0) else android.graphics.Color.argb(45, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawRoundRect(sleeveRect, sleeveCornerR, sleeveCornerR, sleeveStroke)
+    canvas.restore()
+
+// 5. Hi-Fi Tonearm Assembly Mounted on the Right
+    val armPivotX = cardRect.left + (cardH * 1.46f)
+    val armPivotY = cardRect.top + (cardH * 0.20f)
+    val armBaseR = cardH * 0.082f
+    val armLength = cardH * 0.52f
+
+    // Base Gimbal Flange
+    val armBasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFFD6D6DC).toArgb() else Color(0xFF28282D).toArgb()
+        style = Paint.Style.FILL
+    }
+    val armBaseStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(35, 0, 0, 0) else android.graphics.Color.argb(55, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawCircle(armPivotX, armPivotY, armBaseR, armBasePaint)
+    canvas.drawCircle(armPivotX, armPivotY, armBaseR, armBaseStroke)
+    canvas.drawCircle(armPivotX, armPivotY, armBaseR * 0.38f, holePaint)
+
+    // Rest Cradle Post (Stationary on right deck)
+    val restRad = Math.toRadians(6.0)
+    val restDist = armLength * 0.50f
+    val restX = armPivotX + (kotlin.math.sin(restRad).toFloat() * restDist)
+    val restY = armPivotY + (kotlin.math.cos(restRad).toFloat() * restDist)
+
+    val restPostPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0xFF3A3A40).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(
+        RectF(restX - scaleFactor * 2.5f * uiScale, restY - scaleFactor * 1.5f * uiScale, restX + scaleFactor * 4.5f * uiScale, restY + scaleFactor * 3.5f * uiScale),
+        scaleFactor * 1.0f, scaleFactor * 1.0f, restPostPaint
+    )
+
+    // Dynamic Arm Swing:
+    // When playing: swings inward onto the record grooves (-26° lead-in to -34° run-out)
+    // When paused: parks safely on the rest cradle (+6°)
+    val progress = state.progress.coerceIn(0f, 1f)
+    val armAngle = if (state.isPlaying) {
+        15.0f + (7.5f * progress) // Swings clockwise onto the vinyl grooves
+    } else {
+        -7.0f // Rest position alongside the record
+    }
+
+    canvas.save()
+    canvas.rotate(armAngle, armPivotX, armPivotY)
+
+    // Counterweight Stub (top)
+    val cwStubH = cardH * 0.08f
+    val cwPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF5A5A60).toArgb() else Color(0xFF333338).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(
+        RectF(armPivotX - scaleFactor * 2.2f * uiScale, armPivotY - cwStubH, armPivotX + scaleFactor * 2.2f * uiScale, armPivotY),
+        scaleFactor * 1f, scaleFactor * 1f, cwPaint
+    )
+
+    // Metallic Wand Tube
+    val wandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF707076).toArgb() else Color(0xFFDCDCE0).toArgb()
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.4f * uiScale
+        strokeCap = Paint.Cap.ROUND
+    }
+    val wandBendStartY = armPivotY + (armLength * 0.65f)
+    val wandTipX = armPivotX - (cardH * 0.065f)
+    val wandTipY = armPivotY + armLength
+
+    val wandPath = Path().apply {
+        moveTo(armPivotX, armPivotY)
+        lineTo(armPivotX, wandBendStartY)
+        quadTo(armPivotX, wandBendStartY + (armLength * 0.14f), wandTipX, wandTipY)
+    }
+    canvas.drawPath(wandPath, wandPaint)
+
+    // Headshell & Stylus Cartridge
+    canvas.save()
+    canvas.translate(wandTipX, wandTipY)
+    canvas.rotate(28f) // Angled tangentially with record grooves
+
+    val hsW = scaleFactor * 8.0f * uiScale
+    val hsH = scaleFactor * 15.0f * uiScale
+    val hsRect = RectF(-hsW / 2f, 0f, hsW / 2f, hsH)
+    val hsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF222226).toArgb() else Color(0xFF141416).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(hsRect, scaleFactor * 1.5f * uiScale, scaleFactor * 1.5f * uiScale, hsPaint)
+
+    val cartPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(
+        RectF(-hsW * 0.35f, hsH - scaleFactor * 1.5f * uiScale, hsW * 0.35f, hsH + scaleFactor * 3.5f * uiScale),
+        scaleFactor * 1.0f * uiScale, scaleFactor * 1.0f * uiScale, cartPaint
+    )
+
+    canvas.restore()
+    canvas.restore()
+
+    canvas.restore()
+
+    return bitmap
+}
