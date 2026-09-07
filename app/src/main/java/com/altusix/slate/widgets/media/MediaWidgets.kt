@@ -24,7 +24,8 @@ fun getMediaWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Immersive Canvas", "3x1", "Music & Media", MediaMiniCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Retro Cassette Tape", "4x2", "Music & Media", MediaCassetteReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Spectrum Soundwave", "2x2", "Music & Media", MediaSpectrumReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Editorial Media Card", "2x2", "Music & Media", MediaEditorialReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Retro Turntable Deck", sizeText = "2x2", category = "Music & Media", receiverClass = MediaRetroDeckReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -38,7 +39,8 @@ fun updateAllMediaWidgets(context: Context) {
         MediaCassetteReceiver::class.java,
         MediaSpectrumReceiver::class.java,
         MediaEditorialReceiver::class.java,
-        MediaDockReceiver::class.java
+        MediaDockReceiver::class.java,
+        MediaRetroDeckReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -404,6 +406,63 @@ class MediaDockReceiver : BaseMediaReceiver(R.layout.widget_media_vinyl_disc_lay
             newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
         }
 
+        widgetDimensions[appWidgetId] = Pair(if (w <= 0) 160 else w, if (h <= 0) 160 else h)
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+    }
+}
+
+// 9. Retro Turntable Deck (2x2 - Fixed Ratio Only)
+class MediaRetroDeckReceiver : BaseMediaReceiver(R.layout.widget_media_turntable_deck_layout) {
+
+    companion object {
+        private val widgetDimensions = java.util.concurrent.ConcurrentHashMap<Int, Pair<Int, Int>>()
+    }
+
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        widgetDimensions[appWidgetId] = Pair(wDp, hDp)
+        val state = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().first else MediaStateManager.loadState(context)
+        val art = if (appWidgetId == -1) MediaStateManager.getMockPreviewState().second else MediaStateManager.getArtwork(context)
+        return generateTurntableDeckBitmap(context, state, art, config, isResponsive = false, wDp, hDp)
+    }
+
+    override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
+        try {
+            val (wDp, hDp) = widgetDimensions[appWidgetId] ?: run {
+                val manager = AppWidgetManager.getInstance(context)
+                val options = manager.getAppWidgetOptions(appWidgetId)
+                val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val w = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+                val h = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
+                Pair(if (w <= 0) 160 else w, if (h <= 0) 160 else h)
+            }
+
+            val density = context.resources.displayMetrics.density
+            val padH = if (wDp > hDp) (((wDp - hDp) / 2f) * density).toInt() else 0
+            val padV = if (hDp > wDp) (((hDp - wDp) / 2f) * density).toInt() else 0
+
+            views.setViewPadding(R.id.layout_deck_controls, padH, padV, padH, padV)
+        } catch (_: Exception) {}
+
+        super.setupTouchTargets(context, views, appWidgetId)
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val w = if (isLandscape) {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160
+        } else {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
+        }
+        val h = if (isLandscape) {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
+        } else {
+            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160
+        }
         widgetDimensions[appWidgetId] = Pair(if (w <= 0) 160 else w, if (h <= 0) 160 else h)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }

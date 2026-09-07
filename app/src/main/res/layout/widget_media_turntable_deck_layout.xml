@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Canvas surface -->
+    <ImageView
+        android:id="@+id/widget_canvas_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="Turntable Deck Surface" />
+
+    <!-- Synchronized Controls & App Opener Grid -->
+    <LinearLayout
+        android:id="@+id/layout_deck_controls"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Upper 78%: Tap Platter, Tonearm, or Info to Open Media Player App -->
+        <FrameLayout
+            android:id="@+id/btn_media_open_app"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.78"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Lower 22%: Controls Deck (Contiguous 1:1:1 buttons, zero dead zones) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.22"
+            android:orientation="horizontal">
+
+            <!-- Previous Track -->
+            <FrameLayout
+                android:id="@+id/btn_media_prev"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- Play / Pause -->
+            <FrameLayout
+                android:id="@+id/btn_media_play_pause"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- Next Track -->
+            <FrameLayout
+                android:id="@+id/btn_media_next"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>
