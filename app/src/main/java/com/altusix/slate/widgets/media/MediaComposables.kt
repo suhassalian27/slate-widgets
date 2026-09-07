@@ -195,9 +195,7 @@ fun generateVinylPlayerBitmap(
     val uiScale = (effectiveDim / (160f * scaleFactor)).coerceIn(0.5f, 2.5f)
     val pad = contentW * 0.07f
 
-    // 1. Bottom-Up Controls & Compact Typography
     val btnR = scaleFactor * 11.5f * uiScale
-    val ctrlY = cardRect.bottom - (scaleFactor * 16f * uiScale)
     val ctrlSpacing = minOf(contentW * 0.26f, scaleFactor * 42f * uiScale)
 
     val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -211,10 +209,12 @@ fun generateVinylPlayerBitmap(
         typeface = getSlateFont(context, 700)
     }
 
-    val artistY = ctrlY - (btnR * 1.30f) - (scaleFactor * 5f * uiScale)
+    // 1. Text & Vinyl Stage Anchors (Vinyl position untouched)
+    val baseAnchorY = cardRect.bottom - (scaleFactor * 16f * uiScale)
+    val artistY = baseAnchorY - (btnR * 1.30f) - (scaleFactor * 5f * uiScale)
     val titleY = artistY - artistPaint.textSize - (scaleFactor * 3.5f * uiScale)
 
-    // 2. Horizontally Centered & Enlarged Vinyl Stage
+    // 2. Horizontally Centered & Sized Vinyl Stage
     val availableVinylTop = cardRect.top + (scaleFactor * 8f * uiScale)
     val availableVinylBottom = titleY - titlePaint.textSize - (scaleFactor * 6f * uiScale)
     val vinylCenterY = (availableVinylTop + availableVinylBottom) / 2f
@@ -224,14 +224,13 @@ fun generateVinylPlayerBitmap(
     val maxRadiusByW = (contentW / 2f) - (pad * 0.7f)
     val vinylRadius = minOf(maxRadiusByH, maxRadiusByW).coerceAtLeast(scaleFactor * 26f)
 
-    // 3. Rotating Grooves (Grooves rotate while Center Art stays straight)
+    // 3. Rotating Grooves
     val vinylRotation = if (state.isPlaying && state.positionMs > 0L) {
         ((state.positionMs / 1000f) * 45f) % 360f
     } else {
         0f
     }
 
-    // Rotated vinyl outer body & grooves
     canvas.save()
     canvas.rotate(vinylRotation, vinylCenterX, vinylCenterY)
 
@@ -252,7 +251,7 @@ fun generateVinylPlayerBitmap(
     }
     canvas.restore()
 
-    // 4. Straight Center Vinyl Label (Unrotated)
+    // 4. Center Vinyl Label
     val labelRadius = vinylRadius * 0.42f
     if (artwork != null && !artwork.isRecycled) {
         drawCircularBitmap(canvas, artwork, vinylCenterX, vinylCenterY, labelRadius)
@@ -279,48 +278,172 @@ fun generateVinylPlayerBitmap(
     }
     canvas.drawCircle(vinylCenterX, vinylCenterY, labelRadius * 0.20f, holePaint)
 
-    // 5. Reactive Tonearm
-    val armPivotX = cardRect.right - pad * 1.1f
-    val armPivotY = cardRect.top + pad * 1.2f
+    // 5. Boundary-Safe Tonearm Assembly
+    val baseFlangeR = vinylRadius * 0.18f
+    val rearStubLen = vinylRadius * 0.24f
+    val armLength = vinylRadius * 0.98f
 
-    val pivotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color(0xFF6E6E73).toArgb()
+    // Bounds safety clamping: prevents tonearm elements from clipping outside cardRect
+    val minPivotY = cardRect.top + rearStubLen + (scaleFactor * 6f * uiScale)
+    val maxPivotY = vinylCenterY - (vinylRadius * 0.35f)
+    val armPivotY = (vinylCenterY - vinylRadius * 0.70f).coerceIn(minPivotY, maxPivotY)
+
+    val maxPivotX = cardRect.right - baseFlangeR - (scaleFactor * 4f * uiScale)
+    val targetPivotX = vinylCenterX + (vinylRadius * 1.20f)
+    val armPivotX = targetPivotX.coerceAtMost(maxPivotX)
+    val squeezeOffset = (targetPivotX - armPivotX).coerceAtLeast(0f)
+
+    // Tone-arm Base Flange
+    val baseFlangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFFD8D8DC).toArgb() else Color(0xFF1B1B1E).toArgb()
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(armPivotX, armPivotY, vinylRadius * 0.12f, pivotPaint)
-
-    val armPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color(0xFFA1A1A6).toArgb()
+    val baseBevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(50, 0, 0, 0) else android.graphics.Color.argb(60, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = 1.8f * scaleFactor
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawCircle(armPivotX, armPivotY, baseFlangeR, baseFlangePaint)
+    canvas.drawCircle(armPivotX, armPivotY, baseFlangeR, baseBevelPaint)
+
+    val biasDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF9E9EA4).toArgb() else Color(0xFF38383D).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(armPivotX + baseFlangeR * 0.50f, armPivotY + baseFlangeR * 0.35f, scaleFactor * 2.0f * uiScale, biasDotPaint)
+
+    // Rest Cradle Post (Aligned to resting wand position)
+    val progress = state.progress.coerceIn(0f, 1f)
+    val restAngle = -9.5f - (squeezeOffset / (vinylRadius + 1f)) * 18f
+    val playAngle = 14.5f + (8.0f * progress) - (squeezeOffset / (vinylRadius + 1f)) * 10f
+    val armAngle = if (state.isPlaying) playAngle else restAngle
+
+    val restRad = Math.toRadians(restAngle.toDouble()).toFloat()
+    val restPostDist = armLength * 0.46f
+    val restX = armPivotX + kotlin.math.sin(restRad) * restPostDist
+    val restY = armPivotY + kotlin.math.cos(restRad) * restPostDist
+
+    val restPostPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF8E8E93).toArgb() else Color(0xFF333338).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(
+        RectF(restX - scaleFactor * 2.5f * uiScale, restY - scaleFactor * 1.5f * uiScale, restX + scaleFactor * 5.0f * uiScale, restY + scaleFactor * 3.5f * uiScale),
+        scaleFactor * 1.0f, scaleFactor * 1.0f, restPostPaint
+    )
+
+    // Dynamic Tonearm Structure
+    canvas.save()
+    canvas.rotate(armAngle, armPivotX, armPivotY)
+
+    // A. Rear Stub & Counterweight
+    val stubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFFA5A5AA).toArgb() else Color(0xFF8A8A90).toArgb()
+        style = Paint.Style.FILL
+    }
+    val stubW = scaleFactor * 2.6f * uiScale
+    canvas.drawRect(armPivotX - stubW / 2f, armPivotY - rearStubLen, armPivotX + stubW / 2f, armPivotY, stubPaint)
+
+    val cwW = vinylRadius * 0.15f
+    val cwH = vinylRadius * 0.13f
+    val cwTop = armPivotY - (rearStubLen * 0.90f)
+    val cwRect = RectF(armPivotX - cwW / 2f, cwTop, armPivotX + cwW / 2f, cwTop + cwH)
+    val cwPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF4A4A4F).toArgb() else Color(0xFF2B2B30).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cwRect, scaleFactor * 2f * uiScale, scaleFactor * 2f * uiScale, cwPaint)
+
+    val cwRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(armPivotX - cwW / 2f, cwTop + cwH * 0.65f, armPivotX + cwW / 2f, cwTop + cwH * 0.85f, cwRingPaint)
+
+    // B. Gimbal Ring & Pivot Housing
+    val gimbalR = vinylRadius * 0.10f
+    val gimbalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFFC0C0C6).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(armPivotX, armPivotY, gimbalR, gimbalPaint)
+
+    val centerPinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF222226).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(armPivotX, armPivotY, gimbalR * 0.35f, centerPinPaint)
+
+    val leverPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.White.toArgb() else Color(0xFFE5E5EA).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.save()
+    canvas.rotate(-45f, armPivotX, armPivotY)
+    canvas.drawRoundRect(
+        RectF(armPivotX - gimbalR * 1.4f, armPivotY - scaleFactor * 2.0f * uiScale, armPivotX - gimbalR * 0.4f, armPivotY + scaleFactor * 2.0f * uiScale),
+        scaleFactor * 1.5f, scaleFactor * 1.5f, leverPaint
+    )
+    canvas.restore()
+
+    // C. Aluminum J-Bend Wand (Straight from pivot to cradle, with a subtle bend near tip)
+    val bendStartY = armPivotY + (armLength * 0.72f)
+    val bendXOffset = vinylRadius * 0.055f
+    val wandTipX = armPivotX - bendXOffset
+    val wandTipY = armPivotY + armLength
+
+    val armWandPath = Path().apply {
+        moveTo(armPivotX, armPivotY)
+        lineTo(armPivotX, bendStartY)
+        quadTo(armPivotX, bendStartY + (armLength * 0.14f), wandTipX, wandTipY)
+    }
+
+    val wandStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF6A6A70).toArgb() else Color(0xFFD4D4DA).toArgb()
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 2.2f * uiScale
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    canvas.drawPath(armWandPath, wandStrokePaint)
+
+    // D. Headshell & Cartridge Assembly
+    canvas.save()
+    canvas.translate(wandTipX, wandTipY)
+    canvas.rotate(16f)
+
+    val hsW = scaleFactor * 7.5f * uiScale
+    val hsH = scaleFactor * 14.5f * uiScale
+    val hsRect = RectF(-hsW / 2f, 0f, hsW / 2f, hsH)
+    val hsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFF2C2C30).toArgb() else Color(0xFF1E1E22).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(hsRect, scaleFactor * 1.8f * uiScale, scaleFactor * 1.8f * uiScale, hsPaint)
+
+    val fingerLiftPath = Path().apply {
+        moveTo(hsW / 2f, hsH * 0.35f)
+        quadTo(hsW / 2f + scaleFactor * 4.5f * uiScale, hsH * 0.25f, hsW / 2f + scaleFactor * 4.5f * uiScale, hsH * 0.05f)
+    }
+    val fingerLiftPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0xFFA1A1A6).toArgb() else Color(0xFFC0C0C6).toArgb()
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 1.2f * uiScale
         strokeCap = Paint.Cap.ROUND
     }
+    canvas.drawPath(fingerLiftPath, fingerLiftPaint)
 
-    val armTargetX = if (state.isPlaying) vinylCenterX + vinylRadius * 0.60f else armPivotX - vinylRadius * 0.12f
-    val armTargetY = if (state.isPlaying) vinylCenterY + vinylRadius * 0.35f else armPivotY + vinylRadius * 0.75f
-    val armMidX = if (state.isPlaying) armPivotX - vinylRadius * 0.18f else armPivotX - vinylRadius * 0.05f
-    val armMidY = if (state.isPlaying) armPivotY + vinylRadius * 0.50f else armPivotY + vinylRadius * 0.45f
-
-    val armPath = Path().apply {
-        moveTo(armPivotX, armPivotY)
-        lineTo(armMidX, armMidY)
-        lineTo(armTargetX, armTargetY)
-    }
-    canvas.drawPath(armPath, armPaint)
-
+    val cartW = hsW * 0.70f
+    val cartH = scaleFactor * 4.0f * uiScale
+    val cartRect = RectF(-cartW / 2f, hsH - scaleFactor * 1.5f * uiScale, cartW / 2f, hsH + cartH)
     val cartPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(
-        RectF(
-            armTargetX - 3.5f * scaleFactor,
-            armTargetY - 2.5f * scaleFactor,
-            armTargetX + 7.5f * scaleFactor,
-            armTargetY + 5.5f * scaleFactor
-        ),
-        1.5f * scaleFactor, 1.5f * scaleFactor, cartPaint
-    )
+    canvas.drawRoundRect(cartRect, scaleFactor * 1.0f * uiScale, scaleFactor * 1.0f * uiScale, cartPaint)
+
+    canvas.restore()
+    canvas.restore()
 
     // 6. Track Info Typography
     val maxTextW = contentW - pad * 2f
@@ -340,7 +463,9 @@ fun generateVinylPlayerBitmap(
     canvas.drawText(titleDisplay, cardRect.left + pad, titleY, titlePaint)
     canvas.drawText(artistDisplay, cardRect.left + pad, artistY, artistPaint)
 
-    // 7. Controls Deck
+    // 7. Elevated Controls Deck
+    val ctrlY = cardRect.bottom - (scaleFactor * 21.5f * uiScale)
+
     drawSkipIcon(canvas, cardRect.centerX() - ctrlSpacing, ctrlY, btnR, isNext = false, color = secondaryTextColor)
 
     drawPlayPauseIcon(
