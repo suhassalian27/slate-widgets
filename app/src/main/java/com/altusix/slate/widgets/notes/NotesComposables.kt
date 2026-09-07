@@ -110,9 +110,190 @@ private fun drawCheckbox(
 }
 
 // =========================================================================
-// 1. STICKY NOTE PAD (2x2)
+// 1. SKEUOMORPHIC STICKY NOTE (2x2 - DOG-EAR CORNER FOLD)
 // =========================================================================
 fun generateStickyNoteBitmap(
+    context: Context,
+    note: SlateNoteData,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
+    val primaryTextColor = if (isLight) Color(0xFF1C1C1E).toArgb() else Color.White.toArgb()
+    val secondaryTextColor = if (isLight) Color(0xFF5A5A5E).toArgb() else Color(0xFFA1A1A6).toArgb()
+
+    // 1. Aspect Ratio Clamping (Square 1:1 Note Geometry)
+    val cardRect = if (isResponsive) {
+        val size = minOf(w, h)
+        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    } else {
+        val size = minOf(w, h)
+        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    }
+
+    val cardCornerRadius = scaleFactor * 8f
+    val foldSize = cardRect.width() * 0.17f
+    val uiScale = (cardRect.width() / (160f * scaleFactor)).coerceIn(0.5f, 2.5f)
+
+    // 2. Background Layer Exposed Behind the Peel (Revealed Wall / Undersheet)
+    val revealPath = Path().apply {
+        moveTo(cardRect.right - foldSize, cardRect.top)
+        lineTo(cardRect.right, cardRect.top)
+        lineTo(cardRect.right, cardRect.top + foldSize)
+        close()
+    }
+    val revealPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0x35000000).toArgb() else Color(0x22FFFFFF).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(revealPath, revealPaint)
+
+    // 3. Main Sticky Note Paper Sheet (Cut at Top-Right by Fold)
+    val paperPath = Path().apply {
+        moveTo(cardRect.left + cardCornerRadius, cardRect.top)
+        lineTo(cardRect.right - foldSize, cardRect.top)
+        lineTo(cardRect.right, cardRect.top + foldSize)
+        lineTo(cardRect.right, cardRect.bottom - cardCornerRadius)
+        quadTo(cardRect.right, cardRect.bottom, cardRect.right - cardCornerRadius, cardRect.bottom)
+        lineTo(cardRect.left + cardCornerRadius, cardRect.bottom)
+        quadTo(cardRect.left, cardRect.bottom, cardRect.left, cardRect.bottom - cardCornerRadius)
+        lineTo(cardRect.left, cardRect.top + cardCornerRadius)
+        quadTo(cardRect.left, cardRect.top, cardRect.left + cardCornerRadius, cardRect.top)
+        close()
+    }
+
+    val paperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(paperPath, paperPaint)
+
+    // Subtle paper border outline
+    val paperStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0x18000000).toArgb() else Color(0x1AFFFFFF).toArgb()
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawPath(paperPath, paperStroke)
+
+    // 4. Fold Crease Drop Shadow (Cast diagonally onto the paper face)
+    val shadowPath = Path().apply {
+        moveTo(cardRect.right - foldSize, cardRect.top)
+        lineTo(cardRect.right, cardRect.top + foldSize)
+        lineTo(cardRect.right - foldSize * 0.72f, cardRect.top + foldSize * 1.28f)
+        lineTo(cardRect.right - foldSize * 1.28f, cardRect.top + foldSize * 0.72f)
+        close()
+    }
+    val foldShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            cardRect.right - foldSize, cardRect.top,
+            cardRect.right - foldSize * 1.15f, cardRect.top + foldSize * 1.15f,
+            intArrayOf(Color(0x38000000).toArgb(), Color.Transparent.toArgb()),
+            null,
+            Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawPath(shadowPath, foldShadowPaint)
+
+    // 5. Dog-Ear Fold Flap (The turned-down corner triangle)
+    val flapPath = Path().apply {
+        moveTo(cardRect.right - foldSize, cardRect.top)
+        lineTo(cardRect.right - foldSize, cardRect.top + foldSize)
+        lineTo(cardRect.right, cardRect.top + foldSize)
+        close()
+    }
+    val flapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // Slightly elevated tint for underside of paper
+        color = if (isLight) Color(0xFFECE5D8).toArgb() else Color(0xFF2C2A28).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(flapPath, flapPaint)
+
+    val flapStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color(0x25000000).toArgb() else Color(0x35FFFFFF).toArgb()
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f * scaleFactor
+    }
+    canvas.drawPath(flapPath, flapStroke)
+
+    val pad = cardRect.width() * 0.095f
+
+    // 6. Sticky Note Typography (Unruled, Clean Flow)
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = (cardRect.height() * 0.095f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        typeface = getSlateFont(context, 700)
+    }
+
+    val maxTitleW = cardRect.width() - (pad * 2f) - foldSize * 0.6f
+    val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
+        var t = note.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title
+
+    val titleY = cardRect.top + pad * 1.5f
+    canvas.drawText(displayTitle, cardRect.left + pad, titleY, titlePaint)
+
+    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = (cardRect.height() * 0.072f).coerceIn(scaleFactor * 8.5f, scaleFactor * 14f)
+        typeface = getSlateFont(context, 400)
+    }
+    val lineSpacing = cardRect.height() * 0.11f
+    drawWrappedText(
+        canvas = canvas,
+        text = note.content,
+        x = cardRect.left + pad,
+        startY = titleY + pad * 0.95f,
+        maxWidth = cardRect.width() - pad * 2f,
+        paint = contentPaint,
+        lineSpacing = lineSpacing,
+        maxLines = 4
+    )
+
+    // 7. Floating Action Puck (Bottom Right)
+    val puckR = scaleFactor * 13f * uiScale
+    val puckCx = cardRect.right - pad * 1.25f
+    val puckCy = cardRect.bottom - pad * 1.25f
+
+    // Puck Drop Shadow
+    val puckShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color(0x30000000).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(puckCx, puckCy + 1.2f * scaleFactor, puckR, puckShadowPaint)
+
+    // Puck Surface
+    val puckBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.White.toArgb() else Color(0xFF26262B).toArgb()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(puckCx, puckCy, puckR, puckBgPaint)
+
+    val puckIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = puckR * 0.88f
+        textAlign = Paint.Align.CENTER
+        typeface = getSlateFont(context, 700)
+    }
+    canvas.drawText("✦", puckCx, puckCy + puckR * 0.32f, puckIconPaint)
+
+    return bitmap
+}
+
+// =========================================================================
+// 1b. DESK MEMO PAD (4x2 - HORIZONTAL RULED NOTEPAD)
+// =========================================================================
+fun generateDeskMemoBitmap(
     context: Context,
     note: SlateNoteData,
     slateConfig: SlateWidgetConfig,
@@ -132,8 +313,10 @@ fun generateStickyNoteBitmap(
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+        val aspect = 2f
+        val cardW = minOf(w, h * aspect)
+        val cardH = cardW / aspect
+        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
     }
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -142,14 +325,19 @@ fun generateStickyNoteBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.width() * 0.08f
+    val pad = cardRect.height() * 0.10f
 
     // 1. Frosted Adhesive Tape Strip at Top Center
-    val tapeW = cardRect.width() * 0.32f
-    val tapeH = 14f * scaleFactor
-    val tapeRect = RectF(cardRect.centerX() - tapeW / 2f, cardRect.top + pad * 0.3f, cardRect.centerX() + tapeW / 2f, cardRect.top + pad * 0.3f + tapeH)
+    val tapeW = cardRect.width() * 0.24f
+    val tapeH = 13f * scaleFactor
+    val tapeRect = RectF(
+        cardRect.centerX() - tapeW / 2f,
+        cardRect.top + pad * 0.25f,
+        cardRect.centerX() + tapeW / 2f,
+        cardRect.top + pad * 0.25f + tapeH
+    )
     val tapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x40000000).toArgb() else Color(0x28FFFFFF).toArgb()
+        color = if (isLight) Color(0x35000000).toArgb() else Color(0x28FFFFFF).toArgb()
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(tapeRect, 3f * scaleFactor, 3f * scaleFactor, tapePaint)
@@ -157,16 +345,15 @@ fun generateStickyNoteBitmap(
     // 2. Note Title & Category Tag
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.092f
+        textSize = cardRect.height() * 0.11f
         typeface = getSlateFont(context, 700)
     }
-    val titleY = cardRect.top + pad * 2.1f
-    canvas.drawText(note.title.take(24), cardRect.left + pad, titleY, titlePaint)
+    val titleY = cardRect.top + pad * 1.9f
+    canvas.drawText(note.title.take(32), cardRect.left + pad, titleY, titlePaint)
 
-    // Category pill on the right
     val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.052f
+        textSize = cardRect.height() * 0.070f
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
@@ -174,13 +361,13 @@ fun generateStickyNoteBitmap(
 
     // 3. Ruled Horizontal Lines
     val lineStartY = titleY + pad * 0.8f
-    val lineSpacing = cardRect.height() * 0.11f
+    val lineSpacing = cardRect.height() * 0.13f
     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x18FFFFFF).toArgb()
         strokeWidth = 1f * scaleFactor
     }
 
-    val numLines = 5
+    val numLines = 4
     for (i in 0 until numLines) {
         val y = lineStartY + i * lineSpacing
         canvas.drawLine(cardRect.left + pad, y, cardRect.right - pad, y, linePaint)
@@ -189,7 +376,7 @@ fun generateStickyNoteBitmap(
     // 4. Note Content Typography
     val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFF2C2C2E).toArgb() else Color(0xFFD1D1D6).toArgb()
-        textSize = cardRect.height() * 0.066f
+        textSize = cardRect.height() * 0.082f
         typeface = getSlateFont(context, 400)
     }
     drawWrappedText(
@@ -197,7 +384,7 @@ fun generateStickyNoteBitmap(
         text = note.content,
         x = cardRect.left + pad,
         startY = lineStartY + lineSpacing * 0.72f,
-        maxWidth = cardRect.width() - pad * 2f,
+        maxWidth = cardRect.width() - pad * 2.8f,
         paint = contentPaint,
         lineSpacing = lineSpacing,
         maxLines = 4
@@ -206,11 +393,11 @@ fun generateStickyNoteBitmap(
     // 5. Edit Pencil Indicator at Bottom Right
     val editPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.065f
+        textSize = cardRect.height() * 0.085f
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText("✎", cardRect.right - pad, cardRect.bottom - pad * 0.9f, editPaint)
+    canvas.drawText("✎", cardRect.right - pad, cardRect.bottom - pad * 0.8f, editPaint)
 
     return bitmap
 }

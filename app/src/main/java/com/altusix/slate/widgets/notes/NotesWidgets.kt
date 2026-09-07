@@ -18,6 +18,7 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 fun getNotesWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Sticky Note Pad", "2x2", "Notes", NotesStickyPadReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Desk Memo Pad", "4x2", "Notes", NotesDeskMemoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Checklist Tasks", "4x2", "Notes", NotesChecklistReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Checklist Mini", "2x2", "Notes", NotesChecklist2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Classic Legal Pad", "4x2", "Notes", NotesLegalPadReceiver::class.java, hasModeOption = true),
@@ -34,6 +35,7 @@ fun updateAllNotesWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
     val receivers = listOf(
         NotesStickyPadReceiver::class.java,
+        NotesDeskMemoReceiver::class.java,
         NotesChecklistReceiver::class.java,
         NotesChecklist2x2Receiver::class.java,
         NotesLegalPadReceiver::class.java,
@@ -213,12 +215,21 @@ abstract class BaseNotesReceiver(private val layoutResId: Int) : AppWidgetProvid
     }
 }
 
-// 1. Sticky Note Pad (2x2)
+// 1. Sticky Note Pad (2x2 - Dog-Ear Corner)
 class NotesStickyPadReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val note = if (appWidgetId == -1) SlateNoteData.getDefaultNote() else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Sticky Note")
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
         return generateStickyNoteBitmap(context, note, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 1b. Desk Memo Pad (4x2 - Taped Ruled Pad)
+class NotesDeskMemoReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val note = if (appWidgetId == -1) SlateNoteData.getDefaultNote() else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Desk Memo")
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateDeskMemoBitmap(context, note, config, isResponsive, wDp, hDp)
     }
 }
 
