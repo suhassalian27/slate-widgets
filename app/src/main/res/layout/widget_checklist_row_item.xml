@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_click_target"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="34dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="18dp"
+    android:paddingTop="5dp"
+    android:paddingEnd="18dp"
+    android:paddingBottom="5dp">
+
+    <!-- Checkbox Icon -->
+    <ImageView
+        android:id="@+id/row_checkbox_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:contentDescription="Check Item" />
+
+    <!-- Task Text -->
+    <TextView
+        android:id="@+id/row_task_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp" />
+
+</LinearLayout>

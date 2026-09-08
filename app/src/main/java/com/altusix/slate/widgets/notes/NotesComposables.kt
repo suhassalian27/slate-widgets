@@ -141,6 +141,136 @@ private fun drawCheckbox(
     }
 }
 
+fun createCheckmarkBitmap(context: Context, isDone: Boolean, accentColor: Int, borderColor: Int): Bitmap {
+    val sizePx = (20f * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val radius = sizePx / 2f
+    val corner = 5f * context.resources.displayMetrics.density
+
+    val boxRect = RectF(1.5f, 1.5f, sizePx - 1.5f, sizePx - 1.5f)
+    if (isDone) {
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(boxRect, corner, corner, fillPaint)
+
+        val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2.2f * context.resources.displayMetrics.density
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        val path = Path().apply {
+            moveTo(sizePx * 0.26f, sizePx * 0.50f)
+            lineTo(sizePx * 0.45f, sizePx * 0.70f)
+            lineTo(sizePx * 0.76f, sizePx * 0.30f)
+        }
+        canvas.drawPath(path, checkPaint)
+    } else {
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = borderColor
+            style = Paint.Style.STROKE
+            strokeWidth = 1.8f * context.resources.displayMetrics.density
+        }
+        canvas.drawRoundRect(boxRect, corner, corner, strokePaint)
+    }
+    return bitmap
+}
+
+fun getTintedVectorBitmap(context: Context, resId: Int, tintColor: Int): Bitmap? {
+    val drawable = androidx.core.content.ContextCompat.getDrawable(context, resId) ?: return null
+    val density = context.resources.displayMetrics.density
+    val size = (16f * density).toInt().coerceAtLeast(1)
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    drawable.mutate().apply {
+        setTint(tintColor)
+        setBounds(0, 0, size, size)
+        draw(canvas)
+    }
+    return bmp
+}
+
+fun generateCardSurfaceBitmap(
+    context: Context,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val bgColor = androidx.compose.ui.graphics.Color(slateConfig.backgroundColorHex)
+        .copy(alpha = slateConfig.opacity).toArgb()
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val aspect = 2f
+        val cardW = minOf(w, h * aspect)
+        val cardH = cardW / aspect
+        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+    return bitmap
+}
+
+fun createCheckmarkBitmap(
+    context: Context,
+    isDone: Boolean,
+    accentColor: Int,
+    borderColor: Int,
+    fScale: Float = 1.0f
+): Bitmap {
+    val sizeDp = (20f * fScale).coerceIn(16f, 26f)
+    val sizePx = (sizeDp * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val corner = 5f * context.resources.displayMetrics.density
+
+    val boxRect = RectF(1.5f, 1.5f, sizePx - 1.5f, sizePx - 1.5f)
+    if (isDone) {
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(boxRect, corner, corner, fillPaint)
+
+        val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2.2f * context.resources.displayMetrics.density
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        val path = Path().apply {
+            moveTo(sizePx * 0.26f, sizePx * 0.50f)
+            lineTo(sizePx * 0.45f, sizePx * 0.70f)
+            lineTo(sizePx * 0.76f, sizePx * 0.30f)
+        }
+        canvas.drawPath(path, checkPaint)
+    } else {
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = borderColor
+            style = Paint.Style.STROKE
+            strokeWidth = 1.8f * context.resources.displayMetrics.density
+        }
+        canvas.drawRoundRect(boxRect, corner, corner, strokePaint)
+    }
+    return bitmap
+}
+
 // =========================================================================
 // 1. SKEUOMORPHIC STICKY NOTE (2x2 - DOG-EAR CORNER FOLD)
 // =========================================================================
@@ -588,113 +718,6 @@ fun generateChecklistBitmap(
                 typeface = getSlateFont(context, 400)
             }
             canvas.drawText("Tap to add item...", textLeft, cy + (itemTextSize * 0.35f), placeholderPaint)
-        }
-    }
-
-    return bitmap
-}
-
-// =========================================================================
-// 3. INTERACTIVE CHECKLIST (2x2)
-// =========================================================================
-fun generateChecklist2x2Bitmap(
-    context: Context,
-    note: SlateNoteData,
-    slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
-    val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val isLight = slateConfig.themeMode == "LIGHT"
-    val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
-
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
-    }
-
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
-
-    val pad = cardRect.width() * 0.09f
-
-    // 1. Header (Title + Progress Count)
-    val headerY = cardRect.top + pad * 1.8f
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = cardRect.height() * 0.095f
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText(note.title.take(16), cardRect.left + pad, headerY, titlePaint)
-
-    val countBadge = "${note.completedCount}/${note.totalCount}"
-    val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = cardRect.height() * 0.082f
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.RIGHT
-    }
-    canvas.drawText(countBadge, cardRect.right - pad, headerY, countPaint)
-
-    // 2. Checklist Rows (3 prominent rows)
-    val rowStartY = headerY + pad * 0.8f
-    val rowH = (cardRect.bottom - pad - rowStartY) / 3f
-    val checkR = rowH * 0.28f
-
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = rowH * 0.44f
-        typeface = getSlateFont(context, 500)
-    }
-
-    for (i in 0 until 3) {
-        val cy = rowStartY + i * rowH + rowH / 2f
-        val cx = cardRect.left + pad + checkR
-
-        if (i < note.items.size) {
-            val item = note.items[i]
-            drawCheckbox(
-                canvas = canvas,
-                cx = cx,
-                cy = cy,
-                radius = checkR,
-                isDone = item.isDone,
-                accentColor = accentColor,
-                borderColor = secondaryTextColor,
-                scaleFactor = scaleFactor
-            )
-
-            val textLeft = cx + checkR + pad * 0.8f
-            val maxTextW = cardRect.width() - textLeft - pad
-
-            textPaint.color = if (item.isDone) secondaryTextColor else primaryTextColor
-            val displayText = if (textPaint.measureText(item.text) > maxTextW) {
-                var t = item.text
-                while (t.isNotEmpty() && textPaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
-                "$t…"
-            } else item.text
-
-            val textBaseY = cy + rowH * 0.16f
-            canvas.drawText(displayText, textLeft, textBaseY, textPaint)
-
-            if (item.isDone) {
-                val measuredW = textPaint.measureText(displayText)
-                val strikePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = secondaryTextColor
-                    strokeWidth = 1.5f * scaleFactor
-                }
-                canvas.drawLine(textLeft, cy, textLeft + measuredW, cy, strikePaint)
-            }
         }
     }
 

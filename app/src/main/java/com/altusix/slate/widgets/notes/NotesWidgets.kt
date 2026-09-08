@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.RemoteViews
 import com.altusix.slate.R
+import androidx.compose.ui.graphics.toArgb
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
@@ -20,7 +21,6 @@ fun getNotesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Sticky Note Pad", "2x2", "Notes", NotesStickyPadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Desk Memo Pad", "4x2", "Notes", NotesDeskMemoReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Checklist Tasks", "4x2", "Notes", NotesChecklistReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Checklist Mini", "2x2", "Notes", NotesChecklist2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Classic Legal Pad", "4x2", "Notes", NotesLegalPadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Quick Thought Strip", "4x1", "Notes", NotesQuickThoughtReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Mini Thought Capsule", "2x1", "Notes", NotesMiniThoughtReceiver::class.java, hasModeOption = true),
@@ -37,7 +37,6 @@ fun updateAllNotesWidgets(context: Context) {
         NotesStickyPadReceiver::class.java,
         NotesDeskMemoReceiver::class.java,
         NotesChecklistReceiver::class.java,
-        NotesChecklist2x2Receiver::class.java,
         NotesLegalPadReceiver::class.java,
         NotesQuickThoughtReceiver::class.java,
         NotesMiniThoughtReceiver::class.java,
@@ -243,58 +242,117 @@ class NotesDeskMemoReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layou
     }
 }
 
-// 2. Checklist Tasks (4x2)
+// 2. Checklist Tasks (4x2 - Adaptive Dynamic Rows)
 class NotesChecklistReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist_4x2_layout) {
     override val widgetEditMode: String = "CHECKLIST_ONLY"
 
     companion object {
         private val widgetDimensions = java.util.concurrent.ConcurrentHashMap<Int, Pair<Int, Int>>()
+
+        fun resolveDimensions(context: Context, appWidgetId: Int): Pair<Int, Int> {
+            val manager = AppWidgetManager.getInstance(context) ?: return Pair(260, 140)
+            val options = manager.getAppWidgetOptions(appWidgetId) ?: return Pair(260, 140)
+            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+            val minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+            val maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0)
+            val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+            val maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
+
+            // Portrait: Width is MIN_WIDTH, Height is MAX_HEIGHT
+            // Landscape: Width is MAX_WIDTH, Height is MIN_HEIGHT
+            val w = if (isLandscape) {
+                if (maxW > 0) maxW else minW
+            } else {
+                if (minW > 0) minW else maxW
+            }
+
+            val h = if (isLandscape) {
+                if (minH > 0) minH else maxH
+            } else {
+                if (maxH > 0) maxH else minH
+            }
+
+            return Pair(if (w > 0) w else 260, if (h > 0) h else 140)
+        }
     }
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         widgetDimensions[appWidgetId] = Pair(wDp, hDp)
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Checklist") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Checklist")
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateChecklistBitmap(context, note, config, isResponsive, wDp, hDp)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+
+        if (appWidgetId == -1) {
+            val note = NotesStorageManager.getNoteForWidget(context, -1, "Checklist")
+            return generateChecklistBitmap(context, note, config, isResponsive, wDp, hDp)
+        }
+
+        return generateCardSurfaceBitmap(context, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        super.setupTouchTargets(context, views, appWidgetId)
-
-        // 1. Synchronize Letterbox Padding to Align XML with Canvas
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        if (!isResponsive) {
-            try {
-                val (wDp, hDp) = widgetDimensions[appWidgetId] ?: run {
-                    val manager = AppWidgetManager.getInstance(context)
-                    val options = manager.getAppWidgetOptions(appWidgetId)
-                    val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                    val w = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 260) ?: 260 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 260) ?: 260
-                    val h = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140) ?: 140 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140) ?: 140
-                    Pair(if (w <= 0) 260 else w, if (h <= 0) 140 else h)
-                }
-
-                val density = context.resources.displayMetrics.density
-                val targetAspect = 2.0f
-                val currentAspect = wDp.toFloat() / hDp.toFloat()
-
-                val padH = if (currentAspect > targetAspect) {
-                    val contentW = hDp * targetAspect
-                    (((wDp - contentW) / 2f) * density).toInt()
-                } else 0
-
-                val padV = if (currentAspect < targetAspect) {
-                    val contentH = wDp / targetAspect
-                    (((hDp - contentH) / 2f) * density).toInt()
-                } else 0
-
-                views.setViewPadding(R.id.layout_checklist_root, padH, padV, padH, padV)
-            } catch (_: Exception) {}
+        val config = loadSlateWidgetConfig(context, appWidgetId)
+        val note = if (appWidgetId == -1) {
+            NotesStorageManager.getNoteForWidget(context, -1, "Checklist")
         } else {
-            views.setViewPadding(R.id.layout_checklist_root, 0, 0, 0, 0)
+            NotesStorageManager.getNoteForWidget(context, appWidgetId, "Checklist")
         }
 
-        // 2. Reusable Edit PendingIntent
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        val (wDp, hDp) = widgetDimensions[appWidgetId] ?: resolveDimensions(context, appWidgetId)
+
+        // Calculate Letterbox Margins for Fixed Mode
+        val density = context.resources.displayMetrics.density
+        val padH: Int
+        val padV: Int
+        val effectiveCardHDp: Int
+
+        if (!isResponsive) {
+            val targetAspect = 2.0f
+            val currentAspect = wDp.toFloat() / hDp.toFloat()
+
+            if (currentAspect > targetAspect) {
+                val contentW = hDp * targetAspect
+                padH = (((wDp - contentW) / 2f) * density).toInt()
+                padV = 0
+                effectiveCardHDp = hDp
+            } else {
+                val contentH = wDp / targetAspect
+                padH = 0
+                padV = (((hDp - contentH) / 2f) * density).toInt()
+                effectiveCardHDp = contentH.toInt()
+            }
+        } else {
+            padH = 0
+            padV = 0
+            effectiveCardHDp = hDp
+        }
+
+        views.setViewPadding(R.id.layout_checklist_content, padH, padV, padH, padV)
+
+        val accentColor = androidx.compose.ui.graphics.Color(config.accentColorHex).toArgb()
+        val isLight = config.themeMode == "LIGHT"
+        val primaryText = if (isLight) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+        val secondaryText = if (isLight) android.graphics.Color.parseColor("#6C6C70") else android.graphics.Color.parseColor("#8E8E93")
+        val fScale = note.fontScaleMultiplier
+
+        // Header View Binding
+        views.setTextViewText(R.id.txt_checklist_title, note.title)
+        views.setTextColor(R.id.txt_checklist_title, primaryText)
+        views.setTextViewTextSize(R.id.txt_checklist_title, android.util.TypedValue.COMPLEX_UNIT_SP, 16f * fScale)
+
+        views.setTextViewText(R.id.txt_checklist_count, "${note.completedCount}/${note.totalCount}")
+        views.setTextColor(R.id.txt_checklist_count, accentColor)
+        views.setTextViewTextSize(R.id.txt_checklist_count, android.util.TypedValue.COMPLEX_UNIT_SP, 13f * fScale)
+
+        val editBmp = getTintedVectorBitmap(context, R.drawable.ic_pencil_alt, accentColor)
+        if (editBmp != null) views.setImageViewBitmap(R.id.icon_checklist_edit, editBmp)
+
         val editIntent = Intent(context, this.javaClass).apply {
             action = ACTION_EDIT_NOTE
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -303,38 +361,73 @@ class NotesChecklistReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist
         }
         val editPi = PendingIntent.getBroadcast(
             context,
-            (appWidgetId * 41 + 1),
+            appWidgetId * 41 + 1,
             editIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        views.setOnClickPendingIntent(R.id.btn_note_open_edit, editPi)
 
-        // 3. Row Touch Target Binding
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Checklist") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Checklist")
-        val checkRowIds = listOf(
-            R.id.btn_check_item_0, R.id.btn_check_item_1, R.id.btn_check_item_2,
-            R.id.btn_check_item_3, R.id.btn_check_item_4
-        )
+        // Dynamic Row Capacity Calculation
+        val headerH = 42
+        val bottomH = 6
+        val availableH = (effectiveCardHDp - headerH - bottomH).coerceAtLeast(0)
 
-        for (i in checkRowIds.indices) {
-            if (i < note.items.size) {
-                // Active item: toggle state
-                val intent = Intent(context, this.javaClass).apply {
-                    action = ACTION_TOGGLE_CHECK
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    putExtra(EXTRA_ITEM_INDEX, i)
-                    data = Uri.parse("slate_notes://$appWidgetId/check/$i")
-                }
-                val pi = PendingIntent.getBroadcast(
-                    context,
-                    (appWidgetId * 43 + i),
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(checkRowIds[i], pi)
+        // Calibrated Row Heights per font scale
+        val rowHDp = when (note.fontSize) {
+            "SMALL" -> 31
+            "LARGE" -> 39
+            else -> 34 // "MEDIUM"
+        }
+        val maxFittingRows = (availableH / rowHDp).coerceAtLeast(1)
+
+        views.removeAllViews(R.id.layout_dynamic_checklist_rows)
+
+        val itemsToShow = minOf(note.items.size, maxFittingRows)
+        val checkedBmp = createCheckmarkBitmap(context, isDone = true, accentColor, secondaryText, fScale)
+        val uncheckedBmp = createCheckmarkBitmap(context, isDone = false, accentColor, secondaryText, fScale)
+
+        for (i in 0 until itemsToShow) {
+            val item = note.items[i]
+            val rowView = RemoteViews(context.packageName, R.layout.widget_checklist_row_item)
+
+            val textPaintFlags = if (item.isDone) {
+                android.graphics.Paint.STRIKE_THRU_TEXT_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG
             } else {
-                // Empty placeholder row: opens note editor to add tasks
-                views.setOnClickPendingIntent(checkRowIds[i], editPi)
+                android.graphics.Paint.ANTI_ALIAS_FLAG
             }
+            rowView.setTextViewText(R.id.row_task_text, item.text)
+            rowView.setTextColor(R.id.row_task_text, if (item.isDone) secondaryText else primaryText)
+            rowView.setInt(R.id.row_task_text, "setPaintFlags", textPaintFlags)
+            rowView.setTextViewTextSize(R.id.row_task_text, android.util.TypedValue.COMPLEX_UNIT_SP, 14f * fScale)
+
+            rowView.setImageViewBitmap(R.id.row_checkbox_icon, if (item.isDone) checkedBmp else uncheckedBmp)
+
+            val checkIntent = Intent(context, this.javaClass).apply {
+                action = ACTION_TOGGLE_CHECK
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                putExtra(EXTRA_ITEM_INDEX, i)
+                data = Uri.parse("slate_notes://$appWidgetId/check/$i")
+            }
+            val checkPi = PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 1000 + i,
+                checkIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            rowView.setOnClickPendingIntent(R.id.row_click_target, checkPi)
+
+            views.addView(R.id.layout_dynamic_checklist_rows, rowView)
+        }
+
+        // Empty state placeholder
+        if (note.items.isEmpty()) {
+            val emptyRow = RemoteViews(context.packageName, R.layout.widget_checklist_row_item)
+            emptyRow.setTextViewText(R.id.row_task_text, "Tap to add items...")
+            emptyRow.setTextColor(R.id.row_task_text, secondaryText)
+            emptyRow.setTextViewTextSize(R.id.row_task_text, android.util.TypedValue.COMPLEX_UNIT_SP, 14f * fScale)
+            emptyRow.setImageViewBitmap(R.id.row_checkbox_icon, uncheckedBmp)
+            emptyRow.setOnClickPendingIntent(R.id.row_click_target, editPi)
+            views.addView(R.id.layout_dynamic_checklist_rows, emptyRow)
         }
     }
 
@@ -344,48 +437,9 @@ class NotesChecklistReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist
         appWidgetId: Int,
         newOptions: Bundle?
     ) {
-        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val w = if (isLandscape) {
-            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 260) ?: 260
-        } else {
-            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 260) ?: 260
-        }
-        val h = if (isLandscape) {
-            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140) ?: 140
-        } else {
-            newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140) ?: 140
-        }
-        widgetDimensions[appWidgetId] = Pair(if (w <= 0) 260 else w, if (h <= 0) 140 else h)
+        val dims = resolveDimensions(context, appWidgetId)
+        widgetDimensions[appWidgetId] = dims
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
-    }
-}
-
-// 3. Checklist Mini (2x2)
-class NotesChecklist2x2Receiver : BaseNotesReceiver(R.layout.widget_notes_checklist_2x2_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Checklist") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Checklist")
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateChecklist2x2Bitmap(context, note, config, isResponsive, wDp, hDp)
-    }
-
-    override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        super.setupTouchTargets(context, views, appWidgetId)
-        val checkRowIds = listOf(R.id.btn_check_item_0, R.id.btn_check_item_1, R.id.btn_check_item_2)
-        for (i in checkRowIds.indices) {
-            val intent = Intent(context, this.javaClass).apply {
-                action = ACTION_TOGGLE_CHECK
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                putExtra(EXTRA_ITEM_INDEX, i)
-                data = Uri.parse("slate_notes://$appWidgetId/check2x2/$i")
-            }
-            val pi = PendingIntent.getBroadcast(
-                context,
-                (appWidgetId * 47 + i),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(checkRowIds[i], pi)
-        }
     }
 }
 
