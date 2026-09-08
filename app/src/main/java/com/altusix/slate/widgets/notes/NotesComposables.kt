@@ -934,8 +934,8 @@ fun generateQuickThoughtBitmap(
 
     val fScale = note.fontScaleMultiplier
 
-    // 1. Concentric Accent Icon Disc (Centered in the left pill curve)
-    val badgeR = cardRect.height() * 0.28f
+    // 1. Concentric Accent Icon Disc (Anchored inside the left cap)
+    val badgeR = cardRect.height() * 0.33f
     val badgeCx = cardRect.left + pillRadius
     val badgeCy = cardRect.centerY()
 
@@ -945,16 +945,23 @@ fun generateQuickThoughtBitmap(
     }
     canvas.drawCircle(badgeCx, badgeCy, badgeR, badgePaint)
 
-    // Inner 4-Point Star Sparkle
-    val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.White.toArgb() else Color(0xFF121214).toArgb()
-        textSize = badgeR * 0.95f
-        textAlign = Paint.Align.CENTER
-        typeface = getSlateFont(context, 700)
+    // Vector Pencil Icon (mirrored horizontally to match Widget 6 orientation)
+    val iconSize = (badgeR * 1.15f).toInt().coerceAtLeast(1)
+    val iconLeft = (badgeCx - iconSize / 2f).toInt()
+    val iconTop = (badgeCy - iconSize / 2f).toInt()
+    val iconRight = iconLeft + iconSize
+    val iconBottom = iconTop + iconSize
+
+    val iconTint = if (isLight) Color.White.toArgb() else Color(0xFF121214).toArgb()
+    androidx.core.content.ContextCompat.getDrawable(context, com.altusix.slate.R.drawable.ic_pencil_alt)?.let { drawable ->
+        canvas.save()
+        canvas.scale(-1f, 1f, badgeCx, badgeCy)
+        val mutated = drawable.mutate()
+        mutated.setTint(iconTint)
+        mutated.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+        mutated.draw(canvas)
+        canvas.restore()
     }
-    val iconMetrics = iconPaint.fontMetrics
-    val iconY = badgeCy - ((iconMetrics.ascent + iconMetrics.descent) / 2f)
-    canvas.drawText("✦", badgeCx, iconY, iconPaint)
 
     // 2. Text Bounds & Layout Geometry
     val textLeft = badgeCx + badgeR + (14f * scaleFactor)
@@ -980,7 +987,6 @@ fun generateQuickThoughtBitmap(
 
     // 3. Mathematical Vertical Centering
     if (rawBody.isBlank()) {
-        // Single line: Center title vertically
         val titleMetrics = titlePaint.fontMetrics
         val titleY = cardRect.centerY() - ((titleMetrics.ascent + titleMetrics.descent) / 2f)
 
@@ -992,7 +998,6 @@ fun generateQuickThoughtBitmap(
 
         canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
     } else {
-        // Two lines: Center title + subtitle as a balanced unit
         val titleMetrics = titlePaint.fontMetrics
         val bodyMetrics = bodyPaint.fontMetrics
         val lineGap = 3.5f * scaleFactor
