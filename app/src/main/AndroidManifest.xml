@@ -84,6 +84,13 @@
             android:exported="false"
             android:theme="@style/Theme.Slate" />
 
+        <!-- Photos & Memories Config Activity -->
+        <activity
+            android:name=".widgets.photos.PhotosConfigActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Slate"
+            android:windowSoftInputMode="adjustResize" />
+
         <activity
             android:name=".widgets.media.MediaTrampolineActivity"
             android:exported="false"
@@ -3196,6 +3203,114 @@
             android:name=".widgets.notes.NotesStackReceiver"
             android:exported="true"
             android:label="Multi-Note Stack">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- ========================================================================= -->
+        <!-- SLATE "PHOTOS & MEMORIES" WIDGETS -->
+        <!-- ========================================================================= -->
+
+        <!-- 1. Polaroid Memory (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosPolaroidReceiver"
+            android:exported="true"
+            android:label="Polaroid Memory">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 2. On This Day (4x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosOnThisDayReceiver"
+            android:exported="true"
+            android:label="On This Day">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 3. 35mm Film Strip (4x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosFilmStripReceiver"
+            android:exported="true"
+            android:label="35mm Film Strip">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 4. Bento Collage (4x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosCollageBentoReceiver"
+            android:exported="true"
+            android:label="Bento Collage">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 5. Photo Carousel (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosCarouselReceiver"
+            android:exported="true"
+            android:label="Photo Carousel">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 6. Photo Stamp (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosStampReceiver"
+            android:exported="true"
+            android:label="Photo Stamp">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 7. Locket Memory (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosLocketReceiver"
+            android:exported="true"
+            android:label="Locket Memory">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. Full-Bleed Clock Overlay (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosClockOverlayReceiver"
+            android:exported="true"
+            android:label="Full-Bleed Clock">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
