@@ -15,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -31,7 +32,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,17 +45,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,11 +61,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.theme.ThemePreferences
+import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.ui.components.CustomColorPickerDialog
+import com.altusix.slate.ui.components.RainbowCustomCircle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.hypot
@@ -109,6 +114,8 @@ class CameraWidgetConfigActivity : ComponentActivity() {
             ) {
                 var config by remember { mutableStateOf(initialConfig) }
                 var rawPickedUri by remember { mutableStateOf<Uri?>(null) }
+                var showColorPicker by remember { mutableStateOf(false) }
+                var showAdvanced by remember { mutableStateOf(false) }
 
                 val photoPicker = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.PickVisualMedia()
@@ -144,13 +151,15 @@ class CameraWidgetConfigActivity : ComponentActivity() {
                     Surface(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF0C0C0E))
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
                             .imePadding(),
                         color = Color(0xFF0C0C0E)
                     ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
+                        ) {
                             // 1. Top Bar
                             Row(
                                 modifier = Modifier
@@ -201,184 +210,136 @@ class CameraWidgetConfigActivity : ComponentActivity() {
 
                             HorizontalDivider(color = Color(0xFF1E1E24), thickness = 1.dp)
 
-                            // 2. Scrollable Configuration Body
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(20.dp)
+                            // 2. PINNED / STICKY LIVE PREVIEW
+                            val context = LocalContext.current
+                            val slateConfig = remember(widgetId) { loadSlateWidgetConfig(context, widgetId) }
+
+                            val previewData by produceState(
+                                initialValue = Pair<Bitmap?, Float>(null, 1.0f),
+                                config,
+                                slateConfig
                             ) {
-                                // Live Preview Card
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(210.dp)
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(Color(0xFF16161B))
-                                        .border(1.dp, Color(0xFF282830), RoundedCornerShape(20.dp))
-                                        .clickable {
-                                            if (config.photoUri != null) {
-                                                rawPickedUri = Uri.parse(config.photoUri)
-                                            } else {
-                                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val imageBitmap = rememberUriImageBitmap(config.photoUri)
+                                value = withContext(Dispatchers.Default) {
+                                    renderExactWidgetPreview(context, widgetId, config, slateConfig)
+                                }
+                            }
 
-                                    if (imageBitmap != null) {
-                                        val colorMatrix = remember(config.filterStyle) {
-                                            when (config.filterStyle) {
-                                                PhotoFilterStyle.GRAYSCALE -> ColorMatrix().apply { setToSaturation(0f) }
-                                                PhotoFilterStyle.SEPIA -> ColorMatrix(floatArrayOf(0.393f, 0.769f, 0.189f, 0f, 0f, 0.349f, 0.686f, 0.168f, 0f, 0f, 0.272f, 0.534f, 0.131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
-                                                PhotoFilterStyle.DARK_DIM -> ColorMatrix().apply { setToScale(0.7f, 0.7f, 0.7f, 1f) }
-                                                PhotoFilterStyle.VINTAGE -> ColorMatrix(floatArrayOf(0.9f, 0.1f, 0.1f, 0f, 20f, 0.1f, 0.8f, 0.1f, 0f, 15f, 0.1f, 0.1f, 0.6f, 0f, 10f, 0f, 0f, 0f, 1f, 0f))
-                                                PhotoFilterStyle.COOL_BLUE -> ColorMatrix(floatArrayOf(0.7f, 0f, 0.2f, 0f, 0f, 0f, 0.9f, 0.2f, 0f, 0f, 0f, 0.2f, 1.2f, 0f, 20f, 0f, 0f, 0f, 1f, 0f))
-                                                PhotoFilterStyle.WARM_GOLD -> ColorMatrix(floatArrayOf(1.2f, 0.1f, 0f, 0f, 15f, 0.1f, 1.1f, 0f, 0f, 10f, 0f, 0f, 0.8f, 0f, -10f, 0f, 0f, 0f, 1f, 0f))
-                                                PhotoFilterStyle.HIGH_CONTRAST -> ColorMatrix(floatArrayOf(1.4f, -0.1f, -0.1f, 0f, -20f, -0.1f, 1.4f, -0.1f, 0f, -20f, -0.1f, -0.1f, 1.4f, 0f, -20f, 0f, 0f, 0f, 1f, 0f))
-                                                else -> ColorMatrix()
-                                            }
+                            val previewBitmap = previewData.first
+                            val targetAspect = previewData.second
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(210.dp)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color(0xFF141418))
+                                    .border(1.dp, Color(0xFF24242C), RoundedCornerShape(20.dp))
+                                    .clickable {
+                                        if (config.photoUri != null) {
+                                            rawPickedUri = Uri.parse(config.photoUri)
+                                        } else {
+                                            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                         }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (previewBitmap != null && !config.photoUri.isNullOrEmpty()) {
+                                    Image(
+                                        bitmap = previewBitmap.asImageBitmap(),
+                                        contentDescription = "Exact Widget Preview",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .padding(10.dp)
+                                            .aspectRatio(targetAspect)
+                                    )
 
-                                        Image(
-                                            bitmap = imageBitmap,
-                                            contentDescription = "Live Preview",
-                                            contentScale = ContentScale.Crop,
-                                            colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-
-                                        val isPolaroid = config.borderStyle == PhotoFrameBorder.POLAROID
-
-                                        when (config.borderStyle) {
-                                            PhotoFrameBorder.POLAROID -> {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .fillMaxHeight(0.24f)
-                                                        .align(Alignment.BottomCenter)
-                                                        .background(Color.White),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    if (config.customCaption.isNotEmpty()) {
-                                                        Text(
-                                                            text = config.customCaption,
-                                                            color = Color(0xFF121214),
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 14.sp,
-                                                            textAlign = TextAlign.Center
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            PhotoFrameBorder.VIGNETTE -> Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(Brush.radialGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
-                                            )
-                                            PhotoFrameBorder.THIN_BORDER -> Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(2.dp)
-                                                    .border(3.5.dp, Color.White, RoundedCornerShape(18.dp))
-                                            )
-                                            PhotoFrameBorder.INNER_OUTLINE -> Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(8.dp)
-                                                    .border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
-                                            )
-                                            PhotoFrameBorder.FILM_STRIP -> {
-                                                Column(
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    verticalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(Color.Black))
-                                                    Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(Color.Black))
-                                                }
-                                            }
-                                            else -> {}
-                                        }
-
-                                        if (config.customCaption.isNotEmpty() && !isPolaroid) {
-                                            Text(
-                                                text = config.customCaption,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomStart)
-                                                    .padding(14.dp)
-                                            )
-                                        }
-
-                                        // Action Buttons
-                                        Row(
+                                    Row(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(
                                             modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(10.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color.Black.copy(alpha = 0.70f))
+                                                .clickable {
+                                                    config.photoUri?.let { rawPickedUri = Uri.parse(it) }
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 5.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(Color.Black.copy(alpha = 0.65f))
-                                                    .clickable {
-                                                        config.photoUri?.let { rawPickedUri = Uri.parse(it) }
-                                                    }
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                                            ) {
-                                                Text("Edit Crop", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                            }
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(Color.Black.copy(alpha = 0.65f))
-                                                    .clickable {
-                                                        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                                    }
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                                            ) {
-                                                Text("Change Photo", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                            }
-                                        }
-                                    } else {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(48.dp)
-                                                    .clip(CircleShape)
-                                                    .background(accentColor.copy(alpha = 0.15f)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Add,
-                                                    contentDescription = "Choose Photo",
-                                                    tint = accentColor,
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                            }
                                             Text(
-                                                text = "Tap to choose a photo",
+                                                "Edit Crop",
                                                 color = Color.White,
-                                                fontWeight = FontWeight.Medium,
-                                                fontSize = 14.sp
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
                                             )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color.Black.copy(alpha = 0.70f))
+                                                .clickable {
+                                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                        ) {
                                             Text(
-                                                text = "Opens camera directly on launcher tap",
-                                                color = Color(0xFF8E8E93),
-                                                fontSize = 12.sp
+                                                "Change Photo",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
                                             )
                                         }
                                     }
+                                } else {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .clip(CircleShape)
+                                                .background(accentColor.copy(alpha = 0.15f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "Choose Photo",
+                                                tint = accentColor,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = "Tap to choose a photo",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = "Live preview reflects your exact home screen frame",
+                                            color = Color(0xFF8E8E93),
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
+                            }
 
+                            HorizontalDivider(color = Color(0xFF1A1A22), thickness = 1.dp)
+
+                            // 3. SCROLLABLE CONTROLS BODY
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
                                 // Frame Border Style
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(
@@ -469,43 +430,412 @@ class CameraWidgetConfigActivity : ComponentActivity() {
                                     }
                                 }
 
-                                // Caption Overlay
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(
-                                        text = "CAPTION OVERLAY",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF8E8E93),
-                                        letterSpacing = 0.5.sp
-                                    )
-
-                                    OutlinedTextField(
-                                        value = config.customCaption,
-                                        onValueChange = { config = config.copy(customCaption = it) },
-                                        label = { Text("Caption (Optional)") },
-                                        placeholder = { Text("e.g. Captured with Slate") },
-                                        singleLine = true,
+                                // Caption Overlay Section
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = accentColor,
-                                            unfocusedBorderColor = Color(0xFF2C2C35),
-                                            focusedLabelColor = accentColor,
-                                            unfocusedLabelColor = Color(0xFF8E8E93),
-                                            focusedTextColor = Color.White,
-                                            unfocusedTextColor = Color.White,
-                                            focusedContainerColor = Color(0xFF16161B),
-                                            unfocusedContainerColor = Color(0xFF16161B)
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "CAPTION OVERLAY",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF8E8E93),
+                                            letterSpacing = 0.5.sp
                                         )
-                                    )
+
+                                        Switch(
+                                            checked = config.showCaption,
+                                            onCheckedChange = { config = config.copy(showCaption = it) },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.Black,
+                                                checkedTrackColor = accentColor,
+                                                uncheckedThumbColor = Color(0xFF8E8E93),
+                                                uncheckedTrackColor = Color(0xFF1C1C22)
+                                            )
+                                        )
+                                    }
+
+                                    AnimatedVisibility(visible = config.showCaption) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                            OutlinedTextField(
+                                                value = config.customCaption,
+                                                onValueChange = { config = config.copy(customCaption = it) },
+                                                label = { Text("Caption Text") },
+                                                placeholder = { Text("e.g. Captured with Slate") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = accentColor,
+                                                    unfocusedBorderColor = Color(0xFF2C2C35),
+                                                    focusedLabelColor = accentColor,
+                                                    unfocusedLabelColor = Color(0xFF8E8E93),
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor = Color.White,
+                                                    focusedContainerColor = Color(0xFF16161B),
+                                                    unfocusedContainerColor = Color(0xFF16161B)
+                                                )
+                                            )
+
+                                            // 1. Text Size (S / M / L)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Text Size", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(Color(0xFF1C1C22))
+                                                        .padding(2.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    CaptionSize.values().forEach { size ->
+                                                        val isSelected = config.captionSize == size
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(if (isSelected) accentColor else Color.Transparent)
+                                                                .clickable {
+                                                                    config = config.copy(
+                                                                        captionSize = size
+                                                                    )
+                                                                }
+                                                                .padding(horizontal = 16.dp, vertical = 7.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = size.label,
+                                                                color = if (isSelected) Color.Black else Color(0xFF8E8E93),
+                                                                fontSize = 12.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 2. Text Color: Swatches + Rainbow Custom Picker
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Text Color", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                val coreSwatches = listOf(
+                                                    0xFFFFFFFFL, // White
+                                                    0xFF121214L, // Black
+                                                    accentColor.toArgb().toLong() and 0xFFFFFFFFL, // Accent
+                                                    0xFF8E8E93L  // Gray
+                                                )
+
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    coreSwatches.forEach { hexVal ->
+                                                        val isSelected = config.captionColorHex == hexVal
+                                                        val swatchColor = Color(hexVal.toInt())
+
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(32.dp)
+                                                                .clip(CircleShape)
+                                                                .background(swatchColor)
+                                                                .border(
+                                                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                                                    color = if (isSelected) Color.White else Color(0xFF383842),
+                                                                    shape = CircleShape
+                                                                )
+                                                                .clickable { config = config.copy(captionColorHex = hexVal) },
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            if (isSelected) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Check,
+                                                                    contentDescription = null,
+                                                                    tint = if (hexVal == 0xFFFFFFFFL) Color.Black else Color.White,
+                                                                    modifier = Modifier.size(13.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    val isCustom = coreSwatches.none { it == config.captionColorHex }
+                                                    RainbowCustomCircle(
+                                                        isSelected = isCustom,
+                                                        activeColor = if (isCustom) Color(config.captionColorHex.toInt()) else null,
+                                                        onClick = { showColorPicker = true }
+                                                    )
+                                                }
+                                            }
+
+                                            // 3. Position (Bottom / Center / Top)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Position", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(Color(0xFF1C1C22))
+                                                        .padding(2.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    CaptionPosition.values().forEach { pos ->
+                                                        val isSelected = config.captionPosition == pos
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(if (isSelected) accentColor else Color.Transparent)
+                                                                .clickable {
+                                                                    config = config.copy(
+                                                                        captionPosition = pos,
+                                                                        captionVerticalBias = pos.biasY
+                                                                    )
+                                                                }
+                                                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = pos.label,
+                                                                color = if (isSelected) Color.Black else Color(0xFF8E8E93),
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 4. Alignment (Left / Center / Right)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Alignment", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(Color(0xFF1C1C22))
+                                                        .padding(2.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    CaptionAlignment.values().forEach { align ->
+                                                        val isSelected = config.captionAlignment == align
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(if (isSelected) accentColor else Color.Transparent)
+                                                                .clickable {
+                                                                    config = config.copy(
+                                                                        captionAlignment = align,
+                                                                        captionHorizontalBias = align.biasX
+                                                                    )
+                                                                }
+                                                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = align.label,
+                                                                color = if (isSelected) Color.Black else Color(0xFF8E8E93),
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 5. Advanced Options Toggle
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color(0xFF16161C))
+                                                    .clickable { showAdvanced = !showAdvanced }
+                                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Advanced Styling",
+                                                    color = Color.White,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Icon(
+                                                    imageVector = if (showAdvanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF8E8E93)
+                                                )
+                                            }
+
+                                            AnimatedVisibility(visible = showAdvanced) {
+                                                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                                    // Font Style Selector (Sans / Serif / Mono / Script)
+                                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        Text("Font Style", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            CaptionFont.values().forEach { font ->
+                                                                val isSelected = config.captionFont == font
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .height(36.dp)
+                                                                        .clip(RoundedCornerShape(10.dp))
+                                                                        .background(if (isSelected) accentColor else Color(0xFF1C1C22))
+                                                                        .clickable { config = config.copy(captionFont = font) },
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(
+                                                                        text = font.label,
+                                                                        color = if (isSelected) Color.Black else Color(0xFFD1D1D6),
+                                                                        fontSize = 12.sp,
+                                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Vertical Position Slider
+                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text("Vertical Fine-Tune", color = Color(0xFF8E8E93), fontSize = 12.sp)
+                                                            Text("${(config.captionVerticalBias * 100).toInt()}%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                        }
+
+                                                        Slider(
+                                                            value = config.captionVerticalBias,
+                                                            onValueChange = { config = config.copy(captionVerticalBias = it) },
+                                                            valueRange = 0.08f..0.92f,
+                                                            colors = SliderDefaults.colors(
+                                                                thumbColor = accentColor,
+                                                                activeTrackColor = accentColor,
+                                                                inactiveTrackColor = Color(0xFF282832)
+                                                            )
+                                                        )
+                                                    }
+
+                                                    // Horizontal Position Slider
+                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text("Horizontal Fine-Tune", color = Color(0xFF8E8E93), fontSize = 12.sp)
+                                                            Text("${(config.captionHorizontalBias * 100).toInt()}%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                        }
+
+                                                        Slider(
+                                                            value = config.captionHorizontalBias,
+                                                            onValueChange = { config = config.copy(captionHorizontalBias = it) },
+                                                            valueRange = 0.0f..1.0f,
+                                                            colors = SliderDefaults.colors(
+                                                                thumbColor = accentColor,
+                                                                activeTrackColor = accentColor,
+                                                                inactiveTrackColor = Color(0xFF282832)
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                // Shared Color Picker Dialog from ui.components
+                if (showColorPicker) {
+                    CustomColorPickerDialog(
+                        initialColor = Color(config.captionColorHex.toInt()),
+                        title = "Caption Color",
+                        onDismiss = { showColorPicker = false },
+                        onColorSelected = { color ->
+                            val hex = (color.toArgb().toLong() and 0xFFFFFFFFL)
+                            config = config.copy(captionColorHex = hex)
+                            showColorPicker = false
+                        }
+                    )
+                }
             }
         }
     }
+}
+
+// ============================================================================
+// EXACT WIDGET BITMAP GENERATOR FOR CONFIG VIEWPORT
+// ============================================================================
+
+private fun renderExactWidgetPreview(
+    context: Context,
+    widgetId: Int,
+    cameraConfig: CameraWidgetConfig,
+    slateConfig: SlateWidgetConfig
+): Pair<Bitmap, Float> {
+    val info = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+        AppWidgetManager.getInstance(context).getAppWidgetInfo(widgetId)
+    } else null
+    val providerClass = info?.provider?.className ?: ""
+
+    return when {
+        providerClass.contains("4x2") -> {
+            Pair(generatePhotoFrame4x2Bitmap(context, slateConfig, cameraConfig, 320, 160), 2.0f)
+        }
+        providerClass.contains("Circle") -> {
+            Pair(generatePhotoFrameCircleBitmap(context, slateConfig, cameraConfig, 200, 200), 1.0f)
+        }
+        providerClass.contains("FluidBlob") -> {
+            Pair(generatePhotoFrameFluidBlobCameraBitmap(context, slateConfig, cameraConfig, 200, 200), 1.0f)
+        }
+        providerClass.contains("Blob") -> {
+            Pair(generatePhotoFrameBlobCameraBitmap(context, slateConfig, cameraConfig, 200, 200), 1.0f)
+        }
+        else -> {
+            Pair(generatePhotoFrameCameraBitmap(context, slateConfig, cameraConfig, isResponsive = false, 200, 200), 1.0f)
+        }
+    }
+}
+
+private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val globalSettings = ThemePreferences(context).getThemeSettings()
+    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+
+    val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
+            ((bgColor shr 8 and 0xFFL) * 0.7152f) +
+            ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
+    val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+        ?: if (isLight) "LIGHT" else "DARK"
+
+    return SlateWidgetConfig(
+        themeMode = mode,
+        backgroundColorHex = bgColor,
+        opacity = opacity,
+        accentColorHex = accentColor
+    )
 }
 
 // ============================================================================
@@ -626,9 +956,20 @@ fun SlateProEditorOverlay(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF1C1C1E)).clickable { onDismiss() },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1C1C1E))
+                        .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Cancel",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
                 Text(text = "Edit Photo", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
@@ -915,12 +1256,19 @@ fun SlateProEditorOverlay(
                     .padding(16.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFF0A0A0C)).padding(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF0A0A0C))
+                        .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     CropRatio.values().forEach { ratio ->
                         val isSelected = selectedRatio == ratio
-                        val animatedBg by animateColorAsState(if (isSelected) Color(0xFF2C2C30) else Color.Transparent, label = "ratioBg")
+                        val animatedBg by animateColorAsState(
+                            if (isSelected) Color(0xFF2C2C30) else Color.Transparent,
+                            label = "ratioBg"
+                        )
 
                         Box(
                             modifier = Modifier
@@ -930,16 +1278,32 @@ fun SlateProEditorOverlay(
                                 .background(animatedBg)
                                 .clickable { selectedRatio = ratio },
                             contentAlignment = Alignment.Center
-                        ) { Text(text = ratio.label, color = if (isSelected) Color.White else Color(0xFF8E8E93), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                        ) {
+                            Text(
+                                text = ratio.label,
+                                color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    EditorActionButton(Icons.Default.Refresh, "Rotate") { rotationAngle = (rotationAngle + 90f) % 360f }
-                    EditorActionButton(FlipHorizontalIcon, "Flip H") { flipH = !flipH }
-                    EditorActionButton(FlipVerticalIcon, "Flip V") { flipV = !flipV }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    EditorActionButton(Icons.Default.Refresh, "Rotate") {
+                        rotationAngle = (rotationAngle + 90f) % 360f
+                    }
+                    EditorActionButton(FlipHorizontalIcon, "Flip H") {
+                        flipH = !flipH
+                    }
+                    EditorActionButton(FlipVerticalIcon, "Flip V") {
+                        flipV = !flipV
+                    }
                 }
             }
         }
@@ -948,13 +1312,31 @@ fun SlateProEditorOverlay(
 
 @Composable
 private fun EditorActionButton(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
         Box(
-            modifier = Modifier.size(46.dp).clip(CircleShape).background(Color(0xFF1C1C1E)),
+            modifier = Modifier
+                .size(46.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF1C1C1E)),
             contentAlignment = Alignment.Center
-        ) { Icon(imageVector = icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(20.dp)) }
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Spacer(modifier = Modifier.height(6.dp))
-        Text(text = label, color = Color(0xFF8E8E93), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            color = Color(0xFF8E8E93),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -989,18 +1371,4 @@ private fun cropBitmapFromBounds(
         FileOutputStream(outputFile).use { out -> cropped.compress(Bitmap.CompressFormat.JPEG, 92, out) }
         Uri.fromFile(outputFile).toString()
     } catch (_: Exception) { null }
-}
-
-@Composable
-private fun rememberUriImageBitmap(uriStr: String?): ImageBitmap? {
-    val context = LocalContext.current
-    return remember(uriStr) {
-        if (uriStr.isNullOrEmpty()) null
-        else {
-            try {
-                val uri = Uri.parse(uriStr)
-                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-            } catch (_: Exception) { null }
-        }
-    }
 }

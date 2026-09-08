@@ -30,12 +30,45 @@ enum class PhotoFrameBorder(val label: String) {
     FILM_STRIP("Film Strip")
 }
 
+enum class CaptionSize(val label: String, val scale: Float) {
+    SMALL("S", 0.80f),
+    MEDIUM("M", 1.0f),
+    LARGE("L", 1.30f)
+}
+
+enum class CaptionPosition(val label: String, val biasY: Float) {
+    BOTTOM("Bottom", 0.88f),
+    CENTER("Center", 0.50f),
+    TOP("Top", 0.12f)
+}
+
+enum class CaptionAlignment(val label: String, val biasX: Float) {
+    LEFT("Left", 0.0f),
+    CENTER("Center", 0.5f),
+    RIGHT("Right", 1.0f)
+}
+
+enum class CaptionFont(val label: String) {
+    SANS("Sans"),
+    SERIF("Serif"),
+    MONO("Mono"),
+    SCRIPT("Script")
+}
+
 data class CameraWidgetConfig(
     val photoUri: String? = null,
     val clickAction: PhotoClickAction = PhotoClickAction.OPEN_CAMERA,
     val filterStyle: PhotoFilterStyle = PhotoFilterStyle.NONE,
     val borderStyle: PhotoFrameBorder = PhotoFrameBorder.NONE,
     val customCaption: String = "",
+    val showCaption: Boolean = true,
+    val captionSize: CaptionSize = CaptionSize.MEDIUM,
+    val captionPosition: CaptionPosition = CaptionPosition.BOTTOM,
+    val captionAlignment: CaptionAlignment = CaptionAlignment.CENTER,
+    val captionColorHex: Long = 0xFFFFFFFFL,
+    val captionFont: CaptionFont = CaptionFont.SANS,
+    val captionVerticalBias: Float = 0.88f,
+    val captionHorizontalBias: Float = 0.50f,
     val showDateTaken: Boolean = false,
     val isResponsive: Boolean = false
 )
@@ -54,6 +87,14 @@ object CameraWidgetPreferences {
             putString("filter_style_$widgetId", config.filterStyle.name)
             putString("border_style_$widgetId", config.borderStyle.name)
             putString("caption_$widgetId", config.customCaption)
+            putBoolean("show_caption_$widgetId", config.showCaption)
+            putString("caption_size_$widgetId", config.captionSize.name)
+            putString("caption_position_$widgetId", config.captionPosition.name)
+            putString("caption_alignment_$widgetId", config.captionAlignment.name)
+            putLong("caption_color_hex_$widgetId", config.captionColorHex)
+            putString("caption_font_$widgetId", config.captionFont.name)
+            putFloat("caption_v_bias_$widgetId", config.captionVerticalBias)
+            putFloat("caption_h_bias_$widgetId", config.captionHorizontalBias)
             putBoolean("show_date_$widgetId", config.showDateTaken)
             putBoolean("responsive_$widgetId", config.isResponsive)
             apply()
@@ -76,10 +117,48 @@ object CameraWidgetPreferences {
         } catch (_: Exception) { PhotoFrameBorder.NONE }
 
         val caption = prefs.getString("caption_$widgetId", "") ?: ""
+        val showCaption = prefs.getBoolean("show_caption_$widgetId", caption.isNotBlank())
+
+        val captionSize = try {
+            CaptionSize.valueOf(prefs.getString("caption_size_$widgetId", CaptionSize.MEDIUM.name)!!)
+        } catch (_: Exception) { CaptionSize.MEDIUM }
+
+        val captionPosition = try {
+            CaptionPosition.valueOf(prefs.getString("caption_position_$widgetId", CaptionPosition.BOTTOM.name)!!)
+        } catch (_: Exception) { CaptionPosition.BOTTOM }
+
+        val captionAlignment = try {
+            CaptionAlignment.valueOf(prefs.getString("caption_alignment_$widgetId", CaptionAlignment.CENTER.name)!!)
+        } catch (_: Exception) { CaptionAlignment.CENTER }
+
+        val captionColorHex = prefs.getLong("caption_color_hex_$widgetId", 0xFFFFFFFFL)
+
+        val captionFont = try {
+            CaptionFont.valueOf(prefs.getString("caption_font_$widgetId", CaptionFont.SANS.name)!!)
+        } catch (_: Exception) { CaptionFont.SANS }
+
+        val captionVBias = prefs.getFloat("caption_v_bias_$widgetId", captionPosition.biasY)
+        val captionHBias = prefs.getFloat("caption_h_bias_$widgetId", captionAlignment.biasX)
         val showDateTaken = prefs.getBoolean("show_date_$widgetId", false)
         val isResponsive = prefs.getBoolean("responsive_$widgetId", false)
 
-        return CameraWidgetConfig(uri, clickAction, filter, border, caption, showDateTaken, isResponsive)
+        return CameraWidgetConfig(
+            photoUri = uri,
+            clickAction = clickAction,
+            filterStyle = filter,
+            borderStyle = border,
+            customCaption = caption,
+            showCaption = showCaption,
+            captionSize = captionSize,
+            captionPosition = captionPosition,
+            captionAlignment = captionAlignment,
+            captionColorHex = captionColorHex,
+            captionFont = captionFont,
+            captionVerticalBias = captionVBias,
+            captionHorizontalBias = captionHBias,
+            showDateTaken = showDateTaken,
+            isResponsive = isResponsive
+        )
     }
 }
 
