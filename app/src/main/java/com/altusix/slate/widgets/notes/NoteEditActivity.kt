@@ -46,9 +46,16 @@ class NoteEditActivity : ComponentActivity() {
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         val editMode = intent?.getStringExtra(BaseNotesReceiver.EXTRA_EDIT_MODE) ?: "TEXT_ONLY"
+        val stackPage = intent?.getIntExtra("EXTRA_STACK_PAGE", -1) ?: -1
 
+        // Load active page if launched from NotesStackReceiver, else standard widget note
         val existingNote = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            NotesStorageManager.getNoteForWidget(this, widgetId)
+            if (stackPage >= 0) {
+                val stack = NotesStorageManager.getNotesStack(this, widgetId)
+                stack.getOrElse(stackPage % stack.size) { SlateNoteData.getDefaultNote() }
+            } else {
+                NotesStorageManager.getNoteForWidget(this, widgetId)
+            }
         } else {
             SlateNoteData.getDefaultNote()
         }
@@ -90,9 +97,15 @@ class NoteEditActivity : ComponentActivity() {
                         updatedAt = System.currentTimeMillis()
                     )
 
+                    // Persist to stack page or standalone widget note
                     if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                        NotesStorageManager.saveNoteForWidget(this@NoteEditActivity, widgetId, updatedNote)
+                        if (stackPage >= 0) {
+                            NotesStorageManager.saveNoteInStack(this@NoteEditActivity, widgetId, stackPage, updatedNote)
+                        } else {
+                            NotesStorageManager.saveNoteForWidget(this@NoteEditActivity, widgetId, updatedNote)
+                        }
                     }
+
                     updateAllNotesWidgets(this@NoteEditActivity)
                     setResult(Activity.RESULT_OK)
                     finish()
@@ -168,7 +181,7 @@ class NoteEditActivity : ComponentActivity() {
                                         onDismissRequest = { categoryMenuExpanded = false },
                                         modifier = Modifier.background(Color(0xFF1E1E26))
                                     ) {
-                                        listOf("Memo", "Focus", "Ideas", "Checklist", "Log", "Personal").forEach { cat ->
+                                        listOf("Memo", "Focus", "Ideas", "Checklist", "Log", "Personal", "Design", "Roadmap", "Manifesto", "Engineering", "Inspiration").forEach { cat ->
                                             DropdownMenuItem(
                                                 text = {
                                                     Text(

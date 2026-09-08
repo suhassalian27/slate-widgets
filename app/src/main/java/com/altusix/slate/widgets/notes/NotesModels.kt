@@ -213,4 +213,42 @@ object NotesStorageManager {
             )
         )
     }
+
+    fun getNotesStack(context: Context, appWidgetId: Int): List<SlateNoteData> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString("widget_${appWidgetId}_stack_data", null)
+        if (!jsonStr.isNullOrBlank()) {
+            try {
+                val arr = JSONArray(jsonStr)
+                val list = mutableListOf<SlateNoteData>()
+                for (i in 0 until arr.length()) {
+                    list.add(SlateNoteData.fromJson(arr.getString(i)))
+                }
+                if (list.isNotEmpty()) return list
+            } catch (_: Exception) {}
+        }
+        val defaultStack = getMockNotesStack()
+        val arr = JSONArray()
+        for (item in defaultStack) {
+            arr.put(item.toJson())
+        }
+        prefs.edit().putString("widget_${appWidgetId}_stack_data", arr.toString()).apply()
+        return defaultStack
+    }
+
+    fun saveNoteInStack(context: Context, appWidgetId: Int, pageIndex: Int, updatedNote: SlateNoteData) {
+        val stack = getNotesStack(context, appWidgetId).toMutableList()
+        val validIndex = if (stack.isEmpty()) 0 else pageIndex % stack.size
+        if (validIndex in stack.indices) {
+            stack[validIndex] = updatedNote
+        } else {
+            stack.add(updatedNote)
+        }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val arr = JSONArray()
+        for (item in stack) {
+            arr.put(item.toJson())
+        }
+        prefs.edit().putString("widget_${appWidgetId}_stack_data", arr.toString()).apply()
+    }
 }

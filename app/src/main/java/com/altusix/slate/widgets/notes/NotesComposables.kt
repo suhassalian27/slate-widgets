@@ -1409,77 +1409,126 @@ fun generateDotGridBitmap(
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
+    // Base Paper Surface
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    // 1. Dot Grid Matrix Background
+    // 1. Clipped Dot Grid Matrix
+    canvas.save()
+    val clipPath = Path().apply {
+        addRoundRect(cardRect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(clipPath)
+
     val dotGridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0x1F000000).toArgb() else Color(0x18FFFFFF).toArgb()
         style = Paint.Style.FILL
     }
     val gridSpacing = 20f * scaleFactor
     var gy = cardRect.top + gridSpacing
-    while (gy < cardRect.bottom - gridSpacing / 2f) {
+    while (gy < cardRect.bottom) {
         var gx = cardRect.left + gridSpacing
-        while (gx < cardRect.right - gridSpacing / 2f) {
+        while (gx < cardRect.right) {
             canvas.drawCircle(gx, gy, 1.4f * scaleFactor, dotGridPaint)
             gx += gridSpacing
         }
         gy += gridSpacing
     }
+    canvas.restore()
 
-    val pad = cardRect.width() * 0.09f
+    val padX = 18f * scaleFactor
+    val padTop = 16f * scaleFactor
+    val padBottom = 16f * scaleFactor
+    val fScale = note.fontScaleMultiplier
 
-    // 2. Title
+    // 2. Header: Title and Category Badge (No Pencil Icon)
+    val titleTextSize = 15.5f * scaleFactor * fScale
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.092f
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
-    val titleY = cardRect.top + pad * 1.8f
-    canvas.drawText(note.title, cardRect.left + pad, titleY, titlePaint)
 
-    // Accent line below title
-    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        strokeWidth = 2f * scaleFactor
-    }
-    val lineY = titleY + pad * 0.5f
-    canvas.drawLine(cardRect.left + pad, lineY, cardRect.left + pad + 32f * scaleFactor, lineY, linePaint)
-
-    // 3. Body Text
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF2C2C2E).toArgb() else Color(0xFFD1D1D6).toArgb()
-        textSize = cardRect.height() * 0.068f
-        typeface = getSlateFont(context, 400)
-    }
-    drawWrappedText(
-        canvas = canvas,
-        text = note.content,
-        x = cardRect.left + pad,
-        startY = lineY + pad * 1.3f,
-        maxWidth = cardRect.width() - pad * 2f,
-        paint = bodyPaint,
-        lineSpacing = cardRect.height() * 0.115f,
-        maxLines = 5
-    )
-
-    // 4. Dot Grid Badge in Corner
-    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.052f
+        textSize = (10f * scaleFactor * fScale).coerceIn(9f * scaleFactor, 14f * scaleFactor)
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText("5MM GRID", cardRect.right - pad, cardRect.bottom - pad, badgePaint)
+
+    val titleTopClearance = cardRect.top + padTop
+    val titleMetrics = titlePaint.fontMetrics
+    val titleY = titleTopClearance - titleMetrics.ascent
+
+    // Category Tag on the right
+    val catText = note.category.uppercase()
+    val catWidth = catPaint.measureText(catText)
+    canvas.drawText(catText, cardRect.right - padX, titleY, catPaint)
+
+    // Title Text starting cleanly at padX
+    val titleStartX = cardRect.left + padX
+    val maxTitleW = (cardRect.right - padX - catWidth - (12f * scaleFactor)) - titleStartX
+    val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
+        var t = note.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title
+
+    canvas.drawText(displayTitle, titleStartX, titleY, titlePaint)
+
+    // Minimal Accent Underline below title
+    val underlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        strokeWidth = 2f * scaleFactor
+        strokeCap = Paint.Cap.ROUND
+    }
+    val underlineY = titleY + maxOf(titleMetrics.descent + (4f * scaleFactor), 6f * scaleFactor)
+    val underlineLength = (28f * scaleFactor * fScale).coerceAtMost(titlePaint.measureText(displayTitle))
+    canvas.drawLine(titleStartX, underlineY, titleStartX + underlineLength, underlineY, underlinePaint)
+
+    // 3. Technical Grid Badge at Bottom Right
+    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = (9.5f * scaleFactor * fScale).coerceIn(8.5f * scaleFactor, 12f * scaleFactor)
+        typeface = getSlateFont(context, 700)
+        textAlign = Paint.Align.RIGHT
+    }
+    val badgeMetrics = badgePaint.fontMetrics
+    val badgeY = cardRect.bottom - padBottom
+    canvas.drawText("5MM GRID", cardRect.right - padX, badgeY, badgePaint)
+
+    // 4. Dynamic Body Text Flow (Fills height down to the bottom badge)
+    val bodyTextSize = 12.5f * scaleFactor * fScale
+    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = bodyTextSize
+        typeface = getSlateFont(context, 400)
+    }
+
+    val lineSpacing = bodyTextSize * 1.45f
+    val startY = underlineY + (10f * scaleFactor) + (bodyTextSize * 0.85f)
+    val bottomLimit = badgeY - (badgeMetrics.descent - badgeMetrics.ascent) - (6f * scaleFactor)
+
+    drawWrappedText(
+        canvas = canvas,
+        text = note.content,
+        x = cardRect.left + padX,
+        startY = startY,
+        maxWidth = cardRect.width() - (padX * 2f),
+        paint = contentPaint,
+        lineSpacing = lineSpacing,
+        bottomLimit = bottomLimit
+    )
 
     return bitmap
 }
@@ -1508,92 +1557,138 @@ fun generateNoteStackBitmap(
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val baseCardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
-    // 1. Stacked Underneath Cards (Physical Layered Effect)
+    // Reserve top offset for the physical layered cards underneath
+    val stackOffset = 6f * scaleFactor
+    val cardRect = RectF(
+        baseCardRect.left,
+        baseCardRect.top + stackOffset,
+        baseCardRect.right,
+        baseCardRect.bottom
+    )
+
+    // 1. Stacked Underneath Card Layer (Physical Depth Effect)
     val underPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF18181B).toArgb()
+        color = if (isLight) Color(0xFFDCDCE0).toArgb() else Color(0xFF1C1C20).toArgb()
         style = Paint.Style.FILL
     }
-    val offset1 = 6f * scaleFactor
-    val underRect1 = RectF(cardRect.left + offset1, cardRect.top - offset1, cardRect.right - offset1, cardRect.bottom - offset1)
-    canvas.drawRoundRect(underRect1, cardCornerRadius, cardCornerRadius, underPaint)
+    val underRect = RectF(
+        cardRect.left + (8f * scaleFactor),
+        cardRect.top - stackOffset,
+        cardRect.right - (8f * scaleFactor),
+        cardRect.bottom - stackOffset
+    )
+    canvas.drawRoundRect(underRect, cardCornerRadius, cardCornerRadius, underPaint)
 
-    // 2. Top Foreground Card
+    // 2. Foreground Card Plate
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.width() * 0.09f
+    val padX = 18f * scaleFactor
+    val fScale = note.fontScaleMultiplier
 
-    // 3. Title & Category
+    // 3. Header: Title and Category Badge (Zero Overlap)
+    val titleTextSize = 15.5f * scaleFactor * fScale
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.088f
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
-    val titleY = cardRect.top + pad * 1.8f
-    canvas.drawText(note.title, cardRect.left + pad, titleY, titlePaint)
 
     val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.052f
+        textSize = (10f * scaleFactor * fScale).coerceIn(9f * scaleFactor, 14f * scaleFactor)
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText(note.category.uppercase(), cardRect.right - pad, titleY, catPaint)
 
-    // 4. Content
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF2C2C2E).toArgb() else Color(0xFFD1D1D6).toArgb()
-        textSize = cardRect.height() * 0.066f
-        typeface = getSlateFont(context, 400)
+    val titleTopClearance = cardRect.top + (16f * scaleFactor)
+    val titleMetrics = titlePaint.fontMetrics
+    val titleY = titleTopClearance - titleMetrics.ascent
+
+    // Draw Category Tag
+    val catText = note.category.uppercase()
+    val catWidth = catPaint.measureText(catText)
+    canvas.drawText(catText, cardRect.right - padX, titleY, catPaint)
+
+    // Truncate Title to prevent colliding with Category
+    val titleStartX = cardRect.left + padX
+    val maxTitleW = (cardRect.right - padX - catWidth - (12f * scaleFactor)) - titleStartX
+    val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
+        var t = note.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title
+    canvas.drawText(displayTitle, titleStartX, titleY, titlePaint)
+
+    // 4. Stack Navigation Deck at Bottom: "◀   2 of 3   ▶"
+    val navY = cardRect.bottom - (16f * scaleFactor)
+    val navMetricsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 12f * scaleFactor
+        typeface = getSlateFont(context, 700)
     }
-    drawWrappedText(
-        canvas = canvas,
-        text = note.content,
-        x = cardRect.left + pad,
-        startY = titleY + pad * 1.1f,
-        maxWidth = cardRect.width() - pad * 2f,
-        paint = bodyPaint,
-        lineSpacing = cardRect.height() * 0.11f,
-        maxLines = 4
-    )
+    val navMetrics = navMetricsPaint.fontMetrics
+    val navDeckTop = navY + navMetrics.ascent
 
-    // 5. Stack Navigation Deck at Bottom: "<", "1 of 3", ">"
-    val navY = cardRect.bottom - pad * 1.1f
-    val navTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val navArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardRect.height() * 0.075f
+        textSize = 12f * scaleFactor
         typeface = getSlateFont(context, 700)
     }
 
-    // Prev "<"
-    canvas.drawText("◀", cardRect.left + pad * 1.2f, navY, navTextPaint)
+    // Prev "◀"
+    canvas.drawText("◀", cardRect.left + padX + (4f * scaleFactor), navY, navArrowPaint)
 
-    // Page count center
+    // Page indicator center
     val pageCountText = "${pageIndex + 1} of $totalPages"
     val pagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.065f
+        textSize = (11f * scaleFactor * fScale).coerceIn(10f * scaleFactor, 14f * scaleFactor)
         typeface = getSlateFont(context, 600)
         textAlign = Paint.Align.CENTER
     }
     canvas.drawText(pageCountText, cardRect.centerX(), navY, pagePaint)
 
-    // Next ">"
+    // Next "▶"
     val nextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardRect.height() * 0.075f
+        textSize = 12f * scaleFactor
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText("▶", cardRect.right - pad * 1.2f, navY, nextPaint)
+    canvas.drawText("▶", cardRect.right - padX - (4f * scaleFactor), navY, nextPaint)
+
+    // 5. Dynamic Body Text Flow (Fills height down to navigation deck)
+    val bodyTextSize = 12.5f * scaleFactor * fScale
+    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = bodyTextSize
+        typeface = getSlateFont(context, 400)
+    }
+
+    val lineSpacing = bodyTextSize * 1.45f
+    val startY = titleY + titleMetrics.descent + (10f * scaleFactor) + (bodyTextSize * 0.85f)
+    val bottomLimit = navDeckTop - (8f * scaleFactor)
+
+    drawWrappedText(
+        canvas = canvas,
+        text = note.content,
+        x = cardRect.left + padX,
+        startY = startY,
+        maxWidth = cardRect.width() - (padX * 2f),
+        paint = contentPaint,
+        lineSpacing = lineSpacing,
+        bottomLimit = bottomLimit
+    )
 
     return bitmap
 }

@@ -21,12 +21,12 @@ fun getNotesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Sticky Note Pad", "2x2", "Notes", NotesStickyPadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Desk Memo Pad", "4x2", "Notes", NotesDeskMemoReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Checklist Tasks", "4x2", "Notes", NotesChecklistReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Dot Grid Scratchpad", "2x2", "Notes", NotesDotGridReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Classic Legal Pad", "4x2", "Notes", NotesLegalPadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Quick Thought Strip", "4x1", "Notes", NotesQuickThoughtReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Mini Thought Capsule", "2x1", "Notes", NotesMiniThoughtReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Bento Notes & Tasks", "4x2", "Notes", NotesBentoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Torn Receipt Log", "2x2", "Notes", NotesTornReceiptReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Dot Grid Scratchpad", "2x2", "Notes", NotesDotGridReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Multi-Note Stack", "2x2", "Notes", NotesStackReceiver::class.java, hasModeOption = true)
     )
 }
@@ -534,8 +534,20 @@ class NotesTornReceiptReceiver : BaseNotesReceiver(R.layout.widget_notes_card_la
 
 // 9. Dot Grid Scratchpad (2x2)
 class NotesDotGridReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) SlateNoteData.getDefaultNote() else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Grid")
+    override val widgetEditMode: String = "TEXT_ONLY"
+
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val note = if (appWidgetId == -1) {
+            SlateNoteData.getDefaultNote()
+        } else {
+            NotesStorageManager.getNoteForWidget(context, appWidgetId, "Grid")
+        }
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
         return generateDotGridBitmap(context, note, config, isResponsive, wDp, hDp)
     }
@@ -543,16 +555,38 @@ class NotesDotGridReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout
 
 // 10. Multi-Note Stack (2x2)
 class NotesStackReceiver : BaseNotesReceiver(R.layout.widget_notes_stack_layout) {
+    override val widgetEditMode: String = "TEXT_ONLY"
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val stack = NotesStorageManager.getMockNotesStack()
+        val stack = if (appWidgetId == -1) {
+            NotesStorageManager.getNotesStack(context, -1)
+        } else {
+            NotesStorageManager.getNotesStack(context, appWidgetId)
+        }
         val page = if (appWidgetId == -1) 0 else NotesStorageManager.getStackPageIndex(context, appWidgetId)
         val note = stack[page % stack.size]
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateNoteStackBitmap(context, note, page, stack.size, config, isResponsive, wDp, hDp)
+        return generateNoteStackBitmap(context, note, page % stack.size, stack.size, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
         super.setupTouchTargets(context, views, appWidgetId)
+        val page = NotesStorageManager.getStackPageIndex(context, appWidgetId)
+
+        // Bind main note area click to edit the CURRENT page
+        val editIntent = Intent(context, NoteEditActivity::class.java).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra("EXTRA_STACK_PAGE", page)
+            putExtra(EXTRA_EDIT_MODE, widgetEditMode)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val editPi = PendingIntent.getActivity(
+            context,
+            appWidgetId * 59 + 3,
+            editIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.btn_note_open_edit, editPi)
 
         // Prev Arrow
         val prevIntent = Intent(context, this.javaClass).apply {
@@ -563,7 +597,7 @@ class NotesStackReceiver : BaseNotesReceiver(R.layout.widget_notes_stack_layout)
         }
         val prevPi = PendingIntent.getBroadcast(
             context,
-            (appWidgetId * 59 + 1),
+            appWidgetId * 59 + 1,
             prevIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -578,7 +612,7 @@ class NotesStackReceiver : BaseNotesReceiver(R.layout.widget_notes_stack_layout)
         }
         val nextPi = PendingIntent.getBroadcast(
             context,
-            (appWidgetId * 59 + 2),
+            appWidgetId * 59 + 2,
             nextIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
