@@ -916,7 +916,9 @@ fun generateQuickThoughtBitmap(
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
     val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val aspect = 4f
         val cardW = minOf(w, h * aspect)
         val cardH = cardW / aspect
@@ -930,69 +932,94 @@ fun generateQuickThoughtBitmap(
     }
     canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
 
-    val pad = cardRect.height() * 0.18f
+    val fScale = note.fontScaleMultiplier
 
-    // 1. Tag Icon Badge (Left)
-    val badgeR = cardRect.height() * 0.32f
+    // 1. Concentric Accent Icon Disc (Centered in the left pill curve)
+    val badgeR = cardRect.height() * 0.28f
     val badgeCx = cardRect.left + pillRadius
     val badgeCy = cardRect.centerY()
+
     val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
     canvas.drawCircle(badgeCx, badgeCy, badgeR, badgePaint)
 
+    // Inner 4-Point Star Sparkle
     val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.White.toArgb() else Color.Black.toArgb()
-        textSize = badgeR * 0.9f
+        color = if (isLight) Color.White.toArgb() else Color(0xFF121214).toArgb()
+        textSize = badgeR * 0.95f
         textAlign = Paint.Align.CENTER
         typeface = getSlateFont(context, 700)
     }
-    canvas.drawText("✦", badgeCx, badgeCy + badgeR * 0.35f, iconPaint)
+    val iconMetrics = iconPaint.fontMetrics
+    val iconY = badgeCy - ((iconMetrics.ascent + iconMetrics.descent) / 2f)
+    canvas.drawText("✦", badgeCx, iconY, iconPaint)
 
-    // 2. Note Thought Text
-    val textLeft = badgeCx + badgeR + pad * 1.1f
-    val textRight = cardRect.right - pillRadius * 0.8f
+    // 2. Text Bounds & Layout Geometry
+    val textLeft = badgeCx + badgeR + (14f * scaleFactor)
+    val textRight = cardRect.right - (pillRadius * 0.75f)
     val maxTextW = (textRight - textLeft).coerceAtLeast(10f)
 
+    val titleTextSize = (14.5f * scaleFactor * fScale).coerceIn(12f * scaleFactor, 18f * scaleFactor)
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.26f
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
+
+    val bodyTextSize = (12f * scaleFactor * fScale).coerceIn(10f * scaleFactor, 15f * scaleFactor)
     val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardRect.height() * 0.18f
+        textSize = bodyTextSize
         typeface = getSlateFont(context, 400)
     }
 
-    val titleText = note.title
-    val bodyText = note.content.replace("\n", " ")
+    val titleText = note.title.trim()
+    val rawBody = note.content.replace("\n", " ").trim()
 
-    val displayTitle = if (titlePaint.measureText(titleText) > maxTextW) {
-        var t = titleText
-        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
-        "$t…"
-    } else titleText
+    // 3. Mathematical Vertical Centering
+    if (rawBody.isBlank()) {
+        // Single line: Center title vertically
+        val titleMetrics = titlePaint.fontMetrics
+        val titleY = cardRect.centerY() - ((titleMetrics.ascent + titleMetrics.descent) / 2f)
 
-    val displayBody = if (bodyPaint.measureText(bodyText) > maxTextW) {
-        var b = bodyText
-        while (b.isNotEmpty() && bodyPaint.measureText("$b…") > maxTextW) b = b.dropLast(1)
-        "$b…"
-    } else bodyText
+        val displayTitle = if (titlePaint.measureText(titleText) > maxTextW) {
+            var t = titleText
+            while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
+            "$t…"
+        } else titleText
 
-    val titleY = cardRect.centerY() - cardRect.height() * 0.05f
-    canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
-    canvas.drawText(displayBody, textLeft, titleY + cardRect.height() * 0.27f, bodyPaint)
+        canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
+    } else {
+        // Two lines: Center title + subtitle as a balanced unit
+        val titleMetrics = titlePaint.fontMetrics
+        val bodyMetrics = bodyPaint.fontMetrics
+        val lineGap = 3.5f * scaleFactor
 
-    // Edit icon on the far right
-    val editPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.24f
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.RIGHT
+        val titleH = titleMetrics.descent - titleMetrics.ascent
+        val bodyH = bodyMetrics.descent - bodyMetrics.ascent
+        val totalBlockH = titleH + lineGap + bodyH
+
+        val blockTop = cardRect.centerY() - (totalBlockH / 2f)
+        val titleY = blockTop - titleMetrics.ascent
+        val bodyY = titleY + titleMetrics.descent + lineGap - bodyMetrics.ascent
+
+        val displayTitle = if (titlePaint.measureText(titleText) > maxTextW) {
+            var t = titleText
+            while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTextW) t = t.dropLast(1)
+            "$t…"
+        } else titleText
+
+        val displayBody = if (bodyPaint.measureText(rawBody) > maxTextW) {
+            var b = rawBody
+            while (b.isNotEmpty() && bodyPaint.measureText("$b…") > maxTextW) b = b.dropLast(1)
+            "$b…"
+        } else rawBody
+
+        canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
+        canvas.drawText(displayBody, textLeft, bodyY, bodyPaint)
     }
-    canvas.drawText("✎", cardRect.right - pad * 1.5f, cardRect.centerY() + cardRect.height() * 0.08f, editPaint)
 
     return bitmap
 }

@@ -466,9 +466,21 @@ class NotesLegalPadReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layou
 
 // 5. Quick Thought Strip (4x1)
 class NotesQuickThoughtReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Thought") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Thought")
-        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+    override val widgetEditMode: String = "TEXT_ONLY"
+
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val note = if (appWidgetId == -1) {
+            NotesStorageManager.getNoteForWidget(context, -1, "Thought")
+        } else {
+            NotesStorageManager.getNoteForWidget(context, appWidgetId, "Thought")
+        }
+        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
         return generateQuickThoughtBitmap(context, note, config, isResponsive, wDp, hDp)
     }
 }
