@@ -3164,20 +3164,8 @@
                 android:resource="@xml/widget_info_4x1" />
         </receiver>
 
-        <!-- 6. Mini Thought Capsule (2x1) -->
-        <receiver
-            android:name=".widgets.notes.NotesMiniThoughtReceiver"
-            android:exported="true"
-            android:label="Mini Thought Capsule">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x1" />
-        </receiver>
 
-        <!-- 7. Bento Notes & Tasks (4x2) -->
+        <!-- 6. Bento Notes & Tasks (4x2) -->
         <receiver
             android:name=".widgets.notes.NotesBentoReceiver"
             android:exported="true"
@@ -3190,7 +3178,7 @@
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
 
-        <!-- 8. Torn Receipt Log (2x2) -->
+        <!-- 7. Torn Receipt Log (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesTornReceiptReceiver"
             android:exported="true"
@@ -3203,7 +3191,7 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 9. Dot Grid Scratchpad (2x2) -->
+        <!-- 8. Dot Grid Scratchpad (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesDotGridReceiver"
             android:exported="true"
@@ -3216,7 +3204,7 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 10. Multi-Note Stack (2x2) -->
+        <!-- 9. Multi-Note Stack (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesStackReceiver"
             android:exported="true"

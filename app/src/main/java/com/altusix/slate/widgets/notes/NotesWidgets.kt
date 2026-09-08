@@ -24,7 +24,6 @@ fun getNotesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Dot Grid Scratchpad", "2x2", "Notes", NotesDotGridReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Classic Legal Pad", "4x2", "Notes", NotesLegalPadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Quick Thought Strip", "4x1", "Notes", NotesQuickThoughtReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Mini Thought Capsule", "2x1", "Notes", NotesMiniThoughtReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Bento Notes & Tasks", "4x2", "Notes", NotesBentoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Torn Receipt Log", "2x2", "Notes", NotesTornReceiptReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Multi-Note Stack", "2x2", "Notes", NotesStackReceiver::class.java, hasModeOption = true)
@@ -39,7 +38,6 @@ fun updateAllNotesWidgets(context: Context) {
         NotesChecklistReceiver::class.java,
         NotesLegalPadReceiver::class.java,
         NotesQuickThoughtReceiver::class.java,
-        NotesMiniThoughtReceiver::class.java,
         NotesBentoReceiver::class.java,
         NotesTornReceiptReceiver::class.java,
         NotesDotGridReceiver::class.java,
@@ -485,16 +483,7 @@ class NotesQuickThoughtReceiver : BaseNotesReceiver(R.layout.widget_notes_card_l
     }
 }
 
-// 6. Mini Thought Capsule (2x1)
-class NotesMiniThoughtReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Thought") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Thought")
-        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateMiniThoughtBitmap(context, note, config, isResponsive, wDp, hDp)
-    }
-}
-
-// 7. Bento Notes & Tasks (4x2)
+// 6. Bento Notes & Tasks (4x2)
 class NotesBentoReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist_4x2_layout) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Checklist") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Checklist")
@@ -523,7 +512,7 @@ class NotesBentoReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist_4x2
     }
 }
 
-// 8. Torn Receipt Log (2x2)
+// 7. Torn Receipt Log (2x2)
 class NotesTornReceiptReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
     override val widgetEditMode: String = "TEXT_ONLY"
 
@@ -544,7 +533,7 @@ class NotesTornReceiptReceiver : BaseNotesReceiver(R.layout.widget_notes_card_la
     }
 }
 
-// 9. Dot Grid Scratchpad (2x2)
+// 8. Dot Grid Scratchpad (2x2)
 class NotesDotGridReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
     override val widgetEditMode: String = "TEXT_ONLY"
 
@@ -565,7 +554,7 @@ class NotesDotGridReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout
     }
 }
 
-// 10. Multi-Note Stack (2x2)
+// 9. Multi-Note Stack (2x2)
 class NotesStackReceiver : BaseNotesReceiver(R.layout.widget_notes_stack_layout) {
     override val widgetEditMode: String = "TEXT_ONLY"
 

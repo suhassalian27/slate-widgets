@@ -1029,86 +1029,9 @@ fun generateQuickThoughtBitmap(
     return bitmap
 }
 
-// =========================================================================
-// 6. MINI THOUGHT CAPSULE (2x1)
-// =========================================================================
-fun generateMiniThoughtBitmap(
-    context: Context,
-    note: SlateNoteData,
-    slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
-    val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val isLight = slateConfig.themeMode == "LIGHT"
-    val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
-
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
-    }
-
-    val pillRadius = cardRect.height() / 2f
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, pillRadius, pillRadius, bgPaint)
-
-    val pad = cardRect.height() * 0.16f
-    val iconR = cardRect.height() * 0.30f
-    val iconCx = cardRect.left + pillRadius
-    val iconCy = cardRect.centerY()
-
-    val iconBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(iconCx, iconCy, iconR, iconBgPaint)
-
-    val iconTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.White.toArgb() else Color.Black.toArgb()
-        textSize = iconR * 0.9f
-        textAlign = Paint.Align.CENTER
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText("✎", iconCx, iconCy + iconR * 0.35f, iconTextPaint)
-
-    val textLeft = iconCx + iconR + pad * 1.1f
-    val maxTextW = (cardRect.right - textLeft - pad).coerceAtLeast(10f)
-
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = cardRect.height() * 0.24f
-        typeface = getSlateFont(context, 700)
-    }
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = cardRect.height() * 0.17f
-        typeface = getSlateFont(context, 400)
-    }
-
-    val displayTitle = note.title.take(16)
-    val displayBody = note.content.replace("\n", " ").take(22)
-
-    val titleY = cardRect.centerY() - cardRect.height() * 0.05f
-    canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
-    canvas.drawText(displayBody, textLeft, titleY + cardRect.height() * 0.26f, bodyPaint)
-
-    return bitmap
-}
 
 // =========================================================================
-// 7. BENTO NOTES & TASKS (4x2)
+// 6. BENTO NOTES & TASKS (4x2)
 // =========================================================================
 fun generateBentoNoteBitmap(
     context: Context,
@@ -1259,7 +1182,7 @@ fun generateBentoNoteBitmap(
 }
 
 // =========================================================================
-// 8. TORN PERFORATED RECEIPT (2x2)
+// 7. TORN PERFORATED RECEIPT (2x2)
 // =========================================================================
 fun generateTornReceiptBitmap(
     context: Context,
@@ -1420,7 +1343,7 @@ fun generateTornReceiptBitmap(
 }
 
 // =========================================================================
-// 9. DOT GRID SCRATCHPAD (2x2)
+// 8. DOT GRID SCRATCHPAD (2x2)
 // =========================================================================
 fun generateDotGridBitmap(
     context: Context,
@@ -1566,7 +1489,7 @@ fun generateDotGridBitmap(
 }
 
 // =========================================================================
-// 10. MULTI-NOTE STACK (2x2)
+// 9. MULTI-NOTE STACK (2x2)
 // =========================================================================
 fun generateNoteStackBitmap(
     context: Context,
