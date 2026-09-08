@@ -1245,96 +1245,144 @@ fun generateTornReceiptBitmap(
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
     val isLight = slateConfig.themeMode == "LIGHT"
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
+    val secondaryTextColor = if (isLight) Color(0xFF4A4A4E).toArgb() else Color(0xFFD1D1D6).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
+    // Base Paper Card Surface
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardRect.width() * 0.08f
+    val padX = 18f * scaleFactor
+    val padBottom = 16f * scaleFactor
+    val fScale = note.fontScaleMultiplier
 
     // 1. Perforation Dots across the top
-    val perfY = cardRect.top + pad * 1.2f
+    val perfY = cardRect.top + (14f * scaleFactor)
+    val dotRadius = 2.2f * scaleFactor
     val perfPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFD1D1D6).toArgb() else Color(0x30FFFFFF).toArgb()
+        color = if (isLight) Color(0x35000000).toArgb() else Color(0x30FFFFFF).toArgb()
         style = Paint.Style.FILL
     }
-    val dotCount = 12
-    val dotSpacing = (cardRect.width() - pad * 2f) / dotCount
-    for (i in 0..dotCount) {
-        val dx = cardRect.left + pad + i * dotSpacing
-        canvas.drawCircle(dx, perfY, 2.5f * scaleFactor, perfPaint)
+    val dotGap = 12f * scaleFactor
+    var currDotX = cardRect.left + padX
+    val maxDotX = cardRect.right - padX
+    while (currDotX <= maxDotX) {
+        canvas.drawCircle(currDotX, perfY, dotRadius, perfPaint)
+        currDotX += dotGap
     }
 
-    // 2. Receipt Header Tag
-    val headerY = perfY + pad * 1.5f
+    // 2. Receipt Category Tag (Comfortable clearance below dots)
+    val tagTextSize = (10f * scaleFactor * fScale).coerceIn(9f * scaleFactor, 13f * scaleFactor)
     val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = cardRect.height() * 0.052f
+        textSize = tagTextSize
         typeface = getSlateFont(context, 700)
     }
-    canvas.drawText("SLATE LOG / RECEIPT", cardRect.left + pad, headerY, tagPaint)
+    val tagMetrics = tagPaint.fontMetrics
+    val tagText = "# ${note.category.uppercase()}"
 
-    // 3. Receipt Title
+    // Clear 8dp gap below dots to avoid crowding
+    val tagTop = perfY + dotRadius + (8f * scaleFactor)
+    val tagY = tagTop - tagMetrics.ascent
+    canvas.drawText(tagText, cardRect.left + padX, tagY, tagPaint)
+
+    // 3. Receipt Title & Pencil Icon (Anchored closely below category tag)
+    val titleTextSize = 15.5f * scaleFactor * fScale
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardRect.height() * 0.085f
+        textSize = titleTextSize
         typeface = getSlateFont(context, 700)
     }
-    val titleY = headerY + cardRect.height() * 0.10f
-    canvas.drawText(note.title.uppercase(), cardRect.left + pad, titleY, titlePaint)
 
-    // Divider
+    val titleMetrics = titlePaint.fontMetrics
+    val tagBottom = tagY + tagMetrics.descent
+    // Tight 4dp spacing between category tag and title
+    val titleTop = tagBottom + (4f * scaleFactor)
+    val titleY = titleTop - titleMetrics.ascent
+
+    // Pencil Icon placed before title
+    val editIconSize = 11.5f * scaleFactor * fScale
+    val editPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = editIconSize
+        typeface = getSlateFont(context, 700)
+    }
+    val editIconText = "✎"
+    val editIconW = editPaint.measureText(editIconText)
+    val editGap = 6f * scaleFactor
+
+    val pencilX = cardRect.left + padX
+    canvas.drawText(editIconText, pencilX, titleY - 1.5f * scaleFactor, editPaint)
+
+    val titleStartX = pencilX + editIconW + editGap
+    val maxTitleW = (cardRect.right - padX) - titleStartX
+    val displayTitle = if (titlePaint.measureText(note.title.uppercase()) > maxTitleW) {
+        var t = note.title.uppercase()
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title.uppercase()
+
+    canvas.drawText(displayTitle, titleStartX, titleY, titlePaint)
+
+    // Dashed Receipt Divider Line
     val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x20FFFFFF).toArgb()
+        color = if (isLight) Color(0xFFDCDCE0).toArgb() else Color(0x22FFFFFF).toArgb()
         strokeWidth = 1.2f * scaleFactor
         pathEffect = DashPathEffect(floatArrayOf(4f * scaleFactor, 4f * scaleFactor), 0f)
     }
-    val divY = titleY + pad * 0.6f
-    canvas.drawLine(cardRect.left + pad, divY, cardRect.right - pad, divY, divPaint)
+    val divY = titleY + titleMetrics.descent + (8f * scaleFactor)
+    canvas.drawLine(cardRect.left + padX, divY, cardRect.right - padX, divY, divPaint)
 
-    // 4. Content (Monospace receipt formatting)
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF2C2C2E).toArgb() else Color(0xFFD1D1D6).toArgb()
-        textSize = cardRect.height() * 0.062f
-        typeface = Typeface.MONOSPACE
-    }
-    drawWrappedText(
-        canvas = canvas,
-        text = note.content,
-        x = cardRect.left + pad,
-        startY = divY + pad * 1.1f,
-        maxWidth = cardRect.width() - pad * 2f,
-        paint = bodyPaint,
-        lineSpacing = cardRect.height() * 0.095f,
-        maxLines = 4
-    )
-
-    // 5. Stylized Barcode at Bottom
-    val barcodeY = cardRect.bottom - pad * 1.6f
-    val barcodeH = cardRect.height() * 0.10f
+    // 4. Stylized Barcode pinned at the bottom
+    val barcodeH = 18f * scaleFactor
+    val barcodeY = cardRect.bottom - padBottom - barcodeH
     val barcodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF141416).toArgb() else Color(0x90FFFFFF).toArgb()
+        color = if (isLight) Color(0xFF141416).toArgb() else Color(0x80FFFFFF).toArgb()
         style = Paint.Style.FILL
     }
 
-    val barWidths = intArrayOf(2, 4, 1, 3, 2, 5, 2, 1, 4, 2, 3, 1, 4, 2, 3, 1, 5, 2)
-    var currBarX = cardRect.left + pad
-    val maxBarcodeX = cardRect.right - pad
-    for (bw in barWidths) {
-        val barW = bw * scaleFactor * 1.2f
+    val barPattern = intArrayOf(2, 4, 1, 3, 2, 5, 2, 1, 4, 2, 3, 1, 4, 2, 3, 1, 5, 2, 3, 1, 4, 2, 3, 1, 2)
+    var currBarX = cardRect.left + padX
+    val maxBarcodeX = cardRect.right - padX
+    for (bw in barPattern) {
+        val barW = bw * scaleFactor * 1.15f
         if (currBarX + barW > maxBarcodeX) break
         canvas.drawRect(currBarX, barcodeY, currBarX + barW, barcodeY + barcodeH, barcodePaint)
-        currBarX += barW + 3f * scaleFactor
+        currBarX += barW + (3f * scaleFactor)
     }
+
+    // 5. Content (Monospace receipt formatting, fills space down to barcode)
+    val bodyTextSize = 12f * scaleFactor * fScale
+    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = bodyTextSize
+        typeface = Typeface.MONOSPACE
+    }
+
+    val lineSpacing = bodyTextSize * 1.45f
+    val startY = divY + (10f * scaleFactor) + (bodyTextSize * 0.85f)
+    val bottomLimit = barcodeY - (10f * scaleFactor)
+
+    drawWrappedText(
+        canvas = canvas,
+        text = note.content,
+        x = cardRect.left + padX,
+        startY = startY,
+        maxWidth = cardRect.width() - (padX * 2f),
+        paint = contentPaint,
+        lineSpacing = lineSpacing,
+        bottomLimit = bottomLimit
+    )
 
     return bitmap
 }

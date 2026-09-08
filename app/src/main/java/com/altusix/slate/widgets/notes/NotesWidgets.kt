@@ -513,8 +513,20 @@ class NotesBentoReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist_4x2
 
 // 8. Torn Receipt Log (2x2)
 class NotesTornReceiptReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Receipt") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Receipt")
+    override val widgetEditMode: String = "TEXT_ONLY"
+
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val note = if (appWidgetId == -1) {
+            NotesStorageManager.getNoteForWidget(context, -1, "Receipt")
+        } else {
+            NotesStorageManager.getNoteForWidget(context, appWidgetId, "Receipt")
+        }
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
         return generateTornReceiptBitmap(context, note, config, isResponsive, wDp, hDp)
     }
