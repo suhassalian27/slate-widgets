@@ -19,14 +19,13 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 fun getNotesWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Sticky Note Pad", "2x2", "Notes", NotesStickyPadReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Multi-Note Stack", "2x2", "Notes", NotesStackReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Desk Memo Pad", "4x2", "Notes", NotesDeskMemoReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Checklist Tasks", "4x2", "Notes", NotesChecklistReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Dot Grid Scratchpad", "2x2", "Notes", NotesDotGridReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Classic Legal Pad", "4x2", "Notes", NotesLegalPadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Quick Thought Strip", "4x1", "Notes", NotesQuickThoughtReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Bento Notes & Tasks", "4x2", "Notes", NotesBentoReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Torn Receipt Log", "2x2", "Notes", NotesTornReceiptReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Multi-Note Stack", "2x2", "Notes", NotesStackReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -38,7 +37,6 @@ fun updateAllNotesWidgets(context: Context) {
         NotesChecklistReceiver::class.java,
         NotesLegalPadReceiver::class.java,
         NotesQuickThoughtReceiver::class.java,
-        NotesBentoReceiver::class.java,
         NotesTornReceiptReceiver::class.java,
         NotesDotGridReceiver::class.java,
         NotesStackReceiver::class.java
@@ -483,34 +481,6 @@ class NotesQuickThoughtReceiver : BaseNotesReceiver(R.layout.widget_notes_card_l
     }
 }
 
-// 6. Bento Notes & Tasks (4x2)
-class NotesBentoReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist_4x2_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Checklist") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Checklist")
-        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generateBentoNoteBitmap(context, note, config, isResponsive, wDp, hDp)
-    }
-
-    override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        super.setupTouchTargets(context, views, appWidgetId)
-        val checkRowIds = listOf(R.id.btn_check_item_0, R.id.btn_check_item_1, R.id.btn_check_item_2)
-        for (i in checkRowIds.indices) {
-            val intent = Intent(context, this.javaClass).apply {
-                action = ACTION_TOGGLE_CHECK
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                putExtra(EXTRA_ITEM_INDEX, i)
-                data = Uri.parse("slate_notes://$appWidgetId/bento_check/$i")
-            }
-            val pi = PendingIntent.getBroadcast(
-                context,
-                (appWidgetId * 53 + i),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(checkRowIds[i], pi)
-        }
-    }
-}
 
 // 7. Torn Receipt Log (2x2)
 class NotesTornReceiptReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {

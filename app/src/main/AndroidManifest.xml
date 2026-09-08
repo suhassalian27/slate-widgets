@@ -3165,19 +3165,6 @@
         </receiver>
 
 
-        <!-- 6. Bento Notes & Tasks (4x2) -->
-        <receiver
-            android:name=".widgets.notes.NotesBentoReceiver"
-            android:exported="true"
-            android:label="Bento Notes &amp; Tasks">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x2" />
-        </receiver>
-
         <!-- 7. Torn Receipt Log (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesTornReceiptReceiver"
