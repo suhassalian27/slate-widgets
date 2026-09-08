@@ -25,6 +25,9 @@ fun getPhotosWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Photo Stamp", "2x2", "Photos & Memories", PhotosStampReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Locket Memory", "2x2", "Photos & Memories", PhotosLocketReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Full-Bleed Clock", "2x2", "Photos & Memories", PhotosClockOverlayReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Stacked Photo Frame", "2x2", "Photos & Memories", PhotosStackedReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Taped Polaroid Frame", "2x2", "Photos & Memories", PhotosTapedReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Push Pin Polaroid Frame", "2x2", "Photos & Memories", PhotosPushPinReceiver::class.java, hasModeOption = true),
     )
 }
 
@@ -38,7 +41,10 @@ fun updateAllPhotosWidgets(context: Context) {
         PhotosCarouselReceiver::class.java,
         PhotosStampReceiver::class.java,
         PhotosLocketReceiver::class.java,
-        PhotosClockOverlayReceiver::class.java
+        PhotosClockOverlayReceiver::class.java,
+        PhotosStackedReceiver::class.java,
+        PhotosTapedReceiver::class.java,
+        PhotosPushPinReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -109,6 +115,8 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
 
 abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvider() {
 
+    open val targetAspect: Float = 1.0f
+
     companion object {
         const val ACTION_OPEN_CONFIG = "com.altusix.slate.photos.ACTION_OPEN_CONFIG"
         const val ACTION_CYCLE_PHOTO = "com.altusix.slate.photos.ACTION_CYCLE_PHOTO"
@@ -159,6 +167,7 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
     private fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
         try {
             val config = loadSlateWidgetConfig(context, id)
+            val isResponsive = if (id == -1) (targetAspect == 2.0f) else parseAndLockIsResponsive(context, id)
             val options = manager.getAppWidgetOptions(id)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
@@ -166,8 +175,39 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
             val wDp = if (wDpRaw <= 0) 160 else wDpRaw
             val hDp = if (hDpRaw <= 0) 160 else hDpRaw
 
-            val bitmap = renderWidgetBitmap(context, id, config, wDp, hDp)
+            val density = context.resources.displayMetrics.density
+            val padH: Int
+            val padV: Int
+            val effWDp: Int
+            val effHDp: Int
+
+            if (!isResponsive) {
+                val currentAspect = wDp.toFloat() / hDp.toFloat()
+                if (currentAspect > targetAspect) {
+                    val contentW = hDp * targetAspect
+                    padH = (((wDp - contentW) / 2f) * density).toInt()
+                    padV = 0
+                    effWDp = maxOf(1, (wDp - (wDp - contentW)).toInt())
+                    effHDp = hDp
+                } else {
+                    val contentH = wDp / targetAspect
+                    padH = 0
+                    padV = (((hDp - contentH) / 2f) * density).toInt()
+                    effWDp = wDp
+                    effHDp = maxOf(1, (hDp - (hDp - contentH)).toInt())
+                }
+            } else {
+                padH = 0
+                padV = 0
+                effWDp = wDp
+                effHDp = hDp
+            }
+
+            val bitmap = renderWidgetBitmap(context, id, config, effWDp, effHDp)
             val views = RemoteViews(context.packageName, layoutResId)
+            try {
+                views.setViewPadding(R.id.layout_photos_root, padH, padV, padH, padV)
+            } catch (_: Exception) {}
             views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
 
             setupTouchTargets(context, views, id)
@@ -178,13 +218,13 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
     }
 
     protected open fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        // Base open config intent
-        val openIntent = Intent(context, this.javaClass).apply {
-            action = ACTION_OPEN_CONFIG
+        // Base open config intent (Direct Activity Launch - Android 12+ BAL Compliant)
+        val openIntent = Intent(context, PhotosConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             data = Uri.parse("slate_photos://$appWidgetId/config")
         }
-        val openPi = PendingIntent.getBroadcast(
+        val openPi = PendingIntent.getActivity(
             context,
             (appWidgetId * 53 + 1),
             openIntent,
@@ -243,6 +283,7 @@ class PhotosPolaroidReceiver : BasePhotosReceiver(R.layout.widget_photos_card_la
 
 // 2. On This Day (Time Machine) (4x2)
 class PhotosOnThisDayReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override val targetAspect = 2.0f
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
@@ -252,6 +293,7 @@ class PhotosOnThisDayReceiver : BasePhotosReceiver(R.layout.widget_photos_card_l
 
 // 3. 35mm Film Strip (4x2)
 class PhotosFilmStripReceiver : BasePhotosReceiver(R.layout.widget_photos_filmstrip_layout) {
+    override val targetAspect = 2.0f
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
@@ -261,6 +303,7 @@ class PhotosFilmStripReceiver : BasePhotosReceiver(R.layout.widget_photos_filmst
 
 // 4. Bento Collage (4x2)
 class PhotosCollageBentoReceiver : BasePhotosReceiver(R.layout.widget_photos_bento_layout) {
+    override val targetAspect = 2.0f
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
@@ -301,5 +344,32 @@ class PhotosClockOverlayReceiver : BasePhotosReceiver(R.layout.widget_photos_car
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
         return generatePhotoClockOverlayBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 9. Stacked Photo Frame (2x2)
+class PhotosStackedReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateStackedMemoryBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 10. Taped Polaroid Frame (2x2)
+class PhotosTapedReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateTapedPolaroidBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 11. Push Pin Polaroid Frame (2x2)
+class PhotosPushPinReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generatePushPinBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
     }
 }

@@ -10,12 +10,12 @@ import android.graphics.Matrix
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,15 +27,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +50,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -61,12 +59,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.altusix.slate.core.theme.ThemePreferences
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.hypot
@@ -74,427 +72,444 @@ import kotlin.math.hypot
 class CameraWidgetConfigActivity : ComponentActivity() {
 
     private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
-    private var currentConfig by mutableStateOf(CameraWidgetConfig())
-    private var rawPickedUri by mutableStateOf<Uri?>(null)
 
-    private val photoPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        uri?.let { rawPickedUri = it }
-    }
-
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        window.setBackgroundDrawableResource(android.R.color.transparent)
 
-        widgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        setResult(Activity.RESULT_CANCELED)
+
+        widgetId = intent?.extras?.getInt(
+            AppWidgetManager.EXTRA_APPWIDGET_ID,
+            AppWidgetManager.INVALID_APPWIDGET_ID
+        ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+
         if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            finish()
-            return
+            widgetId = intent?.getIntExtra(
+                AppWidgetManager.EXTRA_APPWIDGET_ID,
+                AppWidgetManager.INVALID_APPWIDGET_ID
+            ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
         }
 
-        currentConfig = CameraWidgetPreferences.loadConfig(this, widgetId)
+        val initialConfig = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            CameraWidgetPreferences.loadConfig(this, widgetId)
+        } else {
+            CameraWidgetConfig()
+        }
+
+        val themePrefs = ThemePreferences(this).getThemeSettings()
+        val accentColor = themePrefs.accentColor
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme(background = Color.Transparent, surface = Color(0xFF0A0A0C))) {
-                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    background = Color(0xFF0C0C0E),
+                    surface = Color(0xFF16161B)
+                )
+            ) {
+                var config by remember { mutableStateOf(initialConfig) }
+                var rawPickedUri by remember { mutableStateOf<Uri?>(null) }
+
+                val photoPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
+                ) { uri: Uri? ->
+                    uri?.let { rawPickedUri = it }
+                }
+
+                fun saveAndFinish() {
+                    if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                        CameraWidgetPreferences.saveConfig(this@CameraWidgetConfigActivity, widgetId, config)
+                        val appWidgetManager = AppWidgetManager.getInstance(this@CameraWidgetConfigActivity)
+                        updateCameraWidget(this@CameraWidgetConfigActivity, appWidgetManager, widgetId)
+                        val resultIntent = Intent().apply {
+                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                        }
+                        setResult(Activity.RESULT_OK, resultIntent)
+                    } else {
+                        setResult(Activity.RESULT_OK)
+                    }
+                    finish()
+                }
 
                 if (rawPickedUri != null) {
                     SlateProEditorOverlay(
                         rawUri = rawPickedUri!!,
                         onDismiss = { rawPickedUri = null },
                         onImageTransformed = { editedUriStr ->
-                            currentConfig = currentConfig.copy(photoUri = editedUriStr)
+                            config = config.copy(photoUri = editedUriStr)
                             rawPickedUri = null
                         }
                     )
                 } else {
-                    ModalBottomSheet(
-                        onDismissRequest = { finish() },
-                        sheetState = sheetState,
-                        containerColor = Color(0xFF0A0A0C),
-                        contentColor = Color.White,
-                        dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF2C2C30)) },
-                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF0C0C0E))
+                            .statusBarsPadding()
+                            .navigationBarsPadding()
+                            .imePadding(),
+                        color = Color(0xFF0C0C0E)
                     ) {
-                        SlateStudioConfigSheetContent(
-                            currentConfig = currentConfig,
-                            onDismiss = { finish() },
-                            onPickPhotoClicked = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                            onEditCurrentPhotoClicked = {
-                                currentConfig.photoUri?.let { rawPickedUri = Uri.parse(it) }
-                            },
-                            onConfigChanged = { currentConfig = it },
-                            onSaveClicked = { saveAndFinish() }
-                        )
-                    }
-                }
-            }
-        }
-    }
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // 1. Top Bar
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = { finish() },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF1C1C22))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Cancel",
+                                            tint = Color(0xFFD1D1D6),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Camera Frame Setup",
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                }
 
-    private fun saveAndFinish() {
-        CameraWidgetPreferences.saveConfig(this, widgetId, currentConfig)
-        val appWidgetManager = AppWidgetManager.getInstance(this)
-        updateCameraWidget(this, appWidgetManager, widgetId)
-        setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
-        finish()
-    }
-}
+                                Button(
+                                    onClick = { saveAndFinish() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = accentColor,
+                                        contentColor = Color.Black
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Text("Save", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
 
-// ============================================================================
-// STUDIO PARADIGM DATA & COMPONENTS
-// ============================================================================
+                            HorizontalDivider(color = Color(0xFF1E1E24), thickness = 1.dp)
 
-enum class StudioTab(val title: String) {
-    PHOTO("Photo"), STYLE("Style"), ACTION("Action")
-}
+                            // 2. Scrollable Configuration Body
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
+                                // Live Preview Card
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(210.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(Color(0xFF16161B))
+                                        .border(1.dp, Color(0xFF282830), RoundedCornerShape(20.dp))
+                                        .clickable {
+                                            if (config.photoUri != null) {
+                                                rawPickedUri = Uri.parse(config.photoUri)
+                                            } else {
+                                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val imageBitmap = rememberUriImageBitmap(config.photoUri)
 
-val SwapIconVector = ImageVector.Builder(
-    name = "SwapIcon", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f
-).apply {
-    path(stroke = SolidColor(Color.White), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
-        moveTo(16f, 3f); lineTo(21f, 8f); lineTo(16f, 13f)
-        moveTo(21f, 8f); lineTo(3f, 8f)
-        moveTo(8f, 21f); lineTo(3f, 16f); lineTo(8f, 11f)
-        moveTo(3f, 16f); lineTo(21f, 16f)
-    }
-}.build()
+                                    if (imageBitmap != null) {
+                                        val colorMatrix = remember(config.filterStyle) {
+                                            when (config.filterStyle) {
+                                                PhotoFilterStyle.GRAYSCALE -> ColorMatrix().apply { setToSaturation(0f) }
+                                                PhotoFilterStyle.SEPIA -> ColorMatrix(floatArrayOf(0.393f, 0.769f, 0.189f, 0f, 0f, 0.349f, 0.686f, 0.168f, 0f, 0f, 0.272f, 0.534f, 0.131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+                                                PhotoFilterStyle.DARK_DIM -> ColorMatrix().apply { setToScale(0.7f, 0.7f, 0.7f, 1f) }
+                                                PhotoFilterStyle.VINTAGE -> ColorMatrix(floatArrayOf(0.9f, 0.1f, 0.1f, 0f, 20f, 0.1f, 0.8f, 0.1f, 0f, 15f, 0.1f, 0.1f, 0.6f, 0f, 10f, 0f, 0f, 0f, 1f, 0f))
+                                                PhotoFilterStyle.COOL_BLUE -> ColorMatrix(floatArrayOf(0.7f, 0f, 0.2f, 0f, 0f, 0f, 0.9f, 0.2f, 0f, 0f, 0f, 0.2f, 1.2f, 0f, 20f, 0f, 0f, 0f, 1f, 0f))
+                                                PhotoFilterStyle.WARM_GOLD -> ColorMatrix(floatArrayOf(1.2f, 0.1f, 0f, 0f, 15f, 0.1f, 1.1f, 0f, 0f, 10f, 0f, 0f, 0.8f, 0f, -10f, 0f, 0f, 0f, 1f, 0f))
+                                                PhotoFilterStyle.HIGH_CONTRAST -> ColorMatrix(floatArrayOf(1.4f, -0.1f, -0.1f, 0f, -20f, -0.1f, 1.4f, -0.1f, 0f, -20f, -0.1f, -0.1f, 1.4f, 0f, -20f, 0f, 0f, 0f, 1f, 0f))
+                                                else -> ColorMatrix()
+                                            }
+                                        }
 
-@Composable
-fun SlateStudioConfigSheetContent(
-    currentConfig: CameraWidgetConfig,
-    onDismiss: () -> Unit,
-    onPickPhotoClicked: () -> Unit,
-    onEditCurrentPhotoClicked: () -> Unit,
-    onConfigChanged: (CameraWidgetConfig) -> Unit,
-    onSaveClicked: () -> Unit
-) {
-    var selectedTab by remember { mutableStateOf(StudioTab.PHOTO) }
+                                        Image(
+                                            bitmap = imageBitmap,
+                                            contentDescription = "Live Preview",
+                                            contentScale = ContentScale.Crop,
+                                            colorFilter = ColorFilter.colorMatrix(colorMatrix),
+                                            modifier = Modifier.fillMaxSize()
+                                        )
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.85f)
-            .padding(horizontal = 22.dp)
-            .padding(bottom = 24.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = "Cancel", color = Color.Gray, fontSize = 15.sp, modifier = Modifier.clickable { onDismiss() }.padding(vertical = 8.dp))
-            Text(text = "Photo Setup", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(text = "Save", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.clickable { onSaveClicked() }.padding(vertical = 8.dp))
-        }
+                                        val isPolaroid = config.borderStyle == PhotoFrameBorder.POLAROID
 
-        Spacer(modifier = Modifier.height(24.dp))
+                                        when (config.borderStyle) {
+                                            PhotoFrameBorder.POLAROID -> {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .fillMaxHeight(0.24f)
+                                                        .align(Alignment.BottomCenter)
+                                                        .background(Color.White),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (config.customCaption.isNotEmpty()) {
+                                                        Text(
+                                                            text = config.customCaption,
+                                                            color = Color(0xFF121214),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 14.sp,
+                                                            textAlign = TextAlign.Center
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            PhotoFrameBorder.VIGNETTE -> Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Brush.radialGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
+                                            )
+                                            PhotoFrameBorder.THIN_BORDER -> Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(2.dp)
+                                                    .border(3.5.dp, Color.White, RoundedCornerShape(18.dp))
+                                            )
+                                            PhotoFrameBorder.INNER_OUTLINE -> Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(8.dp)
+                                                    .border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
+                                            )
+                                            PhotoFrameBorder.FILM_STRIP -> {
+                                                Column(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    verticalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(Color.Black))
+                                                    Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(Color.Black))
+                                                }
+                                            }
+                                            else -> {}
+                                        }
 
-        // Live Preview Hero
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF141416))
-                .clickable {
-                    if (currentConfig.photoUri != null) onEditCurrentPhotoClicked()
-                    else onPickPhotoClicked()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            val imageBitmap = rememberUriImageBitmap(currentConfig.photoUri)
+                                        if (config.customCaption.isNotEmpty() && !isPolaroid) {
+                                            Text(
+                                                text = config.customCaption,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomStart)
+                                                    .padding(14.dp)
+                                            )
+                                        }
 
-            if (imageBitmap != null) {
-                val colorMatrix = remember(currentConfig.filterStyle) {
-                    when (currentConfig.filterStyle) {
-                        PhotoFilterStyle.GRAYSCALE -> ColorMatrix().apply { setToSaturation(0f) }
-                        PhotoFilterStyle.SEPIA -> ColorMatrix(floatArrayOf(0.393f, 0.769f, 0.189f, 0f, 0f, 0.349f, 0.686f, 0.168f, 0f, 0f, 0.272f, 0.534f, 0.131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
-                        PhotoFilterStyle.DARK_DIM -> ColorMatrix().apply { setToScale(0.7f, 0.7f, 0.7f, 1f) }
-                        PhotoFilterStyle.VINTAGE -> ColorMatrix(floatArrayOf(0.9f, 0.1f, 0.1f, 0f, 20f, 0.1f, 0.8f, 0.1f, 0f, 15f, 0.1f, 0.1f, 0.6f, 0f, 10f, 0f, 0f, 0f, 1f, 0f))
-                        PhotoFilterStyle.COOL_BLUE -> ColorMatrix(floatArrayOf(0.7f, 0f, 0.2f, 0f, 0f, 0f, 0.9f, 0.2f, 0f, 0f, 0f, 0.2f, 1.2f, 0f, 20f, 0f, 0f, 0f, 1f, 0f))
-                        PhotoFilterStyle.WARM_GOLD -> ColorMatrix(floatArrayOf(1.2f, 0.1f, 0f, 0f, 15f, 0.1f, 1.1f, 0f, 0f, 10f, 0f, 0f, 0.8f, 0f, -10f, 0f, 0f, 0f, 1f, 0f))
-                        PhotoFilterStyle.HIGH_CONTRAST -> ColorMatrix(floatArrayOf(1.4f, -0.1f, -0.1f, 0f, -20f, -0.1f, 1.4f, -0.1f, 0f, -20f, -0.1f, -0.1f, 1.4f, 0f, -20f, 0f, 0f, 0f, 1f, 0f))
-                        else -> ColorMatrix()
-                    }
-                }
+                                        // Action Buttons
+                                        Row(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(10.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color.Black.copy(alpha = 0.65f))
+                                                    .clickable {
+                                                        config.photoUri?.let { rawPickedUri = Uri.parse(it) }
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                            ) {
+                                                Text("Edit Crop", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            }
 
-                Image(
-                    bitmap = imageBitmap,
-                    contentDescription = "Live Preview",
-                    contentScale = ContentScale.Crop,
-                    colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                    modifier = Modifier.fillMaxSize()
-                )
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color.Black.copy(alpha = 0.65f))
+                                                    .clickable {
+                                                        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                            ) {
+                                                Text("Change Photo", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            }
+                                        }
+                                    } else {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .background(accentColor.copy(alpha = 0.15f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Add,
+                                                    contentDescription = "Choose Photo",
+                                                    tint = accentColor,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = "Tap to choose a photo",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = "Opens camera directly on launcher tap",
+                                                color = Color(0xFF8E8E93),
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
 
-                val isPolaroid = currentConfig.borderStyle == PhotoFrameBorder.POLAROID
+                                // Frame Border Style
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        text = "FRAME BORDER STYLE",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF8E8E93),
+                                        letterSpacing = 0.5.sp
+                                    )
 
-                when (currentConfig.borderStyle) {
-                    PhotoFrameBorder.POLAROID -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(0.24f)
-                                .align(Alignment.BottomCenter)
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (currentConfig.customCaption.isNotEmpty()) {
-                                Text(
-                                    text = currentConfig.customCaption,
-                                    color = Color(0xFF121214),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    textAlign = TextAlign.Center
-                                )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        PhotoFrameBorder.values().forEach { border ->
+                                            val isSelected = config.borderStyle == border
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = { config = config.copy(borderStyle = border) },
+                                                label = {
+                                                    Text(
+                                                        text = border.label,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = accentColor,
+                                                    selectedLabelColor = Color.Black,
+                                                    containerColor = Color(0xFF1C1C22),
+                                                    labelColor = Color(0xFFD1D1D6)
+                                                ),
+                                                border = FilterChipDefaults.filterChipBorder(
+                                                    borderColor = if (isSelected) accentColor else Color(0xFF282830),
+                                                    enabled = true,
+                                                    selected = isSelected
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Aesthetic Filters
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        text = "AESTHETIC FILTER",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF8E8E93),
+                                        letterSpacing = 0.5.sp
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        PhotoFilterStyle.values().forEach { style ->
+                                            val isChosen = config.filterStyle == style
+                                            FilterChip(
+                                                selected = isChosen,
+                                                onClick = { config = config.copy(filterStyle = style) },
+                                                label = {
+                                                    Text(
+                                                        text = style.label,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = accentColor,
+                                                    selectedLabelColor = Color.Black,
+                                                    containerColor = Color(0xFF1C1C22),
+                                                    labelColor = Color(0xFFD1D1D6)
+                                                ),
+                                                border = FilterChipDefaults.filterChipBorder(
+                                                    borderColor = if (isChosen) accentColor else Color(0xFF282830),
+                                                    enabled = true,
+                                                    selected = isChosen
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Caption Overlay
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        text = "CAPTION OVERLAY",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF8E8E93),
+                                        letterSpacing = 0.5.sp
+                                    )
+
+                                    OutlinedTextField(
+                                        value = config.customCaption,
+                                        onValueChange = { config = config.copy(customCaption = it) },
+                                        label = { Text("Caption (Optional)") },
+                                        placeholder = { Text("e.g. Captured with Slate") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = accentColor,
+                                            unfocusedBorderColor = Color(0xFF2C2C35),
+                                            focusedLabelColor = accentColor,
+                                            unfocusedLabelColor = Color(0xFF8E8E93),
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
+                                            focusedContainerColor = Color(0xFF16161B),
+                                            unfocusedContainerColor = Color(0xFF16161B)
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
-                    PhotoFrameBorder.VIGNETTE -> Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)))))
-                    PhotoFrameBorder.THIN_BORDER -> Box(modifier = Modifier.fillMaxSize().padding(2.dp).border(3.5.dp, Color.White, RoundedCornerShape(22.dp)))
-                    PhotoFrameBorder.INNER_OUTLINE -> Box(modifier = Modifier.fillMaxSize().padding(10.dp).border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(16.dp)))
-                    PhotoFrameBorder.FILM_STRIP -> {
-                        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                            Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(Color.Black))
-                            Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(Color.Black))
-                        }
-                    }
-                    else -> {}
                 }
-
-                if (currentConfig.customCaption.isNotEmpty() && !isPolaroid) {
-                    Text(
-                        text = currentConfig.customCaption,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
-                    )
-                }
-            } else {
-                Text(text = "Widget Preview", color = Color(0xFF38383A), fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFF141416)).padding(4.dp)
-        ) {
-            StudioTab.values().forEach { tab ->
-                val isSelected = selectedTab == tab
-                Box(
-                    modifier = Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(10.dp)).background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent).clickable { selectedTab = tab },
-                    contentAlignment = Alignment.Center
-                ) { Text(text = tab.title, color = if (isSelected) Color.White else Color(0xFF8E8E93), fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium) }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Crossfade(targetState = selectedTab, label = "tabCrossfade") { tab ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (tab) {
-                    StudioTab.PHOTO -> PhotoTabContent(currentConfig, onPickPhotoClicked, onEditCurrentPhotoClicked)
-                    StudioTab.STYLE -> StyleTabContent(currentConfig, onConfigChanged)
-                    StudioTab.ACTION -> ActionTabContent(currentConfig, onConfigChanged)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PhotoTabContent(
-    config: CameraWidgetConfig,
-    onPickPhotoClicked: () -> Unit,
-    onEditPhotoClicked: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (config.photoUri == null) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF141416)).border(1.dp, Color(0xFF242428), RoundedCornerShape(16.dp)).clickable { onPickPhotoClicked() },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF222226)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Select Photo from Gallery", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Tap to browse", color = Color(0xFF8E8E93), fontSize = 11.sp)
-                }
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF1C1C1E))
-                        .clickable { onEditPhotoClicked() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Photo", tint = Color.White)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Edit Photo", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF1C1C1E))
-                        .clickable { onPickPhotoClicked() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(SwapIconVector, contentDescription = "Change Photo", tint = Color.White)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Change Photo", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun StyleTabContent(config: CameraWidgetConfig, onConfigChanged: (CameraWidgetConfig) -> Unit) {
-    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-        Text("Filter", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            FilterSwatch(PhotoFilterStyle.NONE, config.filterStyle, listOf(Color.Red, Color.Yellow, Color.Green, Color.Blue)) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.GRAYSCALE, config.filterStyle, listOf(Color.White, Color.DarkGray, Color.Black)) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.SEPIA, config.filterStyle, listOf(Color(0xFFD2B48C), Color(0xFF8B4513))) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.DARK_DIM, config.filterStyle, listOf(Color(0xFF424242), Color(0xFF212121))) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.VINTAGE, config.filterStyle, listOf(Color(0xFFD27D2D), Color(0xFF8B0000))) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.COOL_BLUE, config.filterStyle, listOf(Color(0xFF00FFFF), Color(0xFF00008B))) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.WARM_GOLD, config.filterStyle, listOf(Color(0xFFFFD700), Color(0xFFFF8C00))) { onConfigChanged(config.copy(filterStyle = it)) }
-            FilterSwatch(PhotoFilterStyle.HIGH_CONTRAST, config.filterStyle, listOf(Color.White, Color.Black)) { onConfigChanged(config.copy(filterStyle = it)) }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text("Frame", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            PhotoFrameBorder.values().forEach { border ->
-                FrameSelector(border, config.borderStyle) { onConfigChanged(config.copy(borderStyle = it)) }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text("Caption", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(modifier = Modifier.height(10.dp))
-        BasicTextField(
-            value = config.customCaption,
-            onValueChange = { onConfigChanged(config.copy(customCaption = it)) },
-            textStyle = TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium),
-            cursorBrush = SolidColor(Color.White),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { innerTextField ->
-                Column {
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        if (config.customCaption.isEmpty()) { Text("Add text overlay...", color = Color(0xFF38383A), fontSize = 16.sp) }
-                        innerTextField()
-                    }
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF38383A)))
-                }
-            }
-        )
-        Spacer(modifier = Modifier.height(40.dp))
-    }
-}
-
-@Composable
-private fun FilterSwatch(filter: PhotoFilterStyle, current: PhotoFilterStyle, colors: List<Color>, onClick: (PhotoFilterStyle) -> Unit) {
-    val isSelected = filter == current
-    val scale by animateFloatAsState(if (isSelected) 1.1f else 1.0f, label = "swatchScale")
-    val ringColor by animateColorAsState(if (isSelected) Color.White else Color.Transparent, label = "swatchRing")
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick(filter) }) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale }
-                .clip(CircleShape)
-                .border(2.dp, ringColor, CircleShape)
-                .padding(4.dp)
-                .clip(CircleShape)
-                .background(Brush.sweepGradient(colors))
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(text = filter.label, color = if (isSelected) Color.White else Color.Gray, fontSize = 10.sp)
-    }
-}
-
-@Composable
-private fun FrameSelector(frame: PhotoFrameBorder, current: PhotoFrameBorder, onClick: (PhotoFrameBorder) -> Unit) {
-    val isSelected = frame == current
-    val bgColor by animateColorAsState(if (isSelected) Color.White else Color(0xFF1C1C1E), label = "frameBg")
-    val textColor by animateColorAsState(if (isSelected) Color.Black else Color.White, label = "frameText")
-
-    Box(
-        modifier = Modifier
-            .height(44.dp)
-            .widthIn(min = 100.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .clickable { onClick(frame) }
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) { Text(text = frame.label, color = textColor, fontSize = 11.sp, fontWeight = FontWeight.Medium) }
-}
-
-@Composable
-fun ActionTabContent(config: CameraWidgetConfig, onConfigChanged: (CameraWidgetConfig) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val actions = listOf(
-            Triple(PhotoClickAction.OPEN_GALLERY, Icons.Default.Edit, "Open Photos App"),
-            Triple(PhotoClickAction.OPEN_CAMERA, Icons.Default.Edit, "Launch Camera"),
-            Triple(PhotoClickAction.OPEN_SETTINGS, Icons.Default.Settings, "Edit Widget Settings"),
-            Triple(PhotoClickAction.NOTHING, Icons.Default.Close, "No Action")
-        )
-
-        actions.forEach { (action, icon, desc) ->
-            val isSelected = config.clickAction == action
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(if (isSelected) Color(0xFF1C1C1E) else Color.Transparent).clickable { onConfigChanged(config.copy(clickAction = action)) }.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF2C2C30)), contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(action.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text(desc, color = Color.Gray, fontSize = 12.sp)
-                }
-                if (isSelected) { Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.White) }
             }
         }
     }
 }
 
 // ============================================================================
-// FEATURE 3: 8-HANDLE INTERACTIVE CROP ENGINE
+// 8-HANDLE INTERACTIVE CROP ENGINE
 // ============================================================================
 
 enum class CropRatio(val label: String, val ratio: Float?) {
@@ -549,7 +564,6 @@ fun SlateProEditorOverlay(
         } catch (_: Exception) { null }
     }
 
-    // Inset Image Bounds with Padding to prevent handle dots clipping against viewport edges
     val imageRect = remember(rawBitmap, containerSize, rotationAngle, paddingPx) {
         if (rawBitmap == null || containerSize == IntSize.Zero) Rect.Zero
         else {
@@ -572,7 +586,6 @@ fun SlateProEditorOverlay(
 
     var cropRect by remember { mutableStateOf(Rect.Zero) }
 
-    // Initial crop frame defaults to 100% of full imageRect bounds
     LaunchedEffect(imageRect, selectedRatio) {
         if (imageRect != Rect.Zero) {
             val targetRatio = selectedRatio.ratio ?: (imageRect.width / imageRect.height)
@@ -647,7 +660,6 @@ fun SlateProEditorOverlay(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Main Interactive Viewfinder
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -828,7 +840,7 @@ fun SlateProEditorOverlay(
                                                 DragHandle.TOP_RIGHT -> {
                                                     val deltaW = dragAmount.x - dragAmount.y * targetRatio
                                                     val maxW = img.right - rect.left
-                                                    val maxH = rect.bottom - img.top
+                                                    val maxH = img.bottom - rect.top
                                                     val allowedW = minOf(maxW, maxH * targetRatio)
                                                     val newW = (rect.width + deltaW / 2f).coerceIn(minSize, allowedW)
                                                     newR = rect.left + newW
@@ -857,21 +869,18 @@ fun SlateProEditorOverlay(
                         if (cropRect != Rect.Zero) {
                             val overlayColor = Color.Black.copy(alpha = 0.65f)
 
-                            // 4-Scrim Mask Quadrants
                             drawRect(overlayColor, topLeft = Offset(0f, 0f), size = Size(size.width, cropRect.top))
                             drawRect(overlayColor, topLeft = Offset(0f, cropRect.bottom), size = Size(size.width, size.height - cropRect.bottom))
                             drawRect(overlayColor, topLeft = Offset(0f, cropRect.top), size = Size(cropRect.left, cropRect.height))
                             drawRect(overlayColor, topLeft = Offset(cropRect.right, cropRect.top), size = Size(size.width - cropRect.right, cropRect.height))
 
-                            // Crop Frame Border
                             drawRect(
                                 color = Color.White,
                                 topLeft = cropRect.topLeft,
                                 size = cropRect.size,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+                                style = Stroke(width = 1.5.dp.toPx())
                             )
 
-                            // 8 Circular Handle Dots
                             val handleRadius = 6.5.dp.toPx()
                             val cx = cropRect.left + cropRect.width / 2f
                             val cy = cropRect.top + cropRect.height / 2f

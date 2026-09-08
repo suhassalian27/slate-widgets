@@ -942,13 +942,9 @@
         <!-- ================================================================= -->
         <!-- Camera Widget Configuration Activity -->
         <activity
-            android:name="com.altusix.slate.widgets.camera.CameraWidgetConfigActivity"
+            android:name=".widgets.camera.CameraWidgetConfigActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
+            android:theme="@style/Theme.Slate" />
         <!-- 1. Camera Photo Frame Widget (4x2 Fixed Wide Frame) -->
         <receiver
             android:name="com.altusix.slate.widgets.camera.CameraPhotoFrame4x2Receiver"
@@ -1001,7 +997,7 @@
         </receiver>
         <!-- 6. STACKED PHOTO FRAME -->
         <receiver
-            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameStackedReceiver" android:exported="true" android:label="Slate Stacked Photo Frame">
+            android:name=".widgets.photos.PhotosStackedReceiver" android:exported="true" android:label="Slate Stacked Photo Frame">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -1009,7 +1005,7 @@
         </receiver>
         <!-- 7. TAPED POLAROID PHOTO FRAME -->
         <receiver
-            android:name="com.altusix.slate.widgets.camera.CameraPhotoFrameTapedReceiver" android:exported="true" android:label="Slate Taped Photo Frame">
+            android:name=".widgets.photos.PhotosTapedReceiver" android:exported="true" android:label="Slate Taped Photo Frame">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -1017,7 +1013,7 @@
         </receiver>
         <!-- 8. PUSH PIN POLAROID PHOTO FRAME -->
         <receiver
-            android:name="com.altusix.slate.widgets.camera.CameraPhotoFramePushPinReceiver" android:exported="true" android:label="Slate Push Pin Photo Frame">
+            android:name=".widgets.photos.PhotosPushPinReceiver" android:exported="true" android:label="Slate Push Pin Photo Frame">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

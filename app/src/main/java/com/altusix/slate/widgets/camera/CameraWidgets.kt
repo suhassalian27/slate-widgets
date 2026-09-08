@@ -17,9 +17,6 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getCameraWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo(name = "Stacked Photo Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameStackedReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Taped Polaroid Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameTapedReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Push Pin Polaroid Frame", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFramePushPinReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Camera Shutter Launcher", sizeText = "2x2", category = "Camera", receiverClass = CameraShutterLauncherReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Wide Photo Frame", sizeText = "4x2", category = "Camera", receiverClass = CameraPhotoFrame4x2Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Photo Frame & Gallery", sizeText = "2x2", category = "Camera", receiverClass = CameraPhotoFrameReceiver::class.java, hasModeOption = true),
@@ -84,25 +81,16 @@ private fun getPhotoPendingIntent(context: Context, widgetId: Int, cameraConfig:
         )
     }
 
-    return when (cameraConfig.clickAction) {
-        PhotoClickAction.OPEN_GALLERY -> {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                type = "image/*"
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        }
-        PhotoClickAction.OPEN_CAMERA -> {
-            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        }
-        PhotoClickAction.OPEN_SETTINGS -> {
-            PendingIntent.getActivity(context, widgetId, createConfigIntent(context, widgetId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        }
-        PhotoClickAction.NOTHING -> null
+    // Direct camera trigger on launcher tap
+    val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
+    return PendingIntent.getActivity(
+        context,
+        widgetId,
+        cameraIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
 }
 
 fun updateAllCameraWidgets(context: Context) {
@@ -113,9 +101,6 @@ fun updateAllCameraWidgets(context: Context) {
         CameraPhotoFrameCircleReceiver::class.java,
         CameraPhotoFrameBlobReceiver::class.java,
         CameraPhotoFrameFluidBlobReceiver::class.java,
-        CameraPhotoFrameStackedReceiver::class.java,
-        CameraPhotoFrameTapedReceiver::class.java,
-        CameraPhotoFramePushPinReceiver::class.java,
         CameraShutterLauncherReceiver::class.java,
         CameraAperturePillReceiver::class.java
     )
@@ -140,9 +125,6 @@ fun updateCameraWidget(context: Context, appWidgetManager: AppWidgetManager, wid
         providerClass.contains("Circle") -> CameraPhotoFrameCircleReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
         providerClass.contains("FluidBlob") -> CameraPhotoFrameFluidBlobReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
         providerClass.contains("Blob") -> CameraPhotoFrameBlobReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
-        providerClass.contains("Stacked") -> CameraPhotoFrameStackedReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
-        providerClass.contains("Taped") -> CameraPhotoFrameTapedReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
-        providerClass.contains("PushPin") -> CameraPhotoFramePushPinReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
         providerClass.contains("ShutterLauncher") -> CameraShutterLauncherReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
         providerClass.contains("AperturePill") -> CameraAperturePillReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
         else -> CameraPhotoFrameReceiver.updatePhotoWidget(context, appWidgetManager, widgetId)
@@ -363,144 +345,6 @@ class CameraPhotoFrameFluidBlobReceiver : AppWidgetProvider() {
 
             val config = loadSlateWidgetConfig(context, widgetId)
             val bitmap = generatePhotoFrameFluidBlobCameraBitmap(context, config, cameraConfig, wDp, hDp)
-
-            val views = RemoteViews(context.packageName, R.layout.widget_image_container)
-            views.setImageViewBitmap(R.id.widget_image_view, bitmap)
-
-            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
-            if (pendingIntent != null) {
-                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-            } else {
-                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-            }
-
-            appWidgetManager.updateAppWidget(widgetId, views)
-        }
-    }
-}
-
-// 6. STACKED PHOTO FRAME (2x2 / Layered Polaroid Stack Display)
-class CameraPhotoFrameStackedReceiver : AppWidgetProvider() {
-
-    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
-        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
-        return generatePhotoFrameStackedCameraBitmap(context, config, cameraConfig, wDp, hDp)
-    }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
-    }
-
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
-        updatePhotoWidget(context, appWidgetManager, appWidgetId)
-        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
-    }
-
-    companion object {
-        fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
-            val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-            val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
-            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
-            val wDp = if (wDpRaw <= 0) 200 else wDpRaw
-            val hDp = if (hDpRaw <= 0) 200 else hDpRaw
-
-            val config = loadSlateWidgetConfig(context, widgetId)
-            val bitmap = generatePhotoFrameStackedCameraBitmap(context, config, cameraConfig, wDp, hDp)
-
-            val views = RemoteViews(context.packageName, R.layout.widget_image_container)
-            views.setImageViewBitmap(R.id.widget_image_view, bitmap)
-
-            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
-            if (pendingIntent != null) {
-                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-            } else {
-                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-            }
-
-            appWidgetManager.updateAppWidget(widgetId, views)
-        }
-    }
-}
-
-// 7. TAPED POLAROID PHOTO FRAME (2x2 / Masking Tape Mounted Display)
-class CameraPhotoFrameTapedReceiver : AppWidgetProvider() {
-
-    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
-        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
-        return generatePhotoFrameTapedCameraBitmap(context, config, cameraConfig, wDp, hDp)
-    }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
-    }
-
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
-        updatePhotoWidget(context, appWidgetManager, appWidgetId)
-        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
-    }
-
-    companion object {
-        fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
-            val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-            val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
-            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
-            val wDp = if (wDpRaw <= 0) 200 else wDpRaw
-            val hDp = if (hDpRaw <= 0) 200 else hDpRaw
-
-            val config = loadSlateWidgetConfig(context, widgetId)
-            val bitmap = generatePhotoFrameTapedCameraBitmap(context, config, cameraConfig, wDp, hDp)
-
-            val views = RemoteViews(context.packageName, R.layout.widget_image_container)
-            views.setImageViewBitmap(R.id.widget_image_view, bitmap)
-
-            val pendingIntent = getPhotoPendingIntent(context, widgetId, cameraConfig)
-            if (pendingIntent != null) {
-                views.setOnClickPendingIntent(R.id.widget_image_view, pendingIntent)
-            } else {
-                val dummyIntent = PendingIntent.getBroadcast(context, widgetId, Intent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_image_view, dummyIntent)
-            }
-
-            appWidgetManager.updateAppWidget(widgetId, views)
-        }
-    }
-}
-
-// 8. PUSH PIN POLAROID PHOTO FRAME (2x2 / Red Thumbtack Mounted Display)
-class CameraPhotoFramePushPinReceiver : AppWidgetProvider() {
-
-    fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
-        val cameraConfig = CameraWidgetPreferences.loadConfig(context, -1)
-        return generatePhotoFramePushPinCameraBitmap(context, config, cameraConfig, wDp, hDp)
-    }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (widgetId in appWidgetIds) { updatePhotoWidget(context, appWidgetManager, widgetId) }
-    }
-
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
-        updatePhotoWidget(context, appWidgetManager, appWidgetId)
-        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
-    }
-
-    companion object {
-        fun updatePhotoWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
-            val cameraConfig = CameraWidgetPreferences.loadConfig(context, widgetId)
-            val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 200) ?: 200
-            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
-            val wDp = if (wDpRaw <= 0) 200 else wDpRaw
-            val hDp = if (hDpRaw <= 0) 200 else hDpRaw
-
-            val config = loadSlateWidgetConfig(context, widgetId)
-            val bitmap = generatePhotoFramePushPinCameraBitmap(context, config, cameraConfig, wDp, hDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_image_container)
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)

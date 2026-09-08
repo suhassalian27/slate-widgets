@@ -32,7 +32,7 @@ enum class PhotoFrameBorder(val label: String) {
 
 data class CameraWidgetConfig(
     val photoUri: String? = null,
-    val clickAction: PhotoClickAction = PhotoClickAction.OPEN_GALLERY,
+    val clickAction: PhotoClickAction = PhotoClickAction.OPEN_CAMERA,
     val filterStyle: PhotoFilterStyle = PhotoFilterStyle.NONE,
     val borderStyle: PhotoFrameBorder = PhotoFrameBorder.NONE,
     val customCaption: String = "",
@@ -64,8 +64,8 @@ object CameraWidgetPreferences {
         val prefs = getPrefs(context)
         val uri = prefs.getString("photo_uri_$widgetId", null)
         val clickAction = try {
-            PhotoClickAction.valueOf(prefs.getString("click_action_$widgetId", PhotoClickAction.OPEN_GALLERY.name)!!)
-        } catch (_: Exception) { PhotoClickAction.OPEN_GALLERY }
+            PhotoClickAction.valueOf(prefs.getString("click_action_$widgetId", PhotoClickAction.OPEN_CAMERA.name)!!)
+        } catch (_: Exception) { PhotoClickAction.OPEN_CAMERA }
 
         val filter = try {
             PhotoFilterStyle.valueOf(prefs.getString("filter_style_$widgetId", PhotoFilterStyle.NONE.name)!!)
