@@ -231,7 +231,7 @@ class NotesStickyPadReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layo
     }
 }
 
-// 1b. Desk Memo Pad (4x2 - Taped Ruled Pad)
+// 2. Desk Memo Pad (4x2 - Taped Ruled Pad)
 class NotesDeskMemoReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
     override val widgetEditMode: String = "TEXT_ONLY"
 
@@ -242,7 +242,7 @@ class NotesDeskMemoReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layou
     }
 }
 
-// 2. Checklist Tasks (4x2 - Adaptive Dynamic Rows)
+// 3. Checklist Tasks (4x2 - Adaptive Dynamic Rows)
 class NotesChecklistReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist_4x2_layout) {
     override val widgetEditMode: String = "CHECKLIST_ONLY"
 
@@ -445,8 +445,20 @@ class NotesChecklistReceiver : BaseNotesReceiver(R.layout.widget_notes_checklist
 
 // 4. Classic Legal Pad (4x2)
 class NotesLegalPadReceiver : BaseNotesReceiver(R.layout.widget_notes_card_layout) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val note = if (appWidgetId == -1) NotesStorageManager.getNoteForWidget(context, -1, "Legal Pad") else NotesStorageManager.getNoteForWidget(context, appWidgetId, "Legal Pad")
+    override val widgetEditMode: String = "TEXT_ONLY"
+
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val note = if (appWidgetId == -1) {
+            SlateNoteData.getDefaultNote()
+        } else {
+            NotesStorageManager.getNoteForWidget(context, appWidgetId, "Legal Pad")
+        }
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
         return generateLegalPadBitmap(context, note, config, isResponsive, wDp, hDp)
     }

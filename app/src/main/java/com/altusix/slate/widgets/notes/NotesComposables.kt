@@ -411,7 +411,7 @@ fun generateStickyNoteBitmap(
 }
 
 // =========================================================================
-// 1b. DESK MEMO PAD (4x2 - HORIZONTAL RULED NOTEPAD)
+// 2. DESK MEMO PAD (4x2 - HORIZONTAL RULED NOTEPAD)
 // =========================================================================
 fun generateDeskMemoBitmap(
     context: Context,
@@ -560,7 +560,7 @@ fun generateDeskMemoBitmap(
 }
 
 // =========================================================================
-// 2. INTERACTIVE CHECKLIST (4x2)
+// 3. INTERACTIVE CHECKLIST (4x2)
 // =========================================================================
 fun generateChecklistBitmap(
     context: Context,
@@ -743,86 +743,153 @@ fun generateLegalPadBitmap(
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
     val isLight = slateConfig.themeMode == "LIGHT"
     val primaryTextColor = if (isLight) Color(0xFF141416).toArgb() else Color.White.toArgb()
-    val secondaryTextColor = if (isLight) Color(0xFF6C6C70).toArgb() else Color(0xFF8E8E93).toArgb()
+    val secondaryTextColor = if (isLight) Color(0xFF4A4A4E).toArgb() else Color(0xFFD1D1D6).toArgb()
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val aspect = 2f
         val cardW = minOf(w, h * aspect)
         val cardH = cardW / aspect
         RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
     }
 
+    // Base Paper Surface
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    // 1. Top Binding Header Strip (Slate Notebook Binding)
-    val bindH = cardRect.height() * 0.16f
+    // 1. Top Binding Header Strip with Accent Stitching
+    val bindH = 26f * scaleFactor
+    val bindPath = Path().apply {
+        moveTo(cardRect.left + cardCornerRadius, cardRect.top)
+        lineTo(cardRect.right - cardCornerRadius, cardRect.top)
+        quadTo(cardRect.right, cardRect.top, cardRect.right, cardRect.top + cardCornerRadius)
+        lineTo(cardRect.right, cardRect.top + bindH)
+        lineTo(cardRect.left, cardRect.top + bindH)
+        lineTo(cardRect.left, cardRect.top + cardCornerRadius)
+        quadTo(cardRect.left, cardRect.top, cardRect.left + cardCornerRadius, cardRect.top)
+        close()
+    }
     val bindPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF2C2C2E).toArgb() else Color(0xFF1C1C1E).toArgb()
+        color = if (isLight) Color(0xFF242428).toArgb() else Color(0xFF141416).toArgb()
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(
-        RectF(cardRect.left, cardRect.top, cardRect.right, cardRect.top + bindH),
-        cardCornerRadius, cardCornerRadius, bindPaint
-    )
-    canvas.drawRect(cardRect.left, cardRect.top + bindH - cardCornerRadius, cardRect.right, cardRect.top + bindH, bindPaint)
+    canvas.drawPath(bindPath, bindPaint)
 
-    // Gold / accent stitching line across binding
+    // Dashed Accent Stitching Line
     val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        strokeWidth = 1.6f * scaleFactor
-        pathEffect = DashPathEffect(floatArrayOf(6f * scaleFactor, 6f * scaleFactor), 0f)
+        strokeWidth = 1.4f * scaleFactor
+        pathEffect = DashPathEffect(floatArrayOf(5f * scaleFactor, 4f * scaleFactor), 0f)
     }
-    canvas.drawLine(cardRect.left + 16f * scaleFactor, cardRect.top + bindH * 0.5f, cardRect.right - 16f * scaleFactor, cardRect.top + bindH * 0.5f, stitchPaint)
+    canvas.drawLine(
+        cardRect.left + 16f * scaleFactor,
+        cardRect.top + bindH * 0.5f,
+        cardRect.right - 16f * scaleFactor,
+        cardRect.top + bindH * 0.5f,
+        stitchPaint
+    )
 
-    val pad = cardRect.height() * 0.10f
-
-    // 2. Red Vertical Margin Line (at ~20% of width)
-    val marginX = cardRect.left + cardRect.width() * 0.18f
+    // 2. Red Vertical Legal Margin Line
+    val marginX = cardRect.left + (32f * scaleFactor).coerceAtMost(cardRect.width() * 0.20f)
     val redMarginPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color(0x60E53935).toArgb()
-        strokeWidth = 1.5f * scaleFactor
+        color = if (isLight) Color(0x75E53935).toArgb() else Color(0x55E53935).toArgb()
+        strokeWidth = 1.2f * scaleFactor
     }
     canvas.drawLine(marginX, cardRect.top + bindH, marginX, cardRect.bottom, redMarginPaint)
 
-    // 3. Horizontal Ruled Lines
-    val lineSpacing = cardRect.height() * 0.18f
-    val ruledPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val fScale = note.fontScaleMultiplier
+    val padRight = 18f * scaleFactor
+    val padLeft = marginX + (10f * scaleFactor)
+
+    // 3. Dynamic Title Clearance & Baseline Anchor
+    val titleTextSize = 15.5f * scaleFactor * fScale
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = titleTextSize
+        typeface = getSlateFont(context, 700)
+    }
+
+    val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = (10f * scaleFactor * fScale).coerceIn(9f * scaleFactor, 14f * scaleFactor)
+        typeface = getSlateFont(context, 700)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val titleTopClearance = cardRect.top + bindH + (10f * scaleFactor)
+    val titleMetrics = titlePaint.fontMetrics
+    val titleY = titleTopClearance - titleMetrics.ascent
+
+    // Category Tag on the right
+    val catText = note.category.uppercase()
+    val catWidth = catPaint.measureText(catText)
+    canvas.drawText(catText, cardRect.right - padRight, titleY, catPaint)
+
+    // Pencil Icon placed before the title
+    val editIconSize = 11.5f * scaleFactor * fScale
+    val editPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = editIconSize
+        typeface = getSlateFont(context, 700)
+    }
+    val editIconText = "✎"
+    val editIconW = editPaint.measureText(editIconText)
+    val editGap = 6f * scaleFactor
+
+    val pencilX = padLeft
+    canvas.drawText(editIconText, pencilX, titleY - 1.5f * scaleFactor, editPaint)
+
+    // Title Text
+    val titleStartX = pencilX + editIconW + editGap
+    val maxTitleW = cardRect.right - padRight - catWidth - (12f * scaleFactor) - titleStartX
+    val displayTitle = if (titlePaint.measureText(note.title) > maxTitleW) {
+        var t = note.title
+        while (t.isNotEmpty() && titlePaint.measureText("$t…") > maxTitleW) t = t.dropLast(1)
+        "$t…"
+    } else note.title
+
+    canvas.drawText(displayTitle, titleStartX, titleY, titlePaint)
+
+    // 4. Dynamic Ruled Horizontal Lines (Filling available vertical space)
+    val lineStartY = titleY + maxOf(titleMetrics.descent + (4f * scaleFactor), 9f * scaleFactor)
+    val lineSpacing = 21.5f * scaleFactor * fScale
+    val bottomLimit = cardRect.bottom - (10f * scaleFactor)
+    val availableHeight = (bottomLimit - lineStartY).coerceAtLeast(0f)
+    val numLines = (availableHeight / lineSpacing).toInt().coerceAtLeast(2)
+
+    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x18FFFFFF).toArgb()
         strokeWidth = 1f * scaleFactor
     }
-    for (i in 1..4) {
-        val y = cardRect.top + bindH + i * lineSpacing
-        canvas.drawLine(cardRect.left, y, cardRect.right, y, ruledPaint)
+
+    for (i in 0 until numLines) {
+        val lineY = lineStartY + i * lineSpacing
+        canvas.drawLine(cardRect.left, lineY, cardRect.right, lineY, linePaint)
     }
 
-    // 4. Note Title
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = cardRect.height() * 0.11f
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText(note.title, marginX + pad * 0.8f, cardRect.top + bindH + lineSpacing * 0.72f, titlePaint)
-
-    // 5. Multi-line Body Content
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF3A3A3C).toArgb() else Color(0xFFD1D1D6).toArgb()
-        textSize = cardRect.height() * 0.088f
+    // 5. Note Content Typography
+    val bodyTextSize = 12.5f * scaleFactor * fScale
+    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = bodyTextSize
         typeface = getSlateFont(context, 400)
     }
+
     drawWrappedText(
         canvas = canvas,
         text = note.content,
-        x = marginX + pad * 0.8f,
-        startY = cardRect.top + bindH + lineSpacing * 1.72f,
-        maxWidth = cardRect.right - marginX - pad * 1.5f,
-        paint = bodyPaint,
+        x = padLeft,
+        startY = lineStartY + (lineSpacing * 0.72f),
+        maxWidth = cardRect.right - padRight - padLeft,
+        paint = contentPaint,
         lineSpacing = lineSpacing,
-        maxLines = 3
+        maxLines = numLines,
+        bottomLimit = bottomLimit
     )
 
     return bitmap
