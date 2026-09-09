@@ -149,6 +149,13 @@ class PhotosConfigActivity : ComponentActivity() {
                     )
                 }
 
+                val supportsLocation = remember(widgetId) {
+                    if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                        val info = AppWidgetManager.getInstance(this@PhotosConfigActivity).getAppWidgetInfo(widgetId)
+                        info?.provider?.className?.contains("OnThisDay") == true
+                    } else false
+                }
+
                 val activeItem = config.items.getOrNull(selectedIndex) ?: SlateMemoryItem()
                 var caption by remember(activeItem.id) { mutableStateOf(activeItem.caption) }
                 var dateText by remember(activeItem.id) { mutableStateOf(activeItem.dateText) }
@@ -675,28 +682,30 @@ class PhotosConfigActivity : ComponentActivity() {
                                                     )
                                                 )
 
-                                                OutlinedTextField(
-                                                    value = location,
-                                                    onValueChange = {
-                                                        location = it
-                                                        syncActiveItem(newLoc = it)
-                                                    },
-                                                    label = { Text("Location (Optional)") },
-                                                    placeholder = { Text("e.g. Pacific Coast, California") },
-                                                    singleLine = true,
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedBorderColor = Color(selectedAccentHex),
-                                                        unfocusedBorderColor = Color(0xFF2C2C35),
-                                                        focusedLabelColor = Color(selectedAccentHex),
-                                                        unfocusedLabelColor = Color(0xFF8E8E93),
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color(0xFF16161B),
-                                                        unfocusedContainerColor = Color(0xFF16161B)
+                                                if (supportsLocation) {
+                                                    OutlinedTextField(
+                                                        value = location,
+                                                        onValueChange = {
+                                                            location = it
+                                                            syncActiveItem(newLoc = it)
+                                                        },
+                                                        label = { Text("Location (Optional)") },
+                                                        placeholder = { Text("e.g. Pacific Coast, California") },
+                                                        singleLine = true,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedBorderColor = Color(selectedAccentHex),
+                                                            unfocusedBorderColor = Color(0xFF2C2C35),
+                                                            focusedLabelColor = Color(selectedAccentHex),
+                                                            unfocusedLabelColor = Color(0xFF8E8E93),
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedContainerColor = Color(0xFF16161B),
+                                                            unfocusedContainerColor = Color(0xFF16161B)
+                                                        )
                                                     )
-                                                )
+                                                }
 
                                                 // Font Style Selector
                                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1126,7 +1135,18 @@ private fun renderExactPhotoWidgetPreview(
             Pair(generatePushPinBitmap(context, activeItem, slateConfig, isResponsive, 200, 200), 1.0f)
         }
         else -> {
-            Pair(generatePolaroidMemoryBitmap(context, activeItem, slateConfig, isResponsive, 200, 200), 1.0f)
+            Pair(
+                generatePolaroidMemoryBitmap(
+                    context = context,
+                    item = activeItem,
+                    slateConfig = slateConfig,
+                    isResponsive = isResponsive,
+                    wDp = 200,
+                    hDp = 200,
+                    showCaption = photoConfig.showCaption
+                ),
+                1.0f
+            )
         }
     }
 }

@@ -279,7 +279,15 @@ class PhotosPolaroidReceiver : BasePhotosReceiver(R.layout.widget_photos_card_la
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generatePolaroidMemoryBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generatePolaroidMemoryBitmap(
+            context,
+            photoConfig.currentItem,
+            config,
+            isResponsive,
+            wDp,
+            hDp,
+            photoConfig.showCaption
+        )
     }
 }
 
