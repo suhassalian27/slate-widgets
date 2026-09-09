@@ -609,7 +609,7 @@ fun generateOnThisDayBitmap(
 }
 
 // =========================================================================
-// 3. 35mm FILM STRIP (4x2)
+// 3. 35mm FILM STRIP (4x2 / Adaptive Photobooth Strip)
 // =========================================================================
 fun generateFilmStripBitmap(
     context: Context,
@@ -623,7 +623,9 @@ fun generateFilmStripBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val aspect = 2.1f
         val cardW = minOf(w, h * aspect)
         val cardH = cardW / aspect
@@ -631,10 +633,10 @@ fun generateFilmStripBitmap(
     }
 
     val bgColor = getSafeBgColor(slateConfig)
-    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
     val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val isLight = slateConfig.themeMode == "LIGHT"
 
+    // 1. Film Canister Base Card
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -642,74 +644,156 @@ fun generateFilmStripBitmap(
     val corner = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, corner, corner, bgPaint)
 
-    val sprocketTrackH = cardRect.height() * 0.16f
-    val sprockW = 8.5f * scaleFactor
-    val sprockH = 5.5f * scaleFactor
-    val sprockCorner = 1.8f * scaleFactor
-    val sprockGap = 13.5f * scaleFactor
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x1A000000 else 0x22FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawRoundRect(cardRect, corner, corner, borderPaint)
 
+    val defaultList = if (items.isNotEmpty()) items else PhotosWidgetConfig.getDefaultConfig().items
     val sprocketPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x33000000 else 0x33FFFFFF
+        color = if (isLight) 0x2B000000 else 0x33FFFFFF
         style = Paint.Style.FILL
     }
-
-    var sx = cardRect.left + 10f * scaleFactor
-    while (sx + sprockW < cardRect.right - 8f * scaleFactor) {
-        val topHole = RectF(sx, cardRect.top + (sprocketTrackH - sprockH) / 2f, sx + sprockW, cardRect.top + (sprocketTrackH + sprockH) / 2f)
-        canvas.drawRoundRect(topHole, sprockCorner, sprockCorner, sprocketPaint)
-
-        val botY = cardRect.bottom - sprocketTrackH
-        val botHole = RectF(sx, botY + (sprocketTrackH - sprockH) / 2f, sx + sprockW, botY + (sprocketTrackH + sprockH) / 2f)
-        canvas.drawRoundRect(botHole, sprockCorner, sprockCorner, sprocketPaint)
-
-        sx += sprockW + sprockGap
+    val frameBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x1E000000 else 0x30FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
     }
 
-    // Markings dynamically bound to Theme Studio Accent Color
-    val accentMarkingsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 700)
-        textSize = 7.5f * scaleFactor
-        color = accentColor
-    }
-    canvas.drawText("SLATE 400 • 36 EXP", cardRect.left + 16f * scaleFactor, cardRect.top + sprocketTrackH - 2f * scaleFactor, accentMarkingsPaint)
+    // Determine layout: True if taller than wide (Portrait Photobooth strip)
+    val isVertical = isResponsive && (cardRect.height() > cardRect.width() * 1.08f)
 
-    val photoAreaTop = cardRect.top + sprocketTrackH
-    val photoAreaBottom = cardRect.bottom - sprocketTrackH
+    if (isVertical) {
+        // =====================================================================
+        // VERTICAL PHOTOBOOTH STRIP (Left & Right Sprocket Holes)
+        // =====================================================================
+        val trackW = (cardRect.width() * 0.14f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+        val sprockW = 4.8f * scaleFactor
+        val sprockH = 7.5f * scaleFactor
+        val sprockCorner = 1.5f * scaleFactor
+        val sprockGap = 12f * scaleFactor
 
-    val frameCount = 3
-    val padH = 8f * scaleFactor
-    val availableW = cardRect.width() - padH * 2
-    val frameGap = 6f * scaleFactor
-    val frameW = (availableW - frameGap * (frameCount - 1)) / frameCount
+        // Draw Left & Right Sprocket Holes
+        var sy = cardRect.top + 10f * scaleFactor
+        while (sy + sprockH < cardRect.bottom - 8f * scaleFactor) {
+            val leftHole = RectF(
+                cardRect.left + (trackW - sprockW) / 2f,
+                sy,
+                cardRect.left + (trackW + sprockW) / 2f,
+                sy + sprockH
+            )
+            canvas.drawRoundRect(leftHole, sprockCorner, sprockCorner, sprocketPaint)
 
-    val frameLabels = listOf("▸ 01A", "▸ 02A", "▸ 03A")
-    val defaultList = if (items.isNotEmpty()) items else PhotosWidgetConfig.getDefaultConfig().items
+            val rightX = cardRect.right - trackW
+            val rightHole = RectF(
+                rightX + (trackW - sprockW) / 2f,
+                sy,
+                rightX + (trackW + sprockW) / 2f,
+                sy + sprockH
+            )
+            canvas.drawRoundRect(rightHole, sprockCorner, sprockCorner, sprocketPaint)
 
-    for (i in 0 until frameCount) {
-        val fx = cardRect.left + padH + i * (frameW + frameGap)
-        val frameRect = RectF(fx, photoAreaTop + 3f * scaleFactor, fx + frameW, photoAreaBottom - 10f * scaleFactor)
-        val item = defaultList.getOrNull(i)
-
-        drawPhotoSurface(
-            canvas = canvas,
-            item = item,
-            bounds = frameRect,
-            cornerRadius = 4f * scaleFactor,
-            scaleFactor = scaleFactor,
-            isLight = isLight,
-            accentColor = accentColor,
-            fallbackSeed = i
-        )
-
-        val frameBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) 0x22000000 else 0x33FFFFFF
-            style = Paint.Style.STROKE
-            strokeWidth = 1f * scaleFactor
+            sy += sprockH + sprockGap
         }
-        canvas.drawRoundRect(frameRect, 4f * scaleFactor, 4f * scaleFactor, frameBorder)
 
-        val numY = photoAreaBottom - 1f * scaleFactor
-        canvas.drawText(frameLabels[i], fx + 2f * scaleFactor, numY, accentMarkingsPaint)
+        // Inner Vertical Frames
+        val photoAreaLeft = cardRect.left + trackW
+        val photoAreaRight = cardRect.right - trackW
+        val frameW = photoAreaRight - photoAreaLeft
+
+        // 3 frames for tall widgets, 2 frames for shorter heights
+        val aspect = cardRect.height() / cardRect.width()
+        val frameCount = if (aspect >= 1.6f) 3 else 2
+
+        val padV = 8f * scaleFactor
+        val frameGap = 6f * scaleFactor
+        val availableH = cardRect.height() - (padV * 2)
+        val frameH = (availableH - frameGap * (frameCount - 1)) / frameCount
+
+        for (i in 0 until frameCount) {
+            val fy = cardRect.top + padV + i * (frameH + frameGap)
+            val frameRect = RectF(photoAreaLeft, fy, photoAreaRight, fy + frameH)
+            val item = defaultList.getOrNull(i)
+
+            drawPhotoSurface(
+                canvas = canvas,
+                item = item,
+                bounds = frameRect,
+                cornerRadius = 4f * scaleFactor,
+                scaleFactor = scaleFactor,
+                isLight = isLight,
+                accentColor = slateConfig.accentColorHex.toInt(),
+                fallbackSeed = i
+            )
+            canvas.drawRoundRect(frameRect, 4f * scaleFactor, 4f * scaleFactor, frameBorder)
+        }
+    } else {
+        // =====================================================================
+        // HORIZONTAL FILM STRIP (Top & Bottom Sprocket Holes)
+        // =====================================================================
+        val trackH = (cardRect.height() * 0.15f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+        val sprockW = 7.5f * scaleFactor
+        val sprockH = 4.8f * scaleFactor
+        val sprockCorner = 1.5f * scaleFactor
+        val sprockGap = 12f * scaleFactor
+
+        // Draw Top & Bottom Sprocket Holes
+        var sx = cardRect.left + 10f * scaleFactor
+        while (sx + sprockW < cardRect.right - 8f * scaleFactor) {
+            val topHole = RectF(
+                sx,
+                cardRect.top + (trackH - sprockH) / 2f,
+                sx + sprockW,
+                cardRect.top + (trackH + sprockH) / 2f
+            )
+            canvas.drawRoundRect(topHole, sprockCorner, sprockCorner, sprocketPaint)
+
+            val botY = cardRect.bottom - trackH
+            val botHole = RectF(
+                sx,
+                botY + (trackH - sprockH) / 2f,
+                sx + sprockW,
+                botY + (trackH + sprockH) / 2f
+            )
+            canvas.drawRoundRect(botHole, sprockCorner, sprockCorner, sprocketPaint)
+
+            sx += sprockW + sprockGap
+        }
+
+        // Inner Horizontal Frames (Cleanly centered between tracks without text offsets)
+        val padV = 5f * scaleFactor
+        val photoAreaTop = cardRect.top + trackH + padV
+        val photoAreaBottom = cardRect.bottom - trackH - padV
+        val frameH = photoAreaBottom - photoAreaTop
+
+        // 3 frames for wide widgets, 2 frames for compact widths
+        val aspect = cardRect.width() / cardRect.height()
+        val frameCount = if (aspect >= 1.6f) 3 else 2
+
+        val padH = 8f * scaleFactor
+        val frameGap = 6f * scaleFactor
+        val availableW = cardRect.width() - (padH * 2)
+        val frameW = (availableW - frameGap * (frameCount - 1)) / frameCount
+
+        for (i in 0 until frameCount) {
+            val fx = cardRect.left + padH + i * (frameW + frameGap)
+            val frameRect = RectF(fx, photoAreaTop, fx + frameW, photoAreaBottom)
+            val item = defaultList.getOrNull(i)
+
+            drawPhotoSurface(
+                canvas = canvas,
+                item = item,
+                bounds = frameRect,
+                cornerRadius = 4f * scaleFactor,
+                scaleFactor = scaleFactor,
+                isLight = isLight,
+                accentColor = slateConfig.accentColorHex.toInt(),
+                fallbackSeed = i
+            )
+            canvas.drawRoundRect(frameRect, 4f * scaleFactor, 4f * scaleFactor, frameBorder)
+        }
     }
 
     return bitmap
