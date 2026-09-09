@@ -60,32 +60,34 @@ fun updateAllPhotosWidgets(context: Context) {
 
 private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-    val bgKey = "widget_${widgetId}_bg_color"
-
-    if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
-        val globalSettings = ThemePreferences(context).getThemeSettings()
-        val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
-                ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
-                ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
-
-        widgetPrefs.edit()
-            .putString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
-            .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-            .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
-            .putFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-            .apply()
-    }
-
+    val hasCustomTheme = widgetPrefs.getBoolean("widget_${widgetId}_has_custom_theme", false)
     val globalSettings = ThemePreferences(context).getThemeSettings()
-    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+
+    val bgColor = if (hasCustomTheme) {
+        widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
+    } else {
+        globalSettings.bgHex
+    }
+    val opacity = if (hasCustomTheme) {
+        widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
+    } else {
+        globalSettings.opacity
+    }
+    val accentColor = if (hasCustomTheme) {
+        widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
+    } else {
+        globalSettings.accentHex
+    }
 
     val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
             ((bgColor shr 8 and 0xFFL) * 0.7152f) +
             ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
-    val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
-        ?: if (isLight) "LIGHT" else "DARK"
+    val mode = if (hasCustomTheme) {
+        widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
+            ?: if (isLight) "LIGHT" else "DARK"
+    } else {
+        if (isLight) "LIGHT" else "DARK"
+    }
 
     return SlateWidgetConfig(
         themeMode = mode,

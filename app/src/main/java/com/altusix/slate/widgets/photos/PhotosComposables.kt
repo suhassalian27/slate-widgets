@@ -8,20 +8,14 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
-import androidx.core.graphics.PathParser
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.cos
-import kotlin.math.sin
 
 // =========================================================================
 // CANVAS BITMAP GENERATORS FOR SLATE "PHOTOS & MEMORIES" WIDGETS
 // =========================================================================
 
-/**
- * Creates a ColorMatrixColorFilter corresponding to the chosen MemoryFilterStyle.
- */
 fun getFilterColorMatrix(style: MemoryFilterStyle): ColorMatrixColorFilter? {
     return when (style) {
         MemoryFilterStyle.ORIGINAL -> null
@@ -71,9 +65,6 @@ fun getFilterColorMatrix(style: MemoryFilterStyle): ColorMatrixColorFilter? {
     }
 }
 
-/**
- * Draws the user photo bitmap cropped to fill bounds, or a rich procedural landscape fallback.
- */
 private fun drawPhotoSurface(
     canvas: Canvas,
     item: SlateMemoryItem?,
@@ -107,14 +98,10 @@ private fun drawPhotoSurface(
         }
         canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, paint)
     } else {
-        // High-aesthetic procedural scenic artwork
         drawProceduralScenery(canvas, bounds, cornerRadius, scaleFactor, isLight, accentColor, fallbackSeed, colorFilter)
     }
 }
 
-/**
- * Renders an artistic procedural scenic canvas with mountains, glowing celestial body, and gradients.
- */
 private fun drawProceduralScenery(
     canvas: Canvas,
     bounds: RectF,
@@ -132,12 +119,11 @@ private fun drawProceduralScenery(
     canvas.clipPath(clipPath)
 
     val (topColor, midColor, botColor) = when (seed % 3) {
-        0 -> Triple(0xFF181B28.toInt(), 0xFF353C58.toInt(), 0xFF655268.toInt()) // Twilight Alpine
-        1 -> Triple(0xFF22161A.toInt(), 0xFF582D33.toInt(), 0xFFB36746.toInt()) // Golden Horizon
-        else -> Triple(0xFF102027.toInt(), 0xFF24444F.toInt(), 0xFF4C7B8B.toInt()) // Pacific Mist
+        0 -> Triple(0xFF181B28.toInt(), 0xFF353C58.toInt(), 0xFF655268.toInt())
+        1 -> Triple(0xFF22161A.toInt(), 0xFF582D33.toInt(), 0xFFB36746.toInt())
+        else -> Triple(0xFF102027.toInt(), 0xFF24444F.toInt(), 0xFF4C7B8B.toInt())
     }
 
-    // Sky gradient
     val skyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             bounds.left, bounds.top,
@@ -150,7 +136,6 @@ private fun drawProceduralScenery(
     }
     canvas.drawRect(bounds, skyPaint)
 
-    // Celestial body (Sun / Moon)
     val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = when (seed % 3) {
@@ -164,7 +149,6 @@ private fun drawProceduralScenery(
     val sunX = bounds.left + bounds.width() * (if (seed % 2 == 0) 0.72f else 0.32f)
     val sunY = bounds.top + bounds.height() * 0.38f
 
-    // Soft celestial glow
     val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = RadialGradient(
             sunX, sunY, sunRadius * 2.2f,
@@ -177,7 +161,6 @@ private fun drawProceduralScenery(
     canvas.drawCircle(sunX, sunY, sunRadius * 2.2f, glowPaint)
     canvas.drawCircle(sunX, sunY, sunRadius, sunPaint)
 
-    // Layer 1: Distant Mountain Ridge
     val mountainPaint1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = when (seed % 3) {
             0 -> 0x882A2E44.toInt()
@@ -199,7 +182,6 @@ private fun drawProceduralScenery(
     }
     canvas.drawPath(path1, mountainPaint1)
 
-    // Layer 2: Foreground Peaks / Dunes
     val mountainPaint2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = when (seed % 3) {
             0 -> 0xFF141724.toInt()
@@ -221,7 +203,6 @@ private fun drawProceduralScenery(
     }
     canvas.drawPath(path2, mountainPaint2)
 
-    // Minimal camera aperture glyph watermark
     val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(120, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -236,9 +217,6 @@ private fun drawProceduralScenery(
     canvas.restore()
 }
 
-/**
- * Truncates text with an ellipsis if it exceeds maxWidth.
- */
 private fun truncateText(text: String, maxWidth: Float, paint: Paint): String {
     if (paint.measureText(text) <= maxWidth) return text
     var truncated = text
@@ -246,19 +224,6 @@ private fun truncateText(text: String, maxWidth: Float, paint: Paint): String {
         truncated = truncated.dropLast(1)
     }
     return if (truncated.isEmpty()) "" else "$truncated…"
-}
-
-fun getPhotoCaptionTypeface(context: Context, font: CaptionFont): Typeface {
-    return when (font) {
-        CaptionFont.SANS -> getSlateFont(context, weight = 700)
-        CaptionFont.SERIF -> Typeface.create(Typeface.SERIF, Typeface.BOLD)
-        CaptionFont.MONO -> Typeface.MONOSPACE
-        CaptionFont.SCRIPT -> try {
-            Typeface.create("cursive", Typeface.BOLD)
-        } catch (_: Exception) {
-            Typeface.create("casual", Typeface.BOLD)
-        }
-    }
 }
 
 // =========================================================================
@@ -282,18 +247,19 @@ fun generatePolaroidMemoryBitmap(
     }
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val cardBg = if (isLight) 0xFFFDFBF7.toInt() else 0xFF1C1C20.toInt()
+    val bgColor = getSafeBgColor(slateConfig)
+    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
     val frameBorderColor = if (isLight) 0x22000000 else 0x22FFFFFF
-    val cardCorner = 12f * scaleFactor
+    val cardCorner = getStandardCornerRadius(scaleFactor)
 
-    // Background Polaroid Card
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = cardBg
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cardCorner, cardCorner, cardPaint)
 
-    // Outer subtle border stroke
     val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = frameBorderColor
         style = Paint.Style.STROKE
@@ -301,7 +267,6 @@ fun generatePolaroidMemoryBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCorner, cardCorner, borderPaint)
 
-    // Photo Aperture: Left/Right/Top inset ~ 8-9%, bottom chin ~24%
     val padX = cardRect.width() * 0.085f
     val padTop = cardRect.height() * 0.09f
     val chinHeight = cardRect.height() * 0.25f
@@ -313,8 +278,7 @@ fun generatePolaroidMemoryBitmap(
         cardRect.bottom - chinHeight
     )
 
-    // Inner photo outline & shadow
-    val photoCorner = 4f * scaleFactor
+    val photoCorner = 6f * scaleFactor
     drawPhotoSurface(
         canvas = canvas,
         item = item,
@@ -322,11 +286,10 @@ fun generatePolaroidMemoryBitmap(
         cornerRadius = photoCorner,
         scaleFactor = scaleFactor,
         isLight = isLight,
-        accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb(),
+        accentColor = accentColor,
         fallbackSeed = 0
     )
 
-    // Photo frame inner bevel
     val photoInnerBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x1A000000 else 0x33000000
         style = Paint.Style.STROKE
@@ -334,7 +297,7 @@ fun generatePolaroidMemoryBitmap(
     }
     canvas.drawRoundRect(photoBounds, photoCorner, photoCorner, photoInnerBorder)
 
-    // Top Washi Tape strip badge
+    // Washi Tape tinted slightly toward accent
     val tapeW = cardRect.width() * 0.32f
     val tapeH = 11f * scaleFactor
     val tapeRect = RectF(
@@ -344,20 +307,19 @@ fun generatePolaroidMemoryBitmap(
         cardRect.top + 3f * scaleFactor + tapeH
     )
     val tapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x66D1C7BD else 0x445A5868
+        color = Color.argb(130, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(tapeRect, 3f * scaleFactor, 3f * scaleFactor, tapePaint)
 
-    // Bottom Chin Typography: Caption + Date Stamp
     val captionText = item?.caption ?: "Summer Memories"
     val dateText = item?.dateText ?: "September 2024"
 
-    val textColor = if (isLight) 0xFF1C1C1E.toInt() else 0xFFEBEBF5.toInt()
+    val textColor = if (isLight) 0xFF1C1C1E.toInt() else 0xFFF2F2F7.toInt()
     val subTextColor = if (isLight) 0xFF7C7C84.toInt() else 0xFF8E8E93.toInt()
 
     val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
+        typeface = getSlateFont(context, weight = 700)
         textSize = 12f * scaleFactor
         color = textColor
     }
@@ -368,9 +330,9 @@ fun generatePolaroidMemoryBitmap(
     canvas.drawText(truncatedCaption, photoBounds.left + 2f * scaleFactor, captionY, captionPaint)
 
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 400, isItalic = true)
+        typeface = getSlateFont(context, weight = 500)
         textSize = 9.5f * scaleFactor
-        color = subTextColor
+        color = accentColor
     }
     val truncatedDate = truncateText(dateText, maxTextW, datePaint)
     canvas.drawText(truncatedDate, photoBounds.left + 2f * scaleFactor, captionY + 14f * scaleFactor, datePaint)
@@ -404,9 +366,10 @@ fun generateOnThisDayBitmap(
     val cornerRadius = getStandardCornerRadius(scaleFactor)
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
@@ -414,7 +377,6 @@ fun generateOnThisDayBitmap(
     val pad = 12f * scaleFactor
     val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
-    // Left 44% Photo Frame
     val photoW = innerRect.width() * 0.44f
     val photoBounds = RectF(innerRect.left, innerRect.top, innerRect.left + photoW, innerRect.bottom)
     val photoCorner = 14f * scaleFactor
@@ -430,7 +392,6 @@ fun generateOnThisDayBitmap(
         fallbackSeed = 1
     )
 
-    // Left photo subtle border
     val photoBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x1A000000 else 0x22FFFFFF
         style = Paint.Style.STROKE
@@ -438,11 +399,9 @@ fun generateOnThisDayBitmap(
     }
     canvas.drawRoundRect(photoBounds, photoCorner, photoCorner, photoBorder)
 
-    // Right Content Area
     val rightLeft = photoBounds.right + 14f * scaleFactor
     val maxTextW = innerRect.right - rightLeft
 
-    // Header Pill: "ON THIS DAY"
     var curY = innerRect.top + 14f * scaleFactor
     val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
@@ -462,7 +421,6 @@ fun generateOnThisDayBitmap(
     canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillPaint)
     canvas.drawText(pillLabel, rightLeft + pillPadX, curY + 1.5f * scaleFactor, pillTextPaint)
 
-    // Time delta headline: e.g. "1 YEAR AGO"
     curY += 24f * scaleFactor
     val titleColor = if (isLight) 0xFF1C1C1E.toInt() else 0xFFF2F2F7.toInt()
     val headlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -473,7 +431,6 @@ fun generateOnThisDayBitmap(
     val headlineText = "1 YEAR AGO"
     canvas.drawText(headlineText, rightLeft, curY, headlinePaint)
 
-    // Date & Location metadata
     curY += 16f * scaleFactor
     val metaColor = if (isLight) 0xFF636366.toInt() else 0xFF98989D.toInt()
     val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -486,7 +443,6 @@ fun generateOnThisDayBitmap(
     val fullMeta = truncateText("$dateText$locText", maxTextW, metaPaint)
     canvas.drawText(fullMeta, rightLeft, curY, metaPaint)
 
-    // Quote Caption
     curY += 18f * scaleFactor
     val captionColor = if (isLight) 0xFF3A3A3C.toInt() else 0xFFD1D1D6.toInt()
     val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -502,7 +458,7 @@ fun generateOnThisDayBitmap(
 }
 
 // =========================================================================
-// 3. 35mm FILM STRIP (4x2 / 4x1)
+// 3. 35mm FILM STRIP (4x2)
 // =========================================================================
 fun generateFilmStripBitmap(
     context: Context,
@@ -523,15 +479,18 @@ fun generateFilmStripBitmap(
         RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
     }
 
-    // Rich Film Canister Carbon Black Base
+    val bgColor = getSafeBgColor(slateConfig)
+    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val isLight = slateConfig.themeMode == "LIGHT"
+
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF121214.toInt()
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val corner = 14f * scaleFactor
+    val corner = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, corner, corner, bgPaint)
 
-    // Film Sprocket Tracks (Top & Bottom)
     val sprocketTrackH = cardRect.height() * 0.16f
     val sprockW = 8.5f * scaleFactor
     val sprockH = 5.5f * scaleFactor
@@ -539,17 +498,15 @@ fun generateFilmStripBitmap(
     val sprockGap = 13.5f * scaleFactor
 
     val sprocketPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF2A2A30.toInt()
+        color = if (isLight) 0x33000000 else 0x33FFFFFF
         style = Paint.Style.FILL
     }
 
     var sx = cardRect.left + 10f * scaleFactor
     while (sx + sprockW < cardRect.right - 8f * scaleFactor) {
-        // Top hole
         val topHole = RectF(sx, cardRect.top + (sprocketTrackH - sprockH) / 2f, sx + sprockW, cardRect.top + (sprocketTrackH + sprockH) / 2f)
         canvas.drawRoundRect(topHole, sprockCorner, sprockCorner, sprocketPaint)
 
-        // Bottom hole
         val botY = cardRect.bottom - sprocketTrackH
         val botHole = RectF(sx, botY + (sprocketTrackH - sprockH) / 2f, sx + sprockW, botY + (sprocketTrackH + sprockH) / 2f)
         canvas.drawRoundRect(botHole, sprockCorner, sprockCorner, sprocketPaint)
@@ -557,18 +514,16 @@ fun generateFilmStripBitmap(
         sx += sprockW + sprockGap
     }
 
-    // Gold / Amber Film Metadata Bar
-    val goldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Markings dynamically bound to Theme Studio Accent Color
+    val accentMarkingsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 700)
         textSize = 7.5f * scaleFactor
-        color = 0xFFE5A93C.toInt()
+        color = accentColor
     }
-    canvas.drawText("SLATE 400 • 36 EXP", cardRect.left + 16f * scaleFactor, cardRect.top + sprocketTrackH - 2f * scaleFactor, goldPaint)
+    canvas.drawText("SLATE 400 • 36 EXP", cardRect.left + 16f * scaleFactor, cardRect.top + sprocketTrackH - 2f * scaleFactor, accentMarkingsPaint)
 
-    // Center Frames: 3 Consecutive Negatives
     val photoAreaTop = cardRect.top + sprocketTrackH
     val photoAreaBottom = cardRect.bottom - sprocketTrackH
-    val photoAreaH = photoAreaBottom - photoAreaTop
 
     val frameCount = 3
     val padH = 8f * scaleFactor
@@ -588,24 +543,22 @@ fun generateFilmStripBitmap(
             canvas = canvas,
             item = item,
             bounds = frameRect,
-            cornerRadius = 3f * scaleFactor,
+            cornerRadius = 4f * scaleFactor,
             scaleFactor = scaleFactor,
-            isLight = false,
-            accentColor = 0xFFE5A93C.toInt(),
+            isLight = isLight,
+            accentColor = accentColor,
             fallbackSeed = i
         )
 
-        // Frame divider stroke
         val frameBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0x33FFFFFF
+            color = if (isLight) 0x22000000 else 0x33FFFFFF
             style = Paint.Style.STROKE
             strokeWidth = 1f * scaleFactor
         }
-        canvas.drawRoundRect(frameRect, 3f * scaleFactor, 3f * scaleFactor, frameBorder)
+        canvas.drawRoundRect(frameRect, 4f * scaleFactor, 4f * scaleFactor, frameBorder)
 
-        // Frame number stamp under photo
         val numY = photoAreaBottom - 1f * scaleFactor
-        canvas.drawText(frameLabels[i], fx + 2f * scaleFactor, numY, goldPaint)
+        canvas.drawText(frameLabels[i], fx + 2f * scaleFactor, numY, accentMarkingsPaint)
     }
 
     return bitmap
@@ -637,9 +590,10 @@ fun generateCollageBentoBitmap(
     val cornerRadius = getStandardCornerRadius(scaleFactor)
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
@@ -651,7 +605,6 @@ fun generateCollageBentoBitmap(
     val defaultList = if (items.isNotEmpty()) items else PhotosWidgetConfig.getDefaultConfig().items
     val tileCorner = 14f * scaleFactor
 
-    // Left Hero Tile: 54% width, 100% height
     val heroW = (inner.width() - gap) * 0.54f
     val heroRect = RectF(inner.left, inner.top, inner.left + heroW, inner.bottom)
     val heroItem = defaultList.getOrNull(0)
@@ -667,7 +620,6 @@ fun generateCollageBentoBitmap(
         fallbackSeed = 0
     )
 
-    // Hero tile frosted bottom pill caption
     val pillH = 22f * scaleFactor
     val pillPad = 6f * scaleFactor
     val pillRect = RectF(heroRect.left + pillPad, heroRect.bottom - pillH - pillPad, heroRect.right - pillPad, heroRect.bottom - pillPad)
@@ -686,12 +638,10 @@ fun generateCollageBentoBitmap(
     val truncatedHeroText = truncateText(heroCaption, pillRect.width() - 14f * scaleFactor, pillTextPaint)
     canvas.drawText(truncatedHeroText, pillRect.left + 8f * scaleFactor, pillRect.centerY() + 3.5f * scaleFactor, pillTextPaint)
 
-    // Right Stacked Dual Sub-Tiles
     val rightX = heroRect.right + gap
     val subW = inner.right - rightX
     val subH = (inner.height() - gap) / 2f
 
-    // Top sub-tile
     val topSubRect = RectF(rightX, inner.top, inner.right, inner.top + subH)
     val sub1Item = defaultList.getOrNull(1)
     drawPhotoSurface(
@@ -705,7 +655,6 @@ fun generateCollageBentoBitmap(
         fallbackSeed = 1
     )
 
-    // Bottom sub-tile
     val botSubRect = RectF(rightX, topSubRect.bottom + gap, inner.right, inner.bottom)
     val sub2Item = defaultList.getOrNull(2)
     drawPhotoSurface(
@@ -719,7 +668,6 @@ fun generateCollageBentoBitmap(
         fallbackSeed = 2
     )
 
-    // Subtle outline strokes around each tile
     val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x1A000000 else 0x22FFFFFF
         style = Paint.Style.STROKE
@@ -756,9 +704,10 @@ fun generatePhotoCarouselBitmap(
     val cornerRadius = getStandardCornerRadius(scaleFactor)
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
@@ -766,7 +715,6 @@ fun generatePhotoCarouselBitmap(
     val pad = 10f * scaleFactor
     val inner = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
-    // Upper Photo Canvas: ~80% height
     val navDeckH = 26f * scaleFactor
     val photoBounds = RectF(inner.left, inner.top, inner.right, inner.bottom - navDeckH - 4f * scaleFactor)
     val photoCorner = 14f * scaleFactor
@@ -786,7 +734,6 @@ fun generatePhotoCarouselBitmap(
         fallbackSeed = activeIdx
     )
 
-    // Photo bottom subtle vignette shadow
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             photoBounds.left, photoBounds.bottom - 40f * scaleFactor,
@@ -801,7 +748,6 @@ fun generatePhotoCarouselBitmap(
     canvas.clipPath(clipP)
     canvas.drawRect(photoBounds, shadowPaint)
 
-    // Overlay Caption & Location
     val caption = item?.caption ?: "Summer Memories"
     val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 600)
@@ -812,9 +758,7 @@ fun generatePhotoCarouselBitmap(
     canvas.drawText(truncCap, photoBounds.left + 8f * scaleFactor, photoBounds.bottom - 8f * scaleFactor, capPaint)
     canvas.restore()
 
-    // Bottom Navigation Deck: [ < ] [ ● ○ ○ ] [ > ]
     val deckY = inner.bottom - navDeckH / 2f
-
     val btnRadius = 11f * scaleFactor
     val leftBtnX = inner.left + btnRadius + 4f * scaleFactor
     val rightBtnX = inner.right - btnRadius - 4f * scaleFactor
@@ -826,7 +770,6 @@ fun generatePhotoCarouselBitmap(
     canvas.drawCircle(leftBtnX, deckY, btnRadius, btnBgPaint)
     canvas.drawCircle(rightBtnX, deckY, btnRadius, btnBgPaint)
 
-    // Chevron Glyphs
     val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0xFF333336.toInt() else 0xFFF2F2F7.toInt()
         style = Paint.Style.STROKE
@@ -834,7 +777,6 @@ fun generatePhotoCarouselBitmap(
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    // Left chevron
     val lPath = Path().apply {
         moveTo(leftBtnX + 2f * scaleFactor, deckY - 4.5f * scaleFactor)
         lineTo(leftBtnX - 2.5f * scaleFactor, deckY)
@@ -842,7 +784,6 @@ fun generatePhotoCarouselBitmap(
     }
     canvas.drawPath(lPath, arrowPaint)
 
-    // Right chevron
     val rPath = Path().apply {
         moveTo(rightBtnX - 2f * scaleFactor, deckY - 4.5f * scaleFactor)
         lineTo(rightBtnX + 2.5f * scaleFactor, deckY)
@@ -850,7 +791,6 @@ fun generatePhotoCarouselBitmap(
     }
     canvas.drawPath(rPath, arrowPaint)
 
-    // Center pagination dots or indicator text (e.g. 01 / 03)
     val dotCount = minOf(totalCount, 5)
     val dotGap = 7f * scaleFactor
     val totalDotsW = (dotCount - 1) * dotGap
@@ -896,17 +836,16 @@ fun generatePhotoStampBitmap(
     }
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val stampPaperColor = if (isLight) 0xFFFAF7F0.toInt() else 0xFF202024.toInt()
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val stampPaperColor = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
-    // 1. Draw Serrated Postage Stamp Border with Scalloped Perforations
     val stampPath = Path()
     val toothR = 3.6f * scaleFactor
     val step = toothR * 3f
 
-    // Construct path with scalloped notches around edges
     stampPath.moveTo(cardRect.left, cardRect.top)
-    // Top edge
     var cx = cardRect.left + step
     while (cx < cardRect.right - step) {
         stampPath.lineTo(cx - toothR, cardRect.top)
@@ -915,7 +854,6 @@ fun generatePhotoStampBitmap(
     }
     stampPath.lineTo(cardRect.right, cardRect.top)
 
-    // Right edge
     var cy = cardRect.top + step
     while (cy < cardRect.bottom - step) {
         stampPath.lineTo(cardRect.right, cy - toothR)
@@ -924,7 +862,6 @@ fun generatePhotoStampBitmap(
     }
     stampPath.lineTo(cardRect.right, cardRect.bottom)
 
-    // Bottom edge
     cx = cardRect.right - step
     while (cx > cardRect.left + step) {
         stampPath.lineTo(cx + toothR, cardRect.bottom)
@@ -933,7 +870,6 @@ fun generatePhotoStampBitmap(
     }
     stampPath.lineTo(cardRect.left, cardRect.bottom)
 
-    // Left edge
     cy = cardRect.bottom - step
     while (cy > cardRect.top + step) {
         stampPath.lineTo(cardRect.left, cy + toothR)
@@ -948,29 +884,26 @@ fun generatePhotoStampBitmap(
     }
     canvas.drawPath(stampPath, stampPaint)
 
-    // Subtle edge border
     val stampBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x33A09080 else 0x33FFFFFF
+        color = if (isLight) 0x33000000 else 0x33FFFFFF
         style = Paint.Style.STROKE
         strokeWidth = 1f * scaleFactor
     }
     canvas.drawPath(stampPath, stampBorderPaint)
 
-    // 2. Inner Photo Frame: Rectangular inset with clean gap
     val inset = 12f * scaleFactor
     val photoBounds = RectF(cardRect.left + inset, cardRect.top + inset, cardRect.right - inset, cardRect.bottom - inset - 22f * scaleFactor)
     drawPhotoSurface(
         canvas = canvas,
         item = item,
         bounds = photoBounds,
-        cornerRadius = 3f * scaleFactor,
+        cornerRadius = 4f * scaleFactor,
         scaleFactor = scaleFactor,
         isLight = isLight,
         accentColor = accentColor,
         fallbackSeed = 2
     )
 
-    // Photo fine border
     val innerStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x33000000 else 0x33FFFFFF
         style = Paint.Style.STROKE
@@ -978,7 +911,6 @@ fun generatePhotoStampBitmap(
     }
     canvas.drawRect(photoBounds, innerStroke)
 
-    // 3. Denomination Badge (Top Right of Stamp) e.g. "45¢"
     val valPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 800)
         textSize = 10f * scaleFactor
@@ -987,9 +919,8 @@ fun generatePhotoStampBitmap(
     val valText = "45¢"
     canvas.drawText(valText, photoBounds.right - valPaint.measureText(valText) - 4f * scaleFactor, photoBounds.top + 13f * scaleFactor, valPaint)
 
-    // 4. Postal Cancellation Wave Mark (Over bottom-left corner of photo)
     val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x444A3B32 else 0x44AAAAAA
+        color = if (isLight) 0x44000000 else 0x55FFFFFF
         style = Paint.Style.STROKE
         strokeWidth = 1.2f * scaleFactor
     }
@@ -1001,11 +932,10 @@ fun generatePhotoStampBitmap(
     wavePath.quadTo(wx + 45f * scaleFactor, wy + 6f * scaleFactor, wx + 60f * scaleFactor, wy)
     canvas.drawPath(wavePath, inkPaint)
 
-    // 5. Bottom Stamp Label: e.g. "SLATE POST • 2024"
     val postPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 700)
         textSize = 8.5f * scaleFactor
-        color = if (isLight) 0xFF4A4038.toInt() else 0xFFC7C0B8.toInt()
+        color = if (isLight) 0xFF1C1C1E.toInt() else 0xFFD1D1D6.toInt()
     }
     val caption = item?.caption?.uppercase() ?: "SLATE POST • 2024"
     val truncPost = truncateText(caption, cardRect.width() - inset * 2, postPaint)
@@ -1038,14 +968,14 @@ fun generateLocketMemoryBitmap(
     val cornerRadius = getStandardCornerRadius(scaleFactor)
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-    // Locket Center Geometry (Portrait Oval / Circle)
     val pad = 12f * scaleFactor
     val locketCenterX = cardRect.centerX()
     val locketCenterY = cardRect.centerY() - 10f * scaleFactor
@@ -1058,7 +988,6 @@ fun generateLocketMemoryBitmap(
         locketCenterY + locketRadius
     )
 
-    // Metallic Outer Rim / Bevel
     val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = SweepGradient(
             locketCenterX, locketCenterY,
@@ -1070,7 +999,6 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(locketCenterX, locketCenterY, locketRadius + 2.5f * scaleFactor, rimPaint)
 
-    // Top Pendant Hinge loop
     val hingePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFD4AF37.toInt()
         style = Paint.Style.STROKE
@@ -1078,7 +1006,6 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(locketCenterX, locketBounds.top - 2.5f * scaleFactor, 4f * scaleFactor, hingePaint)
 
-    // Clipped circular photo
     canvas.save()
     val clipPath = Path().apply {
         addCircle(locketCenterX, locketCenterY, locketRadius, Path.Direction.CW)
@@ -1096,7 +1023,6 @@ fun generateLocketMemoryBitmap(
     )
     canvas.restore()
 
-    // Inner Glass Highlight
     val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             locketBounds.left, locketBounds.top,
@@ -1112,10 +1038,7 @@ fun generateLocketMemoryBitmap(
     canvas.drawCircle(locketCenterX, locketCenterY, locketRadius, glassPaint)
     canvas.restore()
 
-    // Bottom Caption Pill
     val caption = item?.caption ?: "Forever & Always"
-    val dateText = item?.dateText ?: "September 2024"
-
     val textY = cardRect.bottom - 16f * scaleFactor
     val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 600)
@@ -1154,7 +1077,6 @@ fun generatePhotoClockOverlayBitmap(
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
-    // 1. Full-Bleed Photo
     drawPhotoSurface(
         canvas = canvas,
         item = item,
@@ -1166,7 +1088,6 @@ fun generatePhotoClockOverlayBitmap(
         fallbackSeed = 1
     )
 
-    // 2. High-contrast Top and Bottom Vignettes
     val topGradient = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             cardRect.left, cardRect.top,
@@ -1192,7 +1113,6 @@ fun generatePhotoClockOverlayBitmap(
     canvas.drawRect(cardRect, topGradient)
     canvas.drawRect(cardRect, botGradient)
 
-    // 3. Top Digital Clock Overlay (HH:mm)
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     val dateFormat = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
     val now = Date()
@@ -1214,12 +1134,11 @@ fun generatePhotoClockOverlayBitmap(
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 600)
         textSize = 9.5f * scaleFactor
-        color = Color.argb(220, 255, 255, 255)
+        color = accentColor
         setShadowLayer(3f * scaleFactor, 0f, 1.5f * scaleFactor, 0x88000000.toInt())
     }
     canvas.drawText(dateStr, timeX, timeY + 14f * scaleFactor, datePaint)
 
-    // 4. Bottom Memory Frosted Pill: Caption
     val caption = item?.caption ?: "Sunset Memories"
     val pillH = 22f * scaleFactor
     val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1239,7 +1158,6 @@ fun generatePhotoClockOverlayBitmap(
 
     canvas.restore()
 
-    // Outer card stroke
     val outerBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0x22FFFFFF
         style = Paint.Style.STROKE
@@ -1251,7 +1169,7 @@ fun generatePhotoClockOverlayBitmap(
 }
 
 // =========================================================================
-// 9. STACKED PHOTO FRAME (2x2 / Layered Polaroid Stack Display)
+// 9. STACKED PHOTO FRAME (2x2)
 // =========================================================================
 fun generateStackedMemoryBitmap(
     context: Context,
@@ -1271,49 +1189,56 @@ fun generateStackedMemoryBitmap(
     val cardRect = RectF(cx - cardSize / 2f, cy - cardSize / 2f, cx + cardSize / 2f, cy + cardSize / 2f)
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-
     val isLight = slateConfig.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
+    val underBg = if (isLight) {
+        Color.argb((alphaInt * 0.9f).toInt(), 0xE5, 0xE5, 0xEA)
+    } else {
+        if (bgColor == 0xFF000000.toInt()) 0xFF141418.toInt() else Color.argb((alphaInt * 0.8f).toInt(), 0x18, 0x18, 0x1C)
+    }
+
+    val underPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = underBg
+        style = Paint.Style.FILL
+    }
     val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0xFFFDFBF7.toInt() else 0xFF1E1E22.toInt()
+        color = cardBg
         style = Paint.Style.FILL
     }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(40, 0, 0, 0); style = Paint.Style.FILL }
     val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(45, 0, 0, 0) else Color.argb(45, 255, 255, 255)
+        color = if (isLight) Color.argb(35, 0, 0, 0) else Color.argb(35, 255, 255, 255)
         style = Paint.Style.STROKE
         strokeWidth = scaleFactor * 1f
     }
 
-    // Bottom Card (Rotated -6°)
     canvas.save()
     canvas.rotate(-6f, cx, cy)
     canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 2f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, underPaint)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
     canvas.restore()
 
-    // Middle Card (Rotated +5°)
     canvas.save()
     canvas.rotate(5f, cx, cy)
     canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 2f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
-    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, underPaint)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
     canvas.restore()
 
-    // Top Card (Front / Rotated 0°)
     canvas.save()
     canvas.drawRoundRect(RectF(cardRect).apply { offset(0f, scaleFactor * 3f) }, cardCornerRadius, cardCornerRadius, shadowPaint)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBgPaint)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
-    // Inner Photo Bounds (Polaroid White Frame Padding)
     val borderPadding = cardSize * 0.05f
     val bottomChin = cardSize * 0.18f
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
 
-    // Concentric Bento Tile Radius Formula
     val innerRadius = (cardCornerRadius - borderPadding)
         .coerceAtLeast(scaleFactor * 6f)
         .coerceAtMost(minOf(innerPhotoRect.width(), innerPhotoRect.height()) * 0.22f)
@@ -1329,11 +1254,9 @@ fun generateStackedMemoryBitmap(
         fallbackSeed = 0
     )
 
-    // Render custom caption & date
     val captionText = item?.caption ?: "Summer Memories"
     if (captionText.isNotBlank()) {
         val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
-
         val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
         val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
         val maxCapW = cardRect.width() * 0.80f
@@ -1357,7 +1280,7 @@ fun generateStackedMemoryBitmap(
 }
 
 // =========================================================================
-// 10. TAPED POLAROID PHOTO FRAME (2x2 / Masking Tape Mounted Display)
+// 10. TAPED POLAROID PHOTO FRAME (2x2)
 // =========================================================================
 fun generateTapedPolaroidBitmap(
     context: Context,
@@ -1377,12 +1300,14 @@ fun generateTapedPolaroidBitmap(
     val cardRect = RectF(cx - cardSize / 2f, cy - cardSize / 2f, cx + cardSize / 2f, cy + cardSize / 2f)
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-
     val isLight = slateConfig.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
     val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0xFFFDFBF7.toInt() else 0xFF1E1E22.toInt()
+        color = cardBg
         style = Paint.Style.FILL
     }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 0, 0, 0); style = Paint.Style.FILL }
@@ -1421,7 +1346,6 @@ fun generateTapedPolaroidBitmap(
     val captionText = item?.caption ?: "Summer Memories"
     if (captionText.isNotBlank()) {
         val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
-
         val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
         val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
         val maxCapW = cardRect.width() * 0.80f
@@ -1441,8 +1365,8 @@ fun generateTapedPolaroidBitmap(
     }
 
     drawMaskingTape(canvas, cardRect, scaleFactor)
-
     canvas.restore()
+
     return bitmap
 }
 
@@ -1495,7 +1419,7 @@ private fun drawMaskingTape(canvas: Canvas, cardRect: RectF, scaleFactor: Float)
 }
 
 // =========================================================================
-// 11. PUSH PIN POLAROID PHOTO FRAME (2x2 / Red Thumbtack Mounted Display)
+// 11. PUSH PIN POLAROID PHOTO FRAME (2x2)
 // =========================================================================
 fun generatePushPinBitmap(
     context: Context,
@@ -1515,12 +1439,14 @@ fun generatePushPinBitmap(
     val cardRect = RectF(cx - cardSize / 2f, cy - cardSize / 2f, cx + cardSize / 2f, cy + cardSize / 2f)
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-
     val isLight = slateConfig.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
     val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0xFFFDFBF7.toInt() else 0xFF1E1E22.toInt()
+        color = cardBg
         style = Paint.Style.FILL
     }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 0, 0, 0); style = Paint.Style.FILL }
@@ -1559,7 +1485,6 @@ fun generatePushPinBitmap(
     val captionText = item?.caption ?: "Summer Memories"
     if (captionText.isNotBlank()) {
         val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
-
         val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
         val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
         val maxCapW = cardRect.width() * 0.80f
@@ -1579,8 +1504,8 @@ fun generatePushPinBitmap(
     }
 
     drawRedPushPin(canvas, cardRect)
-
     canvas.restore()
+
     return bitmap
 }
 
@@ -1603,7 +1528,6 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
 
     fun matrixOf(vararg values: Float): Matrix = Matrix().apply { setValues(values) }
 
-    // 1. Long Soft Drop Shadow
     val shadowMat1 = matrixOf(1.2623f, -5.763f, 192.04f, 3.1595f, 2.4855f, -379.19f, 0f, 0f, 1f)
     val shadowGrad1 = RadialGradient(278.53f, 12.798f, 7.3868f, intArrayOf(Color.argb(250, 0, 0, 0), Color.argb(150, 0, 0, 0), Color.TRANSPARENT), floatArrayOf(0f, 0.51f, 1f), Shader.TileMode.CLAMP).apply {
         setLocalMatrix(matrixOf(1.6668f, -.43535f, -180.07f, .25023f, 1.4424f, -76.258f, 0f, 0f, 1f))
@@ -1613,7 +1537,6 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
     canvas.drawOval(ovalRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = shadowGrad1; alpha = 158 })
     canvas.restore()
 
-    // 2. Large Red Base Dome
     val baseMat = matrixOf(3.4214f, 0f, -545.23f, 0f, 3.4413f, 495.42f, 0f, 0f, 1f)
     val baseGrad = RadialGradient(305.98f, 4.6951f, 8.9206f, intArrayOf(Color.parseColor("#F60000"), Color.parseColor("#B30000")), null, Shader.TileMode.CLAMP)
     canvas.save()
@@ -1621,14 +1544,12 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
     canvas.drawOval(baseBounds, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = baseGrad })
     canvas.restore()
 
-    // 3. Secondary Contact Shadow
     val shadowMat2 = matrixOf(1.3571f, -2.5511f, 136.44f, 2.2762f, 1.241f, -137.78f, 0f, 0f, 1f)
     canvas.save()
     canvas.concat(shadowMat2)
     canvas.drawOval(ovalRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = shadowGrad1; alpha = 77 })
     canvas.restore()
 
-    // 4. Dark Inner Ring Shading on Base
     val innerShadowGrad = RadialGradient(302.83f, 4.6951f, 8.9206f, intArrayOf(Color.argb(149, 127, 0, 0), Color.argb(127, 132, 0, 0), Color.TRANSPARENT), floatArrayOf(0f, 0.6667f, 1f), Shader.TileMode.CLAMP)
     val innerShadowMat = matrixOf(2.1108f, 0f, -144.39f, 0f, 2.1231f, 495.36f, 0f, 0f, 1f)
     canvas.save()
@@ -1636,14 +1557,12 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
     canvas.drawOval(baseBounds, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = innerShadowGrad })
     canvas.restore()
 
-    // 5. Bottom-left Highlight Curve
-    val highlightPathBot = PathParser.createPathFromPathData("M474.2,531.26 c-6.4976,-5.2202 -8.2466,-8.1777 -7.2576,-14.181 2.8176,7.7769 6.9716,13.737 7.2576,14.181z")
+    val highlightPathBot = androidx.core.graphics.PathParser.createPathFromPathData("M474.2,531.26 c-6.4976,-5.2202 -8.2466,-8.1777 -7.2576,-14.181 2.8176,7.7769 6.9716,13.737 7.2576,14.181z")
     val highlightGradBot = RadialGradient(537.75f, 228.65f, 0.74646f, intArrayOf(Color.WHITE, Color.TRANSPARENT), floatArrayOf(0f, 1f), Shader.TileMode.CLAMP).apply {
         setLocalMatrix(matrixOf(-4.0973f, -10.635f, 5102.7f, 2.6711f, -16.503f, 2861.5f, 0f, 0f, 1f))
     }
     canvas.drawPath(highlightPathBot, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = highlightGradBot; alpha = 188 })
 
-    // 6. Top Angled Sphere Head
     val headMat = matrixOf(2.3962f, 0f, -216.26f, .18197f, 2.4872f, 421.67f, 0f, 0f, 1f)
     val headGrad = RadialGradient(302.66f, 3.251f, 8.9206f, intArrayOf(Color.parseColor("#D43500"), Color.parseColor("#D42400"), Color.parseColor("#D40000"), Color.parseColor("#950000")), floatArrayOf(0f, 0.48052f, 0.73611f, 1f), Shader.TileMode.CLAMP).apply {
         setLocalMatrix(matrixOf(.75426f, -.6773f, 77.596f, .68023f, .80831f, -205.09f, 0f, 0f, 1f))
@@ -1653,8 +1572,7 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
     canvas.drawOval(baseBounds, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = headGrad })
     canvas.restore()
 
-    // 7. Top-right Crescent Highlight
-    val highlightPathTop = PathParser.createPathFromPathData("M514.32,468.93 c10.35,6.9283 13.318,10.867 12.538,18.896 -5.1338,-10.371 -12.058,-18.305 -12.538,-18.896z")
+    val highlightPathTop = androidx.core.graphics.PathParser.createPathFromPathData("M514.32,468.93 c10.35,6.9283 13.318,10.867 12.538,18.896 -5.1338,-10.371 -12.058,-18.305 -12.538,-18.896z")
     val highlightGradTop = RadialGradient(537.75f, 228.65f, 0.74646f, intArrayOf(Color.WHITE, Color.TRANSPARENT), floatArrayOf(0f, 1f), Shader.TileMode.CLAMP).apply {
         setLocalMatrix(matrixOf(5.8281f, 17.872f, -6695.6f, -3.599f, 21.975f, -2611.2f, 0f, 0f, 1f))
     }
@@ -1662,4 +1580,3 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
 
     canvas.restore()
 }
-
