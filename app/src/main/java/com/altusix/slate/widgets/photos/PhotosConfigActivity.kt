@@ -109,10 +109,25 @@ class PhotosConfigActivity : ComponentActivity() {
             widgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
         }
 
+        val hasCustomConfig = getSharedPreferences("slate_photos_widget_prefs", Context.MODE_PRIVATE)
+            .contains("widget_${widgetId}_config")
+
+        val info = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)
+        } else null
+        val providerClassName = info?.provider?.className ?: ""
+
+        val isShapeWidget = providerClassName.let {
+            it.contains("Square") || it.contains("Rectangle") || it.contains("Circle") ||
+                    it.contains("Heart") || it.contains("Star") || it.contains("Flower") ||
+                    it.contains("Clover") || it.contains("Blob")
+        }
+
         val initialConfig = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            PhotosStorageManager.getConfig(this, widgetId)
+            val loaded = PhotosStorageManager.getConfig(this, widgetId)
+            if (isShapeWidget && !hasCustomConfig) loaded.copy(showCaption = false) else loaded
         } else {
-            PhotosWidgetConfig.getDefaultConfig()
+            PhotosWidgetConfig.getDefaultConfig().copy(showCaption = false)
         }
 
         val initialSlateConfig = loadSlateWidgetConfig(this, widgetId)
@@ -1332,6 +1347,30 @@ private fun renderExactPhotoWidgetPreview(
                 ),
                 1.0f
             )
+        }
+        providerClass.contains("PhotosSquare") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.SQUARE, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
+        }
+        providerClass.contains("PhotosRectangle") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.RECTANGLE, slateConfig, isResponsive, 320, 160, photoConfig.showCaption), 2.0f)
+        }
+        providerClass.contains("PhotosCircle") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.CIRCLE, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
+        }
+        providerClass.contains("PhotosHeart") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.HEART, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
+        }
+        providerClass.contains("PhotosFlower") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.FLOWER, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
+        }
+        providerClass.contains("PhotosStar") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.STAR, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
+        }
+        providerClass.contains("PhotosClover") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.CLOVER, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
+        }
+        providerClass.contains("PhotosBlob") -> {
+            Pair(generateShapedPhotoBitmap(context, activeItem, PhotoShape.BLOB, slateConfig, isResponsive, 200, 200, photoConfig.showCaption), 1.0f)
         }
         else -> {
             Pair(

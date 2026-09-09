@@ -28,7 +28,14 @@ fun getPhotosWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Photo Stamp", "2x2", "Photos & Memories", PhotosStampReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Locket Memory", "2x2", "Photos & Memories", PhotosLocketReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Full-Bleed Clock", "2x2", "Photos & Memories", PhotosClockOverlayReceiver::class.java, hasModeOption = true),
-
+        SlateWidgetInfo("Square Photo Frame", "2x2", "Photos & Memories", PhotosSquareReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Rectangle Photo Frame", "4x2", "Photos & Memories", PhotosRectangleReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Circle Photo Frame", "2x2", "Photos & Memories", PhotosCircleReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Heart Photo Frame", "2x2", "Photos & Memories", PhotosHeartReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Flower Photo Frame", "2x2", "Photos & Memories", PhotosFlowerReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Soft Star Photo Frame", "2x2", "Photos & Memories", PhotosStarReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Clover Photo Frame", "2x2", "Photos & Memories", PhotosCloverReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Pebble Photo Frame", "2x2", "Photos & Memories", PhotosBlobReceiver::class.java, hasModeOption = false),
     )
 }
 
@@ -489,5 +496,79 @@ class PhotosPushPinReceiver : BasePhotosReceiver(R.layout.widget_photos_card_lay
             hDp = hDp,
             showCaption = photoConfig.showCaption
         )
+    }
+}
+
+// Square Photo Frame (2x2)
+class PhotosSquareReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override val targetAspect = 1.0f
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig().copy(showCaption = false) else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.SQUARE, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// Rectangle Photo Frame (4x2)
+class PhotosRectangleReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override val targetAspect = 2.0f
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig().copy(showCaption = false) else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.RECTANGLE, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// 12. Circle Photo Frame (2x2)
+class PhotosCircleReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.CIRCLE, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// 13. Heart Photo Frame (2x2)
+class PhotosHeartReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.HEART, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// 14. Flower Photo Frame (2x2)
+class PhotosFlowerReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.FLOWER, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// 15. Soft Star Photo Frame (2x2)
+class PhotosStarReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.STAR, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// 16. Clover Photo Frame (2x2)
+class PhotosCloverReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.CLOVER, config, isResponsive, wDp, hDp, photoConfig.showCaption)
+    }
+}
+
+// 17. Pebble Blob Photo Frame (2x2)
+class PhotosBlobReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layout) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+        val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
+        val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
+        return generateShapedPhotoBitmap(context, photoConfig.currentItem, PhotoShape.BLOB, config, isResponsive, wDp, hDp, photoConfig.showCaption)
     }
 }

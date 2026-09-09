@@ -11,6 +11,10 @@ import com.altusix.slate.utils.getStandardCornerRadius
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.graphics.PointF
+import androidx.core.graphics.PathParser
+import kotlin.math.cos
+import kotlin.math.sin
 
 // =========================================================================
 // CANVAS BITMAP GENERATORS FOR SLATE "PHOTOS & MEMORIES" WIDGETS
@@ -2047,4 +2051,242 @@ private fun drawRedPushPin(canvas: Canvas, cardRect: RectF) {
     canvas.drawPath(highlightPathTop, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = highlightGradTop })
 
     canvas.restore()
+}
+
+private fun addSmoothVerticesPath(path: Path, vertices: List<PointF>, cornerRadius: Float) {
+    if (vertices.size < 3) return
+    val n = vertices.size
+    for (i in 0 until n) {
+        val prev = vertices[(i - 1 + n) % n]
+        val curr = vertices[i]
+        val next = vertices[(i + 1) % n]
+
+        val v1x = prev.x - curr.x
+        val v1y = prev.y - curr.y
+        val len1 = Math.hypot(v1x.toDouble(), v1y.toDouble()).toFloat()
+
+        val v2x = next.x - curr.x
+        val v2y = next.y - curr.y
+        val len2 = Math.hypot(v2x.toDouble(), v2y.toDouble()).toFloat()
+
+        val r = minOf(cornerRadius, len1 / 2f, len2 / 2f)
+
+        val p1x = curr.x + (v1x / len1) * r
+        val p1y = curr.y + (v1y / len1) * r
+
+        val p2x = curr.x + (v2x / len2) * r
+        val p2y = curr.y + (v2y / len2) * r
+
+        if (i == 0) {
+            path.moveTo(p1x, p1y)
+        } else {
+            path.lineTo(p1x, p1y)
+        }
+        path.quadTo(curr.x, curr.y, p2x, p2y)
+    }
+    path.close()
+}
+
+fun getPhotoShapePath(shape: PhotoShape, rect: RectF, scaleFactor: Float): Path {
+    val path = Path()
+    val cx = rect.centerX()
+    val cy = rect.centerY()
+    val radius = minOf(rect.width(), rect.height()) / 2f
+    val cornerRadius = 14f * scaleFactor
+
+    when (shape) {
+        PhotoShape.SQUARE, PhotoShape.RECTANGLE -> {
+            val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+            path.addRoundRect(rect, cardCornerRadius, cardCornerRadius, Path.Direction.CW)
+        }
+        PhotoShape.CIRCLE -> {
+            path.addCircle(cx, cy, radius, Path.Direction.CW)
+        }
+        PhotoShape.HEART -> {
+            val cleftY = cy - radius * 0.7085f
+            val lobePeakY = cy - radius * 0.9175f
+            val extremityY = cy - radius * 0.3675f
+            val tipY = cy + radius * 0.9175f
+            val lobeX = radius * 0.45f
+
+            path.moveTo(cx, cleftY)
+            path.cubicTo(cx + radius * 0.109f, cy - radius * 0.8365f, cx + radius * 0.276f, lobePeakY, cx + lobeX, lobePeakY)
+            path.cubicTo(cx + radius * 0.758f, lobePeakY, cx + radius, cy - radius * 0.6755f, cx + radius, extremityY)
+            path.cubicTo(cx + radius, cy + radius * 0.0105f, cx + radius * 0.66f, cy + radius * 0.3185f, cx, tipY)
+            path.cubicTo(cx - radius * 0.66f, cy + radius * 0.3185f, cx - radius, cy + radius * 0.0105f, cx - radius, extremityY)
+            path.cubicTo(cx - radius, cy - radius * 0.6755f, cx - radius * 0.758f, lobePeakY, cx - lobeX, lobePeakY)
+            path.cubicTo(cx - radius * 0.276f, lobePeakY, cx - radius * 0.109f, cy - radius * 0.8365f, cx, cleftY)
+            path.close()
+        }
+        PhotoShape.STAR -> {
+            val pts = mutableListOf<PointF>()
+            for (i in 0 until 10) {
+                val r = if (i % 2 == 0) radius * 0.95f else radius * 0.48f
+                val angle = Math.toRadians((36 * i - 90).toDouble())
+                pts.add(PointF((cx + r * cos(angle)).toFloat(), (cy + r * sin(angle)).toFloat()))
+            }
+            addSmoothVerticesPath(path, pts, cornerRadius * 0.85f)
+        }
+        PhotoShape.FLOWER -> {
+            val petals = 12
+            val pts = mutableListOf<PointF>()
+            for (i in 0 until petals * 2) {
+                val r = if (i % 2 == 0) radius else radius * 0.82f
+                val angle = Math.toRadians((360.0 / (petals * 2)) * i)
+                pts.add(PointF((cx + r * cos(angle)).toFloat(), (cy + r * sin(angle)).toFloat()))
+            }
+            addSmoothVerticesPath(path, pts, cornerRadius * 0.45f)
+        }
+        PhotoShape.CLOVER -> {
+            val lobeR = radius * 0.52f
+            path.addCircle(cx - lobeR * 0.5f, cy - lobeR * 0.5f, lobeR, Path.Direction.CW)
+            path.addCircle(cx + lobeR * 0.5f, cy - lobeR * 0.5f, lobeR, Path.Direction.CW)
+            path.addCircle(cx - lobeR * 0.5f, cy + lobeR * 0.5f, lobeR, Path.Direction.CW)
+            path.addCircle(cx + lobeR * 0.5f, cy + lobeR * 0.5f, lobeR, Path.Direction.CW)
+        }
+        PhotoShape.BLOB -> {
+            val svgPathData = "M26.2,15.8C14.3,35.9,-28.7,38.6,-38.3,19.9C-47.8,1.2,-23.9,-39,-2.4,-40.4C19.1,-41.8,38.2,-4.3,26.2,15.8Z"
+            val rawPath = PathParser.createPathFromPathData(svgPathData)
+            val bounds = RectF()
+            rawPath.computeBounds(bounds, true)
+            val matrix = Matrix().apply { setRectToRect(bounds, rect, Matrix.ScaleToFit.CENTER) }
+            rawPath.transform(matrix, path)
+        }
+    }
+    return path
+}
+
+// SHAPED PHOTO FRAME BITMAP GENERATOR (showCaption defaults to false)
+fun generateShapedPhotoBitmap(
+    context: Context,
+    item: SlateMemoryItem?,
+    shape: PhotoShape,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    showCaption: Boolean = false
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    // Support 2:1 rectangle aspect or 1:1 square/cutout aspect
+    val cardRect = when {
+        shape == PhotoShape.RECTANGLE -> {
+            if (isResponsive) {
+                RectF(0f, 0f, w, h)
+            } else {
+                val aspect = 2.0f
+                var cardH = h
+                var cardW = cardH * aspect
+                if (cardW > w) {
+                    cardW = w
+                    cardH = cardW / aspect
+                }
+                val leftX = (w - cardW) / 2f
+                val topY = (h - cardH) / 2f
+                RectF(leftX, topY, leftX + cardW, topY + cardH)
+            }
+        }
+        isResponsive -> RectF(0f, 0f, w, h)
+        else -> {
+            val cardSize = minOf(w, h) * 0.94f
+            val leftX = (w - cardSize) / 2f
+            val topY = (h - cardSize) / 2f
+            RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+        }
+    }
+
+    val shapePath = getPhotoShapePath(shape, cardRect, scaleFactor)
+
+    val bgColor = getSafeBgColor(slateConfig)
+    val isLight = slateConfig.themeMode == "LIGHT"
+    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+
+    // 1. Soft Ambient Drop Shadow
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(35, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
+    val shadowPath = Path(shapePath).apply {
+        offset(0f, 3f * scaleFactor)
+    }
+    canvas.drawPath(shadowPath, shadowPaint)
+
+    // 2. Base Surface
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = cardBg
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(shapePath, bgPaint)
+
+    // 3. Photo Surface Cropped Cleanly to Shape
+    canvas.save()
+    canvas.clipPath(shapePath)
+
+    drawPhotoSurface(
+        canvas = canvas,
+        item = item,
+        bounds = cardRect,
+        cornerRadius = 0f,
+        scaleFactor = scaleFactor,
+        isLight = isLight,
+        accentColor = accentColor,
+        fallbackSeed = shape.ordinal
+    )
+
+    // 4. Subtle Floating Caption Pill (Off by default)
+    if (showCaption) {
+        val caption = item?.caption?.trim().orEmpty()
+        if (caption.isNotBlank()) {
+            val pillH = (cardRect.height() * 0.13f).coerceIn(18f * scaleFactor, 26f * scaleFactor)
+            val font = item?.captionFont ?: CaptionFont.SANS
+            val captionTypeface = getPhotoCaptionTypeface(context, font)
+            val textColor = (item?.captionColorHex ?: 0xFFFFFFFFL).toInt()
+
+            val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.typeface = captionTypeface
+                this.textSize = pillH * 0.44f
+                this.color = textColor
+                this.textAlign = Paint.Align.CENTER
+            }
+
+            val maxCapW = cardRect.width() * 0.72f
+            val truncCap = truncateText(caption, maxCapW - 14f * scaleFactor, capPaint)
+
+            val pillW = (capPaint.measureText(truncCap) + 16f * scaleFactor).coerceAtMost(maxCapW)
+            val pillBottomY = cardRect.bottom - (cardRect.height() * 0.12f)
+            val pillRect = RectF(
+                cardRect.centerX() - pillW / 2f,
+                pillBottomY - pillH,
+                cardRect.centerX() + pillW / 2f,
+                pillBottomY
+            )
+
+            val pillBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(175, 18, 18, 20)
+                style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBg)
+
+            val metrics = capPaint.fontMetrics
+            val textY = pillRect.centerY() - ((metrics.ascent + metrics.descent) / 2f)
+            canvas.drawText(truncCap, pillRect.centerX(), textY, capPaint)
+        }
+    }
+
+    // 5. Inner Edge Rim
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x1A000000 else 0x2EFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawPath(shapePath, borderPaint)
+
+    canvas.restore()
+
+    return bitmap
 }

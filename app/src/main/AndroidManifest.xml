@@ -3301,6 +3301,118 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 1. Square Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosSquareReceiver"
+            android:exported="true"
+            android:label="Square Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 2. Rectangle Photo Frame (4x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosRectangleReceiver"
+            android:exported="true"
+            android:label="Rectangle Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+        <!-- 3. Circle Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosCircleReceiver"
+            android:exported="true"
+            android:label="Circle Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 4. Heart Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosHeartReceiver"
+            android:exported="true"
+            android:label="Heart Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 5. Soft Star Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosStarReceiver"
+            android:exported="true"
+            android:label="Soft Star Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 6. Flower Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosFlowerReceiver"
+            android:exported="true"
+            android:label="Flower Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 7. Clover Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosCloverReceiver"
+            android:exported="true"
+            android:label="Clover Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 8. Pebble Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosBlobReceiver"
+            android:exported="true"
+            android:label="Pebble Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
+                <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
 
     </application>
 </manifest>

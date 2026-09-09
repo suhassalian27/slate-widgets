@@ -238,3 +238,14 @@ object PhotosStorageManager {
         }
     }
 }
+
+enum class PhotoShape(val label: String) {
+    SQUARE("Square"),
+    RECTANGLE("Rectangle"),
+    CIRCLE("Circle"),
+    HEART("Heart"),
+    STAR("Soft Star"),
+    FLOWER("Flower"),
+    CLOVER("Clover"),
+    BLOB("Pebble Blob")
+}
