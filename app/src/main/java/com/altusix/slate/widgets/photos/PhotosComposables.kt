@@ -1303,23 +1303,19 @@ fun generateLocketMemoryBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    // 1. Proportional Sizing & Strict Canvas Containment (Prevents Edge Clipping)
     val availableSize = minOf(w, h)
-    // Reserve safe outer buffer so shadow never clips against canvas bounds
-    val safeMargin = availableSize * 0.01f
-    val usableSize = availableSize - (safeMargin * 1f)
+    val safeMargin = availableSize * 0.07f
+    val usableSize = availableSize - (safeMargin * 2f)
 
     val bailHeight = usableSize * 0.14f
     val locketRadius = (usableSize - bailHeight) / 2f
 
     val cx = w / 2f
-    // Vertically center the entire pendant (locket body + top hanging ring)
     val cy = (h / 2f) + (bailHeight * 0.45f)
 
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
-    // Gold Palette for Realistic Metallic Sweep
     val goldColors = intArrayOf(
         0xFFEED688.toInt(),
         0xFFFFF6D1.toInt(),
@@ -1332,7 +1328,7 @@ fun generateLocketMemoryBitmap(
     )
     val goldPositions = floatArrayOf(0f, 0.18f, 0.38f, 0.55f, 0.70f, 0.85f, 0.94f, 1f)
 
-    // 2. Controlled Ambient Drop Shadow (Softer Alpha + Tighter Spread + No Cutoff)
+    // Soft, contained ambient shadow (no flat edge cutoffs)
     val shadowDy = (locketRadius * 0.05f).coerceIn(2f * scaleFactor, 5f * scaleFactor)
     val shadowBlur = (locketRadius * 0.10f).coerceIn(3f * scaleFactor, 8f * scaleFactor)
     val totalShadowRadius = locketRadius + shadowBlur
@@ -1352,7 +1348,7 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy + shadowDy, totalShadowRadius, shadowPaint)
 
-    // 3. Top Pendant Bail (Hanger Ring & Mounting Bracket)
+    // Top Pendant Bail
     val bailOuterR = bailHeight * 0.50f
     val bailInnerR = bailHeight * 0.22f
     val bailCenterY = cy - locketRadius - bailOuterR + (2.5f * scaleFactor)
@@ -1372,7 +1368,6 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, bailCenterY, bailOuterR, bailRimPaint)
 
-    // Mounting Hinge Bracket
     val hingeW = bailOuterR * 1.3f
     val hingeH = 4.5f * scaleFactor
     val hingeRect = RectF(
@@ -1391,15 +1386,13 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawRoundRect(hingeRect, 2f * scaleFactor, 2f * scaleFactor, hingePaint)
 
-    // 4. Stepped Metallic Gold Outer Bezel
-    // A. Outer Bevel Rim
+    // Gold Bezel
     val outerBevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = SweepGradient(cx, cy, goldColors, goldPositions)
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, locketRadius, outerBevelPaint)
 
-    // B. Recessed Shadow Groove
     val grooveRadius = locketRadius - 3.5f * scaleFactor
     val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(95, 60, 40, 10)
@@ -1408,7 +1401,6 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy, grooveRadius, groovePaint)
 
-    // C. Raised Inner Polished Gold Lip
     val innerLipRadius = locketRadius - 6.5f * scaleFactor
     val innerLipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = SweepGradient(cx, cy, goldColors, goldPositions)
@@ -1417,14 +1409,12 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy, innerLipRadius, innerLipPaint)
 
-    // 5. Photo Aperture & Image Surface
+    // Photo Aperture
     val photoRadius = innerLipRadius - 1.5f * scaleFactor
     val photoBounds = RectF(cx - photoRadius, cy - photoRadius, cx + photoRadius, cy + photoRadius)
 
     canvas.save()
-    val clipPath = Path().apply {
-        addCircle(cx, cy, photoRadius, Path.Direction.CW)
-    }
+    val clipPath = Path().apply { addCircle(cx, cy, photoRadius, Path.Direction.CW) }
     canvas.clipPath(clipPath)
 
     drawPhotoSurface(
@@ -1438,7 +1428,6 @@ fun generateLocketMemoryBitmap(
         fallbackSeed = 0
     )
 
-    // 6. Realistic Inset Bezel Shadow
     val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = RadialGradient(
             cx, cy, photoRadius,
@@ -1450,7 +1439,6 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy, photoRadius, innerShadowPaint)
 
-    // 7. Domed Mineral Crystal Glare
     val glareCenterX = cx - (photoRadius * 0.28f)
     val glareCenterY = cy - (photoRadius * 0.32f)
     val glareRadius = photoRadius * 0.95f
@@ -1465,7 +1453,6 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy, photoRadius, crystalGlarePaint)
 
-    // Secondary Rim Reflection
     val rimReflectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             cx, cy + (photoRadius * 0.4f), cx, cy + photoRadius,
@@ -1476,10 +1463,8 @@ fun generateLocketMemoryBitmap(
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, photoRadius, rimReflectionPaint)
-
     canvas.restore()
 
-    // 8. Fine Chamfer Highlight Ring
     val chamferPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(110, 255, 255, 255)
         style = Paint.Style.STROKE

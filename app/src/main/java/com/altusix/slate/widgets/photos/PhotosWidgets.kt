@@ -159,7 +159,28 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (id in appWidgetIds) updateSingleWidget(context, appWidgetManager, id)
+        for (id in appWidgetIds) {
+            updateSingleWidget(context, appWidgetManager, id)
+
+            // Reschedule rotation if the device rebooted or the process was recreated
+            val photoConfig = PhotosStorageManager.getConfig(context, id)
+            if (photoConfig.rotationIntervalMinutes > 0 && photoConfig.items.size > 1) {
+                PhotosAlarmScheduler.scheduleRotation(
+                    context = context,
+                    receiverClass = this.javaClass,
+                    widgetId = id,
+                    intervalMinutes = photoConfig.rotationIntervalMinutes
+                )
+            }
+        }
+    }
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        for (id in appWidgetIds) {
+            // Cancel repeating alarm and prevent battery drain
+            PhotosAlarmScheduler.scheduleRotation(context, this.javaClass, id, 0)
+        }
+        super.onDeleted(context, appWidgetIds)
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
@@ -211,7 +232,28 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
             try {
                 views.setViewPadding(R.id.layout_photos_root, padH, padV, padH, padV)
             } catch (_: Exception) {}
-            views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
+
+            // Track active surface index to trigger smooth crossfade
+            val prefs = context.getSharedPreferences("slate_photos_widget_prefs", Context.MODE_PRIVATE)
+            val currentChild = prefs.getInt("widget_${id}_flipper_child", 0)
+            val nextChild = if (currentChild == 0) 1 else 0
+
+            val targetSurfaceId = if (nextChild == 0) R.id.widget_canvas_surface_0 else R.id.widget_canvas_surface_1
+
+            // 1. Draw the new bitmap on the hidden incoming surface
+            views.setImageViewBitmap(targetSurfaceId, bitmap)
+
+            // Fallback for non-flipper layouts (e.g. Filmstrip / Bento)
+            try { views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap) } catch (_: Exception) {}
+
+            // 2. Crossfade to the new surface
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                views.setDisplayedChild(R.id.photos_flipper, nextChild)
+            } else {
+                views.setInt(R.id.photos_flipper, "setDisplayedChild", nextChild)
+            }
+
+            prefs.edit().putInt("widget_${id}_flipper_child", nextChild).apply()
 
             setupTouchTargets(context, views, id)
             manager.updateAppWidget(id, views)
@@ -221,7 +263,6 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
     }
 
     protected open fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        // Base open config intent (Direct Activity Launch - Android 12+ BAL Compliant)
         val openIntent = Intent(context, PhotosConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -234,9 +275,11 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Bind standard card targets
         try { views.setOnClickPendingIntent(R.id.btn_photo_open, openPi) } catch (_: Exception) {}
         try { views.setOnClickPendingIntent(R.id.btn_photo_open_alt, openPi) } catch (_: Exception) {}
+        try { views.setOnClickPendingIntent(R.id.widget_canvas_surface_0, openPi) } catch (_: Exception) {}
+        try { views.setOnClickPendingIntent(R.id.widget_canvas_surface_1, openPi) } catch (_: Exception) {}
+        try { views.setOnClickPendingIntent(R.id.widget_canvas_surface, openPi) } catch (_: Exception) {}
         try { views.setOnClickPendingIntent(R.id.btn_photo_bento_hero, openPi) } catch (_: Exception) {}
         try { views.setOnClickPendingIntent(R.id.btn_photo_bento_sub1, openPi) } catch (_: Exception) {}
         try { views.setOnClickPendingIntent(R.id.btn_photo_bento_sub2, openPi) } catch (_: Exception) {}
@@ -244,7 +287,6 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
         try { views.setOnClickPendingIntent(R.id.btn_film_frame_1, openPi) } catch (_: Exception) {}
         try { views.setOnClickPendingIntent(R.id.btn_film_frame_2, openPi) } catch (_: Exception) {}
 
-        // Bind carousel navigation buttons if present
         val prevIntent = Intent(context, this.javaClass).apply {
             action = ACTION_CYCLE_PHOTO
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -273,6 +315,7 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
         )
         try { views.setOnClickPendingIntent(R.id.btn_carousel_next, nextPi) } catch (_: Exception) {}
     }
+
 }
 
 // 1. Polaroid Memory (2x2)
@@ -281,13 +324,13 @@ class PhotosPolaroidReceiver : BasePhotosReceiver(R.layout.widget_photos_card_la
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
         return generatePolaroidMemoryBitmap(
-            context,
-            photoConfig.currentItem,
-            config,
-            isResponsive,
-            wDp,
-            hDp,
-            photoConfig.showCaption
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
         )
     }
 }

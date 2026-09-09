@@ -244,7 +244,23 @@ class PhotosConfigActivity : ComponentActivity() {
                         // 1. Save Photo Config
                         PhotosStorageManager.saveConfig(this@PhotosConfigActivity, widgetId, config)
 
-                        // 2. Save Theme Studio Attributes
+                        // 2. Schedule or Cancel Auto Rotation
+                        val providerInfo = AppWidgetManager.getInstance(this@PhotosConfigActivity).getAppWidgetInfo(widgetId)
+                        providerInfo?.provider?.className?.let { className ->
+                            try {
+                                val clazz = Class.forName(className)
+                                PhotosAlarmScheduler.scheduleRotation(
+                                    context = this@PhotosConfigActivity,
+                                    receiverClass = clazz,
+                                    widgetId = widgetId,
+                                    intervalMinutes = config.rotationIntervalMinutes
+                                )
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+
+                        // 3. Save Theme Studio Attributes
                         val widgetPrefs = getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
                         widgetPrefs.edit()
                             .putString("widget_${widgetId}_theme_mode", currentSlateConfig.themeMode)
@@ -477,114 +493,112 @@ class PhotosConfigActivity : ComponentActivity() {
                                 verticalArrangement = Arrangement.spacedBy(20.dp)
                             ) {
                                 if (selectedTab == 0) {
-                                    // Hide slot selector entirely for single-photo widgets
-                                    if (!isSinglePhotoWidget) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
+                                    // 1. Photos in Widget Slots
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "PHOTOS IN WIDGET (${config.items.size})",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF8E8E93),
+                                                letterSpacing = 0.5.sp
+                                            )
+
+                                            if (!isFixedThreeSlot && config.items.size < 6) {
                                                 Text(
-                                                    text = "PHOTOS IN WIDGET (${config.items.size})",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF8E8E93),
-                                                    letterSpacing = 0.5.sp
+                                                    text = "+ Add Slot",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = Color(selectedAccentHex),
+                                                    modifier = Modifier.clickable {
+                                                        val newItem = SlateMemoryItem(
+                                                            id = System.currentTimeMillis().toString(),
+                                                            caption = "New Memory",
+                                                            dateText = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date())
+                                                        )
+                                                        val updated = config.items + newItem
+                                                        config = config.copy(items = updated, currentIndex = updated.size - 1)
+                                                        selectedIndex = updated.size - 1
+                                                    }
                                                 )
-
-                                                if (!isFixedThreeSlot && config.items.size < 6) {
-                                                    Text(
-                                                        text = "+ Add Slot",
-                                                        fontSize = 12.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color(selectedAccentHex),
-                                                        modifier = Modifier.clickable {
-                                                            val newItem = SlateMemoryItem(
-                                                                id = System.currentTimeMillis().toString(),
-                                                                caption = "New Memory",
-                                                                dateText = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date())
-                                                            )
-                                                            val updated = config.items + newItem
-                                                            config = config.copy(items = updated, currentIndex = updated.size - 1)
-                                                            selectedIndex = updated.size - 1
-                                                        }
-                                                    )
-                                                }
                                             }
+                                        }
 
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                config.items.forEachIndexed { idx, item ->
-                                                    val isSelected = idx == selectedIndex
-                                                    val itemBmp = remember(item.imagePath) {
-                                                        item.imagePath?.let {
-                                                            val f = File(it)
-                                                            if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
-                                                        }
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            config.items.forEachIndexed { idx, item ->
+                                                val isSelected = idx == selectedIndex
+                                                val itemBmp = remember(item.imagePath) {
+                                                    item.imagePath?.let {
+                                                        val f = File(it)
+                                                        if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
+                                                    }
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(64.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(Color(0xFF1C1C22))
+                                                        .border(
+                                                            width = if (isSelected) 2.dp else 1.dp,
+                                                            color = if (isSelected) Color(selectedAccentHex) else Color(0xFF2C2C35),
+                                                            shape = RoundedCornerShape(12.dp)
+                                                        )
+                                                        .clickable {
+                                                            syncActiveItem()
+                                                            selectedIndex = idx
+                                                            config = config.copy(currentIndex = idx)
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (itemBmp != null) {
+                                                        Image(
+                                                            bitmap = itemBmp.asImageBitmap(),
+                                                            contentDescription = null,
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = "#${idx + 1}",
+                                                            color = if (isSelected) Color(selectedAccentHex) else Color(0xFF8E8E93),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 14.sp
+                                                        )
                                                     }
 
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(64.dp)
-                                                            .clip(RoundedCornerShape(12.dp))
-                                                            .background(Color(0xFF1C1C22))
-                                                            .border(
-                                                                width = if (isSelected) 2.dp else 1.dp,
-                                                                color = if (isSelected) Color(selectedAccentHex) else Color(0xFF2C2C35),
-                                                                shape = RoundedCornerShape(12.dp)
+                                                    if (!isFixedThreeSlot && config.items.size > 1 && isSelected) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .align(Alignment.TopEnd)
+                                                                .padding(2.dp)
+                                                                .size(20.dp)
+                                                                .clip(CircleShape)
+                                                                .background(Color.Black.copy(alpha = 0.7f))
+                                                                .clickable {
+                                                                    val curList = config.items.toMutableList()
+                                                                    curList.removeAt(idx)
+                                                                    val nextIdx = 0.coerceAtMost(curList.size - 1)
+                                                                    config = config.copy(items = curList, currentIndex = nextIdx)
+                                                                    selectedIndex = nextIdx
+                                                                },
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Delete,
+                                                                contentDescription = "Remove",
+                                                                tint = Color(0xFFFF453A),
+                                                                modifier = Modifier.size(12.dp)
                                                             )
-                                                            .clickable {
-                                                                syncActiveItem()
-                                                                selectedIndex = idx
-                                                                config = config.copy(currentIndex = idx)
-                                                            },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        if (itemBmp != null) {
-                                                            Image(
-                                                                bitmap = itemBmp.asImageBitmap(),
-                                                                contentDescription = null,
-                                                                modifier = Modifier.fillMaxSize(),
-                                                                contentScale = ContentScale.Crop
-                                                            )
-                                                        } else {
-                                                            Text(
-                                                                text = "#${idx + 1}",
-                                                                color = if (isSelected) Color(selectedAccentHex) else Color(0xFF8E8E93),
-                                                                fontWeight = FontWeight.Bold,
-                                                                fontSize = 14.sp
-                                                            )
-                                                        }
-
-                                                        if (!isFixedThreeSlot && config.items.size > 1 && isSelected) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .align(Alignment.TopEnd)
-                                                                    .padding(2.dp)
-                                                                    .size(20.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(Color.Black.copy(alpha = 0.7f))
-                                                                    .clickable {
-                                                                        val curList = config.items.toMutableList()
-                                                                        curList.removeAt(idx)
-                                                                        val nextIdx = 0.coerceAtMost(curList.size - 1)
-                                                                        config = config.copy(items = curList, currentIndex = nextIdx)
-                                                                        selectedIndex = nextIdx
-                                                                    },
-                                                                contentAlignment = Alignment.Center
-                                                            ) {
-                                                                Icon(
-                                                                    imageVector = Icons.Default.Delete,
-                                                                    contentDescription = "Remove",
-                                                                    tint = Color(0xFFFF453A),
-                                                                    modifier = Modifier.size(12.dp)
-                                                                )
-                                                            }
                                                         }
                                                     }
                                                 }
@@ -592,7 +606,69 @@ class PhotosConfigActivity : ComponentActivity() {
                                         }
                                     }
 
-                                    // Filter Selection
+                                    // 2. Rotation Interval Selector
+                                    if (config.items.size > 1 && !isFixedThreeSlot) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "ROTATION INTERVAL",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF8E8E93),
+                                                    letterSpacing = 0.5.sp
+                                                )
+                                                Text(
+                                                    text = if (config.rotationIntervalMinutes == 0) "Off" else "Every ${config.rotationIntervalMinutes}m",
+                                                    fontSize = 12.sp,
+                                                    color = Color(selectedAccentHex),
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+
+                                            val intervals = listOf(
+                                                0 to "Off",
+                                                15 to "15m",
+                                                30 to "30m",
+                                                60 to "1h",
+                                                180 to "3h"
+                                            )
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(Color(0xFF141416))
+                                                    .padding(3.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                intervals.forEach { (mins, label) ->
+                                                    val isSelected = config.rotationIntervalMinutes == mins
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(36.dp)
+                                                            .clip(RoundedCornerShape(9.dp))
+                                                            .background(if (isSelected) Color(0xFF26262E) else Color.Transparent)
+                                                            .clickable { config = config.copy(rotationIntervalMinutes = mins) },
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = label,
+                                                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                                            fontSize = 12.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 3. Filter Selection
                                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                         Text(
                                             text = "AESTHETIC FILTER",
@@ -640,6 +716,7 @@ class PhotosConfigActivity : ComponentActivity() {
                                         }
                                     }
 
+                                    // 4. Caption & Overlay
                                     if (supportsCaption) {
                                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                             Row(
@@ -692,7 +769,6 @@ class PhotosConfigActivity : ComponentActivity() {
                                                         )
                                                     )
 
-                                                    // Date stamp only displayed for widgets that render it
                                                     if (supportsDateStamp) {
                                                         OutlinedTextField(
                                                             value = dateText,
@@ -743,7 +819,6 @@ class PhotosConfigActivity : ComponentActivity() {
                                                         )
                                                     }
 
-                                                    // Font Style Selector
                                                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                                         Text("Font Style", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
 
@@ -778,7 +853,6 @@ class PhotosConfigActivity : ComponentActivity() {
                                                         }
                                                     }
 
-                                                    // Text Color Selection
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
                                                         horizontalArrangement = Arrangement.SpaceBetween,

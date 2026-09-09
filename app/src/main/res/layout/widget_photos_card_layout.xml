@@ -5,12 +5,27 @@
     android:layout_height="match_parent">
 
     <!-- Canvas Surface for Memory Photo, Texture, Frame & Caption -->
-    <ImageView
-        android:id="@+id/widget_canvas_surface"
+    <ViewFlipper
+        android:id="@+id/photos_flipper"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY"
-        android:contentDescription="Photos Canvas Surface" />
+        android:animateFirstView="false"
+        android:inAnimation="@anim/slate_photo_fade_in"
+        android:outAnimation="@anim/slate_photo_fade_out">
+
+        <ImageView
+            android:id="@+id/widget_canvas_surface_0"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+
+        <ImageView
+            android:id="@+id/widget_canvas_surface_1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+
+    </ViewFlipper>
 
     <!-- Whole-card touch target to open Photo / Gallery / Config -->
     <FrameLayout

@@ -78,7 +78,8 @@ data class PhotosWidgetConfig(
     val currentIndex: Int = 0,
     val showDate: Boolean = true,
     val showCaption: Boolean = true,
-    val isResponsive: Boolean = false
+    val isResponsive: Boolean = false,
+    val rotationIntervalMinutes: Int = 0 // 0 = Off / Manual
 ) {
     val currentItem: SlateMemoryItem?
         get() = if (items.isNotEmpty()) items[currentIndex.coerceIn(0, items.size - 1)] else null
@@ -89,6 +90,7 @@ data class PhotosWidgetConfig(
         json.put("showDate", showDate)
         json.put("showCaption", showCaption)
         json.put("isResponsive", isResponsive)
+        json.put("rotationIntervalMinutes", rotationIntervalMinutes)
 
         val arr = JSONArray()
         for (item in items) {
@@ -117,7 +119,8 @@ data class PhotosWidgetConfig(
                     currentIndex = json.optInt("currentIndex", 0),
                     showDate = json.optBoolean("showDate", true),
                     showCaption = json.optBoolean("showCaption", true),
-                    isResponsive = json.optBoolean("isResponsive", false)
+                    isResponsive = json.optBoolean("isResponsive", false),
+                    rotationIntervalMinutes = json.optInt("rotationIntervalMinutes", 0)
                 )
             } catch (_: Exception) {
                 getDefaultConfig()
@@ -152,7 +155,8 @@ data class PhotosWidgetConfig(
                 currentIndex = 0,
                 showDate = true,
                 showCaption = true,
-                isResponsive = false
+                isResponsive = false,
+                rotationIntervalMinutes = 0
             )
         }
     }
