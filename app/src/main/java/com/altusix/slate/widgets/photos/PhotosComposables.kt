@@ -808,7 +808,8 @@ fun generateCollageBentoBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -840,6 +841,7 @@ fun generateCollageBentoBitmap(
     val defaultList = if (items.isNotEmpty()) items else PhotosWidgetConfig.getDefaultConfig().items
     val tileCorner = 14f * scaleFactor
 
+    // 1. Left Hero Tile (~54% width)
     val heroW = (inner.width() - gap) * 0.54f
     val heroRect = RectF(inner.left, inner.top, inner.left + heroW, inner.bottom)
     val heroItem = defaultList.getOrNull(0)
@@ -855,24 +857,39 @@ fun generateCollageBentoBitmap(
         fallbackSeed = 0
     )
 
-    val pillH = 22f * scaleFactor
-    val pillPad = 6f * scaleFactor
-    val pillRect = RectF(heroRect.left + pillPad, heroRect.bottom - pillH - pillPad, heroRect.right - pillPad, heroRect.bottom - pillPad)
-    val pillBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xAA000000.toInt()
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBg)
+    // Hero Tile Caption Pill
+    val heroCaption = heroItem?.caption?.trim().orEmpty()
+    if (showCaption && heroCaption.isNotBlank()) {
+        val pillH = 22f * scaleFactor
+        val pillPad = 6f * scaleFactor
+        val pillRect = RectF(
+            heroRect.left + pillPad,
+            heroRect.bottom - pillH - pillPad,
+            heroRect.right - pillPad,
+            heroRect.bottom - pillPad
+        )
+        val pillBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xAA000000.toInt()
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBg)
 
-    val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
-        textSize = 9.5f * scaleFactor
-        color = android.graphics.Color.WHITE
-    }
-    val heroCaption = heroItem?.caption ?: "Featured Memory"
-    val truncatedHeroText = truncateText(heroCaption, pillRect.width() - 14f * scaleFactor, pillTextPaint)
-    canvas.drawText(truncatedHeroText, pillRect.left + 8f * scaleFactor, pillRect.centerY() + 3.5f * scaleFactor, pillTextPaint)
+        val font = heroItem?.captionFont ?: CaptionFont.SANS
+        val captionTypeface = getPhotoCaptionTypeface(context, font)
+        val textColor = (heroItem?.captionColorHex ?: 0xFFFFFFFFL).toInt()
 
+        val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = captionTypeface
+            this.textSize = 9.5f * scaleFactor
+            this.color = textColor
+        }
+
+        val truncatedHeroText = truncateText(heroCaption, pillRect.width() - 14f * scaleFactor, pillTextPaint)
+        val baselineY = pillRect.centerY() - ((pillTextPaint.fontMetrics.ascent + pillTextPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(truncatedHeroText, pillRect.left + 8f * scaleFactor, baselineY, pillTextPaint)
+    }
+
+    // 2. Right Column (Top & Bottom Sub-Tiles)
     val rightX = heroRect.right + gap
     val subW = inner.right - rightX
     val subH = (inner.height() - gap) / 2f
@@ -903,6 +920,7 @@ fun generateCollageBentoBitmap(
         fallbackSeed = 2
     )
 
+    // 3. Tile Inner Borders
     val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x1A000000 else 0x22FFFFFF
         style = Paint.Style.STROKE

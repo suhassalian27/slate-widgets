@@ -149,11 +149,35 @@ class PhotosConfigActivity : ComponentActivity() {
                     )
                 }
 
-                val supportsLocation = remember(widgetId) {
+                val widgetProviderClass = remember(widgetId) {
                     if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                         val info = AppWidgetManager.getInstance(this@PhotosConfigActivity).getAppWidgetInfo(widgetId)
-                        info?.provider?.className?.contains("OnThisDay") == true
-                    } else false
+                        info?.provider?.className ?: ""
+                    } else ""
+                }
+
+// Bento Collage has a locked 3-tile structure; FilmStrip also uses a fixed 3-frame layout
+                val isFixedThreeSlot = remember(widgetProviderClass) {
+                    widgetProviderClass.contains("CollageBento") || widgetProviderClass.contains("FilmStrip")
+                }
+
+// In Bento Collage, only slot #1 (the hero tile) renders a caption pill
+                val supportsCaption = remember(widgetProviderClass, selectedIndex) {
+                    when {
+                        widgetProviderClass.contains("FilmStrip") -> false
+                        widgetProviderClass.contains("CollageBento") -> selectedIndex == 0
+                        else -> true
+                    }
+                }
+
+// Date stamps are only supported on Polaroid Memory and On This Day
+                val supportsDateStamp = remember(widgetProviderClass) {
+                    widgetProviderClass.contains("Polaroid") || widgetProviderClass.contains("OnThisDay")
+                }
+
+// Only "On This Day" renders a location line
+                val supportsLocation = remember(widgetProviderClass) {
+                    widgetProviderClass.contains("OnThisDay")
                 }
 
                 val activeItem = config.items.getOrNull(selectedIndex) ?: SlateMemoryItem()
@@ -461,7 +485,8 @@ class PhotosConfigActivity : ComponentActivity() {
                                                 letterSpacing = 0.5.sp
                                             )
 
-                                            if (config.items.size < 6) {
+                                            // Only display "+ Add Slot" for widgets that actually support dynamic counts (e.g. Carousel)
+                                            if (!isFixedThreeSlot && config.items.size < 6) {
                                                 Text(
                                                     text = "+ Add Slot",
                                                     fontSize = 12.sp,
@@ -529,7 +554,8 @@ class PhotosConfigActivity : ComponentActivity() {
                                                         )
                                                     }
 
-                                                    if (config.items.size > 1 && isSelected) {
+                                                    // Hide delete icon if widget requires a fixed 3-slot layout
+                                                    if (!isFixedThreeSlot && config.items.size > 1 && isSelected) {
                                                         Box(
                                                             modifier = Modifier
                                                                 .align(Alignment.TopEnd)
@@ -607,90 +633,43 @@ class PhotosConfigActivity : ComponentActivity() {
                                         }
                                     }
 
-                                    // Caption & Details
-                                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "MEMORY DETAILS & CAPTION",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF8E8E93),
-                                                letterSpacing = 0.5.sp
-                                            )
-
-                                            Switch(
-                                                checked = config.showCaption,
-                                                onCheckedChange = { config = config.copy(showCaption = it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = Color.Black,
-                                                    checkedTrackColor = Color(selectedAccentHex),
-                                                    uncheckedThumbColor = Color(0xFF8E8E93),
-                                                    uncheckedTrackColor = Color(0xFF1C1C22)
+                                    if (supportsCaption) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "CAPTION & OVERLAY",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF8E8E93),
+                                                    letterSpacing = 0.5.sp
                                                 )
-                                            )
-                                        }
 
-                                        AnimatedVisibility(visible = config.showCaption) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                                OutlinedTextField(
-                                                    value = caption,
-                                                    onValueChange = {
-                                                        caption = it
-                                                        syncActiveItem(newCap = it)
-                                                    },
-                                                    label = { Text("Caption / Title") },
-                                                    placeholder = { Text("e.g. Summer Memories") },
-                                                    singleLine = true,
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedBorderColor = Color(selectedAccentHex),
-                                                        unfocusedBorderColor = Color(0xFF2C2C35),
-                                                        focusedLabelColor = Color(selectedAccentHex),
-                                                        unfocusedLabelColor = Color(0xFF8E8E93),
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color(0xFF16161B),
-                                                        unfocusedContainerColor = Color(0xFF16161B)
+                                                Switch(
+                                                    checked = config.showCaption,
+                                                    onCheckedChange = { config = config.copy(showCaption = it) },
+                                                    colors = SwitchDefaults.colors(
+                                                        checkedThumbColor = Color.Black,
+                                                        checkedTrackColor = Color(selectedAccentHex),
+                                                        uncheckedThumbColor = Color(0xFF8E8E93),
+                                                        uncheckedTrackColor = Color(0xFF1C1C22)
                                                     )
                                                 )
+                                            }
 
-                                                OutlinedTextField(
-                                                    value = dateText,
-                                                    onValueChange = {
-                                                        dateText = it
-                                                        syncActiveItem(newDate = it)
-                                                    },
-                                                    label = { Text("Date Stamp") },
-                                                    placeholder = { Text("e.g. September 2024") },
-                                                    singleLine = true,
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedBorderColor = Color(selectedAccentHex),
-                                                        unfocusedBorderColor = Color(0xFF2C2C35),
-                                                        focusedLabelColor = Color(selectedAccentHex),
-                                                        unfocusedLabelColor = Color(0xFF8E8E93),
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color(0xFF16161B),
-                                                        unfocusedContainerColor = Color(0xFF16161B)
-                                                    )
-                                                )
-
-                                                if (supportsLocation) {
+                                            AnimatedVisibility(visible = config.showCaption) {
+                                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                                     OutlinedTextField(
-                                                        value = location,
+                                                        value = caption,
                                                         onValueChange = {
-                                                            location = it
-                                                            syncActiveItem(newLoc = it)
+                                                            caption = it
+                                                            syncActiveItem(newCap = it)
                                                         },
-                                                        label = { Text("Location (Optional)") },
-                                                        placeholder = { Text("e.g. Pacific Coast, California") },
+                                                        label = { Text("Caption / Title") },
+                                                        placeholder = { Text("e.g. Featured Memory") },
                                                         singleLine = true,
                                                         modifier = Modifier.fillMaxWidth(),
                                                         shape = RoundedCornerShape(12.dp),
@@ -705,99 +684,150 @@ class PhotosConfigActivity : ComponentActivity() {
                                                             unfocusedContainerColor = Color(0xFF16161B)
                                                         )
                                                     )
-                                                }
 
-                                                // Font Style Selector
-                                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                    Text("Font Style", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        CaptionFont.values().forEach { font ->
-                                                            val isSelected = captionFont == font
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .weight(1f)
-                                                                    .height(38.dp)
-                                                                    .clip(RoundedCornerShape(10.dp))
-                                                                    .background(if (isSelected) Color(selectedAccentHex) else Color(0xFF1C1C22))
-                                                                    .clickable {
-                                                                        captionFont = font
-                                                                        syncActiveItem(newFont = font)
-                                                                    },
-                                                                contentAlignment = Alignment.Center
-                                                            ) {
-                                                                Text(
-                                                                    text = font.label,
-                                                                    color = if (isSelected) {
-                                                                        if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White
-                                                                    } else Color(0xFFD1D1D6),
-                                                                    fontSize = 12.sp,
-                                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                                                )
-                                                            }
-                                                        }
+                                                    // Date stamp only displayed for widgets that render it
+                                                    if (supportsDateStamp) {
+                                                        OutlinedTextField(
+                                                            value = dateText,
+                                                            onValueChange = {
+                                                                dateText = it
+                                                                syncActiveItem(newDate = it)
+                                                            },
+                                                            label = { Text("Date Stamp") },
+                                                            placeholder = { Text("e.g. September 2024") },
+                                                            singleLine = true,
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            colors = OutlinedTextFieldDefaults.colors(
+                                                                focusedBorderColor = Color(selectedAccentHex),
+                                                                unfocusedBorderColor = Color(0xFF2C2C35),
+                                                                focusedLabelColor = Color(selectedAccentHex),
+                                                                unfocusedLabelColor = Color(0xFF8E8E93),
+                                                                focusedTextColor = Color.White,
+                                                                unfocusedTextColor = Color.White,
+                                                                focusedContainerColor = Color(0xFF16161B),
+                                                                unfocusedContainerColor = Color(0xFF16161B)
+                                                            )
+                                                        )
                                                     }
-                                                }
 
-                                                // Text Color Selection
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text("Text Color", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    if (supportsLocation) {
+                                                        OutlinedTextField(
+                                                            value = location,
+                                                            onValueChange = {
+                                                                location = it
+                                                                syncActiveItem(newLoc = it)
+                                                            },
+                                                            label = { Text("Location (Optional)") },
+                                                            placeholder = { Text("e.g. Pacific Coast, California") },
+                                                            singleLine = true,
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            colors = OutlinedTextFieldDefaults.colors(
+                                                                focusedBorderColor = Color(selectedAccentHex),
+                                                                unfocusedBorderColor = Color(0xFF2C2C35),
+                                                                focusedLabelColor = Color(selectedAccentHex),
+                                                                unfocusedLabelColor = Color(0xFF8E8E93),
+                                                                focusedTextColor = Color.White,
+                                                                unfocusedTextColor = Color.White,
+                                                                focusedContainerColor = Color(0xFF16161B),
+                                                                unfocusedContainerColor = Color(0xFF16161B)
+                                                            )
+                                                        )
+                                                    }
 
-                                                    val coreSwatches = listOf(
-                                                        0xFFFFFFFFL,
-                                                        0xFF121214L,
-                                                        selectedAccentHex,
-                                                        0xFF8E8E93L
-                                                    )
+                                                    // Font Style Selector
+                                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        Text("Font Style", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
 
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        coreSwatches.forEach { hexVal ->
-                                                            val isSelected = captionColorHex == hexVal
-                                                            val swatchColor = Color(hexVal.toInt())
-
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(32.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(swatchColor)
-                                                                    .border(
-                                                                        width = if (isSelected) 2.5.dp else 1.dp,
-                                                                        color = if (isSelected) Color.White else Color(0xFF383842),
-                                                                        shape = CircleShape
-                                                                    )
-                                                                    .clickable {
-                                                                        captionColorHex = hexVal
-                                                                        syncActiveItem(newColorHex = hexVal)
-                                                                    },
-                                                                contentAlignment = Alignment.Center
-                                                            ) {
-                                                                if (isSelected) {
-                                                                    Icon(
-                                                                        imageVector = Icons.Default.Check,
-                                                                        contentDescription = null,
-                                                                        tint = if (calculateLuminance(hexVal) > 0.5f) Color.Black else Color.White,
-                                                                        modifier = Modifier.size(13.dp)
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            CaptionFont.values().forEach { font ->
+                                                                val isSelected = captionFont == font
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .height(38.dp)
+                                                                        .clip(RoundedCornerShape(10.dp))
+                                                                        .background(if (isSelected) Color(selectedAccentHex) else Color(0xFF1C1C22))
+                                                                        .clickable {
+                                                                            captionFont = font
+                                                                            syncActiveItem(newFont = font)
+                                                                        },
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(
+                                                                        text = font.label,
+                                                                        color = if (isSelected) {
+                                                                            if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White
+                                                                        } else Color(0xFFD1D1D6),
+                                                                        fontSize = 12.sp,
+                                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                                                     )
                                                                 }
                                                             }
                                                         }
+                                                    }
 
-                                                        val isCustom = coreSwatches.none { it == captionColorHex }
-                                                        RainbowCustomCircle(
-                                                            isSelected = isCustom,
-                                                            activeColor = if (isCustom) Color(captionColorHex.toInt()) else null,
-                                                            onClick = { activeColorTarget = ConfigColorTarget.CAPTION }
+                                                    // Text Color Selection
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text("Text Color", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                        val coreSwatches = listOf(
+                                                            0xFFFFFFFFL,
+                                                            0xFF121214L,
+                                                            selectedAccentHex,
+                                                            0xFF8E8E93L
                                                         )
+
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            coreSwatches.forEach { hexVal ->
+                                                                val isSelected = captionColorHex == hexVal
+                                                                val swatchColor = Color(hexVal.toInt())
+
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(32.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(swatchColor)
+                                                                        .border(
+                                                                            width = if (isSelected) 2.5.dp else 1.dp,
+                                                                            color = if (isSelected) Color.White else Color(0xFF383842),
+                                                                            shape = CircleShape
+                                                                        )
+                                                                        .clickable {
+                                                                            captionColorHex = hexVal
+                                                                            syncActiveItem(newColorHex = hexVal)
+                                                                        },
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    if (isSelected) {
+                                                                        Icon(
+                                                                            imageVector = Icons.Default.Check,
+                                                                            contentDescription = null,
+                                                                            tint = if (calculateLuminance(hexVal) > 0.5f) Color.Black else Color.White,
+                                                                            modifier = Modifier.size(13.dp)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            val isCustom = coreSwatches.none { it == captionColorHex }
+                                                            RainbowCustomCircle(
+                                                                isSelected = isCustom,
+                                                                activeColor = if (isCustom) Color(captionColorHex.toInt()) else null,
+                                                                onClick = { activeColorTarget = ConfigColorTarget.CAPTION }
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1683,3 +1713,4 @@ private fun cropBitmapFromBounds(
         Uri.fromFile(outputFile).toString()
     } catch (_: Exception) { null }
 }
+
