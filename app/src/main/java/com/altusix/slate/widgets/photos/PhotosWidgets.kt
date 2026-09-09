@@ -17,17 +17,18 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 
 fun getPhotosWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
+        SlateWidgetInfo("Taped Polaroid Frame", "2x2", "Photos & Memories", PhotosTapedReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Push Pin Polaroid Frame", "2x2", "Photos & Memories", PhotosPushPinReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Stacked Photo Frame", "2x2", "Photos & Memories", PhotosStackedReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Polaroid Memory", "2x2", "Photos & Memories", PhotosPolaroidReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("On This Day", "4x2", "Photos & Memories", PhotosOnThisDayReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("35mm Film Strip", "4x2", "Photos & Memories", PhotosFilmStripReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Bento Collage", "4x2", "Photos & Memories", PhotosCollageBentoReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Photo Carousel", "2x2", "Photos & Memories", PhotosCarouselReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Photo Stamp", "2x2", "Photos & Memories", PhotosStampReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Locket Memory", "2x2", "Photos & Memories", PhotosLocketReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Locket Memory", "2x2", "Photos & Memories", PhotosLocketReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Full-Bleed Clock", "2x2", "Photos & Memories", PhotosClockOverlayReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Stacked Photo Frame", "2x2", "Photos & Memories", PhotosStackedReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Taped Polaroid Frame", "2x2", "Photos & Memories", PhotosTapedReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Push Pin Polaroid Frame", "2x2", "Photos & Memories", PhotosPushPinReceiver::class.java, hasModeOption = true),
+
     )
 }
 
@@ -361,7 +362,15 @@ class PhotosClockOverlayReceiver : BasePhotosReceiver(R.layout.widget_photos_car
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generatePhotoClockOverlayBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generatePhotoClockOverlayBitmap(
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 

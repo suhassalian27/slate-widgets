@@ -1289,7 +1289,7 @@ fun generatePhotoStampBitmap(
 }
 
 // =========================================================================
-// 7. LOCKET MEMORY (2x2)
+// 7. LOCKET MEMORY (2x2) - PURE FLOATING PENDANT DESIGN
 // =========================================================================
 fun generateLocketMemoryBitmap(
     context: Context,
@@ -1303,96 +1303,172 @@ fun generateLocketMemoryBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
-    }
+    // 1. Proportional Sizing & Optical Centering
+    val availableSize = minOf(w, h)
+    val bailHeight = availableSize * 0.13f
+    val cx = w / 2f
+    // Offset slightly down so the entire pendant (locket + top bail) is optically centered
+    val cy = (h / 2f) + (bailHeight * 0.38f)
+    val locketRadius = (availableSize * 0.43f) - (bailHeight * 0.5f)
 
-    val bgColor = getSafeBgColor(slateConfig)
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
-    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+    // Gold Palette for Realistic Sweep & Metallic Lustre
+    val goldColors = intArrayOf(
+        0xFFEED688.toInt(),
+        0xFFFFF6D1.toInt(),
+        0xFFC9972E.toInt(),
+        0xFF8A6014.toInt(),
+        0xFFEED688.toInt(),
+        0xFFFFF6D1.toInt(),
+        0xFFB07F22.toInt(),
+        0xFFEED688.toInt()
+    )
+    val goldPositions = floatArrayOf(0f, 0.18f, 0.38f, 0.55f, 0.70f, 0.85f, 0.94f, 1f)
+
+    // 2. Soft Ambient Drop Shadow (Floats naturally over any home screen wallpaper)
+    val shadowRadius = locketRadius + 6f * scaleFactor
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = RadialGradient(
+            cx, cy + 6f * scaleFactor, shadowRadius + 12f * scaleFactor,
+            intArrayOf(Color.argb(90, 0, 0, 0), Color.argb(35, 0, 0, 0), Color.TRANSPARENT),
+            floatArrayOf(0.72f, 0.90f, 1f),
+            Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawCircle(cx, cy + 6f * scaleFactor, shadowRadius + 12f * scaleFactor, shadowPaint)
+
+    // 3. Top Pendant Bail (Hanger Ring & Mounting Bracket)
+    val bailOuterR = bailHeight * 0.52f
+    val bailInnerR = bailHeight * 0.24f
+    val bailCenterY = cy - locketRadius - bailOuterR + (3.5f * scaleFactor)
+
+    val bailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = SweepGradient(cx, bailCenterY, goldColors, goldPositions)
+        style = Paint.Style.STROKE
+        strokeWidth = (bailOuterR - bailInnerR)
+    }
+    val bailStrokeRadius = (bailOuterR + bailInnerR) / 2f
+    canvas.drawCircle(cx, bailCenterY, bailStrokeRadius, bailPaint)
+
+    // Bail Highlight & Shadow Edge
+    val bailRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(120, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
+    }
+    canvas.drawCircle(cx, bailCenterY, bailOuterR, bailRimPaint)
+
+    // Mounting Hinge Bracket at top of Locket
+    val hingeW = bailOuterR * 1.3f
+    val hingeH = 5f * scaleFactor
+    val hingeRect = RectF(cx - hingeW / 2f, cy - locketRadius - hingeH / 2f, cx + hingeW / 2f, cy - locketRadius + hingeH / 2f)
+    val hingePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            hingeRect.left, hingeRect.top, hingeRect.right, hingeRect.top,
+            intArrayOf(0xFF996E17.toInt(), 0xFFFFEAA2.toInt(), 0xFF996E17.toInt()),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawRoundRect(hingeRect, 2f * scaleFactor, 2f * scaleFactor, hingePaint)
+
+    // 4. Stepped Metallic Gold Outer Bezel
+    // A. Outer Bevel Rim
+    val outerBevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = SweepGradient(cx, cy, goldColors, goldPositions)
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawCircle(cx, cy, locketRadius, outerBevelPaint)
 
-    val pad = 12f * scaleFactor
-    val locketCenterX = cardRect.centerX()
-    val locketCenterY = cardRect.centerY() - 10f * scaleFactor
-    val locketRadius = minOf(cardRect.width(), cardRect.height()) * 0.35f
-
-    val locketBounds = RectF(
-        locketCenterX - locketRadius,
-        locketCenterY - locketRadius,
-        locketCenterX + locketRadius,
-        locketCenterY + locketRadius
-    )
-
-    val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = SweepGradient(
-            locketCenterX, locketCenterY,
-            intArrayOf(0xFFD4AF37.toInt(), 0xFFFFF2B2.toInt(), 0xFF997A15.toInt(), 0xFFD4AF37.toInt()),
-            floatArrayOf(0f, 0.4f, 0.75f, 1f)
-        )
+    // B. Recessed Shadow Groove
+    val grooveRadius = locketRadius - 3.5f * scaleFactor
+    val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(95, 60, 40, 10)
         style = Paint.Style.STROKE
-        strokeWidth = 3.5f * scaleFactor
+        strokeWidth = 2f * scaleFactor
     }
-    canvas.drawCircle(locketCenterX, locketCenterY, locketRadius + 2.5f * scaleFactor, rimPaint)
+    canvas.drawCircle(cx, cy, grooveRadius, groovePaint)
 
-    val hingePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFD4AF37.toInt()
+    // C. Raised Inner Polished Gold Lip
+    val innerLipRadius = locketRadius - 6.5f * scaleFactor
+    val innerLipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = SweepGradient(cx, cy, goldColors, goldPositions)
         style = Paint.Style.STROKE
-        strokeWidth = 2.2f * scaleFactor
+        strokeWidth = 3f * scaleFactor
     }
-    canvas.drawCircle(locketCenterX, locketBounds.top - 2.5f * scaleFactor, 4f * scaleFactor, hingePaint)
+    canvas.drawCircle(cx, cy, innerLipRadius, innerLipPaint)
+
+    // 5. Photo Aperture & Image Surface
+    val photoRadius = innerLipRadius - 1.5f * scaleFactor
+    val photoBounds = RectF(cx - photoRadius, cy - photoRadius, cx + photoRadius, cy + photoRadius)
 
     canvas.save()
     val clipPath = Path().apply {
-        addCircle(locketCenterX, locketCenterY, locketRadius, Path.Direction.CW)
+        addCircle(cx, cy, photoRadius, Path.Direction.CW)
     }
     canvas.clipPath(clipPath)
+
     drawPhotoSurface(
         canvas = canvas,
         item = item,
-        bounds = locketBounds,
-        cornerRadius = locketRadius,
+        bounds = photoBounds,
+        cornerRadius = photoRadius,
         scaleFactor = scaleFactor,
         isLight = isLight,
         accentColor = accentColor,
         fallbackSeed = 0
     )
-    canvas.restore()
 
-    val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = LinearGradient(
-            locketBounds.left, locketBounds.top,
-            locketBounds.right, locketBounds.bottom,
-            intArrayOf(Color.argb(80, 255, 255, 255), Color.TRANSPARENT),
-            floatArrayOf(0f, 0.6f),
+    // 6. Realistic Inset Bezel Shadow (Deep recessed look)
+    val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = RadialGradient(
+            cx, cy, photoRadius,
+            intArrayOf(Color.TRANSPARENT, Color.argb(40, 0, 0, 0), Color.argb(160, 0, 0, 0)),
+            floatArrayOf(0f, 0.78f, 1f),
             Shader.TileMode.CLAMP
         )
         style = Paint.Style.FILL
     }
-    canvas.save()
-    canvas.clipPath(clipPath)
-    canvas.drawCircle(locketCenterX, locketCenterY, locketRadius, glassPaint)
+    canvas.drawCircle(cx, cy, photoRadius, innerShadowPaint)
+
+    // 7. Domed Mineral Crystal / Specular Glare (Convex watch-lens highlight)
+    val glareCenterX = cx - (photoRadius * 0.28f)
+    val glareCenterY = cy - (photoRadius * 0.32f)
+    val glareRadius = photoRadius * 0.95f
+    val crystalGlarePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = RadialGradient(
+            glareCenterX, glareCenterY, glareRadius,
+            intArrayOf(Color.argb(110, 255, 255, 255), Color.argb(20, 255, 255, 255), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.45f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, photoRadius, crystalGlarePaint)
+
+    // Secondary Rim Reflection (Opposite bottom edge glow)
+    val rimReflectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            cx, cy + (photoRadius * 0.4f), cx, cy + photoRadius,
+            intArrayOf(Color.TRANSPARENT, Color.argb(60, 255, 255, 255)),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, photoRadius, rimReflectionPaint)
+
     canvas.restore()
 
-    val caption = item?.caption ?: "Forever & Always"
-    val textY = cardRect.bottom - 16f * scaleFactor
-    val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
-        textSize = 10.5f * scaleFactor
-        color = if (isLight) 0xFF1C1C1E.toInt() else 0xFFF2F2F7.toInt()
+    // 8. Fine Chamfer Highlight Ring around the photo aperture
+    val chamferPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(110, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
     }
-    val capW = capPaint.measureText(caption)
-    val capX = (cardRect.centerX() - capW / 2f).coerceAtLeast(cardRect.left + pad)
-    val trunc = truncateText(caption, cardRect.width() - pad * 2, capPaint)
-    canvas.drawText(trunc, capX, textY, capPaint)
+    canvas.drawCircle(cx, cy, photoRadius, chamferPaint)
 
     return bitmap
 }
@@ -1406,7 +1482,8 @@ fun generatePhotoClockOverlayBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -1421,6 +1498,7 @@ fun generatePhotoClockOverlayBitmap(
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
+    // 1. Photo Surface
     drawPhotoSurface(
         canvas = canvas,
         item = item,
@@ -1432,11 +1510,12 @@ fun generatePhotoClockOverlayBitmap(
         fallbackSeed = 1
     )
 
+    // 2. Gradients for Legibility
     val topGradient = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             cardRect.left, cardRect.top,
-            cardRect.left, cardRect.top + cardRect.height() * 0.45f,
-            intArrayOf(Color.argb(170, 0, 0, 0), Color.TRANSPARENT),
+            cardRect.left, cardRect.top + cardRect.height() * 0.48f,
+            intArrayOf(Color.argb(180, 0, 0, 0), Color.TRANSPARENT),
             floatArrayOf(0f, 1f),
             Shader.TileMode.CLAMP
         )
@@ -1457,51 +1536,97 @@ fun generatePhotoClockOverlayBitmap(
     canvas.drawRect(cardRect, topGradient)
     canvas.drawRect(cardRect, botGradient)
 
+    // =====================================================================
+    // 3. TYPOGRAPHY CONTROLS (Tweak these limits to adjust text scaling)
+    // =====================================================================
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val pad = (minDim * 0.08f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+
+    // Time Clock Size: minimum 26dp, maximum 38dp
+    val minTimeSize = 26f * scaleFactor
+    val maxTimeSize = 38f * scaleFactor // <-- EDIT MAX TIME SIZE HERE
+    val timeFontSize = (minDim * 0.17f).coerceIn(minTimeSize, maxTimeSize)
+
+    // Date Stamp Size: minimum 9.5dp, maximum 13dp
+    val minDateSize = 9.5f * scaleFactor
+    val maxDateSize = 13f * scaleFactor  // <-- EDIT MAX DATE SIZE HERE
+    val dateFontSize = (timeFontSize * 0.32f).coerceIn(minDateSize, maxDateSize)
+
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     val dateFormat = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
     val now = Date()
     val timeStr = timeFormat.format(now)
     val dateStr = dateFormat.format(now).uppercase()
 
+    // Time Clock Text
     val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 800)
-        textSize = 28f * scaleFactor
+        textSize = timeFontSize
         color = android.graphics.Color.WHITE
-        setShadowLayer(4f * scaleFactor, 0f, 2f * scaleFactor, 0x88000000.toInt())
+        setShadowLayer(4f * scaleFactor, 0f, 2f * scaleFactor, 0x99000000.toInt())
     }
 
-    val pad = 14f * scaleFactor
     val timeX = cardRect.left + pad
-    val timeY = cardRect.top + pad + 24f * scaleFactor
-    canvas.drawText(timeStr, timeX, timeY, timePaint)
+    val timeMetrics = timePaint.fontMetrics
+    val timeBaseline = cardRect.top + pad - timeMetrics.ascent
+    canvas.drawText(timeStr, timeX, timeBaseline, timePaint)
 
+    // Date Stamp Text
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
-        textSize = 9.5f * scaleFactor
+        typeface = getSlateFont(context, weight = 700)
+        textSize = dateFontSize
         color = accentColor
-        setShadowLayer(3f * scaleFactor, 0f, 1.5f * scaleFactor, 0x88000000.toInt())
+        letterSpacing = 0.04f
+        setShadowLayer(3f * scaleFactor, 0f, 1.5f * scaleFactor, 0x99000000.toInt())
     }
-    canvas.drawText(dateStr, timeX, timeY + 14f * scaleFactor, datePaint)
 
-    val caption = item?.caption ?: "Sunset Memories"
-    val pillH = 22f * scaleFactor
-    val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 500)
-        textSize = 10f * scaleFactor
-        color = android.graphics.Color.WHITE
-    }
-    val truncCap = truncateText(caption, cardRect.width() - pad * 2 - 16f * scaleFactor, capPaint)
+    val dateMetrics = datePaint.fontMetrics
+    val dateGap = 4f * scaleFactor
+    val dateBaseline = timeBaseline + timeMetrics.descent + dateGap - dateMetrics.ascent
+    canvas.drawText(dateStr, timeX, dateBaseline, datePaint)
 
-    val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x88000000.toInt()
-        style = Paint.Style.FILL
+    // 4. Bottom Caption Pill
+    if (showCaption) {
+        val caption = item?.caption?.trim().orEmpty().ifEmpty { "Sunset Memories" }
+        if (caption.isNotBlank()) {
+            val pillH = (minDim * 0.12f).coerceIn(22f * scaleFactor, 34f * scaleFactor)
+            val captionFontSize = (pillH * 0.44f).coerceIn(10f * scaleFactor, 14f * scaleFactor)
+
+            val font = item?.captionFont ?: CaptionFont.SANS
+            val captionTypeface = getPhotoCaptionTypeface(context, font)
+            val rawColorHex = item?.captionColorHex ?: 0xFFFFFFFFL
+            val resolvedTextColor = rawColorHex.toInt()
+
+            val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.typeface = captionTypeface
+                this.textSize = captionFontSize
+                this.color = resolvedTextColor
+            }
+
+            val maxTextW = cardRect.width() - (pad * 2f) - (20f * scaleFactor)
+            val truncCap = truncateText(caption, maxTextW, capPaint)
+
+            val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x88000000.toInt()
+                style = Paint.Style.FILL
+            }
+            val pillRect = RectF(
+                timeX,
+                cardRect.bottom - pad - pillH,
+                cardRect.right - pad,
+                cardRect.bottom - pad
+            )
+            canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillPaint)
+
+            val capMetrics = capPaint.fontMetrics
+            val capBaseline = pillRect.centerY() - ((capMetrics.ascent + capMetrics.descent) / 2f)
+            canvas.drawText(truncCap, pillRect.left + (pillH * 0.42f), capBaseline, capPaint)
+        }
     }
-    val pillRect = RectF(timeX, cardRect.bottom - pad - pillH, cardRect.right - pad, cardRect.bottom - pad)
-    canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillPaint)
-    canvas.drawText(truncCap, pillRect.left + 10f * scaleFactor, pillRect.centerY() + 3.5f * scaleFactor, capPaint)
 
     canvas.restore()
 
+    // 5. Card Border
     val outerBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0x22FFFFFF
         style = Paint.Style.STROKE

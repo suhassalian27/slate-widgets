@@ -165,6 +165,7 @@ class PhotosConfigActivity : ComponentActivity() {
                 val supportsCaption = remember(widgetProviderClass, selectedIndex) {
                     when {
                         widgetProviderClass.contains("FilmStrip") -> false
+                        widgetProviderClass.contains("Locket") -> false
                         widgetProviderClass.contains("CollageBento") -> selectedIndex == 0
                         else -> true
                     }
@@ -1153,7 +1154,18 @@ private fun renderExactPhotoWidgetPreview(
             Pair(generateLocketMemoryBitmap(context, activeItem, slateConfig, isResponsive, 200, 200), 1.0f)
         }
         providerClass.contains("ClockOverlay") -> {
-            Pair(generatePhotoClockOverlayBitmap(context, activeItem, slateConfig, isResponsive, 200, 200), 1.0f)
+            Pair(
+                generatePhotoClockOverlayBitmap(
+                    context = context,
+                    item = activeItem,
+                    slateConfig = slateConfig,
+                    isResponsive = isResponsive,
+                    wDp = 200,
+                    hDp = 200,
+                    showCaption = photoConfig.showCaption
+                ),
+                1.0f
+            )
         }
         providerClass.contains("Stacked") -> {
             Pair(generateStackedMemoryBitmap(context, activeItem, slateConfig, isResponsive, 200, 200), 1.0f)
