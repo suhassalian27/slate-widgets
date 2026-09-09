@@ -335,7 +335,15 @@ class PhotosStampReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layou
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generatePhotoStampBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generatePhotoStampBitmap(
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 

@@ -942,7 +942,8 @@ fun generatePhotoCarouselBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = config.showCaption
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -976,6 +977,7 @@ fun generatePhotoCarouselBitmap(
     val totalCount = maxOf(config.items.size, 1)
     val activeIdx = config.currentIndex.coerceIn(0, totalCount - 1)
 
+    // 1. Draw Photo Surface
     drawPhotoSurface(
         canvas = canvas,
         item = item,
@@ -987,30 +989,64 @@ fun generatePhotoCarouselBitmap(
         fallbackSeed = activeIdx
     )
 
-    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = LinearGradient(
-            photoBounds.left, photoBounds.bottom - 40f * scaleFactor,
-            photoBounds.left, photoBounds.bottom,
-            intArrayOf(Color.TRANSPARENT, Color.argb(160, 0, 0, 0)),
-            floatArrayOf(0f, 1f),
-            Shader.TileMode.CLAMP
-        )
-    }
-    canvas.save()
-    val clipP = Path().apply { addRoundRect(photoBounds, photoCorner, photoCorner, Path.Direction.CW) }
-    canvas.clipPath(clipP)
-    canvas.drawRect(photoBounds, shadowPaint)
+    // 2. Caption Overlay (respects font style, custom text color, size & toggle)
+    if (showCaption) {
+        val caption = item?.caption?.trim().orEmpty()
+        if (caption.isNotBlank()) {
+            val font = item?.captionFont ?: CaptionFont.SANS
+            val captionTypeface = getPhotoCaptionTypeface(context, font)
 
-    val caption = item?.caption ?: "Summer Memories"
-    val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
-        textSize = 10f * scaleFactor
-        color = android.graphics.Color.WHITE
-    }
-    val truncCap = truncateText(caption, photoBounds.width() - 16f * scaleFactor, capPaint)
-    canvas.drawText(truncCap, photoBounds.left + 8f * scaleFactor, photoBounds.bottom - 8f * scaleFactor, capPaint)
-    canvas.restore()
+            val rawColorHex = item?.captionColorHex ?: 0xFFFFFFFFL
+            val resolvedTextColor = rawColorHex.toInt()
 
+            // Calculate luminance to pick a contrasting gradient backdrop and text shadow
+            val isColorDark = (((Color.red(resolvedTextColor) * 0.299f) +
+                    (Color.green(resolvedTextColor) * 0.587f) +
+                    (Color.blue(resolvedTextColor) * 0.114f)) / 255f) < 0.45f
+
+            val gradientEndColor = if (isColorDark) Color.argb(160, 255, 255, 255) else Color.argb(175, 0, 0, 0)
+
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    photoBounds.left, photoBounds.bottom - 52f * scaleFactor,
+                    photoBounds.left, photoBounds.bottom,
+                    intArrayOf(Color.TRANSPARENT, gradientEndColor),
+                    floatArrayOf(0f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+
+            canvas.save()
+            val clipP = Path().apply { addRoundRect(photoBounds, photoCorner, photoCorner, Path.Direction.CW) }
+            canvas.clipPath(clipP)
+            canvas.drawRect(photoBounds, shadowPaint)
+
+            // Scaled up to 13.5f for comfortable readability on 2x2
+            val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.typeface = captionTypeface
+                this.textSize = 13.5f * scaleFactor
+                this.color = resolvedTextColor
+                setShadowLayer(
+                    3f * scaleFactor,
+                    0f,
+                    1f * scaleFactor,
+                    if (isColorDark) Color.argb(110, 255, 255, 255) else Color.argb(180, 0, 0, 0)
+                )
+            }
+
+            val maxCaptionWidth = photoBounds.width() - 20f * scaleFactor
+            val truncCap = truncateText(caption, maxCaptionWidth, capPaint)
+            canvas.drawText(
+                truncCap,
+                photoBounds.left + 10f * scaleFactor,
+                photoBounds.bottom - 10f * scaleFactor,
+                capPaint
+            )
+            canvas.restore()
+        }
+    }
+
+    // 3. Navigation Deck (Buttons & Dots)
     val deckY = inner.bottom - navDeckH / 2f
     val btnRadius = 11f * scaleFactor
     val leftBtnX = inner.left + btnRadius + 4f * scaleFactor
@@ -1077,14 +1113,19 @@ fun generatePhotoStampBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val size = minOf(w, h)
+    // 1. Safe Outer Inset: Prevents Samsung One UI's rounded launcher corners from cutting into the teeth
+    val outerPad = (minOf(w, h) * 0.055f).coerceIn(8f * scaleFactor, 18f * scaleFactor)
+    val cardRect = if (isResponsive) {
+        RectF(outerPad, outerPad, w - outerPad, h - outerPad)
+    } else {
+        val size = minOf(w, h) - (outerPad * 2f)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
@@ -1094,42 +1135,56 @@ fun generatePhotoStampBitmap(
     val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val stampPaperColor = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
-    val stampPath = Path()
-    val toothR = 3.6f * scaleFactor
-    val step = toothR * 3f
+    // 2. Mathematically Symmetrical Stamp Perforation Teeth
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val toothR = (minDim * 0.024f).coerceIn(3.2f * scaleFactor, 6.0f * scaleFactor)
+    val cornerGap = toothR * 2.2f
 
-    stampPath.moveTo(cardRect.left, cardRect.top)
-    var cx = cardRect.left + step
-    while (cx < cardRect.right - step) {
-        stampPath.lineTo(cx - toothR, cardRect.top)
-        stampPath.arcTo(RectF(cx - toothR, cardRect.top - toothR, cx + toothR, cardRect.top + toothR), 180f, -180f, false)
-        cx += step
-    }
-    stampPath.lineTo(cardRect.right, cardRect.top)
+    val lenX = cardRect.width() - (cornerGap * 2f)
+    val lenY = cardRect.height() - (cornerGap * 2f)
+    val idealPitch = toothR * 2.85f
 
-    var cy = cardRect.top + step
-    while (cy < cardRect.bottom - step) {
-        stampPath.lineTo(cardRect.right, cy - toothR)
-        stampPath.arcTo(RectF(cardRect.right - toothR, cy - toothR, cardRect.right + toothR, cy + toothR), 270f, -180f, false)
-        cy += step
-    }
-    stampPath.lineTo(cardRect.right, cardRect.bottom)
+    val countX = maxOf(4, (lenX / idealPitch).toInt())
+    val stepX = lenX / countX
+    val countY = maxOf(4, (lenY / idealPitch).toInt())
+    val stepY = lenY / countY
 
-    cx = cardRect.right - step
-    while (cx > cardRect.left + step) {
-        stampPath.lineTo(cx + toothR, cardRect.bottom)
-        stampPath.arcTo(RectF(cx - toothR, cardRect.bottom - toothR, cx + toothR, cardRect.bottom + toothR), 0f, -180f, false)
-        cx -= step
-    }
-    stampPath.lineTo(cardRect.left, cardRect.bottom)
+    val stampPath = Path().apply {
+        // Start Top-Left
+        moveTo(cardRect.left, cardRect.top)
 
-    cy = cardRect.bottom - step
-    while (cy > cardRect.top + step) {
-        stampPath.lineTo(cardRect.left, cy + toothR)
-        stampPath.arcTo(RectF(cardRect.left - toothR, cy - toothR, cardRect.left + toothR, cy + toothR), 90f, -180f, false)
-        cy -= step
+        // Top Edge (Left to Right)
+        for (i in 0 until countX) {
+            val cx = cardRect.left + cornerGap + (i + 0.5f) * stepX
+            lineTo(cx - toothR, cardRect.top)
+            arcTo(RectF(cx - toothR, cardRect.top - toothR, cx + toothR, cardRect.top + toothR), 180f, -180f, false)
+        }
+        lineTo(cardRect.right, cardRect.top)
+
+        // Right Edge (Top to Bottom)
+        for (j in 0 until countY) {
+            val cy = cardRect.top + cornerGap + (j + 0.5f) * stepY
+            lineTo(cardRect.right, cy - toothR)
+            arcTo(RectF(cardRect.right - toothR, cy - toothR, cardRect.right + toothR, cy + toothR), 270f, -180f, false)
+        }
+        lineTo(cardRect.right, cardRect.bottom)
+
+        // Bottom Edge (Right to Left)
+        for (i in (countX - 1) downTo 0) {
+            val cx = cardRect.left + cornerGap + (i + 0.5f) * stepX
+            lineTo(cx + toothR, cardRect.bottom)
+            arcTo(RectF(cx - toothR, cardRect.bottom - toothR, cx + toothR, cardRect.bottom + toothR), 0f, -180f, false)
+        }
+        lineTo(cardRect.left, cardRect.bottom)
+
+        // Left Edge (Bottom to Top)
+        for (j in (countY - 1) downTo 0) {
+            val cy = cardRect.top + cornerGap + (j + 0.5f) * stepY
+            lineTo(cardRect.left, cy + toothR)
+            arcTo(RectF(cardRect.left - toothR, cy - toothR, cardRect.left + toothR, cy + toothR), 90f, -180f, false)
+        }
+        close()
     }
-    stampPath.close()
 
     val stampPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = stampPaperColor
@@ -1138,19 +1193,32 @@ fun generatePhotoStampBitmap(
     canvas.drawPath(stampPath, stampPaint)
 
     val stampBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x33000000 else 0x33FFFFFF
+        color = if (isLight) 0x2A000000 else 0x33FFFFFF
         style = Paint.Style.STROKE
         strokeWidth = 1f * scaleFactor
     }
     canvas.drawPath(stampPath, stampBorderPaint)
 
-    val inset = 12f * scaleFactor
-    val photoBounds = RectF(cardRect.left + inset, cardRect.top + inset, cardRect.right - inset, cardRect.bottom - inset - 22f * scaleFactor)
+    // 3. Proportional Inner Margins & Bottom Chin
+    val paperMargin = (minDim * 0.07f).coerceIn(9f * scaleFactor, 18f * scaleFactor)
+    val chinHeight = if (showCaption) {
+        (cardRect.height() * 0.17f).coerceIn(24f * scaleFactor, 50f * scaleFactor)
+    } else {
+        paperMargin
+    }
+
+    val photoBounds = RectF(
+        cardRect.left + paperMargin,
+        cardRect.top + paperMargin,
+        cardRect.right - paperMargin,
+        cardRect.bottom - chinHeight
+    )
+
     drawPhotoSurface(
         canvas = canvas,
         item = item,
         bounds = photoBounds,
-        cornerRadius = 4f * scaleFactor,
+        cornerRadius = 3f * scaleFactor,
         scaleFactor = scaleFactor,
         isLight = isLight,
         accentColor = accentColor,
@@ -1158,41 +1226,64 @@ fun generatePhotoStampBitmap(
     )
 
     val innerStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x33000000 else 0x33FFFFFF
+        color = if (isLight) 0x24000000 else 0x33FFFFFF
         style = Paint.Style.STROKE
         strokeWidth = 1f * scaleFactor
     }
     canvas.drawRect(photoBounds, innerStroke)
 
-    val valPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 800)
-        textSize = 10f * scaleFactor
-        color = accentColor
-    }
-    val valText = "45¢"
-    canvas.drawText(valText, photoBounds.right - valPaint.measureText(valText) - 4f * scaleFactor, photoBounds.top + 13f * scaleFactor, valPaint)
 
+
+    // 5. Postal Cancellation Wave Mark
     val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x44000000 else 0x55FFFFFF
+        color = if (isLight) 0x3A000000 else 0x48FFFFFF
         style = Paint.Style.STROKE
         strokeWidth = 1.2f * scaleFactor
     }
     val wavePath = Path()
     val wx = photoBounds.left - 4f * scaleFactor
-    val wy = photoBounds.bottom - 12f * scaleFactor
+    val wy = photoBounds.bottom - 10f * scaleFactor
+    val waveW = (photoBounds.width() * 0.35f).coerceIn(35f * scaleFactor, 70f * scaleFactor)
+    val stepW = waveW / 4f
+    val waveAmp = 4f * scaleFactor
+
     wavePath.moveTo(wx, wy)
-    wavePath.quadTo(wx + 15f * scaleFactor, wy - 6f * scaleFactor, wx + 30f * scaleFactor, wy)
-    wavePath.quadTo(wx + 45f * scaleFactor, wy + 6f * scaleFactor, wx + 60f * scaleFactor, wy)
+    wavePath.quadTo(wx + stepW, wy - waveAmp, wx + stepW * 2, wy)
+    wavePath.quadTo(wx + stepW * 3, wy + waveAmp, wx + stepW * 4, wy)
     canvas.drawPath(wavePath, inkPaint)
 
-    val postPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 700)
-        textSize = 8.5f * scaleFactor
-        color = if (isLight) 0xFF1C1C1E.toInt() else 0xFFD1D1D6.toInt()
+    // 6. Proportional Caption with Strict Max-Font-Size Clamp
+    if (showCaption) {
+        val caption = item?.caption?.trim()?.takeIf { it.isNotEmpty() }?.uppercase() ?: "SLATE POST • 2024"
+
+        val font = item?.captionFont ?: CaptionFont.SANS
+        val captionTypeface = getPhotoCaptionTypeface(context, font)
+
+        val rawColorHex = item?.captionColorHex ?: (if (isLight) 0xFF1C1C1EL else 0xFFF2F2F7L)
+        var resolvedTextColor = rawColorHex.toInt()
+        if (isLight && (resolvedTextColor == Color.WHITE || (resolvedTextColor and 0x00FFFFFF) == 0x00FFFFFF)) {
+            resolvedTextColor = Color.parseColor("#121214")
+        }
+
+        // Proportional to chin height, clamped between 9.5dp and 16dp max
+        val captionFontSize = (chinHeight * 0.38f).coerceIn(9.5f * scaleFactor, 16f * scaleFactor)
+
+        val postPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = captionTypeface
+            this.textSize = captionFontSize
+            this.color = resolvedTextColor
+            this.letterSpacing = 0.04f
+        }
+
+        val maxTextW = cardRect.width() - (paperMargin * 2f)
+        val truncPost = truncateText(caption, maxTextW, postPaint)
+
+        val postMetrics = postPaint.fontMetrics
+        val chinCenterY = (photoBounds.bottom + cardRect.bottom) / 2f
+        val textY = chinCenterY - ((postMetrics.ascent + postMetrics.descent) / 2f)
+
+        canvas.drawText(truncPost, photoBounds.left, textY, postPaint)
     }
-    val caption = item?.caption?.uppercase() ?: "SLATE POST • 2024"
-    val truncPost = truncateText(caption, cardRect.width() - inset * 2, postPaint)
-    canvas.drawText(truncPost, photoBounds.left, cardRect.bottom - inset + 2f * scaleFactor, postPaint)
 
     return bitmap
 }
