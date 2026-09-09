@@ -425,13 +425,16 @@ fun generateOnThisDayBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val aspect = 2.05f
         val cardW = minOf(w, h * aspect)
         val cardH = cardW / aspect
@@ -444,18 +447,28 @@ fun generateOnThisDayBitmap(
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
     val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
 
+    // 1. Base Card Surface
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x1A000000 else 0x22FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, borderPaint)
+
+    // 2. Proportional Insets
     val pad = 12f * scaleFactor
     val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
+    // Left Photo Frame (~44% width)
     val photoW = innerRect.width() * 0.44f
     val photoBounds = RectF(innerRect.left, innerRect.top, innerRect.left + photoW, innerRect.bottom)
-    val photoCorner = 14f * scaleFactor
+    val photoCorner = (cornerRadius - pad * 0.4f).coerceAtLeast(8f * scaleFactor)
 
     drawPhotoSurface(
         canvas = canvas,
@@ -469,16 +482,36 @@ fun generateOnThisDayBitmap(
     )
 
     val photoBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) 0x1A000000 else 0x22FFFFFF
+        color = if (isLight) 0x1A000000 else 0x24FFFFFF
         style = Paint.Style.STROKE
-        strokeWidth = 1.2f * scaleFactor
+        strokeWidth = 1f * scaleFactor
     }
     canvas.drawRoundRect(photoBounds, photoCorner, photoCorner, photoBorder)
 
+    // 3. Right Content Column (Top-Right Aligned with Proportional + Max Bounds)
     val rightLeft = photoBounds.right + 14f * scaleFactor
-    val maxTextW = innerRect.right - rightLeft
+    val maxTextW = (innerRect.right - rightLeft).coerceAtLeast(10f)
 
-    var curY = innerRect.top + 14f * scaleFactor
+    // Scale ratio relative to standard 4x2 height (~140dp), strictly clamped
+    val baseH = 140f * scaleFactor
+    val scaleRatio = (innerRect.height() / baseH).coerceIn(0.85f, 1.25f)
+
+    // Font Sizing: scales proportionally with widget size, but has strict MAX SIZE caps
+    val pillH = (16f * scaleFactor * scaleRatio).coerceIn(13f * scaleFactor, 19f * scaleFactor)
+    val pillTextSize = (8.5f * scaleFactor * scaleRatio).coerceIn(7f * scaleFactor, 10f * scaleFactor)
+    val headlineSize = (14.5f * scaleFactor * scaleRatio).coerceIn(11.5f * scaleFactor, 18f * scaleFactor)
+    val metaSize = (9.5f * scaleFactor * scaleRatio).coerceIn(8f * scaleFactor, 12f * scaleFactor)
+    val quoteSize = (11f * scaleFactor * scaleRatio).coerceIn(9f * scaleFactor, 13.5f * scaleFactor)
+
+    // Gaps between lines: proportional without ballooning
+    val gapPillToHeadline = (8.5f * scaleFactor * scaleRatio).coerceAtMost(12f * scaleFactor)
+    val gapHeadlineToDate = (5.5f * scaleFactor * scaleRatio).coerceAtMost(8f * scaleFactor)
+    val gapDateToLoc = (4f * scaleFactor * scaleRatio).coerceAtMost(6f * scaleFactor)
+    val gapLocToQuote = (6.5f * scaleFactor * scaleRatio).coerceAtMost(9f * scaleFactor)
+
+    var curY = innerRect.top + (8f * scaleFactor * scaleRatio)
+
+    // 1. "ON THIS DAY" Pill Badge
     val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         alpha = if (isLight) 35 else 50
@@ -486,49 +519,91 @@ fun generateOnThisDayBitmap(
     }
     val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 700)
-        textSize = 8.5f * scaleFactor
+        textSize = pillTextSize
         color = accentColor
     }
     val pillLabel = "ON THIS DAY"
     val pillLabelW = pillTextPaint.measureText(pillLabel)
-    val pillH = 16f * scaleFactor
     val pillPadX = 8f * scaleFactor
-    val pillRect = RectF(rightLeft, curY - 10f * scaleFactor, rightLeft + pillLabelW + pillPadX * 2, curY - 10f * scaleFactor + pillH)
+    val pillRect = RectF(
+        rightLeft,
+        curY,
+        rightLeft + pillLabelW + pillPadX * 2,
+        curY + pillH
+    )
     canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillPaint)
-    canvas.drawText(pillLabel, rightLeft + pillPadX, curY + 1.5f * scaleFactor, pillTextPaint)
 
-    curY += 24f * scaleFactor
+    val pillMetrics = pillTextPaint.fontMetrics
+    val pillBaseline = pillRect.centerY() - ((pillMetrics.ascent + pillMetrics.descent) / 2f)
+    canvas.drawText(pillLabel, rightLeft + pillPadX, pillBaseline, pillTextPaint)
+
+    curY += pillH + gapPillToHeadline
+
+    // 2. Headline: "1 YEAR AGO"
     val titleColor = if (isLight) 0xFF1C1C1E.toInt() else 0xFFF2F2F7.toInt()
     val headlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 800)
-        textSize = 15f * scaleFactor
+        textSize = headlineSize
         color = titleColor
     }
     val headlineText = "1 YEAR AGO"
-    canvas.drawText(headlineText, rightLeft, curY, headlinePaint)
+    val headMetrics = headlinePaint.fontMetrics
+    val headlineBaseline = curY - headMetrics.ascent
+    canvas.drawText(headlineText, rightLeft, headlineBaseline, headlinePaint)
 
-    curY += 16f * scaleFactor
+    curY += (-headMetrics.ascent + headMetrics.descent) + gapHeadlineToDate
+
+    // 3. Date
     val metaColor = if (isLight) 0xFF636366.toInt() else 0xFF98989D.toInt()
     val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 500)
-        textSize = 10f * scaleFactor
+        textSize = metaSize
         color = metaColor
     }
-    val dateText = item?.dateText ?: "September 8, 2024"
-    val locText = item?.location?.takeIf { it.isNotBlank() }?.let { " • $it" } ?: ""
-    val fullMeta = truncateText("$dateText$locText", maxTextW, metaPaint)
-    canvas.drawText(fullMeta, rightLeft, curY, metaPaint)
+    val dateText = item?.dateText?.takeIf { it.isNotBlank() } ?: "September 2024"
+    val truncatedDate = truncateText(dateText, maxTextW, metaPaint)
+    val dateMetrics = metaPaint.fontMetrics
+    val dateBaseline = curY - dateMetrics.ascent
+    canvas.drawText(truncatedDate, rightLeft, dateBaseline, metaPaint)
 
-    curY += 18f * scaleFactor
-    val captionColor = if (isLight) 0xFF3A3A3C.toInt() else 0xFFD1D1D6.toInt()
-    val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 400, isItalic = true)
-        textSize = 11f * scaleFactor
-        color = captionColor
+    curY += (-dateMetrics.ascent + dateMetrics.descent)
+
+    // 4. Location on its own dedicated line
+    val locationText = item?.location?.trim().orEmpty()
+    if (locationText.isNotBlank()) {
+        curY += gapDateToLoc
+        val truncatedLoc = truncateText(locationText, maxTextW, metaPaint)
+        val locBaseline = curY - dateMetrics.ascent
+        canvas.drawText(truncatedLoc, rightLeft, locBaseline, metaPaint)
+        curY += (-dateMetrics.ascent + dateMetrics.descent)
     }
-    val caption = item?.caption ?: "Golden hour horizon over the cliffs"
-    val quoteFormatted = truncateText("“$caption”", maxTextW, quotePaint)
-    canvas.drawText(quoteFormatted, rightLeft, curY, quotePaint)
+
+    // 5. Quote Caption
+    if (showCaption) {
+        val caption = item?.caption?.trim().orEmpty()
+        if (caption.isNotBlank()) {
+            curY += gapLocToQuote
+
+            val font = item?.captionFont ?: CaptionFont.SANS
+            val captionTypeface = getPhotoCaptionTypeface(context, font)
+
+            val rawCaptionColor = item?.captionColorHex ?: (if (isLight) 0xFF3A3A3CL else 0xFFD1D1D6L)
+            var resolvedCaptionColor = rawCaptionColor.toInt()
+            if (isLight && (resolvedCaptionColor == Color.WHITE || (resolvedCaptionColor and 0x00FFFFFF) == 0x00FFFFFF)) {
+                resolvedCaptionColor = Color.parseColor("#1C1C1E")
+            }
+
+            val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.typeface = captionTypeface
+                this.textSize = quoteSize
+                this.color = resolvedCaptionColor
+            }
+            val quoteMetrics = quotePaint.fontMetrics
+            val quoteBaseline = curY - quoteMetrics.ascent
+            val quoteFormatted = truncateText("“$caption”", maxTextW, quotePaint)
+            canvas.drawText(quoteFormatted, rightLeft, quoteBaseline, quotePaint)
+        }
+    }
 
     return bitmap
 }
