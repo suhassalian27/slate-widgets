@@ -78,7 +78,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.hypot
-
+import android.media.ExifInterface
 private enum class ConfigColorTarget {
     BACKGROUND, ACCENT, CAPTION
 }
@@ -260,7 +260,8 @@ class PhotosConfigActivity : ComponentActivity() {
                         PhotosStorageManager.saveConfig(this@PhotosConfigActivity, widgetId, config)
 
                         // 2. Schedule or Cancel Auto Rotation
-                        val providerInfo = AppWidgetManager.getInstance(this@PhotosConfigActivity).getAppWidgetInfo(widgetId)
+                        val appWidgetManager = AppWidgetManager.getInstance(this@PhotosConfigActivity)
+                        val providerInfo = appWidgetManager.getAppWidgetInfo(widgetId)
                         providerInfo?.provider?.className?.let { className ->
                             try {
                                 val clazz = Class.forName(className)
@@ -286,6 +287,16 @@ class PhotosConfigActivity : ComponentActivity() {
                             .putBoolean("widget_${widgetId}_has_custom_theme", true)
                             .apply()
 
+                        // 4. Update the exact widget instance directly
+                        providerInfo?.provider?.let { component ->
+                            val directUpdateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                                this.component = component
+                                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(widgetId))
+                            }
+                            sendBroadcast(directUpdateIntent)
+                        }
+
+                        // 5. Broadcast to all active photos widgets
                         updateAllPhotosWidgets(this@PhotosConfigActivity)
 
                         val resultIntent = Intent().apply {
@@ -1605,6 +1616,68 @@ private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetC
     )
 }
 
+
+// ============================================================================
+// EXIF-AWARE BITMAP LOADER
+// ============================================================================
+
+private fun decodeSampledBitmapWithExif(context: Context, uri: Uri, maxDim: Int = 2048): Bitmap? {
+    return try {
+        // 1. Read camera orientation from EXIF metadata
+        var orientation = ExifInterface.ORIENTATION_NORMAL
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            val exif = ExifInterface(stream)
+            orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        }
+
+        // 2. Decode bounds to prevent OutOfMemoryError on 50MP+ camera shots
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, boundsOptions)
+        }
+
+        var inSampleSize = 1
+        while (boundsOptions.outWidth / inSampleSize > maxDim || boundsOptions.outHeight / inSampleSize > maxDim) {
+            inSampleSize *= 2
+        }
+
+        // 3. Decode scaled bitmap
+        val decodeOptions = BitmapFactory.Options().apply {
+            this.inSampleSize = inSampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val rawBmp = context.contentResolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, decodeOptions)
+        } ?: return null
+
+        // 4. Auto-correct orientation so camera photos load upright
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+            else -> return rawBmp
+        }
+
+        val oriented = Bitmap.createBitmap(rawBmp, 0, 0, rawBmp.width, rawBmp.height, matrix, true)
+        if (oriented != rawBmp) rawBmp.recycle()
+        oriented
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
 // ============================================================================
 // FEATURE: 8-HANDLE INTERACTIVE CROP ENGINE
 // ============================================================================
@@ -1638,17 +1711,6 @@ val FlipVerticalIcon = ImageVector.Builder(
     }
 }.build()
 
-val SwapIconVector = ImageVector.Builder(
-    name = "SwapIcon", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f
-).apply {
-    path(stroke = SolidColor(Color.White), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
-        moveTo(16f, 3f); lineTo(21f, 8f); lineTo(16f, 13f)
-        moveTo(21f, 8f); lineTo(3f, 8f)
-        moveTo(8f, 21f); lineTo(3f, 16f); lineTo(8f, 11f)
-        moveTo(3f, 16f); lineTo(21f, 16f)
-    }
-}.build()
-
 @Composable
 fun SlateProEditorOverlay(
     rawUri: Uri,
@@ -1659,25 +1721,22 @@ fun SlateProEditorOverlay(
     val density = LocalDensity.current
     val paddingPx = with(density) { 20.dp.toPx() }
 
-    var rotationAngle by remember { mutableFloatStateOf(0f) }
-    var flipH by remember { mutableStateOf(false) }
-    var flipV by remember { mutableStateOf(false) }
     var selectedRatio by remember { mutableStateOf(CropRatio.FREEFORM) }
-
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
-    val rawBitmap = remember(rawUri) {
-        try {
-            context.contentResolver.openInputStream(rawUri)?.use { BitmapFactory.decodeStream(it) }
-        } catch (_: Exception) { null }
+    // Decode with automatic EXIF correction
+    val initialBitmap = remember(rawUri) {
+        decodeSampledBitmapWithExif(context, rawUri)
     }
+    var currentBitmap by remember(initialBitmap) { mutableStateOf(initialBitmap) }
 
-    val imageRect = remember(rawBitmap, containerSize, rotationAngle, paddingPx) {
-        if (rawBitmap == null || containerSize == IntSize.Zero) Rect.Zero
+    // imageRect tracks the exact visual pixels on screen
+    val imageRect = remember(currentBitmap, containerSize, paddingPx) {
+        val bmp = currentBitmap
+        if (bmp == null || containerSize == IntSize.Zero) Rect.Zero
         else {
-            val isRotated = (rotationAngle.toInt() / 90) % 2 != 0
-            val imgW = if (isRotated) rawBitmap.height.toFloat() else rawBitmap.width.toFloat()
-            val imgH = if (isRotated) rawBitmap.width.toFloat() else rawBitmap.height.toFloat()
+            val imgW = bmp.width.toFloat()
+            val imgH = bmp.height.toFloat()
 
             val availW = (containerSize.width.toFloat() - (paddingPx * 2)).coerceAtLeast(1f)
             val availH = (containerSize.height.toFloat() - (paddingPx * 2)).coerceAtLeast(1f)
@@ -1694,6 +1753,7 @@ fun SlateProEditorOverlay(
 
     var cropRect by remember { mutableStateOf(Rect.Zero) }
 
+    // Lock cropRect inside imageRect whenever orientation or aspect ratio changes
     LaunchedEffect(imageRect, selectedRatio) {
         if (imageRect != Rect.Zero) {
             val targetRatio = selectedRatio.ratio ?: (imageRect.width / imageRect.height)
@@ -1712,7 +1772,6 @@ fun SlateProEditorOverlay(
     }
 
     var activeHandle by remember { mutableStateOf(DragHandle.NONE) }
-
     val currentCropRect by rememberUpdatedState(cropRect)
     val currentImageRect by rememberUpdatedState(imageRect)
     val currentRatio by rememberUpdatedState(selectedRatio)
@@ -1728,6 +1787,7 @@ fun SlateProEditorOverlay(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1746,13 +1806,11 @@ fun SlateProEditorOverlay(
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color.White)
                         .clickable {
-                            if (rawBitmap != null && cropRect != Rect.Zero && imageRect != Rect.Zero) {
+                            val bmp = currentBitmap
+                            if (bmp != null && cropRect != Rect.Zero && imageRect != Rect.Zero) {
                                 val processed = cropBitmapFromBounds(
                                     context = context,
-                                    source = rawBitmap,
-                                    rotation = rotationAngle,
-                                    flipH = flipH,
-                                    flipV = flipV,
+                                    source = bmp,
                                     cropRect = cropRect,
                                     imageRect = imageRect
                                 )
@@ -1768,6 +1826,7 @@ fun SlateProEditorOverlay(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Main Editor Canvas
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -1777,21 +1836,16 @@ fun SlateProEditorOverlay(
                     .onGloballyPositioned { containerSize = it.size },
                 contentAlignment = Alignment.Center
             ) {
-                if (rawBitmap != null) {
-                    val previewBitmap = remember(rawBitmap) { rawBitmap.asImageBitmap() }
-
+                val bmp = currentBitmap
+                if (bmp != null) {
+                    // Display current bitmap directly; matches imageRect without post-layout desync
                     Image(
-                        bitmap = previewBitmap,
+                        bitmap = bmp.asImageBitmap(),
                         contentDescription = "Edit Preview",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(20.dp)
-                            .graphicsLayer {
-                                rotationZ = rotationAngle
-                                scaleX = if (flipH) -1f else 1f
-                                scaleY = if (flipV) -1f else 1f
-                            }
                     )
 
                     Canvas(
@@ -2045,9 +2099,24 @@ fun SlateProEditorOverlay(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    EditorActionButton(Icons.Default.Refresh, "Rotate") { rotationAngle = (rotationAngle + 90f) % 360f }
-                    EditorActionButton(FlipHorizontalIcon, "Flip H") { flipH = !flipH }
-                    EditorActionButton(FlipVerticalIcon, "Flip V") { flipV = !flipV }
+                    EditorActionButton(Icons.Default.Refresh, "Rotate") {
+                        currentBitmap?.let { bmp ->
+                            val matrix = Matrix().apply { postRotate(90f) }
+                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                        }
+                    }
+                    EditorActionButton(FlipHorizontalIcon, "Flip H") {
+                        currentBitmap?.let { bmp ->
+                            val matrix = Matrix().apply { postScale(-1f, 1f) }
+                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                        }
+                    }
+                    EditorActionButton(FlipVerticalIcon, "Flip V") {
+                        currentBitmap?.let { bmp ->
+                            val matrix = Matrix().apply { postScale(1f, -1f) }
+                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                        }
+                    }
                 }
             }
         }
@@ -2069,32 +2138,25 @@ private fun EditorActionButton(icon: ImageVector, label: String, onClick: () -> 
 private fun cropBitmapFromBounds(
     context: Context,
     source: Bitmap,
-    rotation: Float,
-    flipH: Boolean,
-    flipV: Boolean,
     cropRect: Rect,
     imageRect: Rect
 ): String? {
     return try {
-        val matrix = Matrix().apply {
-            postRotate(rotation)
-            postScale(if (flipH) -1f else 1f, if (flipV) -1f else 1f)
-        }
-        val transformed = Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+        val scaleX = source.width / imageRect.width
+        val scaleY = source.height / imageRect.height
 
-        val scaleX = transformed.width / imageRect.width
-        val scaleY = transformed.height / imageRect.height
+        val cropX = ((cropRect.left - imageRect.left) * scaleX).toInt().coerceIn(0, source.width - 1)
+        val cropY = ((cropRect.top - imageRect.top) * scaleY).toInt().coerceIn(0, source.height - 1)
 
-        val cropX = ((cropRect.left - imageRect.left) * scaleX).toInt().coerceIn(0, transformed.width - 1)
-        val cropY = ((cropRect.top - imageRect.top) * scaleY).toInt().coerceIn(0, transformed.height - 1)
+        val cropW = (cropRect.width * scaleX).toInt().coerceIn(1, source.width - cropX)
+        val cropH = (cropRect.height * scaleY).toInt().coerceIn(1, source.height - cropY)
 
-        val cropW = (cropRect.width * scaleX).toInt().coerceIn(1, transformed.width - cropX)
-        val cropH = (cropRect.height * scaleY).toInt().coerceIn(1, transformed.height - cropY)
-
-        val cropped = Bitmap.createBitmap(transformed, cropX, cropY, cropW, cropH)
+        val cropped = Bitmap.createBitmap(source, cropX, cropY, cropW, cropH)
 
         val outputFile = File(context.cacheDir, "slate_cropped_${System.currentTimeMillis()}.jpg")
         FileOutputStream(outputFile).use { out -> cropped.compress(Bitmap.CompressFormat.JPEG, 92, out) }
         Uri.fromFile(outputFile).toString()
     } catch (_: Exception) { null }
 }
+
+

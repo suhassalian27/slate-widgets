@@ -52,7 +52,15 @@ fun updateAllPhotosWidgets(context: Context) {
         PhotosClockOverlayReceiver::class.java,
         PhotosStackedReceiver::class.java,
         PhotosTapedReceiver::class.java,
-        PhotosPushPinReceiver::class.java
+        PhotosPushPinReceiver::class.java,
+        PhotosSquareReceiver::class.java,
+        PhotosRectangleReceiver::class.java,
+        PhotosCircleReceiver::class.java,
+        PhotosHeartReceiver::class.java,
+        PhotosFlowerReceiver::class.java,
+        PhotosStarReceiver::class.java,
+        PhotosCloverReceiver::class.java,
+        PhotosBlobReceiver::class.java
     )
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
@@ -240,27 +248,24 @@ abstract class BasePhotosReceiver(private val layoutResId: Int) : AppWidgetProvi
                 views.setViewPadding(R.id.layout_photos_root, padH, padV, padH, padV)
             } catch (_: Exception) {}
 
-            // Track active surface index to trigger smooth crossfade
-            val prefs = context.getSharedPreferences("slate_photos_widget_prefs", Context.MODE_PRIVATE)
-            val currentChild = prefs.getInt("widget_${id}_flipper_child", 0)
-            val nextChild = if (currentChild == 0) 1 else 0
-
-            val targetSurfaceId = if (nextChild == 0) R.id.widget_canvas_surface_0 else R.id.widget_canvas_surface_1
-
-            // 1. Draw the new bitmap on the hidden incoming surface
-            views.setImageViewBitmap(targetSurfaceId, bitmap)
-
-            // Fallback for non-flipper layouts (e.g. Filmstrip / Bento)
+            // 1. Always set the standard canvas surface as the primary target
             try { views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap) } catch (_: Exception) {}
 
-            // 2. Crossfade to the new surface
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                views.setDisplayedChild(R.id.photos_flipper, nextChild)
-            } else {
-                views.setInt(R.id.photos_flipper, "setDisplayedChild", nextChild)
-            }
+            // 2. Dual-surface crossfade flipper support (if present in the layout)
+            try {
+                val prefs = context.getSharedPreferences("slate_photos_widget_prefs", Context.MODE_PRIVATE)
+                val currentChild = prefs.getInt("widget_${id}_flipper_child", 0)
+                val nextChild = if (currentChild == 0) 1 else 0
+                val targetSurfaceId = if (nextChild == 0) R.id.widget_canvas_surface_0 else R.id.widget_canvas_surface_1
 
-            prefs.edit().putInt("widget_${id}_flipper_child", nextChild).apply()
+                views.setImageViewBitmap(targetSurfaceId, bitmap)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    views.setDisplayedChild(R.id.photos_flipper, nextChild)
+                } else {
+                    views.setInt(R.id.photos_flipper, "setDisplayedChild", nextChild)
+                }
+                prefs.edit().putInt("widget_${id}_flipper_child", nextChild).apply()
+            } catch (_: Exception) {}
 
             setupTouchTargets(context, views, id)
             manager.updateAppWidget(id, views)
