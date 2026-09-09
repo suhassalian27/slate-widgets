@@ -298,7 +298,15 @@ class PhotosOnThisDayReceiver : BasePhotosReceiver(R.layout.widget_photos_card_l
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateOnThisDayBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generateOnThisDayBitmap(
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 
@@ -318,7 +326,15 @@ class PhotosCollageBentoReceiver : BasePhotosReceiver(R.layout.widget_photos_ben
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
-        return generateCollageBentoBitmap(context, photoConfig.items, config, isResponsive, wDp, hDp)
+        return generateCollageBentoBitmap(
+            context = context,
+            items = photoConfig.items,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 
@@ -327,7 +343,15 @@ class PhotosCarouselReceiver : BasePhotosReceiver(R.layout.widget_photos_carouse
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generatePhotoCarouselBitmap(context, photoConfig, config, isResponsive, wDp, hDp)
+        return generatePhotoCarouselBitmap(
+            context = context,
+            config = photoConfig,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 
@@ -379,7 +403,15 @@ class PhotosStackedReceiver : BasePhotosReceiver(R.layout.widget_photos_card_lay
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generateStackedMemoryBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generateStackedMemoryBitmap(
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 
@@ -388,7 +420,15 @@ class PhotosTapedReceiver : BasePhotosReceiver(R.layout.widget_photos_card_layou
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generateTapedPolaroidBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generateTapedPolaroidBitmap(
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }
 
@@ -397,6 +437,14 @@ class PhotosPushPinReceiver : BasePhotosReceiver(R.layout.widget_photos_card_lay
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         val photoConfig = if (appWidgetId == -1) PhotosWidgetConfig.getDefaultConfig() else PhotosStorageManager.getConfig(context, appWidgetId)
         val isResponsive = if (appWidgetId == -1) false else parseAndLockIsResponsive(context, appWidgetId)
-        return generatePushPinBitmap(context, photoConfig.currentItem, config, isResponsive, wDp, hDp)
+        return generatePushPinBitmap(
+            context = context,
+            item = photoConfig.currentItem,
+            slateConfig = config,
+            isResponsive = isResponsive,
+            wDp = wDp,
+            hDp = hDp,
+            showCaption = photoConfig.showCaption
+        )
     }
 }

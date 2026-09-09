@@ -1303,18 +1303,23 @@ fun generateLocketMemoryBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    // 1. Proportional Sizing & Optical Centering
+    // 1. Proportional Sizing & Strict Canvas Containment (Prevents Edge Clipping)
     val availableSize = minOf(w, h)
-    val bailHeight = availableSize * 0.13f
+    // Reserve safe outer buffer so shadow never clips against canvas bounds
+    val safeMargin = availableSize * 0.01f
+    val usableSize = availableSize - (safeMargin * 1f)
+
+    val bailHeight = usableSize * 0.14f
+    val locketRadius = (usableSize - bailHeight) / 2f
+
     val cx = w / 2f
-    // Offset slightly down so the entire pendant (locket + top bail) is optically centered
-    val cy = (h / 2f) + (bailHeight * 0.38f)
-    val locketRadius = (availableSize * 0.43f) - (bailHeight * 0.5f)
+    // Vertically center the entire pendant (locket body + top hanging ring)
+    val cy = (h / 2f) + (bailHeight * 0.45f)
 
     val isLight = slateConfig.themeMode == "LIGHT"
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
-    // Gold Palette for Realistic Sweep & Metallic Lustre
+    // Gold Palette for Realistic Metallic Sweep
     val goldColors = intArrayOf(
         0xFFEED688.toInt(),
         0xFFFFF6D1.toInt(),
@@ -1327,22 +1332,30 @@ fun generateLocketMemoryBitmap(
     )
     val goldPositions = floatArrayOf(0f, 0.18f, 0.38f, 0.55f, 0.70f, 0.85f, 0.94f, 1f)
 
-    // 2. Soft Ambient Drop Shadow (Floats naturally over any home screen wallpaper)
-    val shadowRadius = locketRadius + 6f * scaleFactor
+    // 2. Controlled Ambient Drop Shadow (Softer Alpha + Tighter Spread + No Cutoff)
+    val shadowDy = (locketRadius * 0.05f).coerceIn(2f * scaleFactor, 5f * scaleFactor)
+    val shadowBlur = (locketRadius * 0.10f).coerceIn(3f * scaleFactor, 8f * scaleFactor)
+    val totalShadowRadius = locketRadius + shadowBlur
+
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = RadialGradient(
-            cx, cy + 6f * scaleFactor, shadowRadius + 12f * scaleFactor,
-            intArrayOf(Color.argb(90, 0, 0, 0), Color.argb(35, 0, 0, 0), Color.TRANSPARENT),
-            floatArrayOf(0.72f, 0.90f, 1f),
+            cx, cy + shadowDy, totalShadowRadius,
+            intArrayOf(
+                Color.argb(50, 0, 0, 0),
+                Color.argb(25, 0, 0, 0),
+                Color.argb(8, 0, 0, 0),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0.55f, 0.80f, 0.94f, 1f),
             Shader.TileMode.CLAMP
         )
     }
-    canvas.drawCircle(cx, cy + 6f * scaleFactor, shadowRadius + 12f * scaleFactor, shadowPaint)
+    canvas.drawCircle(cx, cy + shadowDy, totalShadowRadius, shadowPaint)
 
     // 3. Top Pendant Bail (Hanger Ring & Mounting Bracket)
-    val bailOuterR = bailHeight * 0.52f
-    val bailInnerR = bailHeight * 0.24f
-    val bailCenterY = cy - locketRadius - bailOuterR + (3.5f * scaleFactor)
+    val bailOuterR = bailHeight * 0.50f
+    val bailInnerR = bailHeight * 0.22f
+    val bailCenterY = cy - locketRadius - bailOuterR + (2.5f * scaleFactor)
 
     val bailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = SweepGradient(cx, bailCenterY, goldColors, goldPositions)
@@ -1352,7 +1365,6 @@ fun generateLocketMemoryBitmap(
     val bailStrokeRadius = (bailOuterR + bailInnerR) / 2f
     canvas.drawCircle(cx, bailCenterY, bailStrokeRadius, bailPaint)
 
-    // Bail Highlight & Shadow Edge
     val bailRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(120, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -1360,10 +1372,15 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, bailCenterY, bailOuterR, bailRimPaint)
 
-    // Mounting Hinge Bracket at top of Locket
+    // Mounting Hinge Bracket
     val hingeW = bailOuterR * 1.3f
-    val hingeH = 5f * scaleFactor
-    val hingeRect = RectF(cx - hingeW / 2f, cy - locketRadius - hingeH / 2f, cx + hingeW / 2f, cy - locketRadius + hingeH / 2f)
+    val hingeH = 4.5f * scaleFactor
+    val hingeRect = RectF(
+        cx - hingeW / 2f,
+        cy - locketRadius - hingeH / 2f,
+        cx + hingeW / 2f,
+        cy - locketRadius + hingeH / 2f
+    )
     val hingePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             hingeRect.left, hingeRect.top, hingeRect.right, hingeRect.top,
@@ -1421,7 +1438,7 @@ fun generateLocketMemoryBitmap(
         fallbackSeed = 0
     )
 
-    // 6. Realistic Inset Bezel Shadow (Deep recessed look)
+    // 6. Realistic Inset Bezel Shadow
     val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = RadialGradient(
             cx, cy, photoRadius,
@@ -1433,7 +1450,7 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy, photoRadius, innerShadowPaint)
 
-    // 7. Domed Mineral Crystal / Specular Glare (Convex watch-lens highlight)
+    // 7. Domed Mineral Crystal Glare
     val glareCenterX = cx - (photoRadius * 0.28f)
     val glareCenterY = cy - (photoRadius * 0.32f)
     val glareRadius = photoRadius * 0.95f
@@ -1448,7 +1465,7 @@ fun generateLocketMemoryBitmap(
     }
     canvas.drawCircle(cx, cy, photoRadius, crystalGlarePaint)
 
-    // Secondary Rim Reflection (Opposite bottom edge glow)
+    // Secondary Rim Reflection
     val rimReflectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             cx, cy + (photoRadius * 0.4f), cx, cy + photoRadius,
@@ -1462,7 +1479,7 @@ fun generateLocketMemoryBitmap(
 
     canvas.restore()
 
-    // 8. Fine Chamfer Highlight Ring around the photo aperture
+    // 8. Fine Chamfer Highlight Ring
     val chamferPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(110, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -1646,7 +1663,8 @@ fun generateStackedMemoryBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -1670,14 +1688,8 @@ fun generateStackedMemoryBitmap(
         if (bgColor == 0xFF000000.toInt()) 0xFF141418.toInt() else Color.argb((alphaInt * 0.8f).toInt(), 0x18, 0x18, 0x1C)
     }
 
-    val underPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = underBg
-        style = Paint.Style.FILL
-    }
-    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = cardBg
-        style = Paint.Style.FILL
-    }
+    val underPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = underBg; style = Paint.Style.FILL }
+    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg; style = Paint.Style.FILL }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(40, 0, 0, 0); style = Paint.Style.FILL }
     val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(35, 0, 0, 0) else Color.argb(35, 255, 255, 255)
@@ -1705,7 +1717,7 @@ fun generateStackedMemoryBitmap(
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
     val borderPadding = cardSize * 0.05f
-    val bottomChin = cardSize * 0.18f
+    val bottomChin = if (showCaption) cardSize * 0.18f else borderPadding
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
 
     val innerRadius = (cardCornerRadius - borderPadding)
@@ -1723,25 +1735,27 @@ fun generateStackedMemoryBitmap(
         fallbackSeed = 0
     )
 
-    val captionText = item?.caption ?: "Summer Memories"
-    if (captionText.isNotBlank()) {
-        val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
-        val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
-        val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
-        val maxCapW = cardRect.width() * 0.80f
-        val maxCapH = polaroidChinRect.height() * 0.50f
-        val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(14f)
+    if (showCaption) {
+        val captionText = item?.caption ?: "Summer Memories"
+        if (captionText.isNotBlank()) {
+            val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
+            val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
+            val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
+            val maxCapW = cardRect.width() * 0.80f
+            val maxCapH = polaroidChinRect.height() * 0.50f
+            val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(14f)
 
-        val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) Color.parseColor("#121214") else Color.parseColor("#F2F2F7")
-            textSize = captionFontSize
-            typeface = getSlateFont(context, weight = 700)
-            textAlign = Paint.Align.CENTER
+            val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.parseColor("#121214") else Color.parseColor("#F2F2F7")
+                textSize = captionFontSize
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.CENTER
+            }
+
+            val captionX = polaroidChinRect.centerX()
+            val captionY = polaroidChinRect.centerY() + (captionFontSize * 0.35f)
+            canvas.drawText(captionText, captionX, captionY, captionPaint)
         }
-
-        val captionX = polaroidChinRect.centerX()
-        val captionY = polaroidChinRect.centerY() + (captionFontSize * 0.35f)
-        canvas.drawText(captionText, captionX, captionY, captionPaint)
     }
 
     canvas.restore()
@@ -1757,7 +1771,8 @@ fun generateTapedPolaroidBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -1775,10 +1790,7 @@ fun generateTapedPolaroidBitmap(
     val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
-    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = cardBg
-        style = Paint.Style.FILL
-    }
+    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg; style = Paint.Style.FILL }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 0, 0, 0); style = Paint.Style.FILL }
     val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(35, 0, 0, 0) else Color.argb(35, 255, 255, 255)
@@ -1794,7 +1806,7 @@ fun generateTapedPolaroidBitmap(
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
     val borderPadding = cardSize * 0.05f
-    val bottomChin = cardSize * 0.20f
+    val bottomChin = if (showCaption) cardSize * 0.20f else borderPadding
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
 
     val innerRadius = (cardCornerRadius - borderPadding)
@@ -1812,25 +1824,27 @@ fun generateTapedPolaroidBitmap(
         fallbackSeed = 1
     )
 
-    val captionText = item?.caption ?: "Summer Memories"
-    if (captionText.isNotBlank()) {
-        val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
-        val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
-        val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
-        val maxCapW = cardRect.width() * 0.80f
-        val maxCapH = polaroidChinRect.height() * 0.50f
-        val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(14f)
+    if (showCaption) {
+        val captionText = item?.caption ?: "Summer Memories"
+        if (captionText.isNotBlank()) {
+            val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
+            val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
+            val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
+            val maxCapW = cardRect.width() * 0.80f
+            val maxCapH = polaroidChinRect.height() * 0.50f
+            val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(14f)
 
-        val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) Color.parseColor("#121214") else Color.parseColor("#F2F2F7")
-            textSize = captionFontSize
-            typeface = getSlateFont(context, weight = 700)
-            textAlign = Paint.Align.CENTER
+            val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.parseColor("#121214") else Color.parseColor("#F2F2F7")
+                textSize = captionFontSize
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.CENTER
+            }
+
+            val captionX = polaroidChinRect.centerX()
+            val captionY = polaroidChinRect.centerY() + (captionFontSize * 0.35f)
+            canvas.drawText(captionText, captionX, captionY, captionPaint)
         }
-
-        val captionX = polaroidChinRect.centerX()
-        val captionY = polaroidChinRect.centerY() + (captionFontSize * 0.35f)
-        canvas.drawText(captionText, captionX, captionY, captionPaint)
     }
 
     drawMaskingTape(canvas, cardRect, scaleFactor)
@@ -1896,7 +1910,8 @@ fun generatePushPinBitmap(
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int
+    hDp: Int,
+    showCaption: Boolean = true
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -1914,10 +1929,7 @@ fun generatePushPinBitmap(
     val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val cardBg = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
 
-    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = cardBg
-        style = Paint.Style.FILL
-    }
+    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBg; style = Paint.Style.FILL }
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 0, 0, 0); style = Paint.Style.FILL }
     val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(35, 0, 0, 0) else Color.argb(35, 255, 255, 255)
@@ -1933,7 +1945,7 @@ fun generatePushPinBitmap(
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardBorderPaint)
 
     val borderPadding = cardSize * 0.05f
-    val bottomChin = cardSize * 0.20f
+    val bottomChin = if (showCaption) cardSize * 0.20f else borderPadding
     val innerPhotoRect = RectF(cardRect.left + borderPadding, cardRect.top + borderPadding, cardRect.right - borderPadding, cardRect.bottom - bottomChin)
 
     val innerRadius = (cardCornerRadius - borderPadding)
@@ -1951,25 +1963,27 @@ fun generatePushPinBitmap(
         fallbackSeed = 2
     )
 
-    val captionText = item?.caption ?: "Summer Memories"
-    if (captionText.isNotBlank()) {
-        val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
-        val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
-        val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
-        val maxCapW = cardRect.width() * 0.80f
-        val maxCapH = polaroidChinRect.height() * 0.50f
-        val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(14f)
+    if (showCaption) {
+        val captionText = item?.caption ?: "Summer Memories"
+        if (captionText.isNotBlank()) {
+            val polaroidChinRect = RectF(cardRect.left, cardRect.bottom - bottomChin, cardRect.right, cardRect.bottom)
+            val refCaptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = getSlateFont(context, weight = 700); textSize = 100f }
+            val measuredCapW = refCaptionPaint.measureText(captionText).coerceAtLeast(1f)
+            val maxCapW = cardRect.width() * 0.80f
+            val maxCapH = polaroidChinRect.height() * 0.50f
+            val captionFontSize = minOf(maxCapH, 100f * (maxCapW / measuredCapW)).coerceAtLeast(14f)
 
-        val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) Color.parseColor("#121214") else Color.parseColor("#F2F2F7")
-            textSize = captionFontSize
-            typeface = getSlateFont(context, weight = 700)
-            textAlign = Paint.Align.CENTER
+            val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.parseColor("#121214") else Color.parseColor("#F2F2F7")
+                textSize = captionFontSize
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.CENTER
+            }
+
+            val captionX = polaroidChinRect.centerX()
+            val captionY = polaroidChinRect.centerY() + (captionFontSize * 0.35f)
+            canvas.drawText(captionText, captionX, captionY, captionPaint)
         }
-
-        val captionX = polaroidChinRect.centerX()
-        val captionY = polaroidChinRect.centerY() + (captionFontSize * 0.35f)
-        canvas.drawText(captionText, captionX, captionY, captionPaint)
     }
 
     drawRedPushPin(canvas, cardRect)
