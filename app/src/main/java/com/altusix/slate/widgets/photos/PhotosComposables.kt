@@ -259,7 +259,7 @@ fun generatePolaroidMemoryBitmap(
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w, h)
     } else {
-        // Locked square aspect in fixed mode
+        // Locked square aspect ratio in fixed mode
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
@@ -272,7 +272,7 @@ fun generatePolaroidMemoryBitmap(
     val frameBorderColor = if (isLight) 0x22000000 else 0x22FFFFFF
     val cardCorner = getStandardCornerRadius(scaleFactor)
 
-    // 1. Background Card
+    // 1. Background Polaroid Card
     val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = cardBg
         style = Paint.Style.FILL
@@ -286,16 +286,15 @@ fun generatePolaroidMemoryBitmap(
     }
     canvas.drawRoundRect(cardRect, cardCorner, cardCorner, borderPaint)
 
-    // 2. Uniform Border Padding (Top, Left, Right match identically)
-    // Anchored to shorter dimension so stretching doesn't inflate side gutters
+    // 2. Uniform Border Margins (Top, Left, Right are identical across Fixed & Responsive)
     val minDimension = minOf(cardRect.width(), cardRect.height())
-    val uniformBorderMargin = (minDimension * 0.065f).coerceAtLeast(10f * scaleFactor)
+    val uniformBorderMargin = minDimension * 0.065f
 
     // Chin height scales proportionally with widget height
     val chinHeight = if (showCaption) {
-        (cardRect.height() * 0.24f).coerceAtLeast(uniformBorderMargin * 2.2f)
+        cardRect.height() * 0.23f
     } else {
-        uniformBorderMargin // Equal margin all around when caption is disabled
+        uniformBorderMargin
     }
 
     val photoBounds = RectF(
@@ -305,7 +304,6 @@ fun generatePolaroidMemoryBitmap(
         cardRect.bottom - chinHeight
     )
 
-    // Inner photo corner radius concentric to card corner
     val photoCorner = (cardCorner - uniformBorderMargin * 0.5f).coerceAtLeast(4f * scaleFactor)
     drawPhotoSurface(
         canvas = canvas,
@@ -325,9 +323,9 @@ fun generatePolaroidMemoryBitmap(
     }
     canvas.drawRoundRect(photoBounds, photoCorner, photoCorner, photoInnerBorder)
 
-    // 3. Top Washi Tape Strip
-    val tapeW = (minDimension * 0.30f).coerceAtLeast(36f * scaleFactor)
-    val tapeH = (uniformBorderMargin * 0.85f).coerceAtLeast(8f * scaleFactor)
+    // 3. Top Washi Tape Strip (Proportional to widget size)
+    val tapeW = minDimension * 0.30f
+    val tapeH = (uniformBorderMargin * 0.85f).coerceAtLeast(6f * scaleFactor)
     val tapeRect = RectF(
         cardRect.centerX() - tapeW / 2f,
         cardRect.top + (uniformBorderMargin - tapeH) / 2f,
@@ -340,7 +338,7 @@ fun generatePolaroidMemoryBitmap(
     }
     canvas.drawRoundRect(tapeRect, 3f * scaleFactor, 3f * scaleFactor, tapePaint)
 
-    // 4. Proportional Typography (Scales with widget & chin size)
+    // 4. Proportional Typography (No hard caps; mathematically centered block)
     if (showCaption) {
         val captionText = item?.caption?.trim() ?: "Summer Memories"
         val dateText = item?.dateText?.trim() ?: "September 2024"
@@ -355,9 +353,9 @@ fun generatePolaroidMemoryBitmap(
             resolvedTextColor = Color.parseColor("#121214")
         }
 
-        // Font size proportional to chin height and widget size
-        val captionFontSize = (chinHeight * 0.28f).coerceIn(11f * scaleFactor, 26f * scaleFactor)
-        val dateFontSize = (captionFontSize * 0.76f).coerceAtLeast(8.5f * scaleFactor)
+        // Font sizes strictly proportional to chin height (no clamping bounds)
+        val captionFontSize = chinHeight * 0.26f
+        val dateFontSize = captionFontSize * 0.72f
 
         val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.typeface = captionTypeface
@@ -365,25 +363,53 @@ fun generatePolaroidMemoryBitmap(
             this.color = resolvedTextColor
         }
 
-        val maxTextW = photoBounds.width() - 4f * scaleFactor
-        val truncatedCaption = truncateText(captionText, maxTextW, captionPaint)
-
-        // Center the text block vertically within the chin space
-        val totalTextGap = 6f * scaleFactor
-        val captionY = photoBounds.bottom + (chinHeight * 0.44f)
-
-        if (truncatedCaption.isNotBlank()) {
-            canvas.drawText(truncatedCaption, photoBounds.left + 2f * scaleFactor, captionY, captionPaint)
-        }
-
         val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.typeface = getSlateFont(context, weight = 500)
             this.textSize = dateFontSize
             this.color = accentColor
         }
+
+        val maxTextW = photoBounds.width() - 4f * scaleFactor
+        val truncatedCaption = truncateText(captionText, maxTextW, captionPaint)
         val truncatedDate = truncateText(dateText, maxTextW, datePaint)
-        if (truncatedDate.isNotBlank()) {
-            canvas.drawText(truncatedDate, photoBounds.left + 2f * scaleFactor, captionY + dateFontSize + totalTextGap, datePaint)
+
+        val hasCaption = truncatedCaption.isNotBlank()
+        val hasDate = truncatedDate.isNotBlank()
+
+        // Exact line measurements via font metrics
+        val capMetrics = captionPaint.fontMetrics
+        val dateMetrics = datePaint.fontMetrics
+
+        val capLineH = -capMetrics.ascent + capMetrics.descent
+        val dateLineH = -dateMetrics.ascent + dateMetrics.descent
+        // Line gap scales proportionally to font size (tight typographic rhythm)
+        val lineGap = captionFontSize * 0.16f
+
+        val totalBlockHeight = when {
+            hasCaption && hasDate -> capLineH + lineGap + dateLineH
+            hasCaption -> capLineH
+            hasDate -> dateLineH
+            else -> 0f
+        }
+
+        // Center the combined text block in the chin area
+        val chinCenterY = (photoBounds.bottom + cardRect.bottom) / 2f
+        val blockTopY = chinCenterY - (totalBlockHeight / 2f)
+        val textLeft = photoBounds.left + 2f * scaleFactor
+
+        if (hasCaption && hasDate) {
+            val captionBaselineY = blockTopY - capMetrics.ascent
+            // Second baseline steps down by exact glyph bounds + lineGap
+            val dateBaselineY = captionBaselineY + capMetrics.descent + lineGap - dateMetrics.ascent
+
+            canvas.drawText(truncatedCaption, textLeft, captionBaselineY, captionPaint)
+            canvas.drawText(truncatedDate, textLeft, dateBaselineY, datePaint)
+        } else if (hasCaption) {
+            val captionBaselineY = chinCenterY - ((capMetrics.ascent + capMetrics.descent) / 2f)
+            canvas.drawText(truncatedCaption, textLeft, captionBaselineY, captionPaint)
+        } else if (hasDate) {
+            val dateBaselineY = chinCenterY - ((dateMetrics.ascent + dateMetrics.descent) / 2f)
+            canvas.drawText(truncatedDate, textLeft, dateBaselineY, datePaint)
         }
     }
 
