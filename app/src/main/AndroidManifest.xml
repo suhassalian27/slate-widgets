@@ -995,30 +995,7 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
         </receiver>
-        <!-- 6. STACKED PHOTO FRAME -->
-        <receiver
-            android:name=".widgets.photos.PhotosStackedReceiver" android:exported="true" android:label="Slate Stacked Photo Frame">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
-        </receiver>
-        <!-- 7. TAPED POLAROID PHOTO FRAME -->
-        <receiver
-            android:name=".widgets.photos.PhotosTapedReceiver" android:exported="true" android:label="Slate Taped Photo Frame">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
-        </receiver>
-        <!-- 8. PUSH PIN POLAROID PHOTO FRAME -->
-        <receiver
-            android:name=".widgets.photos.PhotosPushPinReceiver" android:exported="true" android:label="Slate Push Pin Photo Frame">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_camera_2x2" />
-        </receiver>
+
         <!-- 9. CAMERA SHUTTER LAUNCHER -->
         <receiver
             android:name="com.altusix.slate.widgets.camera.CameraShutterLauncherReceiver" android:exported="true" android:label="Slate Camera Shutter">
@@ -1963,7 +1940,6 @@
         <!-- ================================================================= -->
         <!-- CONTACTS WIDGETS                                                  -->
         <!-- ================================================================= -->
-
         <!-- Contacts Configuration Activity -->
         <activity
             android:name=".ui.config.ContactsWidgetConfigActivity"
@@ -1973,7 +1949,6 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
-
         <!-- 1. Single Avatar Capsule (1x2) -->
         <receiver android:name=".widgets.contacts.ContactsSingleAvatarCapsuleReceiver" android:exported="true" android:label="Slate Single Avatar Capsule">
             <intent-filter>
@@ -2255,7 +2230,6 @@
         <!-- ================================================================= -->
         <!-- DEVICE INFO WIDGETS                                               -->
         <!-- ================================================================= -->
-
         <!-- 1. Device Info Mini Bento (2x2) -->
         <receiver android:name=".widgets.deviceinfo.DeviceInfoMiniBento2x2Receiver" android:exported="true" android:label="Slate Device Info Mini Bento">
             <intent-filter>
@@ -2522,12 +2496,9 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_2x1" />
         </receiver>
 
-
-
         <!-- ================================================================= -->
         <!-- DEVICE INFO WIDGETS                                               -->
         <!-- ================================================================= -->
-
         <!-- 1. Tic Tac Toe Interactive (2x2) -->
         <receiver android:name=".widgets.games.GamesTicTacToeReceiver" android:exported="true" android:label="Slate Tic Tac Toe">
             <intent-filter>
@@ -2696,7 +2667,6 @@
         <!-- ================================================================= -->
         <!-- GOOGLE WIDGETS                                                    -->
         <!-- ================================================================= -->
-
         <!-- 1. Google Search Capsule (4x1) -->
         <receiver android:name=".widgets.google.GoogleSearchCapsuleReceiver" android:exported="true" android:label="Slate Google Search Capsule">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
@@ -2840,12 +2810,9 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-
-
         <!-- ================================================================= -->
         <!-- HEALTH & FITNESS WIDGETS                                          -->
         <!-- ================================================================= -->
-
         <!-- 1. Health & Fitness: Kinetic Tri-Ring (2x2) -->
         <receiver
             android:name=".widgets.health.HealthKineticTriRingReceiver"
@@ -3114,7 +3081,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 2. Desk Memo Pad (4x2) -->
         <receiver
             android:name=".widgets.notes.NotesDeskMemoReceiver"
@@ -3127,7 +3093,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 3. Checklist Tasks (4x2) -->
         <receiver
             android:name=".widgets.notes.NotesChecklistReceiver"
@@ -3140,7 +3105,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 4. Classic Legal Pad (4x2) -->
         <receiver
             android:name=".widgets.notes.NotesLegalPadReceiver"
@@ -3153,7 +3117,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 5. Quick Thought Strip (4x1) -->
         <receiver
             android:name=".widgets.notes.NotesQuickThoughtReceiver"
@@ -3166,8 +3129,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x1" />
         </receiver>
-
-
         <!-- 7. Torn Receipt Log (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesTornReceiptReceiver"
@@ -3180,7 +3141,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 8. Dot Grid Scratchpad (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesDotGridReceiver"
@@ -3193,7 +3153,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 9. Multi-Note Stack (2x2) -->
         <receiver
             android:name=".widgets.notes.NotesStackReceiver"
@@ -3210,7 +3169,6 @@
         <!-- ========================================================================= -->
         <!-- SLATE "PHOTOS & MEMORIES" WIDGETS -->
         <!-- ========================================================================= -->
-
         <!-- 1. Polaroid Memory (2x2) -->
         <receiver
             android:name=".widgets.photos.PhotosPolaroidReceiver"
@@ -3223,7 +3181,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 2. On This Day (4x2) -->
         <receiver
             android:name=".widgets.photos.PhotosOnThisDayReceiver"
@@ -3236,7 +3193,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 3. 35mm Film Strip (4x2) -->
         <receiver
             android:name=".widgets.photos.PhotosFilmStripReceiver"
@@ -3249,7 +3205,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 4. Bento Collage (4x2) -->
         <receiver
             android:name=".widgets.photos.PhotosCollageBentoReceiver"
@@ -3262,7 +3217,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
-
         <!-- 5. Photo Carousel (2x2) -->
         <receiver
             android:name=".widgets.photos.PhotosCarouselReceiver"
@@ -3275,7 +3229,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 6. Photo Stamp (2x2) -->
         <receiver
             android:name=".widgets.photos.PhotosStampReceiver"
@@ -3288,7 +3241,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 7. Locket Memory (2x2) -->
         <receiver
             android:name=".widgets.photos.PhotosLocketReceiver"
@@ -3301,12 +3253,47 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
-
         <!-- 8. Full-Bleed Clock Overlay (2x2) -->
         <receiver
             android:name=".widgets.photos.PhotosClockOverlayReceiver"
             android:exported="true"
             android:label="Full-Bleed Clock">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 9. Stacked Photo Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosStackedReceiver"
+            android:exported="true"
+            android:label="Stacked Photo Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 10. Taped Polaroid Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosTapedReceiver"
+            android:exported="true"
+            android:label="Taped Polaroid Frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+        <!-- 11. Push Pin Polaroid Frame (2x2) -->
+        <receiver
+            android:name=".widgets.photos.PhotosPushPinReceiver"
+            android:exported="true"
+            android:label="Push Pin Polaroid Frame">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

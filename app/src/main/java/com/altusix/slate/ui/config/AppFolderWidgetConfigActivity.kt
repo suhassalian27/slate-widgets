@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.ui.components.CustomColorPickerDialog
+import com.altusix.slate.ui.components.RainbowCustomCircle
 import com.altusix.slate.widgets.appfolder.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

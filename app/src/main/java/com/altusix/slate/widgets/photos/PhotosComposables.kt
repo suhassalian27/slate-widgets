@@ -248,6 +248,19 @@ private fun truncateText(text: String, maxWidth: Float, paint: Paint): String {
     return if (truncated.isEmpty()) "" else "$truncated…"
 }
 
+fun getPhotoCaptionTypeface(context: Context, font: CaptionFont): Typeface {
+    return when (font) {
+        CaptionFont.SANS -> getSlateFont(context, weight = 700)
+        CaptionFont.SERIF -> Typeface.create(Typeface.SERIF, Typeface.BOLD)
+        CaptionFont.MONO -> Typeface.MONOSPACE
+        CaptionFont.SCRIPT -> try {
+            Typeface.create("cursive", Typeface.BOLD)
+        } catch (_: Exception) {
+            Typeface.create("casual", Typeface.BOLD)
+        }
+    }
+}
+
 // =========================================================================
 // 1. POLAROID MEMORY (2x2)
 // =========================================================================

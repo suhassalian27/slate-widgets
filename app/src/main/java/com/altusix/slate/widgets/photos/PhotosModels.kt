@@ -18,13 +18,22 @@ enum class MemoryFilterStyle(val label: String) {
     GOLDEN_HOUR("Golden Hour")
 }
 
+enum class CaptionFont(val label: String) {
+    SANS("Sans"),
+    SERIF("Serif"),
+    MONO("Mono"),
+    SCRIPT("Script")
+}
+
 data class SlateMemoryItem(
     val id: String = System.currentTimeMillis().toString(),
     val imagePath: String? = null,
     val caption: String = "Summer Memories",
     val dateText: String = "September 2024",
     val location: String = "Pacific Coast",
-    val filterStyle: MemoryFilterStyle = MemoryFilterStyle.ORIGINAL
+    val filterStyle: MemoryFilterStyle = MemoryFilterStyle.ORIGINAL,
+    val captionFont: CaptionFont = CaptionFont.SANS,
+    val captionColorHex: Long = 0xFFFFFFFFL
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -33,6 +42,8 @@ data class SlateMemoryItem(
         put("dateText", dateText)
         put("location", location)
         put("filterStyle", filterStyle.name)
+        put("captionFont", captionFont.name)
+        put("captionColorHex", captionColorHex)
     }
 
     companion object {
@@ -42,6 +53,11 @@ data class SlateMemoryItem(
             } catch (_: Exception) {
                 MemoryFilterStyle.ORIGINAL
             }
+            val font = try {
+                CaptionFont.valueOf(json.optString("captionFont", CaptionFont.SANS.name))
+            } catch (_: Exception) {
+                CaptionFont.SANS
+            }
             val path = json.optString("imagePath", "")
             return SlateMemoryItem(
                 id = json.optString("id", System.currentTimeMillis().toString()),
@@ -49,7 +65,9 @@ data class SlateMemoryItem(
                 caption = json.optString("caption", "Summer Memories"),
                 dateText = json.optString("dateText", "September 2024"),
                 location = json.optString("location", "Pacific Coast"),
-                filterStyle = filter
+                filterStyle = filter,
+                captionFont = font,
+                captionColorHex = json.optLong("captionColorHex", 0xFFFFFFFFL)
             )
         }
     }
