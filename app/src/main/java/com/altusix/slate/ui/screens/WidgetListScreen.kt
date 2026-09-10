@@ -54,6 +54,7 @@ import com.altusix.slate.widgets.health.getHealthWidgetsCatalog
 import com.altusix.slate.widgets.media.getMediaWidgetsCatalog
 import com.altusix.slate.widgets.notes.getNotesWidgetsCatalog
 import com.altusix.slate.widgets.photos.getPhotosWidgetsCatalog
+import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -88,12 +89,13 @@ fun WidgetListScreen(
     val mediaWidgets = remember { getMediaWidgetsCatalog() }
     val notesWidgets = remember { getNotesWidgetsCatalog() }
     val photosWidgets = remember { getPhotosWidgetsCatalog() }
+    val productivityWidgets = remember { getProductivityWidgetsCatalog() }
 
     val categories = remember {
         listOf(
             "All", "AI", "App Folder", "App Launcher", "Battery", "Bluetooth",
             "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital",
-            "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google", "Health & Fitness", "Music & Media", "Notes", "Photos & Memories"
+            "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google", "Health & Fitness", "Music & Media", "Notes", "Photos & Memories", "Productivity"
         )
     }
 
@@ -194,10 +196,11 @@ fun WidgetListScreen(
                     18 -> mediaWidgets
                     19 -> notesWidgets
                     20 -> photosWidgets
+                    21 -> productivityWidgets
                     else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
                             calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
                             clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets +
-                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets + notesWidgets + photosWidgets
+                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets + notesWidgets + photosWidgets + productivityWidgets
                 }
             }
 

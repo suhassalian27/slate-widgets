@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <queries>
         <intent>
@@ -30,6 +31,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Health & Fitness Permission -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- Productivity Screen Time Permission -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
 
 
 
@@ -87,6 +90,13 @@
         <!-- Photos & Memories Config Activity -->
         <activity
             android:name=".widgets.photos.PhotosConfigActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Slate"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Productivity Edit Activity -->
+        <activity
+            android:name=".widgets.productivity.ProductivityEditActivity"
             android:exported="false"
             android:theme="@style/Theme.Slate"
             android:windowSoftInputMode="adjustResize" />
@@ -3408,6 +3418,169 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.altusix.slate.photos.ACTION_OPEN_CONFIG" />
                 <action android:name="com.altusix.slate.photos.ACTION_CYCLE_PHOTO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- ========================================================================= -->
+        <!-- PRODUCTIVITY WIDGETS (11 RECEIVERS)                                        -->
+        <!-- ========================================================================= -->
+
+        <!-- 1. Pomodoro Focus Dial (2x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityPomodoroReceiver"
+            android:exported="true"
+            android:label="Pomodoro Focus Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_TOGGLE_TIMER" />
+                <action android:name="com.altusix.slate.productivity.ACTION_RESET_TIMER" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 2. Habit Streak Matrix (4x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityHabitMatrixReceiver"
+            android:exported="true"
+            android:label="Habit Streak Matrix">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_TOGGLE_HABIT_TODAY" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 3. Daily Top 3 Wins (4x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityTop3Receiver"
+            android:exported="true"
+            android:label="Daily Top 3 Wins">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_TOGGLE_TOP3" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 4. Eisenhower Priority Matrix (2x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityEisenhowerReceiver"
+            android:exported="true"
+            android:label="Eisenhower Priority Matrix">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 5. Time-Block Day Timeline (4x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityTimelineReceiver"
+            android:exported="true"
+            android:label="Time-Block Day Timeline">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 6. Goal Milestone Countdown (2x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityGoalReceiver"
+            android:exported="true"
+            android:label="Goal Milestone Countdown">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 7. Weekly Habit Rings (2x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityHabitRingsReceiver"
+            android:exported="true"
+            android:label="Weekly Habit Rings">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. Minimal Task Pipeline (4x1) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityPipelineReceiver"
+            android:exported="true"
+            android:label="Minimal Task Pipeline">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 9. Bookmark List (4x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityBookmarksReceiver"
+            android:exported="true"
+            android:label="Bookmark List">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 10. Screen Time Balance (2x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityScreenTimeReceiver"
+            android:exported="true"
+            android:label="Screen Time Balance">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 11. Clipboard Vault (2x2) -->
+        <receiver
+            android:name=".widgets.productivity.ProductivityClipboardReceiver"
+            android:exported="true"
+            android:label="Clipboard Vault">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.productivity.ACTION_COPY_CLIPBOARD" />
+                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

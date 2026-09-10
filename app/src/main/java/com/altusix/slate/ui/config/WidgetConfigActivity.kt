@@ -71,6 +71,8 @@ import com.altusix.slate.widgets.notes.updateAllNotesWidgets
 import com.altusix.slate.widgets.photos.PhotosConfigActivity
 import com.altusix.slate.widgets.photos.getPhotosWidgetsCatalog
 import com.altusix.slate.widgets.photos.updateAllPhotosWidgets
+import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
+import com.altusix.slate.widgets.productivity.updateAllProductivityWidgets
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
@@ -186,7 +188,8 @@ class WidgetConfigActivity : ComponentActivity() {
                             getCameraWidgetsCatalog() +
                             getMediaWidgetsCatalog() +
                             getNotesWidgetsCatalog() +
-                            getPhotosWidgetsCatalog()
+                            getPhotosWidgetsCatalog() +
+                            getProductivityWidgetsCatalog()
 
                     allWidgets.find { it.receiverClass.name == widgetClassName }
                 }
@@ -304,6 +307,7 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllMediaWidgets(this)
         updateAllNotesWidgets(this)
         updateAllPhotosWidgets(this)
+        updateAllProductivityWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
