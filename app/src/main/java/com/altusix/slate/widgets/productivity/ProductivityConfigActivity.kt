@@ -10,17 +10,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,8 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.theme.ThemePreferences
+import com.altusix.slate.ui.components.SlateStudioScaffold
+import com.altusix.slate.ui.components.StudioTabItem
 
-class ProductivityEditActivity : ComponentActivity() {
+class ProductivityConfigActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -50,157 +45,58 @@ class ProductivityEditActivity : ComponentActivity() {
         val themePrefs = ThemePreferences(this).getThemeSettings()
         val accentColor = themePrefs.accentColor
 
+        val tabs = listOf(
+            StudioTabItem("TOP3", "Top 3 Wins"),
+            StudioTabItem("TIMER", "Pomodoro"),
+            StudioTabItem("HABIT", "Habit"),
+            StudioTabItem("BOOKMARKS", "Bookmarks"),
+            StudioTabItem("CLIPBOARD", "Clipboard"),
+            StudioTabItem("SCREENTIME", "Screen Time"),
+            StudioTabItem("EISENHOWER", "Eisenhower"),
+            StudioTabItem("TIMELINE", "Timeline"),
+            StudioTabItem("GOAL", "Milestone"),
+            StudioTabItem("RINGS", "Rings"),
+            StudioTabItem("PIPELINE", "Pipeline")
+        )
+
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    background = Color(0xFF0C0C0E),
-                    surface = Color(0xFF16161B)
-                )
-            ) {
+            MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0C0C0E), surface = Color(0xFF16161B))) {
                 var selectedTab by remember { mutableStateOf(initialTab) }
                 var config by remember { mutableStateOf(existingConfig) }
 
                 fun saveAndFinish() {
                     if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                        ProductivityStorageManager.saveConfig(this@ProductivityEditActivity, widgetId, config)
+                        ProductivityStorageManager.saveConfig(this@ProductivityConfigActivity, widgetId, config)
                     }
-                    updateAllProductivityWidgets(this@ProductivityEditActivity)
-                    setResult(Activity.RESULT_OK)
+                    updateAllProductivityWidgets(this@ProductivityConfigActivity)
+                    val resultIntent = Intent().apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                    }
+                    setResult(Activity.RESULT_OK, resultIntent)
                     finish()
                 }
 
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF0A0A0C)
+                SlateStudioScaffold(
+                    title = "Productivity Studio",
+                    accentColor = accentColor,
+                    tabs = tabs,
+                    selectedTabKey = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    onBackClick = { finish() },
+                    onSaveClick = { saveAndFinish() }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
-                    ) {
-                        // Top App Bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            IconButton(onClick = { finish() }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color.White
-                                )
-                            }
-                            Text(
-                                text = "Productivity Studio",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            IconButton(
-                                onClick = { saveAndFinish() },
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(accentColor)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Save",
-                                    tint = Color.Black
-                                )
-                            }
-                        }
-
-                        // Tab Selector Row
-                        val tabs = listOf(
-                            "TOP3" to "Top 3 Wins",
-                            "TIMER" to "Pomodoro",
-                            "HABIT" to "Habit",
-                            "BOOKMARKS" to "Bookmarks",
-                            "CLIPBOARD" to "Clipboard",
-                            "SCREENTIME" to "Screen Time",
-                            "EISENHOWER" to "Eisenhower",
-                            "TIMELINE" to "Timeline",
-                            "GOAL" to "Milestone",
-                            "RINGS" to "Rings",
-                            "PIPELINE" to "Pipeline"
-                        )
-
-                        LazyRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(tabs) { (tabKey, tabLabel) ->
-                                val isSelected = selectedTab == tabKey
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(if (isSelected) accentColor else Color(0xFF1E1E24))
-                                        .clickable { selectedTab = tabKey }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                ) {
-                                    Text(
-                                        text = tabLabel,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.Black else Color(0xFFB0B0B8)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Tab Content Body
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(18.dp)
-                        ) {
-                            when (selectedTab) {
-                                "TOP3" -> Top3Editor(config.top3Tasks, accentColor) { updated ->
-                                    config = config.copy(top3Tasks = updated)
-                                }
-                                "TIMER" -> TimerEditor(config.focusTimer, accentColor) { updated ->
-                                    config = config.copy(focusTimer = updated)
-                                }
-                                "HABIT" -> HabitEditor(config.habit, accentColor) { updated ->
-                                    config = config.copy(habit = updated)
-                                }
-                                "BOOKMARKS" -> BookmarksEditor(config.bookmarks, accentColor) { updated ->
-                                    config = config.copy(bookmarks = updated)
-                                }
-                                "CLIPBOARD" -> ClipboardEditor(config.clipboardSnippets, accentColor) { updated ->
-                                    config = config.copy(clipboardSnippets = updated)
-                                }
-                                "SCREENTIME" -> ScreenTimeEditor(this@ProductivityEditActivity, config.screenTime, accentColor) { updated ->
-                                    config = config.copy(screenTime = updated)
-                                }
-                                "EISENHOWER" -> EisenhowerEditor(config.eisenhowerTasks, accentColor) { updated ->
-                                    config = config.copy(eisenhowerTasks = updated)
-                                }
-                                "TIMELINE" -> TimelineEditor(config.timeBlocks, accentColor) { updated ->
-                                    config = config.copy(timeBlocks = updated)
-                                }
-                                "GOAL" -> GoalEditor(config.goal, accentColor) { updated ->
-                                    config = config.copy(goal = updated)
-                                }
-                                "RINGS" -> RingsEditor(config.habitRings, accentColor) { updated ->
-                                    config = config.copy(habitRings = updated)
-                                }
-                                "PIPELINE" -> PipelineEditor(config.pipeline, accentColor) { updated ->
-                                    config = config.copy(pipeline = updated)
-                                }
-                            }
-                        }
+                    when (selectedTab) {
+                        "TOP3" -> Top3Editor(config.top3Tasks, accentColor) { config = config.copy(top3Tasks = it) }
+                        "TIMER" -> TimerEditor(config.focusTimer, accentColor) { config = config.copy(focusTimer = it) }
+                        "HABIT" -> HabitEditor(config.habit, accentColor) { config = config.copy(habit = it) }
+                        "BOOKMARKS" -> BookmarksEditor(config.bookmarks, accentColor) { config = config.copy(bookmarks = it) }
+                        "CLIPBOARD" -> ClipboardEditor(config.clipboardSnippets, accentColor) { config = config.copy(clipboardSnippets = it) }
+                        "SCREENTIME" -> ScreenTimeEditor(this@ProductivityConfigActivity, config.screenTime, accentColor) { config = config.copy(screenTime = it) }
+                        "EISENHOWER" -> EisenhowerEditor(config.eisenhowerTasks, accentColor) { config = config.copy(eisenhowerTasks = it) }
+                        "TIMELINE" -> TimelineEditor(config.timeBlocks, accentColor) { config = config.copy(timeBlocks = it) }
+                        "GOAL" -> GoalEditor(config.goal, accentColor) { config = config.copy(goal = it) }
+                        "RINGS" -> RingsEditor(config.habitRings, accentColor) { config = config.copy(habitRings = it) }
+                        "PIPELINE" -> PipelineEditor(config.pipeline, accentColor) { config = config.copy(pipeline = it) }
                     }
                 }
             }
@@ -222,7 +118,7 @@ private fun Top3Editor(
     Text("Set your 3 most impactful outcomes. Widgets allow instantaneous checkbox tapping directly on your home screen.", fontSize = 13.sp, color = Color.Gray)
 
     for (i in 0 until 3) {
-        val task = tasks.getOrElse(i) { Top3TaskItem("t_${i+1}", "", false, i + 1) }
+        val task = tasks.getOrElse(i) { Top3TaskItem("t_${i + 1}", "", false, i + 1) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -239,7 +135,7 @@ private fun Top3Editor(
                     .background(if (task.isCompleted) accentColor else Color(0xFF2C2C34))
                     .clickable {
                         val updated = tasks.toMutableList()
-                        while (updated.size <= i) updated.add(Top3TaskItem("t_${updated.size+1}", "", false, updated.size + 1))
+                        while (updated.size <= i) updated.add(Top3TaskItem("t_${updated.size + 1}", "", false, updated.size + 1))
                         updated[i] = task.copy(isCompleted = !task.isCompleted)
                         onUpdate(updated)
                     },
@@ -252,9 +148,9 @@ private fun Top3Editor(
 
             OutlinedTextField(
                 value = task.title,
-                onValueChange = { newTitle ->
+                onValueChange = { newTitle: String ->
                     val updated = tasks.toMutableList()
-                    while (updated.size <= i) updated.add(Top3TaskItem("t_${updated.size+1}", "", false, updated.size + 1))
+                    while (updated.size <= i) updated.add(Top3TaskItem("t_${updated.size + 1}", "", false, updated.size + 1))
                     updated[i] = task.copy(title = newTitle)
                     onUpdate(updated)
                 },
@@ -334,7 +230,7 @@ private fun HabitEditor(
 
     OutlinedTextField(
         value = habit.name,
-        onValueChange = { onUpdate(habit.copy(name = it)) },
+        onValueChange = { text: String -> onUpdate(habit.copy(name = text)) },
         label = { Text("Habit Name") },
         modifier = Modifier.fillMaxWidth(),
         textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
@@ -379,7 +275,7 @@ private fun BookmarksEditor(
     Text("Quick Launch Bookmarks (Up to 4)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
 
     for (i in 0 until 4) {
-        val item = bookmarks.getOrElse(i) { BookmarkItem("b_${i+1}", "", "", "") }
+        val item = bookmarks.getOrElse(i) { BookmarkItem("b_${i + 1}", "", "", "") }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -390,9 +286,9 @@ private fun BookmarksEditor(
         ) {
             OutlinedTextField(
                 value = item.title,
-                onValueChange = { newTitle ->
+                onValueChange = { newTitle: String ->
                     val updated = bookmarks.toMutableList()
-                    while (updated.size <= i) updated.add(BookmarkItem("b_${updated.size+1}", "", "", ""))
+                    while (updated.size <= i) updated.add(BookmarkItem("b_${updated.size + 1}", "", "", ""))
                     updated[i] = item.copy(title = newTitle)
                     onUpdate(updated)
                 },
@@ -408,10 +304,10 @@ private fun BookmarksEditor(
 
             OutlinedTextField(
                 value = item.url,
-                onValueChange = { newUrl ->
+                onValueChange = { newUrl: String ->
                     val host = Uri.parse(if (!newUrl.startsWith("http")) "https://$newUrl" else newUrl).host ?: newUrl
                     val updated = bookmarks.toMutableList()
-                    while (updated.size <= i) updated.add(BookmarkItem("b_${updated.size+1}", "", "", ""))
+                    while (updated.size <= i) updated.add(BookmarkItem("b_${updated.size + 1}", "", "", ""))
                     updated[i] = item.copy(url = newUrl, domain = host)
                     onUpdate(updated)
                 },
@@ -437,7 +333,7 @@ private fun ClipboardEditor(
     Text("Clipboard Quick-Copy Vault (2 Slots)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
 
     for (i in 0 until 2) {
-        val item = snippets.getOrElse(i) { ClipboardSnippetItem("c_${i+1}", "", "") }
+        val item = snippets.getOrElse(i) { ClipboardSnippetItem("c_${i + 1}", "", "") }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -448,9 +344,9 @@ private fun ClipboardEditor(
         ) {
             OutlinedTextField(
                 value = item.label,
-                onValueChange = { newLabel ->
+                onValueChange = { newLabel: String ->
                     val updated = snippets.toMutableList()
-                    while (updated.size <= i) updated.add(ClipboardSnippetItem("c_${updated.size+1}", "", ""))
+                    while (updated.size <= i) updated.add(ClipboardSnippetItem("c_${updated.size + 1}", "", ""))
                     updated[i] = item.copy(label = newLabel)
                     onUpdate(updated)
                 },
@@ -466,9 +362,9 @@ private fun ClipboardEditor(
 
             OutlinedTextField(
                 value = item.content,
-                onValueChange = { newContent ->
+                onValueChange = { newContent: String ->
                     val updated = snippets.toMutableList()
-                    while (updated.size <= i) updated.add(ClipboardSnippetItem("c_${updated.size+1}", "", ""))
+                    while (updated.size <= i) updated.add(ClipboardSnippetItem("c_${updated.size + 1}", "", ""))
                     updated[i] = item.copy(content = newContent)
                     onUpdate(updated)
                 },
@@ -561,7 +457,7 @@ private fun EisenhowerEditor(
             Text(label, fontSize = 13.sp, color = accentColor, fontWeight = FontWeight.SemiBold)
             OutlinedTextField(
                 value = item.title,
-                onValueChange = { newTitle ->
+                onValueChange = { newTitle: String ->
                     val updated = tasks.filter { it.quadrant != quadKey }.toMutableList()
                     updated.add(item.copy(title = newTitle))
                     onUpdate(updated)
@@ -600,7 +496,7 @@ private fun TimelineEditor(
             Text("Block ${i + 1} (${block.timeSpanText})", fontSize = 13.sp, color = accentColor, fontWeight = FontWeight.SemiBold)
             OutlinedTextField(
                 value = block.title,
-                onValueChange = { newTitle ->
+                onValueChange = { newTitle: String ->
                     val updated = blocks.toMutableList()
                     while (updated.size <= i) updated.add(TimeBlockItem("tb_${updated.size}", "", 9, 0, 11, 0))
                     updated[i] = block.copy(title = newTitle)
@@ -629,7 +525,7 @@ private fun GoalEditor(
 
     OutlinedTextField(
         value = goal.title,
-        onValueChange = { onUpdate(goal.copy(title = it)) },
+        onValueChange = { text: String -> onUpdate(goal.copy(title = text)) },
         label = { Text("Goal Title") },
         modifier = Modifier.fillMaxWidth(),
         textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
@@ -641,7 +537,7 @@ private fun GoalEditor(
 
     OutlinedTextField(
         value = goal.deadlineDateText,
-        onValueChange = { onUpdate(goal.copy(deadlineDateText = it)) },
+        onValueChange = { text: String -> onUpdate(goal.copy(deadlineDateText = text)) },
         label = { Text("Target Deadline (e.g. Oct 31, Q4)") },
         modifier = Modifier.fillMaxWidth(),
         textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
@@ -686,7 +582,7 @@ private fun RingsEditor(
     Text("Weekly Habit Rings (3 Activities)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
 
     for (i in 0 until 3) {
-        val ring = rings.getOrElse(i) { HabitRingItem("r_$i", "Activity ${i+1}", 3, 5, "hrs", 0xFF0A84FF) }
+        val ring = rings.getOrElse(i) { HabitRingItem("r_$i", "Activity ${i + 1}", 3, 5, "hrs", 0xFF0A84FF) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()

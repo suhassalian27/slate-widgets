@@ -155,7 +155,7 @@ abstract class BaseProductivityReceiver(
         when (intent.action) {
             ACTION_EDIT_PRODUCTIVITY -> {
                 val tab = intent.getStringExtra(EXTRA_TAB) ?: defaultTab
-                val editIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+                val editIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                     putExtra(EXTRA_TAB, tab)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -281,7 +281,7 @@ abstract class BaseProductivityReceiver(
     }
 
     protected open fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val editIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val editIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, defaultTab)
             data = Uri.parse("slate_prod://$appWidgetId/$defaultTab")
@@ -335,7 +335,7 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
         // Upper section -> Open Edit Studio
-        val openIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "TIMER")
             data = Uri.parse("slate_prod://$appWidgetId/timer_settings")
@@ -415,7 +415,7 @@ class ProductivityHabitMatrixReceiver : BaseProductivityReceiver(R.layout.widget
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "HABIT")
             data = Uri.parse("slate_prod://$appWidgetId/habit_edit")
@@ -465,7 +465,7 @@ class ProductivityTop3Receiver : BaseProductivityReceiver(R.layout.widget_produc
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "TOP3")
             data = Uri.parse("slate_prod://$appWidgetId/top3_edit")
@@ -618,7 +618,7 @@ class ProductivityBookmarksReceiver : BaseProductivityReceiver(R.layout.widget_p
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "BOOKMARKS")
             data = Uri.parse("slate_prod://$appWidgetId/bookmarks_edit")
@@ -677,7 +677,7 @@ class ProductivityScreenTimeReceiver : BaseProductivityReceiver(R.layout.widget_
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "SCREENTIME")
             data = Uri.parse("slate_prod://$appWidgetId/screentime_edit")
@@ -713,7 +713,7 @@ class ProductivityClipboardReceiver : BaseProductivityReceiver(R.layout.widget_p
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityEditActivity::class.java).apply {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "CLIPBOARD")
             data = Uri.parse("slate_prod://$appWidgetId/clipboard_edit")

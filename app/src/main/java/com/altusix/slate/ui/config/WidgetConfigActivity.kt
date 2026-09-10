@@ -72,7 +72,7 @@ import com.altusix.slate.widgets.photos.PhotosConfigActivity
 import com.altusix.slate.widgets.photos.getPhotosWidgetsCatalog
 import com.altusix.slate.widgets.photos.updateAllPhotosWidgets
 import com.altusix.slate.widgets.productivity.BaseProductivityReceiver
-import com.altusix.slate.widgets.productivity.ProductivityEditActivity
+import com.altusix.slate.widgets.productivity.ProductivityConfigActivity
 import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import com.altusix.slate.widgets.productivity.updateAllProductivityWidgets
 
@@ -190,7 +190,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 widgetClassName.contains("Pipeline") -> "PIPELINE"
                 else -> "TOP3"
             }
-            val forwardIntent = Intent(this, ProductivityEditActivity::class.java).apply {
+            val forwardIntent = Intent(this, ProductivityConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }
                 putExtra(BaseProductivityReceiver.EXTRA_TAB, tab)
                 addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)

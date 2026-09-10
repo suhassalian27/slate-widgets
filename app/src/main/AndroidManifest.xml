@@ -94,13 +94,6 @@
             android:theme="@style/Theme.Slate"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- Productivity Edit Activity -->
-        <activity
-            android:name=".widgets.productivity.ProductivityEditActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Slate"
-            android:windowSoftInputMode="adjustResize" />
-
         <activity
             android:name=".widgets.media.MediaTrampolineActivity"
             android:exported="false"
@@ -3427,6 +3420,13 @@
         <!-- ========================================================================= -->
         <!-- PRODUCTIVITY WIDGETS (11 RECEIVERS)                                        -->
         <!-- ========================================================================= -->
+
+        <!-- Productivity Config Activity -->
+        <activity
+            android:name=".widgets.productivity.ProductivityConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Slate" />
+
         <service
             android:name=".widgets.productivity.PomodoroTimerService"
             android:exported="false"
