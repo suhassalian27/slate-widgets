@@ -174,7 +174,11 @@
         <!-- APP FOLDER RECEIVERS                                              -->
         <!-- ================================================================= -->
         <!-- AppFolder  Widget Configuration Activity -->
-        <activity android:name=".ui.config.AppFolderWidgetConfigActivity" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".ui.config.AppFolderWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Slate"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- 1. 4-App Folder (2x2) -->
         <receiver android:name=".widgets.appfolder.AppFolder4Receiver" android:exported="true" android:label="Slate 4-App Folder">

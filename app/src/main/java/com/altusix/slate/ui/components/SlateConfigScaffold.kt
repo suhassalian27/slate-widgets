@@ -1,12 +1,11 @@
 package com.altusix.slate.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,9 +19,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -42,37 +45,40 @@ private fun isLightColor(color: Color): Boolean {
 @Composable
 fun SlateConfigScaffold(
     title: String,
-    subtitle: String? = null,
+    subtitle: String? = null, // <-- Included as optional
     accentColor: Color,
     tabs: List<ConfigTabItem> = emptyList(),
     selectedTabKey: String = "",
     onTabSelected: (String) -> Unit = {},
     onBackClick: () -> Unit,
     onSaveClick: () -> Unit,
+    scrollable: Boolean = true,
+    previewHeight: Dp = 190.dp,
+    previewContent: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val contentOnAccent = if (isLightColor(accentColor)) Color.Black else Color.White
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF0C0C0E)
+        color = Color(0xFF0A0A0C)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()
         ) {
-            // 1. Elevated Navigation Header
+            // 1. Top Navigation Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .height(60.dp)
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Back Button + Header Hierarchy
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -89,7 +95,7 @@ fun SlateConfigScaffold(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Cancel",
+                            contentDescription = "Back",
                             tint = Color(0xFFE4E4E8),
                             modifier = Modifier.size(17.dp)
                         )
@@ -107,7 +113,6 @@ fun SlateConfigScaffold(
                             Text(
                                 text = subtitle,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal,
                                 color = Color(0xFF8E8E93),
                                 maxLines = 1
                             )
@@ -115,7 +120,6 @@ fun SlateConfigScaffold(
                     }
                 }
 
-                // Tactile Compound Action Button (Check + Text)
                 Button(
                     onClick = onSaveClick,
                     shape = RoundedCornerShape(19.dp),
@@ -145,63 +149,128 @@ fun SlateConfigScaffold(
                 }
             }
 
-            HorizontalDivider(color = Color(0xFF18181E), thickness = 1.dp)
+            HorizontalDivider(color = Color(0xFF16161C), thickness = 1.dp)
 
-            // 2. Tab Navigation Rail
-            if (tabs.isNotEmpty()) {
-                LazyRow(
+            // 2. High-Contrast Adaptive Preview Viewport
+            if (previewContent != null) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 10.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(tabs) { tab ->
-                        val isSelected = tab.key == selectedTabKey
-                        val animatedBg by animateColorAsState(
-                            targetValue = if (isSelected) accentColor else Color(0xFF16161B),
-                            label = "tabBgAnim"
-                        )
-                        val animatedText by animateColorAsState(
-                            targetValue = if (isSelected) contentOnAccent else Color(0xFF8E8E93),
-                            label = "tabTextAnim"
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .height(36.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(animatedBg)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) Color.Transparent else Color(0xFF24242C),
-                                    shape = RoundedCornerShape(18.dp)
-                                )
-                                .clickable { onTabSelected(tab.key) }
-                                .padding(horizontal = 15.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = tab.label,
-                                fontSize = 12.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = animatedText
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .height(previewHeight)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF252530), Color(0xFF131318), Color(0xFF0B0B0E)),
+                                radius = 700f
                             )
+                        )
+                        .border(1.dp, Color(0xFF262632), RoundedCornerShape(22.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val spacing = 24.dp.toPx()
+                        val dotRadius = 1.0.dp.toPx()
+                        val dotColor = Color(0x22FFFFFF)
+                        val cols = (size.width / spacing).toInt() + 1
+                        val rows = (size.height / spacing).toInt() + 1
+
+                        for (i in 0 until cols) {
+                            for (j in 0 until rows) {
+                                drawCircle(
+                                    color = dotColor,
+                                    radius = dotRadius,
+                                    center = Offset(i * spacing, j * spacing)
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier.shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(20.dp),
+                            spotColor = Color.Black.copy(alpha = 0.75f),
+                            ambientColor = Color.Black.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        previewContent()
+                    }
+                }
+            }
+
+            // 3. Enclosed Segmented Control Track
+            if (tabs.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF141418))
+                        .border(1.dp, Color(0xFF22222A), RoundedCornerShape(14.dp))
+                        .padding(3.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        tabs.forEach { tab ->
+                            val isSelected = tab.key == selectedTabKey
+                            val animatedBg by animateColorAsState(
+                                targetValue = if (isSelected) accentColor else Color.Transparent,
+                                label = "segmentBg"
+                            )
+                            val animatedText by animateColorAsState(
+                                targetValue = if (isSelected) contentOnAccent else Color(0xFF8E8E93),
+                                label = "segmentText"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .background(animatedBg)
+                                    .clickable { onTabSelected(tab.key) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tab.label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = animatedText
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // 3. Main Form Body
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                content()
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // 4. Form Controls Section
+            if (scrollable) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    content()
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    content()
+                }
             }
         }
     }

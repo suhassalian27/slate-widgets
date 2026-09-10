@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -29,9 +30,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -52,7 +51,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -67,8 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.ui.components.ConfigTabItem
 import com.altusix.slate.ui.components.CustomColorPickerDialog
 import com.altusix.slate.ui.components.RainbowCustomCircle
+import com.altusix.slate.ui.components.SlateConfigScaffold
 import com.altusix.slate.widgets.camera.parseAndLockIsResponsive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -78,7 +78,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.hypot
-import android.media.ExifInterface
+
 private enum class ConfigColorTarget {
     BACKGROUND, ACCENT, CAPTION
 }
@@ -123,7 +123,6 @@ class PhotosConfigActivity : ComponentActivity() {
         val initialConfig = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             val loaded = PhotosStorageManager.getConfig(this, widgetId)
             if (!isFixedThreeSlot) {
-                // Filter out empty placeholder slots so the reel only contains real user photos
                 val realItems = loaded.items.filter { !it.imagePath.isNullOrBlank() && File(it.imagePath).exists() }
                 loaded.copy(
                     items = realItems,
@@ -157,8 +156,8 @@ class PhotosConfigActivity : ComponentActivity() {
                     mutableStateOf(if (config.items.isEmpty()) 0 else config.currentIndex.coerceIn(0, config.items.size - 1))
                 }
 
-                // Active Tab: 0 = Photos & Memory, 1 = Widget Theme
-                var selectedTab by remember { mutableIntStateOf(0) }
+                // Active Tab: "PHOTOS" or "THEME"
+                var selectedTab by remember { mutableStateOf("PHOTOS") }
 
                 // Theme States
                 var selectedBgHex by remember { mutableLongStateOf(initialSlateConfig.backgroundColorHex) }
@@ -351,69 +350,21 @@ class PhotosConfigActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .imePadding(),
-                        color = Color(0xFF0C0C0E)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .statusBarsPadding()
-                                .navigationBarsPadding()
-                        ) {
-                            // Top Bar
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    IconButton(
-                                        onClick = { finish() },
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF1C1C22))
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                            contentDescription = "Cancel",
-                                            tint = Color(0xFFD1D1D6),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "Photos & Memories",
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                }
+                    val tabs = listOf(
+                        ConfigTabItem("PHOTOS", "Photos & Memory"),
+                        ConfigTabItem("THEME", "Widget Theme")
+                    )
 
-                                Button(
-                                    onClick = { saveAndFinish() },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(selectedAccentHex),
-                                        contentColor = if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                                    modifier = Modifier.height(36.dp)
-                                ) {
-                                    Text("Save", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-                            }
-
-                            HorizontalDivider(color = Color(0xFF1E1E24), thickness = 1.dp)
-
-                            // Sticky Live Widget Preview
+                    SlateConfigScaffold(
+                        title = "Photos & Memories",
+                        accentColor = Color(selectedAccentHex),
+                        tabs = tabs,
+                        selectedTabKey = selectedTab,
+                        onTabSelected = { selectedTab = it },
+                        onBackClick = { finish() },
+                        onSaveClick = { saveAndFinish() },
+                        previewHeight = 200.dp,
+                        previewContent = {
                             val context = LocalContext.current
                             val previewData by produceState(
                                 initialValue = Pair<Bitmap?, Float>(null, 1.0f),
@@ -431,12 +382,7 @@ class PhotosConfigActivity : ComponentActivity() {
 
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0xFF141418))
-                                    .border(1.dp, Color(0xFF24242C), RoundedCornerShape(20.dp))
+                                    .fillMaxSize()
                                     .clickable {
                                         if (currentImagePath != null) {
                                             val f = File(currentImagePath!!)
@@ -500,833 +446,304 @@ class PhotosConfigActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                        }
+                    ) {
 
-                            // 2-Tab Segmented Selector
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0xFF141418))
-                                    .padding(3.dp)
-                            ) {
-                                listOf("Photos & Memory", "Widget Theme").forEachIndexed { idx, title ->
-                                    val isTabSelected = selectedTab == idx
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(11.dp))
-                                            .background(if (isTabSelected) Color(0xFF26262E) else Color.Transparent)
-                                            .clickable { selectedTab = idx },
-                                        contentAlignment = Alignment.Center
+                        // Tab Content
+                        if (selectedTab == "PHOTOS") {
+                            // A. FIXED 3-SLOT TILES (Bento & FilmStrip)
+                            if (isFixedThreeSlotWidget) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = "WIDGET TILES (3)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF8E8E93),
+                                        letterSpacing = 0.5.sp
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Text(
-                                            text = title,
-                                            color = if (isTabSelected) Color.White else Color(0xFF8E8E93),
-                                            fontSize = 13.sp,
-                                            fontWeight = if (isTabSelected) FontWeight.Bold else FontWeight.Medium
-                                        )
+                                        (0 until 3).forEach { idx ->
+                                            val item = config.items.getOrNull(idx)
+                                            val isSelected = idx == selectedIndex
+                                            val itemBmp = remember(item?.imagePath) {
+                                                item?.imagePath?.let {
+                                                    val f = File(it)
+                                                    if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
+                                                }
+                                            }
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(84.dp)
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .background(Color(0xFF16161B))
+                                                    .border(
+                                                        width = if (isSelected) 2.dp else 1.dp,
+                                                        color = if (isSelected) Color(selectedAccentHex) else Color(0xFF282830),
+                                                        shape = RoundedCornerShape(14.dp)
+                                                    )
+                                                    .clickable {
+                                                        syncActiveItem()
+                                                        selectedIndex = idx
+                                                        if (item?.imagePath == null) {
+                                                            isPickingForNewSlot = false
+                                                            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (itemBmp != null) {
+                                                    Image(
+                                                        bitmap = itemBmp.asImageBitmap(),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Add,
+                                                            contentDescription = null,
+                                                            tint = Color(selectedAccentHex),
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text("Tile ${idx + 1}", fontSize = 11.sp, color = Color(0xFF8E8E93))
+                                                    }
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomStart)
+                                                        .padding(6.dp)
+                                                        .clip(RoundedCornerShape(5.dp))
+                                                        .background(Color.Black.copy(alpha = 0.75f))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("#${idx + 1}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                            }
-
-                            HorizontalDivider(color = Color(0xFF1A1A22), thickness = 1.dp, modifier = Modifier.padding(top = 4.dp))
-
-                            // Scrollable Body
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalArrangement = Arrangement.spacedBy(20.dp)
-                            ) {
-                                if (selectedTab == 0) {
-
-                                    // A. FIXED 3-SLOT TILES (Bento & FilmStrip)
-                                    if (isFixedThreeSlotWidget) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            } else {
+                                // B. SLIDESHOW REEL (Single / Slideshow Widgets)
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(selectedAccentHex))
+                                            )
                                             Text(
-                                                text = "WIDGET TILES (3)",
+                                                text = "SLIDESHOW REEL (${config.items.size})",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFF8E8E93),
                                                 letterSpacing = 0.5.sp
                                             )
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                (0 until 3).forEach { idx ->
-                                                    val item = config.items.getOrNull(idx)
-                                                    val isSelected = idx == selectedIndex
-                                                    val itemBmp = remember(item?.imagePath) {
-                                                        item?.imagePath?.let {
-                                                            val f = File(it)
-                                                            if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
-                                                        }
-                                                    }
-
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .height(84.dp)
-                                                            .clip(RoundedCornerShape(14.dp))
-                                                            .background(Color(0xFF16161B))
-                                                            .border(
-                                                                width = if (isSelected) 2.dp else 1.dp,
-                                                                color = if (isSelected) Color(selectedAccentHex) else Color(0xFF282830),
-                                                                shape = RoundedCornerShape(14.dp)
-                                                            )
-                                                            .clickable {
-                                                                syncActiveItem()
-                                                                selectedIndex = idx
-                                                                if (item?.imagePath == null) {
-                                                                    isPickingForNewSlot = false
-                                                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                                                }
-                                                            },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        if (itemBmp != null) {
-                                                            Image(
-                                                                bitmap = itemBmp.asImageBitmap(),
-                                                                contentDescription = null,
-                                                                modifier = Modifier.fillMaxSize(),
-                                                                contentScale = ContentScale.Crop
-                                                            )
-                                                        } else {
-                                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                                Icon(
-                                                                    imageVector = Icons.Default.Add,
-                                                                    contentDescription = null,
-                                                                    tint = Color(selectedAccentHex),
-                                                                    modifier = Modifier.size(20.dp)
-                                                                )
-                                                                Spacer(modifier = Modifier.height(4.dp))
-                                                                Text("Tile ${idx + 1}", fontSize = 11.sp, color = Color(0xFF8E8E93))
-                                                            }
-                                                        }
-
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .align(Alignment.BottomStart)
-                                                                .padding(6.dp)
-                                                                .clip(RoundedCornerShape(5.dp))
-                                                                .background(Color.Black.copy(alpha = 0.75f))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        ) {
-                                                            Text("#${idx + 1}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // B. SLIDESHOW REEL (Single / Slideshow Widgets)
-                                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(6.dp)
-                                                            .clip(CircleShape)
-                                                            .background(Color(selectedAccentHex))
-                                                    )
-                                                    Text(
-                                                        text = "SLIDESHOW REEL (${config.items.size})",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF8E8E93),
-                                                        letterSpacing = 0.5.sp
-                                                    )
-                                                }
-
-                                                if (config.items.isNotEmpty()) {
-                                                    Text(
-                                                        text = "Clear All",
-                                                        fontSize = 12.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color(0xFFFF453A),
-                                                        modifier = Modifier.clickable {
-                                                            config = config.copy(
-                                                                items = emptyList(),
-                                                                currentIndex = 0,
-                                                                rotationIntervalMinutes = 0
-                                                            )
-                                                            selectedIndex = 0
-                                                            currentImagePath = null
-                                                        }
-                                                    )
-                                                }
-                                            }
-
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                // 1. "+ Add Photos" Card
-                                                if (config.items.size < 6) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .width(76.dp)
-                                                            .height(86.dp)
-                                                            .clip(RoundedCornerShape(16.dp))
-                                                            .background(Color(0xFF14161C))
-                                                            .border(
-                                                                width = 1.5.dp,
-                                                                color = Color(selectedAccentHex).copy(alpha = 0.55f),
-                                                                shape = RoundedCornerShape(16.dp)
-                                                            )
-                                                            .clickable {
-                                                                isPickingForNewSlot = true
-                                                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                                            },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Column(
-                                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                                            verticalArrangement = Arrangement.Center
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Add,
-                                                                contentDescription = "Add Photo",
-                                                                tint = Color(selectedAccentHex),
-                                                                modifier = Modifier.size(24.dp)
-                                                            )
-                                                            Spacer(modifier = Modifier.height(4.dp))
-                                                            Text(
-                                                                text = "Add Photos",
-                                                                fontSize = 10.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                color = Color(selectedAccentHex)
-                                                            )
-                                                        }
-                                                    }
-                                                }
-
-                                                // 2. Real Photo Thumbnails
-                                                config.items.forEachIndexed { idx, item ->
-                                                    val isSelected = idx == selectedIndex
-                                                    val itemBmp = remember(item.imagePath) {
-                                                        item.imagePath?.let {
-                                                            val f = File(it)
-                                                            if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
-                                                        }
-                                                    }
-
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .width(76.dp)
-                                                            .height(86.dp)
-                                                            .clip(RoundedCornerShape(16.dp))
-                                                            .background(Color(0xFF1A1A22))
-                                                            .border(
-                                                                width = if (isSelected) 2.dp else 1.dp,
-                                                                color = if (isSelected) Color(selectedAccentHex) else Color(0xFF282830),
-                                                                shape = RoundedCornerShape(16.dp)
-                                                            )
-                                                            .clickable {
-                                                                syncActiveItem()
-                                                                selectedIndex = idx
-                                                                config = config.copy(currentIndex = idx)
-                                                                currentImagePath = item.imagePath
-                                                            },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        if (itemBmp != null) {
-                                                            Image(
-                                                                bitmap = itemBmp.asImageBitmap(),
-                                                                contentDescription = null,
-                                                                modifier = Modifier.fillMaxSize(),
-                                                                contentScale = ContentScale.Crop
-                                                            )
-                                                        } else {
-                                                            Text(
-                                                                text = "#${idx + 1}",
-                                                                color = if (isSelected) Color(selectedAccentHex) else Color(0xFF8E8E93),
-                                                                fontWeight = FontWeight.Bold,
-                                                                fontSize = 14.sp
-                                                            )
-                                                        }
-
-                                                        // Bottom-Left Index Badge
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .align(Alignment.BottomStart)
-                                                                .padding(6.dp)
-                                                                .clip(RoundedCornerShape(6.dp))
-                                                                .background(Color.Black.copy(alpha = 0.72f))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = "#${idx + 1}",
-                                                                color = Color.White,
-                                                                fontSize = 10.sp,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
-                                                        }
-
-                                                        // Top-Right Close Button
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .align(Alignment.TopEnd)
-                                                                .padding(4.dp)
-                                                                .size(22.dp)
-                                                                .clip(CircleShape)
-                                                                .background(Color.Black.copy(alpha = 0.75f))
-                                                                .clickable {
-                                                                    val curList = config.items.toMutableList()
-                                                                    curList.removeAt(idx)
-                                                                    val nextIdx = 0.coerceAtMost(maxOf(0, curList.size - 1))
-                                                                    config = config.copy(items = curList, currentIndex = nextIdx)
-                                                                    selectedIndex = nextIdx
-                                                                    currentImagePath = curList.getOrNull(nextIdx)?.imagePath
-                                                                },
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Close,
-                                                                contentDescription = "Remove",
-                                                                tint = Color.White,
-                                                                modifier = Modifier.size(13.dp)
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
                                         }
 
-                                        // C. ROTATION INTERVAL (Only shown when 2+ photos exist)
-                                        if (config.items.size > 1) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = "ROTATION INTERVAL",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF8E8E93),
-                                                        letterSpacing = 0.5.sp
+                                        if (config.items.isNotEmpty()) {
+                                            Text(
+                                                text = "Clear All",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFFFF453A),
+                                                modifier = Modifier.clickable {
+                                                    config = config.copy(
+                                                        items = emptyList(),
+                                                        currentIndex = 0,
+                                                        rotationIntervalMinutes = 0
                                                     )
-                                                    Text(
-                                                        text = if (config.rotationIntervalMinutes == 0) "Manual" else "Every ${config.rotationIntervalMinutes}m",
-                                                        fontSize = 12.sp,
-                                                        color = Color(selectedAccentHex),
-                                                        fontWeight = FontWeight.SemiBold
-                                                    )
+                                                    selectedIndex = 0
+                                                    currentImagePath = null
                                                 }
-
-                                                val intervals = listOf(
-                                                    0 to "Manual",
-                                                    15 to "15m",
-                                                    30 to "30m",
-                                                    60 to "1h",
-                                                    180 to "3h"
-                                                )
-
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(Color(0xFF141416))
-                                                        .padding(3.dp),
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    intervals.forEach { (mins, label) ->
-                                                        val isSelected = config.rotationIntervalMinutes == mins
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .weight(1f)
-                                                                .height(36.dp)
-                                                                .clip(RoundedCornerShape(9.dp))
-                                                                .background(if (isSelected) Color(0xFF26262E) else Color.Transparent)
-                                                                .clickable { config = config.copy(rotationIntervalMinutes = mins) },
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Text(
-                                                                text = label,
-                                                                color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                                                fontSize = 12.sp,
-                                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                            )
                                         }
                                     }
 
-                                    // Filter Selection
-                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Text(
-                                            text = "AESTHETIC FILTER",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF8E8E93),
-                                            letterSpacing = 0.5.sp
-                                        )
-
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .horizontalScroll(rememberScrollState()),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            MemoryFilterStyle.values().forEach { style ->
-                                                val isChosen = filterStyle == style
-                                                FilterChip(
-                                                    selected = isChosen,
-                                                    onClick = {
-                                                        filterStyle = style
-                                                        syncActiveItem(newFilter = style)
-                                                    },
-                                                    label = {
-                                                        Text(
-                                                            text = style.label,
-                                                            fontSize = 12.sp,
-                                                            fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Normal
-                                                        )
-                                                    },
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    colors = FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = Color(selectedAccentHex),
-                                                        selectedLabelColor = if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White,
-                                                        containerColor = Color(0xFF1C1C22),
-                                                        labelColor = Color(0xFFD1D1D6)
-                                                    ),
-                                                    border = FilterChipDefaults.filterChipBorder(
-                                                        borderColor = if (isChosen) Color(selectedAccentHex) else Color(0xFF282830),
-                                                        enabled = true,
-                                                        selected = isChosen
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Caption & Overlay
-                                    if (supportsCaption) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "CAPTION & OVERLAY",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF8E8E93),
-                                                    letterSpacing = 0.5.sp
-                                                )
-
-                                                Switch(
-                                                    checked = config.showCaption,
-                                                    onCheckedChange = { config = config.copy(showCaption = it) },
-                                                    colors = SwitchDefaults.colors(
-                                                        checkedThumbColor = Color.Black,
-                                                        checkedTrackColor = Color(selectedAccentHex),
-                                                        uncheckedThumbColor = Color(0xFF8E8E93),
-                                                        uncheckedTrackColor = Color(0xFF1C1C22)
-                                                    )
-                                                )
-                                            }
-
-                                            AnimatedVisibility(visible = config.showCaption) {
-                                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                                    OutlinedTextField(
-                                                        value = caption,
-                                                        onValueChange = {
-                                                            caption = it
-                                                            syncActiveItem(newCap = it)
-                                                        },
-                                                        label = { Text("Caption / Title") },
-                                                        placeholder = { Text("e.g. Featured Memory") },
-                                                        singleLine = true,
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = OutlinedTextFieldDefaults.colors(
-                                                            focusedBorderColor = Color(selectedAccentHex),
-                                                            unfocusedBorderColor = Color(0xFF2C2C35),
-                                                            focusedLabelColor = Color(selectedAccentHex),
-                                                            unfocusedLabelColor = Color(0xFF8E8E93),
-                                                            focusedTextColor = Color.White,
-                                                            unfocusedTextColor = Color.White,
-                                                            focusedContainerColor = Color(0xFF16161B),
-                                                            unfocusedContainerColor = Color(0xFF16161B)
-                                                        )
-                                                    )
-
-                                                    if (supportsDateStamp) {
-                                                        OutlinedTextField(
-                                                            value = dateText,
-                                                            onValueChange = {
-                                                                dateText = it
-                                                                syncActiveItem(newDate = it)
-                                                            },
-                                                            label = { Text("Date Stamp") },
-                                                            placeholder = { Text("e.g. September 2024") },
-                                                            singleLine = true,
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            shape = RoundedCornerShape(12.dp),
-                                                            colors = OutlinedTextFieldDefaults.colors(
-                                                                focusedBorderColor = Color(selectedAccentHex),
-                                                                unfocusedBorderColor = Color(0xFF2C2C35),
-                                                                focusedLabelColor = Color(selectedAccentHex),
-                                                                unfocusedLabelColor = Color(0xFF8E8E93),
-                                                                focusedTextColor = Color.White,
-                                                                unfocusedTextColor = Color.White,
-                                                                focusedContainerColor = Color(0xFF16161B),
-                                                                unfocusedContainerColor = Color(0xFF16161B)
-                                                            )
-                                                        )
-                                                    }
-
-                                                    if (supportsLocation) {
-                                                        OutlinedTextField(
-                                                            value = location,
-                                                            onValueChange = {
-                                                                location = it
-                                                                syncActiveItem(newLoc = it)
-                                                            },
-                                                            label = { Text("Location (Optional)") },
-                                                            placeholder = { Text("e.g. Pacific Coast, California") },
-                                                            singleLine = true,
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            shape = RoundedCornerShape(12.dp),
-                                                            colors = OutlinedTextFieldDefaults.colors(
-                                                                focusedBorderColor = Color(selectedAccentHex),
-                                                                unfocusedBorderColor = Color(0xFF2C2C35),
-                                                                focusedLabelColor = Color(selectedAccentHex),
-                                                                unfocusedLabelColor = Color(0xFF8E8E93),
-                                                                focusedTextColor = Color.White,
-                                                                unfocusedTextColor = Color.White,
-                                                                focusedContainerColor = Color(0xFF16161B),
-                                                                unfocusedContainerColor = Color(0xFF16161B)
-                                                            )
-                                                        )
-                                                    }
-
-                                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                        Text("Font Style", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                        ) {
-                                                            CaptionFont.values().forEach { font ->
-                                                                val isSelected = captionFont == font
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .weight(1f)
-                                                                        .height(38.dp)
-                                                                        .clip(RoundedCornerShape(10.dp))
-                                                                        .background(if (isSelected) Color(selectedAccentHex) else Color(0xFF1C1C22))
-                                                                        .clickable {
-                                                                            captionFont = font
-                                                                            syncActiveItem(newFont = font)
-                                                                        },
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Text(
-                                                                        text = font.label,
-                                                                        color = if (isSelected) {
-                                                                            if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White
-                                                                        } else Color(0xFFD1D1D6),
-                                                                        fontSize = 12.sp,
-                                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text("Text Color", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-
-                                                        val coreSwatches = listOf(
-                                                            0xFFFFFFFFL,
-                                                            0xFF121214L,
-                                                            selectedAccentHex,
-                                                            0xFF8E8E93L
-                                                        )
-
-                                                        Row(
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            coreSwatches.forEach { hexVal ->
-                                                                val isSelected = captionColorHex == hexVal
-                                                                val swatchColor = Color(hexVal.toInt())
-
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(32.dp)
-                                                                        .clip(CircleShape)
-                                                                        .background(swatchColor)
-                                                                        .border(
-                                                                            width = if (isSelected) 2.5.dp else 1.dp,
-                                                                            color = if (isSelected) Color.White else Color(0xFF383842),
-                                                                            shape = CircleShape
-                                                                        )
-                                                                        .clickable {
-                                                                            captionColorHex = hexVal
-                                                                            syncActiveItem(newColorHex = hexVal)
-                                                                        },
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    if (isSelected) {
-                                                                        Icon(
-                                                                            imageVector = Icons.Default.Check,
-                                                                            contentDescription = null,
-                                                                            tint = if (calculateLuminance(hexVal) > 0.5f) Color.Black else Color.White,
-                                                                            modifier = Modifier.size(13.dp)
-                                                                        )
-                                                                    }
-                                                                }
-                                                            }
-
-                                                            val isCustom = coreSwatches.none { it == captionColorHex }
-                                                            RainbowCustomCircle(
-                                                                isSelected = isCustom,
-                                                                activeColor = if (isCustom) Color(captionColorHex.toInt()) else null,
-                                                                onClick = { activeColorTarget = ConfigColorTarget.CAPTION }
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    // ==========================================
-                                    // TAB 2: WIDGET THEME & APPEARANCE
-                                    // ==========================================
-                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Text(
-                                            text = "BACKGROUND STYLE",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF8E8E93),
-                                            letterSpacing = 0.5.sp
-                                        )
-
-                                        val bgPresets = listOf(
-                                            0xFF161618L to "Matte",
-                                            0xFF000000L to "AMOLED",
-                                            0xFFFFFFFFL to "Light"
-                                        )
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            bgPresets.forEach { (hex, label) ->
-                                                val isSelected = selectedBgHex == hex
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(42.dp)
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(if (isSelected) Color(0xFF26262E) else Color(0xFF141416))
-                                                        .border(
-                                                            1.dp,
-                                                            if (isSelected) Color.White.copy(alpha = 0.5f) else Color(0xFF202024),
-                                                            RoundedCornerShape(12.dp)
-                                                        )
-                                                        .clickable {
-                                                            selectedBgHex = hex
-                                                            if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) {
-                                                                selectedAccentHex = 0xFF000000L
-                                                            } else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) {
-                                                                selectedAccentHex = 0xFFFFFFFFL
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                    ) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(8.dp)
-                                                                .clip(CircleShape)
-                                                                .background(Color(hex))
-                                                                .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                                                        )
-                                                        Text(
-                                                            text = label,
-                                                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                                            fontSize = 12.sp,
-                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        // 1. "+ Add Photos" Card
+                                        if (config.items.size < 6) {
                                             Box(
                                                 modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(42.dp)
-                                                    .clip(RoundedCornerShape(12.dp))
-                                                    .background(if (isCustomBg) Color(0xFF26262E) else Color(0xFF141416))
+                                                    .width(76.dp)
+                                                    .height(86.dp)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .background(Color(0xFF14161C))
                                                     .border(
-                                                        1.dp,
-                                                        if (isCustomBg) Color.White.copy(alpha = 0.5f) else Color(0xFF202024),
-                                                        RoundedCornerShape(12.dp)
+                                                        width = 1.5.dp,
+                                                        color = Color(selectedAccentHex).copy(alpha = 0.55f),
+                                                        shape = RoundedCornerShape(16.dp)
                                                     )
-                                                    .clickable { activeColorTarget = ConfigColorTarget.BACKGROUND },
+                                                    .clickable {
+                                                        isPickingForNewSlot = true
+                                                        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                                    },
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center
                                                 ) {
-                                                    val rainbowBrush = Brush.sweepGradient(
-                                                        listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+                                                    Icon(
+                                                        imageVector = Icons.Default.Add,
+                                                        contentDescription = "Add Photo",
+                                                        tint = Color(selectedAccentHex),
+                                                        modifier = Modifier.size(24.dp)
                                                     )
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(9.dp)
-                                                            .clip(CircleShape)
-                                                            .background(if (isCustomBg) Color(selectedBgHex) else Color.Transparent)
-                                                            .then(if (!isCustomBg) Modifier.background(rainbowBrush) else Modifier)
-                                                            .border(0.5.dp, Color.White.copy(alpha = 0.4f), CircleShape)
-                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
                                                     Text(
-                                                        text = "Custom",
-                                                        color = if (isCustomBg) Color.White else Color(0xFF8E8E93),
-                                                        fontSize = 12.sp,
-                                                        fontWeight = if (isCustomBg) FontWeight.Bold else FontWeight.Medium
+                                                        text = "Add Photos",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(selectedAccentHex)
                                                     )
                                                 }
                                             }
                                         }
-                                    }
 
-                                    // Accent Color Selection
-                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Text(
-                                            text = "ACCENT COLOR",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF8E8E93),
-                                            letterSpacing = 0.5.sp
-                                        )
+                                        // 2. Real Photo Thumbnails
+                                        config.items.forEachIndexed { idx, item ->
+                                            val isSelected = idx == selectedIndex
+                                            val itemBmp = remember(item.imagePath) {
+                                                item.imagePath?.let {
+                                                    val f = File(it)
+                                                    if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
+                                                }
+                                            }
 
-                                        val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
-                                        val accentPresets = if (isLightBg) {
-                                            listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-                                        } else {
-                                            listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-                                        }
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(76.dp)
+                                                    .height(86.dp)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .background(Color(0xFF1A1A22))
+                                                    .border(
+                                                        width = if (isSelected) 2.dp else 1.dp,
+                                                        color = if (isSelected) Color(selectedAccentHex) else Color(0xFF282830),
+                                                        shape = RoundedCornerShape(16.dp)
+                                                    )
+                                                    .clickable {
+                                                        syncActiveItem()
+                                                        selectedIndex = idx
+                                                        config = config.copy(currentIndex = idx)
+                                                        currentImagePath = item.imagePath
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (itemBmp != null) {
+                                                    Image(
+                                                        bitmap = itemBmp.asImageBitmap(),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = "#${idx + 1}",
+                                                        color = if (isSelected) Color(selectedAccentHex) else Color(0xFF8E8E93),
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp
+                                                    )
+                                                }
 
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            accentPresets.forEach { hex ->
-                                                val isSelected = selectedAccentHex == hex
-                                                val swatchColor = Color(hex)
-                                                val scale by animateFloatAsState(if (isSelected) 1.15f else 1.0f, label = "circleScale")
-
+                                                // Bottom-Left Index Badge
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(38.dp)
-                                                        .scale(scale)
-                                                        .clickable { selectedAccentHex = hex },
+                                                        .align(Alignment.BottomStart)
+                                                        .padding(6.dp)
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(Color.Black.copy(alpha = 0.72f))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "#${idx + 1}",
+                                                        color = Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+
+                                                // Top-Right Close Button
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(4.dp)
+                                                        .size(22.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color.Black.copy(alpha = 0.75f))
+                                                        .clickable {
+                                                            val curList = config.items.toMutableList()
+                                                            curList.removeAt(idx)
+                                                            val nextIdx = 0.coerceAtMost(maxOf(0, curList.size - 1))
+                                                            config = config.copy(items = curList, currentIndex = nextIdx)
+                                                            selectedIndex = nextIdx
+                                                            currentImagePath = curList.getOrNull(nextIdx)?.imagePath
+                                                        },
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    if (isSelected) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .fillMaxSize()
-                                                                .clip(CircleShape)
-                                                                .border(1.8.dp, Color.White, CircleShape)
-                                                        )
-                                                    }
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(28.dp)
-                                                            .clip(CircleShape)
-                                                            .background(swatchColor)
-                                                            .border(0.5.dp, Color.White.copy(alpha = 0.2f), CircleShape),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        if (isSelected) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Check,
-                                                                contentDescription = null,
-                                                                tint = if (calculateLuminance(hex) > 0.6f) Color.Black else Color.White,
-                                                                modifier = Modifier.size(13.dp)
-                                                            )
-                                                        }
-                                                    }
+                                                    Icon(
+                                                        imageVector = Icons.Default.Close,
+                                                        contentDescription = "Remove",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
                                                 }
                                             }
-
-                                            val isCustomAccent = accentPresets.none { it == selectedAccentHex }
-                                            RainbowCustomCircle(
-                                                isSelected = isCustomAccent,
-                                                activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
-                                                onClick = { activeColorTarget = ConfigColorTarget.ACCENT }
-                                            )
                                         }
                                     }
+                                }
 
-                                    // Surface Opacity Slider
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // C. ROTATION INTERVAL (Only shown when 2+ photos exist)
+                                if (config.items.size > 1) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Surface Translucency", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                            Text("${(opacity * 100).toInt()}%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = "ROTATION INTERVAL",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF8E8E93),
+                                                letterSpacing = 0.5.sp
+                                            )
+                                            Text(
+                                                text = if (config.rotationIntervalMinutes == 0) "Manual" else "Every ${config.rotationIntervalMinutes}m",
+                                                fontSize = 12.sp,
+                                                color = Color(selectedAccentHex),
+                                                fontWeight = FontWeight.SemiBold
+                                            )
                                         }
 
-                                        Slider(
-                                            value = opacity,
-                                            onValueChange = { opacity = it },
-                                            valueRange = 0.0f..1.0f,
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = Color.White,
-                                                activeTrackColor = Color(selectedAccentHex),
-                                                inactiveTrackColor = Color(0xFF282832)
-                                            )
-                                        )
-                                    }
-
-                                    // Sizing Mode (Responsive vs Fixed Aspect)
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(
-                                            text = "SIZING MODE",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF8E8E93),
-                                            letterSpacing = 0.5.sp
+                                        val intervals = listOf(
+                                            0 to "Manual",
+                                            15 to "15m",
+                                            30 to "30m",
+                                            60 to "1h",
+                                            180 to "3h"
                                         )
 
                                         Row(
@@ -1334,27 +751,513 @@ class PhotosConfigActivity : ComponentActivity() {
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(Color(0xFF141416))
-                                                .padding(3.dp)
+                                                .padding(3.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            listOf(true to "Responsive", false to "Fixed Aspect").forEach { (resp, label) ->
-                                                val isModeSelected = isResponsive == resp
+                                            intervals.forEach { (mins, label) ->
+                                                val isSelected = config.rotationIntervalMinutes == mins
                                                 Box(
                                                     modifier = Modifier
                                                         .weight(1f)
-                                                        .height(38.dp)
+                                                        .height(36.dp)
                                                         .clip(RoundedCornerShape(9.dp))
-                                                        .background(if (isModeSelected) Color(0xFF26262E) else Color.Transparent)
-                                                        .clickable { isResponsive = resp },
+                                                        .background(if (isSelected) Color(0xFF26262E) else Color.Transparent)
+                                                        .clickable { config = config.copy(rotationIntervalMinutes = mins) },
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
                                                         text = label,
-                                                        color = if (isModeSelected) Color.White else Color(0xFF8E8E93),
-                                                        fontSize = 13.sp,
-                                                        fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium
+                                                        color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                                     )
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Filter Selection
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = "AESTHETIC FILTER",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF8E8E93),
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    MemoryFilterStyle.values().forEach { style ->
+                                        val isChosen = filterStyle == style
+                                        FilterChip(
+                                            selected = isChosen,
+                                            onClick = {
+                                                filterStyle = style
+                                                syncActiveItem(newFilter = style)
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = style.label,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(selectedAccentHex),
+                                                selectedLabelColor = if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White,
+                                                containerColor = Color(0xFF1C1C22),
+                                                labelColor = Color(0xFFD1D1D6)
+                                            ),
+                                            border = FilterChipDefaults.filterChipBorder(
+                                                borderColor = if (isChosen) Color(selectedAccentHex) else Color(0xFF282830),
+                                                enabled = true,
+                                                selected = isChosen
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Caption & Overlay
+                            if (supportsCaption) {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "CAPTION & OVERLAY",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF8E8E93),
+                                            letterSpacing = 0.5.sp
+                                        )
+
+                                        Switch(
+                                            checked = config.showCaption,
+                                            onCheckedChange = { config = config.copy(showCaption = it) },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.Black,
+                                                checkedTrackColor = Color(selectedAccentHex),
+                                                uncheckedThumbColor = Color(0xFF8E8E93),
+                                                uncheckedTrackColor = Color(0xFF1C1C22)
+                                            )
+                                        )
+                                    }
+
+                                    AnimatedVisibility(visible = config.showCaption) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                            OutlinedTextField(
+                                                value = caption,
+                                                onValueChange = {
+                                                    caption = it
+                                                    syncActiveItem(newCap = it)
+                                                },
+                                                label = { Text("Caption / Title") },
+                                                placeholder = { Text("e.g. Featured Memory") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = Color(selectedAccentHex),
+                                                    unfocusedBorderColor = Color(0xFF2C2C35),
+                                                    focusedLabelColor = Color(selectedAccentHex),
+                                                    unfocusedLabelColor = Color(0xFF8E8E93),
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor = Color.White,
+                                                    focusedContainerColor = Color(0xFF16161B),
+                                                    unfocusedContainerColor = Color(0xFF16161B)
+                                                )
+                                            )
+
+                                            if (supportsDateStamp) {
+                                                OutlinedTextField(
+                                                    value = dateText,
+                                                    onValueChange = {
+                                                        dateText = it
+                                                        syncActiveItem(newDate = it)
+                                                    },
+                                                    label = { Text("Date Stamp") },
+                                                    placeholder = { Text("e.g. September 2024") },
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedBorderColor = Color(selectedAccentHex),
+                                                        unfocusedBorderColor = Color(0xFF2C2C35),
+                                                        focusedLabelColor = Color(selectedAccentHex),
+                                                        unfocusedLabelColor = Color(0xFF8E8E93),
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedContainerColor = Color(0xFF16161B),
+                                                        unfocusedContainerColor = Color(0xFF16161B)
+                                                    )
+                                                )
+                                            }
+
+                                            if (supportsLocation) {
+                                                OutlinedTextField(
+                                                    value = location,
+                                                    onValueChange = {
+                                                        location = it
+                                                        syncActiveItem(newLoc = it)
+                                                    },
+                                                    label = { Text("Location (Optional)") },
+                                                    placeholder = { Text("e.g. Pacific Coast, California") },
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedBorderColor = Color(selectedAccentHex),
+                                                        unfocusedBorderColor = Color(0xFF2C2C35),
+                                                        focusedLabelColor = Color(selectedAccentHex),
+                                                        unfocusedLabelColor = Color(0xFF8E8E93),
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedContainerColor = Color(0xFF16161B),
+                                                        unfocusedContainerColor = Color(0xFF16161B)
+                                                    )
+                                                )
+                                            }
+
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text("Font Style", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    CaptionFont.values().forEach { font ->
+                                                        val isSelected = captionFont == font
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .weight(1f)
+                                                                .height(38.dp)
+                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .background(if (isSelected) Color(selectedAccentHex) else Color(0xFF1C1C22))
+                                                                .clickable {
+                                                                    captionFont = font
+                                                                    syncActiveItem(newFont = font)
+                                                                },
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = font.label,
+                                                                color = if (isSelected) {
+                                                                    if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White
+                                                                } else Color(0xFFD1D1D6),
+                                                                fontSize = 12.sp,
+                                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Text Color", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                                                val coreSwatches = listOf(
+                                                    0xFFFFFFFFL,
+                                                    0xFF121214L,
+                                                    selectedAccentHex,
+                                                    0xFF8E8E93L
+                                                )
+
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    coreSwatches.forEach { hexVal ->
+                                                        val isSelected = captionColorHex == hexVal
+                                                        val swatchColor = Color(hexVal.toInt())
+
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(32.dp)
+                                                                .clip(CircleShape)
+                                                                .background(swatchColor)
+                                                                .border(
+                                                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                                                    color = if (isSelected) Color.White else Color(0xFF383842),
+                                                                    shape = CircleShape
+                                                                )
+                                                                .clickable {
+                                                                    captionColorHex = hexVal
+                                                                    syncActiveItem(newColorHex = hexVal)
+                                                                },
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            if (isSelected) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Check,
+                                                                    contentDescription = null,
+                                                                    tint = if (calculateLuminance(hexVal) > 0.5f) Color.Black else Color.White,
+                                                                    modifier = Modifier.size(13.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    val isCustom = coreSwatches.none { it == captionColorHex }
+                                                    RainbowCustomCircle(
+                                                        isSelected = isCustom,
+                                                        activeColor = if (isCustom) Color(captionColorHex.toInt()) else null,
+                                                        onClick = { activeColorTarget = ConfigColorTarget.CAPTION }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // TAB 2: WIDGET THEME & APPEARANCE
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = "BACKGROUND STYLE",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF8E8E93),
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                val bgPresets = listOf(
+                                    0xFF161618L to "Matte",
+                                    0xFF000000L to "AMOLED",
+                                    0xFFFFFFFFL to "Light"
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    bgPresets.forEach { (hex, label) ->
+                                        val isSelected = selectedBgHex == hex
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(42.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) Color(0xFF26262E) else Color(0xFF141416))
+                                                .border(
+                                                    1.dp,
+                                                    if (isSelected) Color.White.copy(alpha = 0.5f) else Color(0xFF202024),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .clickable {
+                                                    selectedBgHex = hex
+                                                    if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) {
+                                                        selectedAccentHex = 0xFF000000L
+                                                    } else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) {
+                                                        selectedAccentHex = 0xFFFFFFFFL
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(hex))
+                                                        .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                                )
+                                                Text(
+                                                    text = label,
+                                                    color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(42.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isCustomBg) Color(0xFF26262E) else Color(0xFF141416))
+                                            .border(
+                                                1.dp,
+                                                if (isCustomBg) Color.White.copy(alpha = 0.5f) else Color(0xFF202024),
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable { activeColorTarget = ConfigColorTarget.BACKGROUND },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            val rainbowBrush = Brush.sweepGradient(
+                                                listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(9.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isCustomBg) Color(selectedBgHex) else Color.Transparent)
+                                                    .then(if (!isCustomBg) Modifier.background(rainbowBrush) else Modifier)
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                                            )
+                                            Text(
+                                                text = "Custom",
+                                                color = if (isCustomBg) Color.White else Color(0xFF8E8E93),
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isCustomBg) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Accent Color Selection
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(
+                                    text = "ACCENT COLOR",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF8E8E93),
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
+                                val accentPresets = if (isLightBg) {
+                                    listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                                } else {
+                                    listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    accentPresets.forEach { hex ->
+                                        val isSelected = selectedAccentHex == hex
+                                        val swatchColor = Color(hex)
+                                        val scale by animateFloatAsState(if (isSelected) 1.15f else 1.0f, label = "circleScale")
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .scale(scale)
+                                                .clickable { selectedAccentHex = hex },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .clip(CircleShape)
+                                                        .border(1.8.dp, Color.White, CircleShape)
+                                                )
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(CircleShape)
+                                                    .background(swatchColor)
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.2f), CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = if (calculateLuminance(hex) > 0.6f) Color.Black else Color.White,
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    val isCustomAccent = accentPresets.none { it == selectedAccentHex }
+                                    RainbowCustomCircle(
+                                        isSelected = isCustomAccent,
+                                        activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
+                                        onClick = { activeColorTarget = ConfigColorTarget.ACCENT }
+                                    )
+                                }
+                            }
+
+                            // Surface Opacity Slider
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Surface Translucency", color = Color(0xFF8E8E93), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                    Text("${(opacity * 100).toInt()}%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Slider(
+                                    value = opacity,
+                                    onValueChange = { opacity = it },
+                                    valueRange = 0.0f..1.0f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White,
+                                        activeTrackColor = Color(selectedAccentHex),
+                                        inactiveTrackColor = Color(0xFF282832)
+                                    )
+                                )
+                            }
+
+                            // Sizing Mode (Responsive vs Fixed Aspect)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "SIZING MODE",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF8E8E93),
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF141416))
+                                        .padding(3.dp)
+                                ) {
+                                    listOf(true to "Responsive", false to "Fixed Aspect").forEach { (resp, label) ->
+                                        val isModeSelected = isResponsive == resp
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(38.dp)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .background(if (isModeSelected) Color(0xFF26262E) else Color.Transparent)
+                                                .clickable { isResponsive = resp },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                color = if (isModeSelected) Color.White else Color(0xFF8E8E93),
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium
+                                            )
                                         }
                                     }
                                 }
@@ -1616,21 +1519,18 @@ private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetC
     )
 }
 
-
 // ============================================================================
 // EXIF-AWARE BITMAP LOADER
 // ============================================================================
 
 private fun decodeSampledBitmapWithExif(context: Context, uri: Uri, maxDim: Int = 2048): Bitmap? {
     return try {
-        // 1. Read camera orientation from EXIF metadata
         var orientation = ExifInterface.ORIENTATION_NORMAL
         context.contentResolver.openInputStream(uri)?.use { stream ->
             val exif = ExifInterface(stream)
             orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         }
 
-        // 2. Decode bounds to prevent OutOfMemoryError on 50MP+ camera shots
         val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { stream ->
             BitmapFactory.decodeStream(stream, null, boundsOptions)
@@ -1641,7 +1541,6 @@ private fun decodeSampledBitmapWithExif(context: Context, uri: Uri, maxDim: Int 
             inSampleSize *= 2
         }
 
-        // 3. Decode scaled bitmap
         val decodeOptions = BitmapFactory.Options().apply {
             this.inSampleSize = inSampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -1650,7 +1549,6 @@ private fun decodeSampledBitmapWithExif(context: Context, uri: Uri, maxDim: Int 
             BitmapFactory.decodeStream(stream, null, decodeOptions)
         } ?: return null
 
-        // 4. Auto-correct orientation so camera photos load upright
         val matrix = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
@@ -1724,13 +1622,11 @@ fun SlateProEditorOverlay(
     var selectedRatio by remember { mutableStateOf(CropRatio.FREEFORM) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // Decode with automatic EXIF correction
     val initialBitmap = remember(rawUri) {
         decodeSampledBitmapWithExif(context, rawUri)
     }
     var currentBitmap by remember(initialBitmap) { mutableStateOf(initialBitmap) }
 
-    // imageRect tracks the exact visual pixels on screen
     val imageRect = remember(currentBitmap, containerSize, paddingPx) {
         val bmp = currentBitmap
         if (bmp == null || containerSize == IntSize.Zero) Rect.Zero
@@ -1753,7 +1649,6 @@ fun SlateProEditorOverlay(
 
     var cropRect by remember { mutableStateOf(Rect.Zero) }
 
-    // Lock cropRect inside imageRect whenever orientation or aspect ratio changes
     LaunchedEffect(imageRect, selectedRatio) {
         if (imageRect != Rect.Zero) {
             val targetRatio = selectedRatio.ratio ?: (imageRect.width / imageRect.height)
@@ -1787,7 +1682,6 @@ fun SlateProEditorOverlay(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1826,7 +1720,6 @@ fun SlateProEditorOverlay(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Main Editor Canvas
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -1838,7 +1731,6 @@ fun SlateProEditorOverlay(
             ) {
                 val bmp = currentBitmap
                 if (bmp != null) {
-                    // Display current bitmap directly; matches imageRect without post-layout desync
                     Image(
                         bitmap = bmp.asImageBitmap(),
                         contentDescription = "Edit Preview",
@@ -2068,7 +1960,6 @@ fun SlateProEditorOverlay(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Controls Island
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2158,5 +2049,3 @@ private fun cropBitmapFromBounds(
         Uri.fromFile(outputFile).toString()
     } catch (_: Exception) { null }
 }
-
-
