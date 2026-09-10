@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.hypot
 
 data class ConfigTabItem(
     val key: String,
@@ -45,7 +45,7 @@ private fun isLightColor(color: Color): Boolean {
 @Composable
 fun SlateConfigScaffold(
     title: String,
-    subtitle: String? = null, // <-- Included as optional
+    subtitle: String? = null,
     accentColor: Color,
     tabs: List<ConfigTabItem> = emptyList(),
     selectedTabKey: String = "",
@@ -53,7 +53,7 @@ fun SlateConfigScaffold(
     onBackClick: () -> Unit,
     onSaveClick: () -> Unit,
     scrollable: Boolean = true,
-    previewHeight: Dp = 190.dp,
+    previewHeight: Dp = 195.dp,
     previewContent: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -151,55 +151,71 @@ fun SlateConfigScaffold(
 
             HorizontalDivider(color = Color(0xFF16161C), thickness = 1.dp)
 
-            // 2. High-Contrast Adaptive Preview Viewport
+            // 2. High-Contrast Studio Showcase Viewport
             if (previewContent != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                         .height(previewHeight)
-                        .clip(RoundedCornerShape(22.dp))
+                        .clip(RoundedCornerShape(24.dp))
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(Color(0xFF252530), Color(0xFF131318), Color(0xFF0B0B0E)),
-                                radius = 700f
+                                colors = listOf(
+                                    Color(0xFF282A36), // Balanced center stage light
+                                    Color(0xFF171820),
+                                    Color(0xFF0E0F14),
+                                    Color(0xFF090A0D)
+                                ),
+                                radius = 620f
                             )
                         )
-                        .border(1.dp, Color(0xFF262632), RoundedCornerShape(22.dp)),
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x35FFFFFF),
+                                    Color(0x12FFFFFF),
+                                    Color(0x05FFFFFF)
+                                )
+                            ),
+                            shape = RoundedCornerShape(24.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Dot Grid Background
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val spacing = 24.dp.toPx()
+                        val spacing = 22.dp.toPx()
                         val dotRadius = 1.0.dp.toPx()
-                        val dotColor = Color(0x22FFFFFF)
+                        val cx = size.width / 2f
+                        val cy = size.height / 2f
+                        val maxDist = hypot(cx, cy)
+
                         val cols = (size.width / spacing).toInt() + 1
                         val rows = (size.height / spacing).toInt() + 1
 
                         for (i in 0 until cols) {
                             for (j in 0 until rows) {
+                                val px = i * spacing
+                                val py = j * spacing
+                                val dist = hypot(px - cx, py - cy)
+                                val alpha = (1f - (dist / maxDist)).coerceIn(0.06f, 0.26f)
+
                                 drawCircle(
-                                    color = dotColor,
+                                    color = Color.White.copy(alpha = alpha),
                                     radius = dotRadius,
-                                    center = Offset(i * spacing, j * spacing)
+                                    center = Offset(px, py)
                                 )
                             }
                         }
                     }
 
-                    Box(
-                        modifier = Modifier.shadow(
-                            elevation = 16.dp,
-                            shape = RoundedCornerShape(20.dp),
-                            spotColor = Color.Black.copy(alpha = 0.75f),
-                            ambientColor = Color.Black.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        previewContent()
-                    }
+                    // Content renders cleanly without an artificial rectangular shadow
+                    previewContent()
                 }
             }
 
-            // 3. Enclosed Segmented Control Track
+            // 3. Segmented Control Track
             if (tabs.isNotEmpty()) {
                 Box(
                     modifier = Modifier

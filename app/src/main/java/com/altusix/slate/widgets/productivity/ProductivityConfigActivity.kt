@@ -42,6 +42,14 @@ import com.altusix.slate.ui.components.ConfigTabItem
 import com.altusix.slate.ui.components.CustomColorPickerDialog
 import com.altusix.slate.ui.components.RainbowCustomCircle
 import com.altusix.slate.ui.components.SlateConfigScaffold
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 
 private enum class ProductivityColorTarget { BACKGROUND, ACCENT }
 
@@ -159,9 +167,8 @@ class ProductivityConfigActivity : ComponentActivity() {
                         ProductivityWidgetLivePreview(
                             tab = initialTab,
                             config = config,
-                            bgHex = selectedBgHex,
-                            accentHex = selectedAccentHex,
-                            opacity = opacity
+                            slateConfig = currentSlateConfig,
+                            isResponsive = isResponsive
                         )
                     }
                 ) {
@@ -342,105 +349,50 @@ class ProductivityConfigActivity : ComponentActivity() {
 }
 
 // =========================================================================
-// LIVE PREVIEW CONTAINER
+// LIVE PREVIEW CONTAINER (1:1 Exact Canvas Renderer)
 // =========================================================================
 
 @Composable
 private fun ProductivityWidgetLivePreview(
     tab: String,
     config: ProductivityWidgetConfig,
-    bgHex: Long,
-    accentHex: Long,
-    opacity: Float
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean
 ) {
-    val isLight = (((bgHex shr 16 and 0xFFL) * 0.2126f) + ((bgHex shr 8 and 0xFFL) * 0.7152f) + ((bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
-    val textColor = if (isLight) Color.Black else Color.White
-    val subColor = if (isLight) Color(0xFF3C3C43) else Color(0xFF8E8E93)
-    val accentColor = Color(accentHex)
+    val context = LocalContext.current
 
-    Box(
-        modifier = Modifier
-            .widthIn(min = 220.dp, max = 280.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(bgHex).copy(alpha = opacity))
-            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    // Geometry matched to widget aspect ratios
+    val (wDp, hDp) = when (tab) {
+        "PIPELINE" -> 280 to 70
+        "HABIT", "TOP3", "TIMELINE", "BOOKMARKS" -> 260 to 130
+        else -> 140 to 140
+    }
+
+    val previewBitmap = remember(tab, config, slateConfig, isResponsive) {
         when (tab) {
-            "TIMER" -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("FOCUS SESSION", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = accentColor, letterSpacing = 1.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    val mins = config.focusTimer.remainingSeconds / 60
-                    val secs = config.focusTimer.remainingSeconds % 60
-                    Text("%02d:%02d".format(mins, secs), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = textColor)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Session ${config.focusTimer.currentSession} of ${config.focusTimer.maxSessions}", fontSize = 11.sp, color = subColor)
-                }
+            "TIMER" -> generatePomodoroTimerBitmap(context, config.focusTimer, slateConfig, isResponsive, wDp, hDp)
+            "HABIT" -> generateHabitMatrixBitmap(context, config.habit, slateConfig, isResponsive, wDp, hDp)
+            "TOP3" -> generateTop3TasksBitmap(context, config.top3Tasks, slateConfig, isResponsive, wDp, hDp)
+            "EISENHOWER" -> generateEisenhowerMatrixBitmap(context, config.eisenhowerTasks, slateConfig, isResponsive, wDp, hDp)
+            "TIMELINE" -> generateTimeBlockTimelineBitmap(context, config.timeBlocks, slateConfig, isResponsive, wDp, hDp)
+            "GOAL" -> generateGoalMilestoneBitmap(context, config.goal, slateConfig, isResponsive, wDp, hDp)
+            "RINGS" -> generateHabitRingsBitmap(context, config.habitRings, slateConfig, isResponsive, wDp, hDp)
+            "PIPELINE" -> generateTaskPipelineBitmap(context, config.pipeline, slateConfig, isResponsive, wDp, hDp)
+            "BOOKMARKS" -> generateBookmarkListBitmap(context, config.bookmarks, slateConfig, isResponsive, wDp, hDp)
+            "SCREENTIME" -> {
+                val liveData = ProductivityStorageManager.resolveLiveScreenTime(context).copy(limitMinutes = config.screenTime.limitMinutes)
+                generateScreenTimeBitmap(context, liveData, slateConfig, isResponsive, wDp, hDp)
             }
-            "HABIT" -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(config.habit.name.ifEmpty { "Daily Habit" }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textColor, maxLines = 1)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("${config.habit.streakCount}", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = accentColor)
-                    Text("DAYS STREAK", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = subColor, letterSpacing = 1.sp)
-                }
-            }
-            "GOAL" -> {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(config.goal.title.ifEmpty { "Milestone Target" }, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textColor, modifier = Modifier.weight(1f), maxLines = 1)
-                        Text("${config.goal.currentProgress}%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = accentColor)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(config.goal.deadlineDateText.ifEmpty { "Target Date" }, fontSize = 11.sp, color = subColor)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LinearProgressIndicator(
-                        progress = { config.goal.currentProgress / 100f },
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                        color = accentColor,
-                        trackColor = textColor.copy(alpha = 0.15f)
-                    )
-                }
-            }
-            "PIPELINE" -> {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf("To Do" to config.pipeline.todoCount, "In Prog" to config.pipeline.inProgressCount, "Done" to config.pipeline.doneCount).forEach { (label, count) ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("$count", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = if (label == "Done") accentColor else textColor)
-                            Text(label, fontSize = 10.sp, color = subColor, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-            else -> {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("TOP 3 PRIORITIES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = accentColor, letterSpacing = 1.sp)
-                    config.top3Tasks.take(3).forEachIndexed { i, t ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (t.isCompleted) accentColor else textColor.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (t.isCompleted) Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(12.dp))
-                            }
-                            Text(
-                                text = t.title.ifEmpty { "Priority ${i + 1}" },
-                                fontSize = 12.sp,
-                                color = if (t.isCompleted) subColor else textColor,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
+            "CLIPBOARD" -> generateClipboardVaultBitmap(context, config.clipboardSnippets, slateConfig, isResponsive, wDp, hDp)
+            else -> generateTop3TasksBitmap(context, config.top3Tasks, slateConfig, isResponsive, wDp, hDp)
         }
     }
+
+    Image(
+        bitmap = previewBitmap.asImageBitmap(),
+        contentDescription = "Widget Live Preview",
+        modifier = Modifier.size(wDp.dp, hDp.dp)
+    )
 }
 
 // =========================================================================
