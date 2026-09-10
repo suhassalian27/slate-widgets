@@ -13,6 +13,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // =========================================================================
@@ -378,7 +379,7 @@ private fun calculateLuminance(colorLong: Long): Float {
 
 
 // =========================================================================
-// 2. HABIT STREAK MATRIX (4x2)
+// 2. HABIT STREAK MATRIX (Edge-to-Edge Adaptive Grid & Proportional Typography)
 // =========================================================================
 
 fun generateHabitMatrixBitmap(
@@ -393,115 +394,194 @@ fun generateHabitMatrixBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2.0f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    // 1. True Fixed (2.0 aspect) vs Responsive Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // 1. Header (Habit Name & Streak Pill)
-    val headerTop = cardRect.top + 16f * scaleFactor
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val todayCal = Calendar.getInstance()
+    val todayStr = sdf.format(todayCal.time)
+    val isTodayDone = habit.history[todayStr] == true
+
+    // Compute live metrics
+    val streak = calculateHabitStreak(habit.history)
+    val (weekDone, _) = calculateWeekCompletion(habit.history)
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 2. Uniform Symmetrical Margins
+    val padX = (cardW * 0.055f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+    val padY = (cardH * 0.065f).coerceIn(10f * scaleFactor, 18f * scaleFactor)
+
+    val contentLeft = cardRect.left + padX
+    val contentRight = cardRect.right - padX
+    val contentTop = cardRect.top + padY
+    val contentBottom = cardRect.bottom - padY
+
+    // 3. Smooth Proportional Header (Scales directly with widget size without freezing)
+    val headerH = minOf(cardH * 0.25f, cardW * 0.16f).coerceIn(24f * scaleFactor, 52f * scaleFactor)
+
+    // Title & Subtitle Typography
+    val titleSize = headerH * 0.44f
+    val subSize = headerH * 0.30f
+
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 15f * scaleFactor
+        textSize = titleSize
         typeface = getSlateFont(context, 700)
     }
-    canvas.drawText(habit.name, cardRect.left + 18f * scaleFactor, headerTop + 14f * scaleFactor, titlePaint)
+    val habitName = habit.name.ifBlank { "Workout" }
+    canvas.drawText(habitName, contentLeft, contentTop + titleSize, titlePaint)
 
-    val streakBadgeText = "🔥 ${habit.streakCount} DAYS"
-    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = 11f * scaleFactor
-        typeface = getSlateFont(context, 700)
+    val metaText = "🔥 $streak  ·  $weekDone/3 this week"
+    val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = subSize
+        typeface = getSlateFont(context, 500)
     }
-    val badgeW = badgePaint.measureText(streakBadgeText) + 16f * scaleFactor
-    val badgeH = 22f * scaleFactor
-    val badgeX = cardRect.right - 18f * scaleFactor - badgeW
-    val badgeY = headerTop
-    val badgeRect = RectF(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH)
-    val badgeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(35, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
+    canvas.drawText(metaText, contentLeft, contentTop + titleSize + subSize + (3f * scaleFactor), subPaint)
+
+    // Top-Right Action Checkmark
+    val toggleBtnR = headerH * 0.42f
+    val toggleBtnCx = contentRight - toggleBtnR
+    val toggleBtnCy = contentTop + (headerH / 2f)
+
+    val toggleBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isTodayDone) {
+            accentColor
+        } else {
+            if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(24, 255, 255, 255)
+        }
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(badgeRect, 8f * scaleFactor, 8f * scaleFactor, badgeBg)
-    canvas.drawText(streakBadgeText, badgeX + 8f * scaleFactor, badgeY + 15f * scaleFactor, badgePaint)
+    canvas.drawCircle(toggleBtnCx, toggleBtnCy, toggleBtnR, toggleBgPaint)
 
-    // 2. 7x5 Contribution Grid
-    val gridStartX = cardRect.left + 18f * scaleFactor
-    val gridStartY = headerTop + 36f * scaleFactor
-    val availableW = cardRect.width() - 36f * scaleFactor
-    val cols = 5
+    if (!isTodayDone) {
+        val toggleBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(28, 0, 0, 0) else Color.argb(36, 255, 255, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = 1f * scaleFactor
+        }
+        canvas.drawCircle(toggleBtnCx, toggleBtnCy, toggleBtnR, toggleBorder)
+    }
+
+    val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isTodayDone) {
+            if (calculateLuminance(accentColor.toLong()) > 0.5f) Color.BLACK else Color.WHITE
+        } else {
+            secondaryTextColor
+        }
+        style = Paint.Style.STROKE
+        strokeWidth = (toggleBtnR * 0.17f).coerceIn(1.6f * scaleFactor, 3.0f * scaleFactor)
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    val checkPath = Path().apply {
+        val cr = toggleBtnR * 0.38f
+        moveTo(toggleBtnCx - cr, toggleBtnCy)
+        lineTo(toggleBtnCx - (cr * 0.25f), toggleBtnCy + (cr * 0.75f))
+        lineTo(toggleBtnCx + (cr * 1.05f), toggleBtnCy - (cr * 0.65f))
+    }
+    canvas.drawPath(checkPath, checkPaint)
+
+    // 4. Edge-to-Edge Grid Calculation
+    val gridTop = contentTop + headerH + (6f * scaleFactor)
+    val gridBottom = contentBottom
+
+    val availW = (contentRight - contentLeft).coerceAtLeast(10f)
+    val availH = (gridBottom - gridTop).coerceAtLeast(10f)
+
+    // 7 rows (Monday = 0, Sunday = 6)
     val rows = 7
-    val cellGap = 5.5f * scaleFactor
-    val cellSize = minOf((availableW - (cols - 1) * cellGap) / cols, 15f * scaleFactor)
-    val cellCorner = cellSize * 0.35f
+    val todayRow = (todayCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
 
-    val cal = Calendar.getInstance()
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val todayStr = sdf.format(Date())
+    // Maximum vertical step so dots never exceed the vertical area
+    val maxStepY = availH / rows.toFloat()
+
+    // Target pitch: Prevent dots from becoming gigantic in portrait widgets
+    val targetStep = minOf(maxStepY, 26f * scaleFactor)
+
+    // Fit maximum columns edge-to-edge across availW
+    val cols = kotlin.math.ceil((availW / targetStep).toDouble()).toInt().coerceAtLeast(5)
+
+    // Force step to exactly divide availW -> 0px horizontal leftover
+    val step = availW / cols.toFloat()
+    val gap = step * 0.26f
+    val dotR = (step - gap) / 2f
+
+    // Start Column 0 aligned with contentLeft, ending flush with contentRight
+    val gridStartX = contentLeft + (step / 2f)
+
+    // Center the 7 rows vertically within the remaining grid area
+    val totalGridH = rows * step
+    val gridStartY = gridTop + ((availH - totalGridH) / 2f) + (step / 2f)
+
+    val filledPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+    val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val todayRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        style = Paint.Style.STROKE
+        strokeWidth = (dotR * 0.30f).coerceIn(1.4f * scaleFactor, 2.4f * scaleFactor)
+    }
 
     for (c in 0 until cols) {
+        val weeksAgo = (cols - 1) - c
         for (r in 0 until rows) {
-            val dayIndex = (cols - 1 - c) * rows + (rows - 1 - r)
-            val tempCal = cal.clone() as Calendar
-            tempCal.add(Calendar.DAY_OF_YEAR, -dayIndex)
+            // Days after today in current week remain unrendered
+            if (c == cols - 1 && r > todayRow) continue
+
+            val dayOffset = (weeksAgo * 7) + (todayRow - r)
+            val tempCal = todayCal.clone() as Calendar
+            tempCal.add(Calendar.DAY_OF_YEAR, -dayOffset)
             val dateStr = sdf.format(tempCal.time)
-            val isCompleted = habit.history[dateStr] ?: false
-            val isToday = dateStr == todayStr
 
-            val cx = gridStartX + c * (cellSize + cellGap)
-            val cy = gridStartY + r * (cellSize + cellGap)
-            val cellRect = RectF(cx, cy, cx + cellSize, cy + cellSize)
+            val isDone = habit.history[dateStr] == true
+            val isToday = (c == cols - 1 && r == todayRow)
 
-            val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = when {
-                    isCompleted -> accentColor
-                    else -> Color.argb(35, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
+            val dotCx = gridStartX + (c * step)
+            val dotCy = gridStartY + (r * step)
+
+            when {
+                isDone -> {
+                    canvas.drawCircle(dotCx, dotCy, dotR, filledPaint)
                 }
-                style = Paint.Style.FILL
-            }
-            canvas.drawRoundRect(cellRect, cellCorner, cellCorner, fillPaint)
-
-            if (isToday) {
-                val todayBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = primaryTextColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = 1.6f * scaleFactor
+                isToday -> {
+                    // Outlined circular target for today's pending state
+                    canvas.drawCircle(dotCx, dotCy, dotR - (todayRingPaint.strokeWidth / 2f), todayRingPaint)
                 }
-                canvas.drawRoundRect(cellRect, cellCorner, cellCorner, todayBorder)
+                else -> {
+                    canvas.drawCircle(dotCx, dotCy, dotR, emptyPaint)
+                }
             }
         }
     }
 
-    // 3. Right Side: Today's Toggle Action Pill
-    val rightSideX = gridStartX + cols * (cellSize + cellGap) + 14f * scaleFactor
-    val todayDone = habit.history[todayStr] ?: false
-    val actionBtnW = cardRect.right - 18f * scaleFactor - rightSideX
-    val actionBtnH = 42f * scaleFactor
-    val actionBtnY = gridStartY + 35f * scaleFactor
-    val actionRect = RectF(rightSideX, actionBtnY, rightSideX + actionBtnW, actionBtnY + actionBtnH)
-
-    val actionBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (todayDone) accentColor else Color.argb(30, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(actionRect, 12f * scaleFactor, 12f * scaleFactor, actionBg)
-
-    val actionLabel = if (todayDone) "✓ TODAY DONE" else "○ MARK TODAY"
-    val actionTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (todayDone) Color.BLACK else primaryTextColor
-        textSize = 11.5f * scaleFactor
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.CENTER
-    }
-    canvas.drawText(actionLabel, actionRect.centerX(), actionRect.centerY() + 4f * scaleFactor, actionTextPaint)
-
     return bitmap
 }
+
 
 // =========================================================================
 // 3. DAILY TOP 3 WINS (4x2)

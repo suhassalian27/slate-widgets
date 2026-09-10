@@ -551,13 +551,17 @@ private fun HabitEditor(
     accentColor: Color,
     onUpdate: (HabitItem) -> Unit
 ) {
+    val streak = calculateHabitStreak(habit.history)
+    val (weekDone, _) = calculateWeekCompletion(habit.history)
+    val totalLogged = habit.history.values.count { it }
+
     SectionTitle(title = "Habit Details")
 
     OutlinedTextField(
         value = habit.name,
         onValueChange = { text: String -> onUpdate(habit.copy(name = text)) },
         label = { Text("Habit Name") },
-        placeholder = { Text("e.g. Read 20 mins, Workout", color = Color(0xFF8E8E93)) },
+        placeholder = { Text("e.g. Workout, Read, Meditate", color = Color(0xFF8E8E93)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         shape = RoundedCornerShape(14.dp),
@@ -571,7 +575,25 @@ private fun HabitEditor(
     )
 
     Spacer(Modifier.height(4.dp))
-    SectionTitle(title = "Consecutive Streak")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SectionTitle(title = "Habit Analytics")
+        if (habit.history.isNotEmpty()) {
+            Text(
+                text = "Reset History",
+                color = Color(0xFFFF453A),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable {
+                    onUpdate(habit.copy(history = emptyMap(), streakCount = 0))
+                }
+            )
+        }
+    }
 
     Row(
         modifier = Modifier
@@ -579,36 +601,30 @@ private fun HabitEditor(
             .clip(RoundedCornerShape(14.dp))
             .background(Color(0xFF141418))
             .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Text("Active Streak", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text("${habit.streakCount} days continuous", color = Color(0xFF8E8E93), fontSize = 12.sp)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "🔥 $streak", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(text = "Active Streak", color = Color(0xFF8E8E93), fontSize = 11.sp)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF22222A))
-                    .clickable { onUpdate(habit.copy(streakCount = maxOf(0, habit.streakCount - 1))) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("-", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-            Text("${habit.streakCount}", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(accentColor)
-                    .clickable { onUpdate(habit.copy(streakCount = habit.streakCount + 1)) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("+", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
+
+        Box(modifier = Modifier.width(1.dp).height(28.dp).background(Color(0xFF24242C)))
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "$weekDone/7", color = accentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(text = "This Week", color = Color(0xFF8E8E93), fontSize = 11.sp)
+        }
+
+        Box(modifier = Modifier.width(1.dp).height(28.dp).background(Color(0xFF24242C)))
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "$totalLogged", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(text = "Total Days", color = Color(0xFF8E8E93), fontSize = 11.sp)
         }
     }
 }

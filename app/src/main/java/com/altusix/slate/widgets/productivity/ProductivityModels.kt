@@ -13,16 +13,16 @@ import java.util.Date
 import java.util.Locale
 
 // =========================================================================
-// 1. DATA MODELS
+// 1. DATA MODELS (Zero Fake Data)
 // =========================================================================
 
 data class FocusTimerState(
     val isRunning: Boolean = false,
     val remainingSeconds: Int = 25 * 60,
     val totalSeconds: Int = 25 * 60,
-    val currentSession: Int = 2,
+    val currentSession: Int = 0,
     val maxSessions: Int = 4,
-    val phase: String = "FOCUS", // FOCUS, SHORT_BREAK, LONG_BREAK
+    val phase: String = "FOCUS",
     val lastTimestamp: Long = 0L
 ) {
     val formattedTime: String
@@ -35,24 +35,24 @@ data class FocusTimerState(
 
 data class HabitItem(
     val id: String = "habit_1",
-    val name: String = "Deep Work",
-    val streakCount: Int = 18,
+    val name: String = "Workout",
+    val streakCount: Int = 0,
     val targetDaysPerWeek: Int = 7,
     val colorHex: Long = 0xFF4CD964L,
-    val history: Map<String, Boolean> = emptyMap() // "yyyy-MM-dd" -> true
+    val history: Map<String, Boolean> = emptyMap() // Clean start: no fake checkmarks
 )
 
 data class Top3TaskItem(
     val id: String = "task_1",
-    val title: String = "Finish Q3 roadmap",
+    val title: String = "",
     val isCompleted: Boolean = false,
-    val priority: Int = 1 // 1, 2, 3
+    val priority: Int = 1
 )
 
 data class EisenhowerItem(
     val id: String,
     val title: String,
-    val quadrant: String // Q1_DO, Q2_SCHEDULE, Q3_DELEGATE, Q4_DROP
+    val quadrant: String
 )
 
 data class TimeBlockItem(
@@ -70,12 +70,12 @@ data class TimeBlockItem(
 
 data class GoalMilestoneItem(
     val id: String = "goal_1",
-    val title: String = "Slate v2.0 Launch",
-    val currentProgress: Int = 74,
+    val title: String = "Milestone Goal",
+    val currentProgress: Int = 0,
     val targetProgress: Int = 100,
     val unit: String = "%",
-    val deadlineDateText: String = "Oct 31",
-    val milestoneCurrent: Int = 3,
+    val deadlineDateText: String = "",
+    val milestoneCurrent: Int = 0,
     val milestoneTotal: Int = 5
 )
 
@@ -89,9 +89,9 @@ data class HabitRingItem(
 )
 
 data class TaskPipelineData(
-    val todoCount: Int = 3,
-    val inProgressCount: Int = 2,
-    val doneCount: Int = 7
+    val todoCount: Int = 0,
+    val inProgressCount: Int = 0,
+    val doneCount: Int = 0
 )
 
 data class BookmarkItem(
@@ -109,14 +109,10 @@ data class ClipboardSnippetItem(
 )
 
 data class ScreenTimeData(
-    val totalMinutesToday: Int = 222, // 3h 42m
-    val limitMinutes: Int = 270,      // 4h 30m
-    val pickupsCount: Int = 48,
-    val topCategories: List<Pair<String, Int>> = listOf(
-        "Focus & Code" to 125,
-        "Comms & Team" to 62,
-        "Reading" to 35
-    )
+    val totalMinutesToday: Int = 0,
+    val limitMinutes: Int = 240,
+    val pickupsCount: Int = 0,
+    val topCategories: List<Pair<String, Int>> = emptyList()
 ) {
     val formattedHoursMinutes: String
         get() {
@@ -134,60 +130,45 @@ data class ScreenTimeData(
 
 data class ProductivityWidgetConfig(
     val focusTimer: FocusTimerState = FocusTimerState(),
-    val habit: HabitItem = HabitItem(history = generateDefaultHabitHistory()),
+    val habit: HabitItem = HabitItem(),
     val top3Tasks: List<Top3TaskItem> = listOf(
-        Top3TaskItem("t1", "Finalize Slate Productivity widgets", true, 1),
-        Top3TaskItem("t2", "Review system architecture", true, 2),
-        Top3TaskItem("t3", "Prepare release notes & demo", false, 3)
+        Top3TaskItem("t1", "", false, 1),
+        Top3TaskItem("t2", "", false, 2),
+        Top3TaskItem("t3", "", false, 3)
     ),
     val eisenhowerTasks: List<EisenhowerItem> = listOf(
-        EisenhowerItem("e1", "Fix critical sync bug", "Q1_DO"),
-        EisenhowerItem("e2", "Design system audit", "Q2_SCHEDULE"),
-        EisenhowerItem("e3", "Sort sprint tickets", "Q3_DELEGATE"),
-        EisenhowerItem("e4", "Archive old threads", "Q4_DROP")
+        EisenhowerItem("e1", "", "Q1_DO"),
+        EisenhowerItem("e2", "", "Q2_SCHEDULE"),
+        EisenhowerItem("e3", "", "Q3_DELEGATE"),
+        EisenhowerItem("e4", "", "Q4_DROP")
     ),
     val timeBlocks: List<TimeBlockItem> = listOf(
-        TimeBlockItem("tb1", "Deep Work & Architecture", 9, 0, 11, 30, "DEEP"),
-        TimeBlockItem("tb2", "Design Sync & Comms", 11, 30, 12, 30, "SYNC"),
-        TimeBlockItem("tb3", "Widget Canvas Implementation", 14, 0, 16, 30, "BUILD"),
-        TimeBlockItem("tb4", "Daily Code Review", 16, 30, 17, 30, "REVIEW")
+        TimeBlockItem("tb1", "", 9, 0, 11, 0, "FOCUS"),
+        TimeBlockItem("tb2", "", 11, 0, 13, 0, "FOCUS"),
+        TimeBlockItem("tb3", "", 14, 0, 16, 0, "FOCUS"),
+        TimeBlockItem("tb4", "", 16, 0, 18, 0, "FOCUS")
     ),
     val goal: GoalMilestoneItem = GoalMilestoneItem(),
     val habitRings: List<HabitRingItem> = listOf(
-        HabitRingItem("r1", "Deep Work", 4, 4, "hrs", 0xFFFF5E3A),
-        HabitRingItem("r2", "Read 30m", 25, 30, "mins", 0xFF30D158),
-        HabitRingItem("r3", "Workout", 45, 45, "mins", 0xFF0A84FF)
+        HabitRingItem("r1", "Focus", 0, 4, "hrs", 0xFFFF5E3A),
+        HabitRingItem("r2", "Read", 0, 30, "mins", 0xFF30D158),
+        HabitRingItem("r3", "Workout", 0, 45, "mins", 0xFF0A84FF)
     ),
     val pipeline: TaskPipelineData = TaskPipelineData(),
     val bookmarks: List<BookmarkItem> = listOf(
-        BookmarkItem("b1", "GitHub Repo", "https://github.com", "github.com"),
-        BookmarkItem("b2", "Figma Workspace", "https://figma.com", "figma.com"),
-        BookmarkItem("b3", "Linear Issues", "https://linear.app", "linear.app"),
-        BookmarkItem("b4", "Android Docs", "https://developer.android.com", "android.com")
+        BookmarkItem("b1", "", "", ""),
+        BookmarkItem("b2", "", "", ""),
+        BookmarkItem("b3", "", "", ""),
+        BookmarkItem("b4", "", "", "")
     ),
     val clipboardSnippets: List<ClipboardSnippetItem> = listOf(
-        ClipboardSnippetItem("c1", "Design Accent Hex", "#30D158"),
-        ClipboardSnippetItem("c2", "Daily Standup Template", "Yesterday: Finished Photos widgets\nToday: Productivity widgets\nBlockers: None"),
-        ClipboardSnippetItem("c3", "Meeting Zoom Link", "https://zoom.us/j/slate-team")
+        ClipboardSnippetItem("c1", "", ""),
+        ClipboardSnippetItem("c2", "", "")
     ),
     val screenTime: ScreenTimeData = ScreenTimeData()
 ) {
     companion object {
         fun getDefaultConfig(): ProductivityWidgetConfig = ProductivityWidgetConfig()
-
-        fun generateDefaultHabitHistory(): Map<String, Boolean> {
-            val map = mutableMapOf<String, Boolean>()
-            val cal = Calendar.getInstance()
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            for (i in 0 until 35) {
-                val tempCal = cal.clone() as Calendar
-                tempCal.add(Calendar.DAY_OF_YEAR, -i)
-                val dateStr = sdf.format(tempCal.time)
-                val isDone = if (i < 18) true else (i % 3 != 0)
-                map[dateStr] = isDone
-            }
-            return map
-        }
     }
 }
 
@@ -226,12 +207,20 @@ object ProductivityStorageManager {
         val current = getConfig(context, widgetId)
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = sdf.format(Date())
-        val currentDone = current.habit.history[todayStr] ?: false
-        val newMap = current.habit.history.toMutableMap()
-        newMap[todayStr] = !currentDone
 
-        val newStreak = if (!currentDone) current.habit.streakCount + 1 else maxOf(0, current.habit.streakCount - 1)
-        val updatedHabit = current.habit.copy(history = newMap, streakCount = newStreak)
+        val updatedHistory = current.habit.history.toMutableMap()
+        val isDone = updatedHistory[todayStr] == true
+        if (isDone) {
+            updatedHistory.remove(todayStr)
+        } else {
+            updatedHistory[todayStr] = true
+        }
+
+        val updatedStreak = calculateHabitStreak(updatedHistory)
+        val updatedHabit = current.habit.copy(
+            history = updatedHistory,
+            streakCount = updatedStreak
+        )
         saveConfig(context, widgetId, current.copy(habit = updatedHabit))
     }
 
@@ -248,7 +237,6 @@ object ProductivityStorageManager {
         }
 
         val updatedTimer = when {
-            // 1. Timer completed or at 00:00 -> Tap resets back to full session duration
             effectiveRemaining <= 0 -> {
                 timer.copy(
                     isRunning = false,
@@ -256,7 +244,6 @@ object ProductivityStorageManager {
                     lastTimestamp = 0L
                 )
             }
-            // 2. Timer is running -> Tap pauses
             timer.isRunning -> {
                 timer.copy(
                     isRunning = false,
@@ -264,7 +251,6 @@ object ProductivityStorageManager {
                     lastTimestamp = now
                 )
             }
-            // 3. Timer is paused -> Tap starts/resumes
             else -> {
                 timer.copy(
                     isRunning = true,
@@ -287,7 +273,6 @@ object ProductivityStorageManager {
             timer.remainingSeconds
         }
 
-        // If at 00:00, use totalSeconds as the baseline so adjustments work immediately
         val baseRemaining = if (currentRemaining <= 0 && !timer.isRunning) timer.totalSeconds else currentRemaining
         val newRemaining = (baseRemaining + deltaSecs).coerceIn(60, 180 * 60)
         val newTotal = maxOf(timer.totalSeconds, newRemaining)
@@ -366,7 +351,6 @@ object ProductivityStorageManager {
     private fun serializeConfig(config: ProductivityWidgetConfig): String {
         val root = JSONObject()
 
-        // 1. Focus Timer
         val timerObj = JSONObject().apply {
             put("isRunning", config.focusTimer.isRunning)
             put("remainingSeconds", config.focusTimer.remainingSeconds)
@@ -378,7 +362,6 @@ object ProductivityStorageManager {
         }
         root.put("focusTimer", timerObj)
 
-        // 2. Habit
         val habitObj = JSONObject().apply {
             put("id", config.habit.id)
             put("name", config.habit.name)
@@ -391,7 +374,6 @@ object ProductivityStorageManager {
         }
         root.put("habit", habitObj)
 
-        // 3. Top 3 Tasks
         val top3Arr = JSONArray()
         config.top3Tasks.forEach { task ->
             top3Arr.put(JSONObject().apply {
@@ -403,7 +385,6 @@ object ProductivityStorageManager {
         }
         root.put("top3Tasks", top3Arr)
 
-        // 4. Eisenhower Tasks
         val eisenArr = JSONArray()
         config.eisenhowerTasks.forEach { e ->
             eisenArr.put(JSONObject().apply {
@@ -414,7 +395,6 @@ object ProductivityStorageManager {
         }
         root.put("eisenhowerTasks", eisenArr)
 
-        // 5. Time Blocks
         val tbArr = JSONArray()
         config.timeBlocks.forEach { tb ->
             tbArr.put(JSONObject().apply {
@@ -429,7 +409,6 @@ object ProductivityStorageManager {
         }
         root.put("timeBlocks", tbArr)
 
-        // 6. Goal
         val goalObj = JSONObject().apply {
             put("id", config.goal.id)
             put("title", config.goal.title)
@@ -442,7 +421,6 @@ object ProductivityStorageManager {
         }
         root.put("goal", goalObj)
 
-        // 7. Habit Rings
         val ringsArr = JSONArray()
         config.habitRings.forEach { r ->
             ringsArr.put(JSONObject().apply {
@@ -456,7 +434,6 @@ object ProductivityStorageManager {
         }
         root.put("habitRings", ringsArr)
 
-        // 8. Pipeline
         val pipeObj = JSONObject().apply {
             put("todoCount", config.pipeline.todoCount)
             put("inProgressCount", config.pipeline.inProgressCount)
@@ -464,7 +441,6 @@ object ProductivityStorageManager {
         }
         root.put("pipeline", pipeObj)
 
-        // 9. Bookmarks
         val bArr = JSONArray()
         config.bookmarks.forEach { b ->
             bArr.put(JSONObject().apply {
@@ -476,7 +452,6 @@ object ProductivityStorageManager {
         }
         root.put("bookmarks", bArr)
 
-        // 10. Snippets
         val sArr = JSONArray()
         config.clipboardSnippets.forEach { s ->
             sArr.put(JSONObject().apply {
@@ -501,7 +476,7 @@ object ProductivityStorageManager {
                     isRunning = t.optBoolean("isRunning", false),
                     remainingSeconds = t.optInt("remainingSeconds", 25 * 60),
                     totalSeconds = t.optInt("totalSeconds", 25 * 60),
-                    currentSession = t.optInt("currentSession", 2),
+                    currentSession = t.optInt("currentSession", 0),
                     maxSessions = t.optInt("maxSessions", 4),
                     phase = t.optString("phase", "FOCUS"),
                     lastTimestamp = t.optLong("lastTimestamp", 0L)
@@ -517,13 +492,13 @@ object ProductivityStorageManager {
                 }
                 HabitItem(
                     id = h.optString("id", "habit_1"),
-                    name = h.optString("name", "Deep Work"),
-                    streakCount = h.optInt("streakCount", 18),
+                    name = h.optString("name", "Workout"),
+                    streakCount = calculateHabitStreak(history),
                     targetDaysPerWeek = h.optInt("targetDaysPerWeek", 7),
                     colorHex = h.optLong("colorHex", 0xFF4CD964L),
                     history = history
                 )
-            } else ProductivityWidgetConfig.getDefaultConfig().habit
+            } else HabitItem()
 
             val top3List = mutableListOf<Top3TaskItem>()
             if (root.has("top3Tasks")) {
@@ -573,12 +548,12 @@ object ProductivityStorageManager {
                 val g = root.getJSONObject("goal")
                 GoalMilestoneItem(
                     id = g.optString("id", "goal_1"),
-                    title = g.optString("title", "Slate v2.0 Launch"),
-                    currentProgress = g.optInt("currentProgress", 74),
+                    title = g.optString("title", ""),
+                    currentProgress = g.optInt("currentProgress", 0),
                     targetProgress = g.optInt("targetProgress", 100),
                     unit = g.optString("unit", "%"),
-                    deadlineDateText = g.optString("deadlineDateText", "Oct 31"),
-                    milestoneCurrent = g.optInt("milestoneCurrent", 3),
+                    deadlineDateText = g.optString("deadlineDateText", ""),
+                    milestoneCurrent = g.optInt("milestoneCurrent", 0),
                     milestoneTotal = g.optInt("milestoneTotal", 5)
                 )
             } else GoalMilestoneItem()
@@ -602,9 +577,9 @@ object ProductivityStorageManager {
             val pipeline = if (root.has("pipeline")) {
                 val p = root.getJSONObject("pipeline")
                 TaskPipelineData(
-                    todoCount = p.optInt("todoCount", 3),
-                    inProgressCount = p.optInt("inProgressCount", 2),
-                    doneCount = p.optInt("doneCount", 7)
+                    todoCount = p.optInt("todoCount", 0),
+                    inProgressCount = p.optInt("inProgressCount", 0),
+                    doneCount = p.optInt("doneCount", 0)
                 )
             } else TaskPipelineData()
 
@@ -616,7 +591,7 @@ object ProductivityStorageManager {
                     bList.add(BookmarkItem(
                         id = o.optString("id", "b$i"),
                         title = o.optString("title", ""),
-                        url = o.optString("url", "https://google.com"),
+                        url = o.optString("url", ""),
                         domain = o.optString("domain", "")
                     ))
                 }
@@ -653,5 +628,57 @@ object ProductivityStorageManager {
             ProductivityWidgetConfig.getDefaultConfig()
         }
     }
+}
 
+// =========================================================================
+// HABIT COMPUTATION HELPERS
+// =========================================================================
+
+fun calculateHabitStreak(history: Map<String, Boolean>): Int {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val cal = Calendar.getInstance()
+    val todayStr = sdf.format(cal.time)
+
+    var streak = 0
+    val doneToday = history[todayStr] == true
+
+    if (doneToday) {
+        streak++
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+    } else {
+        val yesterdayCal = cal.clone() as Calendar
+        yesterdayCal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayStr = sdf.format(yesterdayCal.time)
+        if (history[yesterdayStr] != true) {
+            return 0
+        }
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+    }
+
+    while (true) {
+        val dateStr = sdf.format(cal.time)
+        if (history[dateStr] == true) {
+            streak++
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        } else {
+            break
+        }
+    }
+    return streak
+}
+
+fun calculateWeekCompletion(history: Map<String, Boolean>): Pair<Int, Int> {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val cal = Calendar.getInstance()
+
+    val dayOfWeekIndex = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    cal.add(Calendar.DAY_OF_YEAR, -dayOfWeekIndex)
+
+    var completed = 0
+    for (i in 0 until 7) {
+        val dateStr = sdf.format(cal.time)
+        if (history[dateStr] == true) completed++
+        cal.add(Calendar.DAY_OF_YEAR, 1)
+    }
+    return Pair(completed, 7)
 }

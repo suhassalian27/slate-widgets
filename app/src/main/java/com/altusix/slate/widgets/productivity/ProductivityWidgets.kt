@@ -245,7 +245,7 @@ abstract class BaseProductivityReceiver(
             val effWDp: Int
             val effHDp: Int
 
-            if (!isResponsive) {
+            if (!isResponsive && targetAspect > 0f) {
                 val currentAspect = wDp.toFloat() / hDp.toFloat().coerceAtLeast(1f)
                 if (currentAspect > targetAspect) {
                     val contentW = hDp * targetAspect
@@ -396,10 +396,13 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
 }
 
 // =========================================================================
-// 2. HABIT STREAK MATRIX (4x2)
+// 2. HABIT STREAK MATRIX
 // =========================================================================
 
-class ProductivityHabitMatrixReceiver : BaseProductivityReceiver(R.layout.widget_productivity_habit_layout, targetAspect = 2.0f) {
+class ProductivityHabitMatrixReceiver : BaseProductivityReceiver(
+    layoutResId = R.layout.widget_productivity_habit_layout,
+    targetAspect = 0f
+) {
     override val defaultTab: String = "HABIT"
 
     override fun renderWidgetBitmap(
@@ -428,7 +431,6 @@ class ProductivityHabitMatrixReceiver : BaseProductivityReceiver(R.layout.widget
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.btn_habit_open, openPi)
-        views.setOnClickPendingIntent(R.id.btn_habit_open_alt, openPi)
 
         val toggleIntent = Intent(context, this.javaClass).apply {
             action = ACTION_TOGGLE_HABIT_TODAY
