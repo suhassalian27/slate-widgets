@@ -14,6 +14,7 @@ import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import android.os.Build
 
 // =========================================================================
 // CATALOG & UPDATE HELPERS
@@ -180,6 +181,21 @@ abstract class BaseProductivityReceiver(
             ACTION_TOGGLE_TIMER -> {
                 if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                     ProductivityStorageManager.toggleFocusTimer(context, appWidgetId)
+                    val config = ProductivityStorageManager.getConfig(context, appWidgetId)
+
+                    val serviceIntent = Intent(context, PomodoroTimerService::class.java).apply {
+                        putExtra(PomodoroTimerService.EXTRA_WIDGET_ID, appWidgetId)
+                        action = if (config.focusTimer.isRunning) {
+                            PomodoroTimerService.ACTION_START
+                        } else {
+                            PomodoroTimerService.ACTION_STOP
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
                     updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
                 }
                 return
@@ -222,30 +238,40 @@ abstract class BaseProductivityReceiver(
             val hDp = if (hDpRaw <= 0) 160 else hDpRaw
 
             val isResponsive = if (id == -1) false else parseAndLockIsResponsive(context, id)
-            val bitmap = renderWidgetBitmap(context, id, config, isResponsive, wDp, hDp)
-            val views = RemoteViews(context.packageName, layoutResId)
-            views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
+            val density = context.resources.displayMetrics.density
 
-            // Dynamic Letterbox Padding Alignment for Fixed Mode
+            val padH: Int
+            val padV: Int
+            val effWDp: Int
+            val effHDp: Int
+
             if (!isResponsive) {
-                val density = context.resources.displayMetrics.density
                 val currentAspect = wDp.toFloat() / hDp.toFloat().coerceAtLeast(1f)
-                val padH: Int
-                val padV: Int
-
                 if (currentAspect > targetAspect) {
                     val contentW = hDp * targetAspect
                     padH = (((wDp - contentW) / 2f) * density).toInt()
                     padV = 0
+                    effWDp = maxOf(1, contentW.toInt())
+                    effHDp = hDp
                 } else {
                     val contentH = wDp / targetAspect
                     padH = 0
                     padV = (((hDp - contentH) / 2f) * density).toInt()
+                    effWDp = wDp
+                    effHDp = maxOf(1, contentH.toInt())
                 }
-                views.setViewPadding(R.id.layout_productivity_root, padH, padV, padH, padV)
             } else {
-                views.setViewPadding(R.id.layout_productivity_root, 0, 0, 0, 0)
+                padH = 0
+                padV = 0
+                effWDp = wDp
+                effHDp = hDp
             }
+
+            // Render to effective size so the canvas fills 100% of the visible area
+            val bitmap = renderWidgetBitmap(context, id, config, isResponsive, effWDp, effHDp)
+            val views = RemoteViews(context.packageName, layoutResId)
+            views.setViewPadding(R.id.layout_productivity_root, padH, padV, padH, padV)
+            views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
 
             setupTouchTargets(context, views, id)
             manager.updateAppWidget(id, views)
@@ -276,9 +302,13 @@ abstract class BaseProductivityReceiver(
 // =========================================================================
 // 1. POMODORO FOCUS DIAL (2x2)
 // =========================================================================
-
 class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_productivity_timer_layout, targetAspect = 1.0f) {
     override val defaultTab: String = "TIMER"
+
+    companion object {
+        const val ACTION_ADJUST_TIMER = "com.altusix.slate.productivity.ACTION_ADJUST_TIMER"
+        const val EXTRA_DELTA_MINUTES = "extra_delta_minutes"
+    }
 
     override fun renderWidgetBitmap(
         context: Context,
@@ -290,6 +320,17 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
     ): Bitmap {
         val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
         return generatePomodoroTimerBitmap(context, prodConfig.focusTimer, config, isResponsive, wDp, hDp)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (intent.action == ACTION_ADJUST_TIMER && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            val delta = intent.getIntExtra(EXTRA_DELTA_MINUTES, 0)
+            ProductivityStorageManager.adjustFocusTimer(context, appWidgetId, delta)
+            updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+            return
+        }
+        super.onReceive(context, intent)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
@@ -308,21 +349,22 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
         )
         views.setOnClickPendingIntent(R.id.btn_timer_open, openPi)
 
-        // Reset Button
-        val resetIntent = Intent(context, this.javaClass).apply {
-            action = ACTION_RESET_TIMER
+        // Minus 5m Button (-5)
+        val minusIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_ADJUST_TIMER
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            data = Uri.parse("slate_prod://$appWidgetId/timer_reset")
+            putExtra(EXTRA_DELTA_MINUTES, -5)
+            data = Uri.parse("slate_prod://$appWidgetId/timer_minus_5")
         }
-        val resetPi = PendingIntent.getBroadcast(
+        val minusPi = PendingIntent.getBroadcast(
             context,
             appWidgetId * 100 + 2,
-            resetIntent,
+            minusIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.btn_timer_reset, resetPi)
+        views.setOnClickPendingIntent(R.id.btn_timer_minus, minusPi)
 
-        // Toggle (Play/Pause) Button
+        // Center Toggle (Play/Pause) Pill
         val toggleIntent = Intent(context, this.javaClass).apply {
             action = ACTION_TOGGLE_TIMER
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -335,6 +377,21 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.btn_timer_toggle, togglePi)
+
+        // Plus 5m Button (+5)
+        val plusIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_ADJUST_TIMER
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra(EXTRA_DELTA_MINUTES, 5)
+            data = Uri.parse("slate_prod://$appWidgetId/timer_plus_5")
+        }
+        val plusPi = PendingIntent.getBroadcast(
+            context,
+            appWidgetId * 100 + 4,
+            plusIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.btn_timer_plus, plusPi)
     }
 }
 

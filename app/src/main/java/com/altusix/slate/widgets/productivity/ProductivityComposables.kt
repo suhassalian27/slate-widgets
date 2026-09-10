@@ -12,6 +12,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
 
 // =========================================================================
 // CANVAS BITMAP GENERATORS FOR SLATE "PRODUCTIVITY" WIDGETS
@@ -176,9 +178,8 @@ private fun drawPillBadge(
 }
 
 // =========================================================================
-// 1. POMODORO FOCUS DIAL (2x2)
+// 1. POMODORO FOCUS DIAL (2x2 - Hero Dial with In-Pill Live Countdown)
 // =========================================================================
-
 fun generatePomodoroTimerBitmap(
     context: Context,
     timer: FocusTimerState,
@@ -191,126 +192,190 @@ fun generatePomodoroTimerBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    // 1. Fixed Mode Square Card Anchoring
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
+    val minDim = minOf(cardRect.width(), cardRect.height())
     val cx = cardRect.centerX()
-    val cy = cardRect.top + cardRect.height() * 0.44f
-    val ringRadius = minOf(cardRect.width(), cardRect.height()) * 0.30f
-    val strokeW = 7f * scaleFactor
 
-    // Background track arc
-    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(30, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
+    // 2. Real-Time Countdown & Angle Calculations
+    val effectiveRemaining = if (timer.isRunning && timer.lastTimestamp > 0L) {
+        val elapsed = ((System.currentTimeMillis() - timer.lastTimestamp) / 1000).toInt()
+        maxOf(0, timer.remainingSeconds - elapsed)
+    } else {
+        timer.remainingSeconds
+    }
+    val mins = effectiveRemaining / 60
+    val secs = effectiveRemaining % 60
+    val formattedTime = String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
+
+    val totalSecs = timer.totalSeconds.coerceAtLeast(60)
+    val progress = ((totalSecs - effectiveRemaining).toFloat() / totalSecs.toFloat()).coerceIn(0f, 1f)
+    val sweepAngle = progress * 360f
+
+    // 3. Enriched Bottom Controls Geometry
+    val bottomCenterY = cardRect.bottom - (minDim * 0.125f)
+    val pillH = minDim * 0.145f
+    val pillW = minDim * 0.46f
+    val btnR = pillH / 2f
+    val btnGap = minDim * 0.035f
+
+    // 4. Maximum Hero Dial Space (Occupies entire upper deck)
+    val bottomDockTop = bottomCenterY - (pillH / 2f)
+    val availableUpperH = bottomDockTop - cardRect.top
+    val cy = cardRect.top + (availableUpperH / 2f) + (minDim * 0.015f)
+    val dialR = (availableUpperH / 2f) * 0.88f
+
+    // 5. Dial Tick Marks (60 radial marks floating outside the disc)
+    val rOuterTicks = dialR
+    val majorTickLen = minDim * 0.040f
+    val minorTickLen = minDim * 0.022f
+
+    val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = strokeW
         strokeCap = Paint.Cap.ROUND
     }
-    val arcRect = RectF(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius)
-    canvas.drawArc(arcRect, 135f, 270f, false, trackPaint)
 
-    // Progress arc
-    val progress = ((timer.totalSeconds - timer.remainingSeconds).toFloat() / timer.totalSeconds.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
-    val sweepAngle = 270f * progress
-    if (sweepAngle > 0f) {
-        val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
-            style = Paint.Style.STROKE
-            strokeWidth = strokeW
-            strokeCap = Paint.Cap.ROUND
+    canvas.save()
+    for (i in 0 until 60) {
+        val isMajor = (i % 5 == 0)
+        tickPaint.strokeWidth = if (isMajor) 1.8f * scaleFactor else 1.0f * scaleFactor
+        tickPaint.color = if (isMajor) {
+            primaryTextColor
+        } else {
+            Color.argb(70, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
         }
-        canvas.drawArc(arcRect, 135f, sweepAngle, false, progPaint)
+
+        val startY = cy - rOuterTicks
+        val endY = startY + (if (isMajor) majorTickLen else minorTickLen)
+        canvas.drawLine(cx, startY, cx, endY, tickPaint)
+        canvas.rotate(6f, cx, cy)
     }
+    canvas.restore()
 
-    // Phase Pill above countdown
-    val phaseText = timer.phase
-    val phaseBg = Color.argb(45, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-    val phasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = 9.5f * scaleFactor
-        typeface = getSlateFont(context, 700)
+    // 6. Subtle Translucent Base Disc
+    val discR = rOuterTicks - majorTickLen - (minDim * 0.030f)
+    val discBounds = RectF(cx - discR, cy - discR, cx + discR, cy + discR)
+
+    val discBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(14, 255, 255, 255)
+        style = Paint.Style.FILL
     }
-    val phaseW = phasePaint.measureText(phaseText)
-    val pillH = 16f * scaleFactor
-    val pillW = phaseW + 14f * scaleFactor
-    val pillY = cy - ringRadius * 0.52f
-    val pillRect = RectF(cx - pillW / 2f, pillY, cx + pillW / 2f, pillY + pillH)
-    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = phaseBg; style = Paint.Style.FILL }
-    canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBgPaint)
-    canvas.drawText(phaseText, cx - phaseW / 2f, pillY + pillH * 0.72f, phasePaint)
+    canvas.drawCircle(cx, cy, discR, discBgPaint)
 
-    // Large Countdown Time Text
-    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = 28f * scaleFactor
-        typeface = getSlateFont(context, 800)
-        textAlign = Paint.Align.CENTER
-    }
-    canvas.drawText(timer.formattedTime, cx, cy + 9f * scaleFactor, timePaint)
-
-    // Session Tracker Dots (● ● ○ ○)
-    val dotY = cy + ringRadius * 0.52f
-    val dotRadius = 3f * scaleFactor
-    val dotSpacing = 10f * scaleFactor
-    val totalDotsW = (timer.maxSessions - 1) * dotSpacing
-    val startDotX = cx - totalDotsW / 2f
-
-    for (s in 1..timer.maxSessions) {
-        val dotX = startDotX + (s - 1) * dotSpacing
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (s <= timer.currentSession) accentColor else Color.argb(60, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+    // 7. Time Timer Pie Wedge (Clockwise 12 o'clock sweep)
+    if (sweepAngle > 0.5f) {
+        val wedgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(
+                if (isLight) 95 else 130,
+                Color.red(accentColor),
+                Color.green(accentColor),
+                Color.blue(accentColor)
+            )
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(dotX, dotY, dotRadius, dotPaint)
+        canvas.drawArc(discBounds, -90f, sweepAngle, true, wedgePaint)
     }
 
-    // Bottom Action Controls Deck (Reset Left, Play/Pause Center-Right)
-    val bottomY = cardRect.bottom - 26f * scaleFactor
-    val btnH = 30f * scaleFactor
+    // 8. Needle Hand & Two-Tier Hub Knob
+    val handAngleRad = Math.toRadians((-90f + sweepAngle).toDouble())
+    val handLen = discR * 0.92f
+    val tipX = (cx + handLen * kotlin.math.cos(handAngleRad)).toFloat()
+    val tipY = (cy + handLen * kotlin.math.sin(handAngleRad)).toFloat()
 
-    // Reset button pill
-    val resetW = 40f * scaleFactor
-    val resetX = cardRect.left + 16f * scaleFactor
-    val resetRect = RectF(resetX, bottomY, resetX + resetW, bottomY + btnH)
-    val resetBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(25, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
+    val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 3.5f * scaleFactor
+        strokeCap = Paint.Cap.ROUND
+        setShadowLayer(4f * scaleFactor, 0f, 1.5f * scaleFactor, 0x66000000)
+    }
+    canvas.drawLine(cx, cy, tipX, tipY, handPaint)
+
+    // Frosted collar + solid white cap
+    val collarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(85, 255, 255, 255)
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(resetRect, 10f * scaleFactor, 10f * scaleFactor, resetBgPaint)
-    val resetTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    canvas.drawCircle(cx, cy, minDim * 0.046f, collarPaint)
+
+    val hubCapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+        setShadowLayer(2f * scaleFactor, 0f, 1f * scaleFactor, 0x44000000)
+    }
+    canvas.drawCircle(cx, cy, minDim * 0.028f, hubCapPaint)
+
+    // 9. Enlarged Clustered Controls (-5 • [▶/❚❚ TIME] • +5)
+    val leftBtnCx = cx - (pillW / 2f) - btnGap - btnR
+    val rightBtnCx = cx + (pillW / 2f) + btnGap + btnR
+
+    val circleBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x14000000 else 0x18FFFFFF
+        style = Paint.Style.FILL
+    }
+    val circleTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = 13f * scaleFactor
+        textSize = pillH * 0.38f
         typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText("↺", resetRect.centerX(), resetRect.centerY() + 4f * scaleFactor, resetTextPaint)
 
-    // Play / Pause main pill
-    val playX = resetX + resetW + 8f * scaleFactor
-    val playW = cardRect.right - 16f * scaleFactor - playX
-    val playRect = RectF(playX, bottomY, playX + playW, bottomY + btnH)
-    val playBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (timer.isRunning) Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else accentColor
+    // Left Circle: -5
+    canvas.drawCircle(leftBtnCx, bottomCenterY, btnR, circleBgPaint)
+    val circleBaseline = bottomCenterY - ((circleTextPaint.fontMetrics.ascent + circleTextPaint.fontMetrics.descent) / 2f)
+    canvas.drawText("-5", leftBtnCx, circleBaseline, circleTextPaint)
+
+    // Right Circle: +5
+    canvas.drawCircle(rightBtnCx, bottomCenterY, btnR, circleBgPaint)
+    canvas.drawText("+5", rightBtnCx, circleBaseline, circleTextPaint)
+
+    // Center Pill containing State Icon & Live Time Readout
+    val pillRect = RectF(cx - pillW / 2f, bottomCenterY - pillH / 2f, cx + pillW / 2f, bottomCenterY + pillH / 2f)
+    val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (timer.isRunning) Color.argb(45, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else accentColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(playRect, 10f * scaleFactor, 10f * scaleFactor, playBgPaint)
+    canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBgPaint)
 
-    val playLabel = if (timer.isRunning) "❚❚  PAUSE" else "▶  START"
-    val playTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (timer.isRunning) accentColor else Color.BLACK
-        textSize = 11.5f * scaleFactor
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.CENTER
+    // Combined Action Icon + Live Countdown Readout
+    val buttonLabel = when {
+        effectiveRemaining <= 0 -> "↺  RESET"
+        timer.isRunning -> "❚❚  $formattedTime"
+        else -> "▶  $formattedTime"
     }
-    canvas.drawText(playLabel, playRect.centerX(), playRect.centerY() + 4f * scaleFactor, playTextPaint)
+
+    val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (timer.isRunning) accentColor else if (calculateLuminance(accentColor.toLong()) > 0.5f) Color.BLACK else Color.WHITE
+        textSize = pillH * 0.38f
+        typeface = getSlateFont(context, 800)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.01f
+    }
+    val pillBaseline = pillRect.centerY() - ((buttonTextPaint.fontMetrics.ascent + buttonTextPaint.fontMetrics.descent) / 2f)
+    canvas.drawText(buttonLabel, pillRect.centerX(), pillBaseline, buttonTextPaint)
 
     return bitmap
 }
+
+private fun calculateLuminance(colorLong: Long): Float {
+    val r = ((colorLong shr 16) and 0xFFL) / 255f
+    val g = ((colorLong shr 8) and 0xFFL) / 255f
+    val b = (colorLong and 0xFFL) / 255f
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
+}
+
 
 // =========================================================================
 // 2. HABIT STREAK MATRIX (4x2)

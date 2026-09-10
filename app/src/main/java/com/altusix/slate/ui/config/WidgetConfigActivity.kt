@@ -71,6 +71,8 @@ import com.altusix.slate.widgets.notes.updateAllNotesWidgets
 import com.altusix.slate.widgets.photos.PhotosConfigActivity
 import com.altusix.slate.widgets.photos.getPhotosWidgetsCatalog
 import com.altusix.slate.widgets.photos.updateAllPhotosWidgets
+import com.altusix.slate.widgets.productivity.BaseProductivityReceiver
+import com.altusix.slate.widgets.productivity.ProductivityEditActivity
 import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import com.altusix.slate.widgets.productivity.updateAllProductivityWidgets
 
@@ -164,6 +166,33 @@ class WidgetConfigActivity : ComponentActivity() {
         if (isCamera) {
             val forwardIntent = Intent(this, CameraWidgetConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
+        // Forward Productivity widgets to ProductivityEditActivity with the corresponding tab
+        val isProductivity = getProductivityWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        if (isProductivity) {
+            val tab = when {
+                widgetClassName.contains("Pomodoro") -> "TIMER"
+                widgetClassName.contains("HabitMatrix") -> "HABIT"
+                widgetClassName.contains("Top3") -> "TOP3"
+                widgetClassName.contains("Bookmarks") -> "BOOKMARKS"
+                widgetClassName.contains("Clipboard") -> "CLIPBOARD"
+                widgetClassName.contains("ScreenTime") -> "SCREENTIME"
+                widgetClassName.contains("Eisenhower") -> "EISENHOWER"
+                widgetClassName.contains("Timeline") -> "TIMELINE"
+                widgetClassName.contains("Goal") -> "GOAL"
+                widgetClassName.contains("HabitRings") -> "RINGS"
+                widgetClassName.contains("Pipeline") -> "PIPELINE"
+                else -> "TOP3"
+            }
+            val forwardIntent = Intent(this, ProductivityEditActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                putExtra(BaseProductivityReceiver.EXTRA_TAB, tab)
                 addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
             }
             startActivity(forwardIntent)

@@ -240,13 +240,63 @@ object ProductivityStorageManager {
         val timer = current.focusTimer
         val now = System.currentTimeMillis()
 
-        val updatedTimer = if (timer.isRunning) {
-            val elapsedSecs = if (timer.lastTimestamp > 0) ((now - timer.lastTimestamp) / 1000).toInt() else 0
-            val newRemaining = maxOf(0, timer.remainingSeconds - elapsedSecs)
-            timer.copy(isRunning = false, remainingSeconds = newRemaining, lastTimestamp = now)
+        val effectiveRemaining = if (timer.isRunning && timer.lastTimestamp > 0L) {
+            val elapsed = ((now - timer.lastTimestamp) / 1000).toInt()
+            maxOf(0, timer.remainingSeconds - elapsed)
         } else {
-            timer.copy(isRunning = true, lastTimestamp = now)
+            timer.remainingSeconds
         }
+
+        val updatedTimer = when {
+            // 1. Timer completed or at 00:00 -> Tap resets back to full session duration
+            effectiveRemaining <= 0 -> {
+                timer.copy(
+                    isRunning = false,
+                    remainingSeconds = timer.totalSeconds.coerceAtLeast(25 * 60),
+                    lastTimestamp = 0L
+                )
+            }
+            // 2. Timer is running -> Tap pauses
+            timer.isRunning -> {
+                timer.copy(
+                    isRunning = false,
+                    remainingSeconds = effectiveRemaining,
+                    lastTimestamp = now
+                )
+            }
+            // 3. Timer is paused -> Tap starts/resumes
+            else -> {
+                timer.copy(
+                    isRunning = true,
+                    lastTimestamp = now
+                )
+            }
+        }
+        saveConfig(context, widgetId, current.copy(focusTimer = updatedTimer))
+    }
+
+    fun adjustFocusTimer(context: Context, widgetId: Int, deltaMinutes: Int) {
+        val current = getConfig(context, widgetId)
+        val timer = current.focusTimer
+        val deltaSecs = deltaMinutes * 60
+
+        val currentRemaining = if (timer.isRunning && timer.lastTimestamp > 0L) {
+            val elapsed = ((System.currentTimeMillis() - timer.lastTimestamp) / 1000).toInt()
+            maxOf(0, timer.remainingSeconds - elapsed)
+        } else {
+            timer.remainingSeconds
+        }
+
+        // If at 00:00, use totalSeconds as the baseline so adjustments work immediately
+        val baseRemaining = if (currentRemaining <= 0 && !timer.isRunning) timer.totalSeconds else currentRemaining
+        val newRemaining = (baseRemaining + deltaSecs).coerceIn(60, 180 * 60)
+        val newTotal = maxOf(timer.totalSeconds, newRemaining)
+
+        val updatedTimer = timer.copy(
+            totalSeconds = newTotal,
+            remainingSeconds = newRemaining,
+            lastTimestamp = if (timer.isRunning) System.currentTimeMillis() else 0L
+        )
         saveConfig(context, widgetId, current.copy(focusTimer = updatedTimer))
     }
 
@@ -603,4 +653,5 @@ object ProductivityStorageManager {
             ProductivityWidgetConfig.getDefaultConfig()
         }
     }
+
 }

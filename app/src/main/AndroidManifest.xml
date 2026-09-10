@@ -3427,6 +3427,11 @@
         <!-- ========================================================================= -->
         <!-- PRODUCTIVITY WIDGETS (11 RECEIVERS)                                        -->
         <!-- ========================================================================= -->
+        <service
+            android:name=".widgets.productivity.PomodoroTimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            tools:ignore="ForegroundServicePermission" />
 
         <!-- 1. Pomodoro Focus Dial (2x2) -->
         <receiver
@@ -3437,6 +3442,7 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.altusix.slate.productivity.ACTION_TOGGLE_TIMER" />
                 <action android:name="com.altusix.slate.productivity.ACTION_RESET_TIMER" />
+                <action android:name="com.altusix.slate.productivity.ACTION_ADJUST_TIMER" />
                 <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
             </intent-filter>
             <meta-data
