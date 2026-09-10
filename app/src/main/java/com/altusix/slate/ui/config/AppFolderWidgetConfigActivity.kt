@@ -95,6 +95,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                         ConfigTabItem("STYLE", "Widget Theme")
                     )
                 }
+                val widgetName = catalogItem?.name ?: ""
 
                 LaunchedEffect(widgetId) {
                     val prefs = getSharedPreferences("slate_widget_prefs", MODE_PRIVATE)
@@ -147,6 +148,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
 
                 SlateConfigScaffold(
                     title = "App Folder",
+                    subtitle = widgetName.ifEmpty { null },
                     accentColor = Color(selectedAccentHex),
                     tabs = tabs,
                     selectedTabKey = selectedTabKey,

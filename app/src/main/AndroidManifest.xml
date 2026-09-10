@@ -249,11 +249,12 @@
         <!-- ================================================================= -->
         <!-- APP LAUNCHER RECEIVERS                                            -->
         <!-- ================================================================= -->
-        <!-- AppLauncher  Widget Configuration Activity -->
+        <!-- AppLauncher Widget Configuration Activity -->
         <activity
             android:name=".ui.config.AppLauncherConfigActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            android:theme="@style/Theme.Slate"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>

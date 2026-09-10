@@ -1,7 +1,6 @@
 package com.altusix.slate.ui.config
 
 import android.Manifest
-import android.R
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.ContentUris
@@ -13,23 +12,20 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
@@ -38,28 +34,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.ui.components.CustomColorPickerDialog
-import com.altusix.slate.ui.components.RainbowCustomCircle
-import com.altusix.slate.widgets.contacts.ContactActionType
-import com.altusix.slate.widgets.contacts.ContactWidgetConfig
-import com.altusix.slate.widgets.contacts.ContactsWidgetPreferences
-import com.altusix.slate.widgets.contacts.getContactsWidgetsCatalog
-import com.altusix.slate.widgets.contacts.loadSlotConfig
-import com.altusix.slate.widgets.contacts.saveSlotConfig
-import com.altusix.slate.widgets.contacts.updateAllContactsWidgets
+import com.altusix.slate.ui.components.*
+import com.altusix.slate.widgets.contacts.*
 import java.io.File
 import java.io.FileOutputStream
 
 class ContactsWidgetConfigActivity : ComponentActivity() {
+
+    private enum class ContactsColorTarget { BACKGROUND, ACCENT }
 
     private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var widgetClassName: String = ""
@@ -80,12 +72,10 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
         if (isGranted) performLaunchPicker()
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
-        window.setBackgroundDrawableResource(R.color.transparent)
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         widgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID
@@ -102,33 +92,37 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
         val appWidgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)
         widgetClassName = appWidgetInfo?.provider?.className ?: ""
 
+        val catalogItem = getContactsWidgetsCatalog().find { it.receiverClass.name == widgetClassName }
+        val widgetName = catalogItem?.name ?: ""
+        val hasModeOption = catalogItem?.hasModeOption ?: true
+        val defaultTheme = ThemePreferences(this).getThemeSettings()
+
         val isMultiActionWidget = widgetClassName.contains("EditorialBento") ||
                 widgetClassName.contains("StackedBento") ||
                 widgetClassName.contains("3Action")
 
         setContent {
-            SlateConfigTheme {
-                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-
-                val catalogItem = remember(widgetClassName) {
-                    getContactsWidgetsCatalog().find { it.receiverClass.name == widgetClassName }
-                }
-                val widgetName = catalogItem?.name ?: ""
-                val hasModeOption = catalogItem?.hasModeOption ?: true
-
+            MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
                 var selectedBgHex by remember { mutableLongStateOf(0xFF161618L) }
-                var selectedAccentHex by remember { mutableLongStateOf(0xFFFFFFFFL) }
+                var selectedAccentHex by remember { mutableLongStateOf(defaultTheme.accentHex) }
                 var opacity by remember { mutableFloatStateOf(1.0f) }
                 var isResponsive by remember { mutableStateOf(true) }
-                var activePickerTarget by remember { mutableStateOf<ColorPickerTarget?>(null) }
-                var selectedMainTab by remember { mutableIntStateOf(0) } // 0: Contact, 1: Style
+                var activePickerTarget by remember { mutableStateOf<ContactsColorTarget?>(null) }
+                var selectedTabKey by remember { mutableStateOf("CONTACT") }
+
+                val tabs = remember {
+                    listOf(
+                        ConfigTabItem("CONTACT", "Contact"),
+                        ConfigTabItem("STYLE", "Widget Theme")
+                    )
+                }
 
                 LaunchedEffect(widgetId) {
                     val prefs = getSharedPreferences("slate_widget_prefs", MODE_PRIVATE)
                     opacity = prefs.getFloat("widget_${widgetId}_opacity", 1.0f)
                     isResponsive = prefs.getBoolean("widget_${widgetId}_is_responsive", true)
                     selectedBgHex = prefs.getLong("widget_${widgetId}_bg_color", 0xFF161618L)
-                    selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", 0xFFFFFFFFL)
+                    selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
                 }
 
                 val currentSlateConfig = remember(selectedBgHex, selectedAccentHex, opacity) {
@@ -141,57 +135,338 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
                     )
                 }
 
-                ModalBottomSheet(
-                    onDismissRequest = { finish() },
-                    sheetState = sheetState,
-                    containerColor = Color(0xFF0A0A0C),
-                    contentColor = Color.White,
-                    dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF2C2C30)) },
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                ) {
-                    ContactsConfigSheetContent(
-                        currentConfig = currentConfig,
-                        slateConfig = currentSlateConfig,
-                        slotIndex = slotIndex,
-                        widgetName = widgetName,
-                        hasModeOption = hasModeOption,
-                        isMultiActionWidget = isMultiActionWidget,
-                        selectedBgHex = selectedBgHex,
-                        selectedAccentHex = selectedAccentHex,
-                        opacity = opacity,
-                        isResponsive = isResponsive,
-                        selectedMainTab = selectedMainTab,
-                        onMainTabSelected = { selectedMainTab = it },
-                        onConfigChanged = { currentConfig = it },
-                        onBgHexChanged = { selectedBgHex = it },
-                        onAccentHexChanged = { selectedAccentHex = it },
-                        onOpacityChanged = { opacity = it },
-                        onResponsiveChanged = { isResponsive = it },
-                        onPickerTargetRequested = { activePickerTarget = it },
-                        onChangeContactRequested = { checkPermissionAndLaunchPicker() },
-                        onDismiss = { finish() },
-                        onSaveClicked = {
-                            saveSlotConfig(this@ContactsWidgetConfigActivity, widgetId, slotIndex, currentConfig)
-                            if (slotIndex == 0) {
-                                ContactsWidgetPreferences.saveConfig(this@ContactsWidgetConfigActivity, widgetId, currentConfig)
+                fun saveAndFinish() {
+                    saveSlotConfig(this@ContactsWidgetConfigActivity, widgetId, slotIndex, currentConfig)
+                    if (slotIndex == 0) {
+                        ContactsWidgetPreferences.saveConfig(this@ContactsWidgetConfigActivity, widgetId, currentConfig)
+                    }
+                    saveSlateWidgetConfig(this@ContactsWidgetConfigActivity, widgetId, currentSlateConfig, isResponsive)
+                    updateAllContactsWidgets(this@ContactsWidgetConfigActivity)
+                    setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
+                    finish()
+                }
+
+                SlateConfigScaffold(
+                    title = if (slotIndex > 0) "Slot ${slotIndex + 1} Contact" else "Contact Setup",
+                    subtitle = widgetName.ifEmpty { null },
+                    accentColor = Color(selectedAccentHex),
+                    tabs = tabs,
+                    selectedTabKey = selectedTabKey,
+                    onTabSelected = { selectedTabKey = it },
+                    onBackClick = { finish() },
+                    onSaveClick = { saveAndFinish() },
+                    scrollable = true,
+                    previewHeight = 180.dp,
+                    previewContent = {
+                        val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
+                        Box(
+                            modifier = Modifier
+                                .widthIn(min = 200.dp, max = 260.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(selectedBgHex).copy(alpha = opacity))
+                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 24.dp, vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                ContactAvatarPreview(
+                                    photoUri = currentConfig.photoUri,
+                                    initials = currentConfig.initials,
+                                    size = 64.dp
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text(
+                                    text = currentConfig.contactName.ifEmpty { "No Contact Selected" },
+                                    color = if (isLightBg) Color.Black else Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                if (currentConfig.phoneNumber.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = currentConfig.phoneNumber,
+                                        color = if (isLightBg) Color(0xFF3C3C43) else Color(0xFF8E8E93),
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
-                            saveSlateWidgetConfig(this@ContactsWidgetConfigActivity, widgetId, currentSlateConfig, isResponsive)
-                            updateAllContactsWidgets(this@ContactsWidgetConfigActivity)
-                            setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
-                            finish()
                         }
-                    )
+                    }
+                ) {
+                    if (selectedTabKey == "CONTACT") {
+                        SectionTitle(title = "Selected Contact")
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF141418))
+                                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    ContactAvatarPreview(
+                                        photoUri = currentConfig.photoUri,
+                                        initials = currentConfig.initials,
+                                        size = 44.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = currentConfig.contactName.ifEmpty { "No Contact Selected" },
+                                            color = Color.White,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = currentConfig.phoneNumber.ifEmpty { "Tap to choose from phonebook" },
+                                            color = Color(0xFF8E8E93),
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { checkPermissionAndLaunchPicker() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(selectedAccentHex),
+                                        contentColor = if (calculateLuminance(selectedAccentHex) > 0.5f) Color.Black else Color.White
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Text(
+                                        text = if (currentConfig.isConfigured) "Change" else "Pick",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!isMultiActionWidget) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SectionTitle(title = "Tap Action")
+
+                            val actionItems = listOf(
+                                Triple(ContactActionType.CALL, Icons.Default.Call, ContactActionType.CALL.description),
+                                Triple(ContactActionType.SMS, Icons.Default.Email, ContactActionType.SMS.description),
+                                Triple(ContactActionType.WHATSAPP, Icons.Default.Send, ContactActionType.WHATSAPP.description),
+                                Triple(ContactActionType.TELEGRAM, Icons.Default.Send, ContactActionType.TELEGRAM.description)
+                            )
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                actionItems.forEach { (action, icon, desc) ->
+                                    val isSelected = currentConfig.actionType == action
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(if (isSelected) Color(0xFF22222A) else Color(0xFF141418))
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) Color(selectedAccentHex) else Color(0xFF24242C),
+                                                RoundedCornerShape(14.dp)
+                                            )
+                                            .clickable { currentConfig = currentConfig.copy(actionType = action) }
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) Color(selectedAccentHex).copy(alpha = 0.2f) else Color(0xFF1C1C22)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = null,
+                                                tint = if (isSelected) Color(selectedAccentHex) else Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(14.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = action.label,
+                                                color = Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = desc,
+                                                color = Color(0xFF8E8E93),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color(selectedAccentHex),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionTitle(title = "Background")
+                            val bgPresets = listOf(
+                                0xFF161618L to "Matte",
+                                0xFF000000L to "AMOLED",
+                                0xFFFFFFFFL to "Light"
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                bgPresets.forEach { (hex, label) ->
+                                    SelectableChip(
+                                        label = label,
+                                        isSelected = selectedBgHex == hex,
+                                        colorPreview = Color(hex),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        selectedBgHex = hex
+                                        if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) selectedAccentHex = 0xFF000000L
+                                        else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) selectedAccentHex = 0xFFFFFFFFL
+                                    }
+                                }
+
+                                val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+                                RainbowPickerChip(
+                                    isSelected = isCustomBg,
+                                    activeColor = if (isCustomBg) Color(selectedBgHex) else null,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    activePickerTarget = ContactsColorTarget.BACKGROUND
+                                }
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SectionTitle(title = "Accent Color")
+                            val accentPresets = if (isLightBg) {
+                                listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                            } else {
+                                listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                accentPresets.forEach { hex ->
+                                    ProfessionalSwatchCircle(
+                                        color = Color(hex),
+                                        isSelected = selectedAccentHex == hex,
+                                        onClick = { selectedAccentHex = hex }
+                                    )
+                                }
+
+                                val isCustomAccent = accentPresets.none { it == selectedAccentHex }
+                                RainbowCustomCircle(
+                                    isSelected = isCustomAccent,
+                                    activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
+                                    onClick = { activePickerTarget = ContactsColorTarget.ACCENT }
+                                )
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SectionTitle(title = "Surface Translucency")
+                                Text(
+                                    text = "${(opacity * 100).toInt()}%",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            ModernOpacitySlider(value = opacity, onValueChange = { opacity = it })
+                        }
+
+                        if (hasModeOption) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SectionTitle(title = "Sizing Mode")
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF141416))
+                                        .padding(4.dp),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsiveVal, label) ->
+                                        val isSelected = isResponsive == responsiveVal
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                                                .clickable { isResponsive = responsiveVal },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 activePickerTarget?.let { target ->
-                    val initialColor = if (target == ColorPickerTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
+                    val initialColor = if (target == ContactsColorTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
                     CustomColorPickerDialog(
                         initialColor = initialColor,
-                        title = if (target == ColorPickerTarget.BACKGROUND) "Custom Background" else "Custom Accent",
+                        title = if (target == ContactsColorTarget.BACKGROUND) "Custom Background" else "Custom Accent",
                         onDismiss = { activePickerTarget = null },
                         onColorSelected = { color ->
                             val hex = (color.toArgb().toLong() and 0xFFFFFFFFL)
-                            if (target == ColorPickerTarget.BACKGROUND) selectedBgHex = hex else selectedAccentHex = hex
+                            if (target == ContactsColorTarget.BACKGROUND) selectedBgHex = hex else selectedAccentHex = hex
                             activePickerTarget = null
                         }
                     )
@@ -323,382 +598,11 @@ class ContactsWidgetConfigActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ContactsConfigSheetContent(
-    currentConfig: ContactWidgetConfig,
-    slateConfig: SlateWidgetConfig,
-    slotIndex: Int,
-    widgetName: String,
-    hasModeOption: Boolean,
-    isMultiActionWidget: Boolean,
-    selectedBgHex: Long,
-    selectedAccentHex: Long,
-    opacity: Float,
-    isResponsive: Boolean,
-    selectedMainTab: Int,
-    onMainTabSelected: (Int) -> Unit,
-    onConfigChanged: (ContactWidgetConfig) -> Unit,
-    onBgHexChanged: (Long) -> Unit,
-    onAccentHexChanged: (Long) -> Unit,
-    onOpacityChanged: (Float) -> Unit,
-    onResponsiveChanged: (Boolean) -> Unit,
-    onPickerTargetRequested: (ColorPickerTarget) -> Unit,
-    onChangeContactRequested: () -> Unit,
-    onDismiss: () -> Unit,
-    onSaveClicked: () -> Unit
+private fun ContactAvatarPreview(
+    photoUri: String?,
+    initials: String,
+    size: Dp = 72.dp
 ) {
-    val isLightBg = slateConfig.themeMode == "LIGHT"
-    val textColor = if (isLightBg) Color.Black else Color.White
-    val secondaryTextColor = if (isLightBg) Color.DarkGray else Color.Gray
-
-    val bgPresets = listOf(0xFF161618L to "Dark", 0xFF000000L to "AMOLED", 0xFFFFFFFFL to "Light")
-    val accentPresets = if (isLightBg) {
-        listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-    } else {
-        listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.92f)
-            .imePadding()
-            .padding(horizontal = 22.dp)
-            .padding(bottom = 16.dp)
-    ) {
-        // --- Header Bar ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Cancel",
-                color = Color.Gray,
-                fontSize = 15.sp,
-                modifier = Modifier.clickable { onDismiss() }.padding(vertical = 8.dp)
-            )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = if (slotIndex > 0) "Slot ${slotIndex + 1} Contact" else "Customize Contact",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                if (widgetName.isNotEmpty()) {
-                    Text(text = widgetName, fontSize = 11.sp, color = Color(0xFF8E8E93), fontWeight = FontWeight.Normal)
-                }
-            }
-            Text(
-                text = "Apply",
-                color = if (currentConfig.isConfigured) Color.White else Color.Gray,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                modifier = Modifier
-                    .clickable(enabled = currentConfig.isConfigured) { onSaveClicked() }
-                    .padding(vertical = 8.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // --- Live Preview Hero Container ---
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(170.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color(selectedBgHex).copy(alpha = opacity))
-                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                ContactAvatarPreview(
-                    photoUri = currentConfig.photoUri,
-                    initials = currentConfig.initials
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = currentConfig.contactName.ifEmpty { "No Contact Selected" },
-                    color = textColor,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                if (currentConfig.phoneNumber.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = currentConfig.phoneNumber,
-                        color = secondaryTextColor,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // --- Main Tab Selector ("Contact" / "Style") ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF141416))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            listOf("Contact", "Style").forEachIndexed { index, label ->
-                val isSelected = selectedMainTab == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                        .clickable { onMainTabSelected(index) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        if (selectedMainTab == 0) {
-            // ==================== TAB 0: CONTACT & ACTION ====================
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF141416))
-                        .border(1.dp, Color(0xFF242428), RoundedCornerShape(20.dp))
-                        .padding(18.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "SELECTED CONTACT",
-                            color = Color(0xFF8E8E93),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = currentConfig.contactName.ifEmpty { "Select from phonebook" },
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        OutlinedButton(
-                            onClick = onChangeContactRequested,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(brush = SolidColor(Color(0xFF3A3A3C)))
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                if (currentConfig.isConfigured) "Change Contact" else "Pick Contact",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-                }
-
-                if (!isMultiActionWidget) {
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    SectionTitle(title = "Tap Action")
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val actionItems = listOf(
-                            Triple(ContactActionType.CALL, Icons.Default.Call, ContactActionType.CALL.description),
-                            Triple(ContactActionType.SMS, Icons.Default.Email, ContactActionType.SMS.description),
-                            Triple(ContactActionType.WHATSAPP, Icons.Default.Send, ContactActionType.WHATSAPP.description),
-                            Triple(ContactActionType.TELEGRAM, Icons.Default.Send, ContactActionType.TELEGRAM.description)
-                        )
-
-                        actionItems.forEach { (action, icon, desc) ->
-                            val isSelected = currentConfig.actionType == action
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) Color(0xFF2C2C30) else Color(0xFF141416))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) Color.White else Color(0xFF242428),
-                                        RoundedCornerShape(16.dp)
-                                    )
-                                    .clickable { onConfigChanged(currentConfig.copy(actionType = action)) }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF222226)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-
-                                Spacer(modifier = Modifier.width(14.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(action.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(desc, color = Color.Gray, fontSize = 11.sp)
-                                }
-
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-        } else {
-            // ==================== TAB 1: STYLE CONFIGURATION ====================
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                Column {
-                    SectionTitle(title = "Background")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        bgPresets.forEach { (hex, label) ->
-                            SelectableChip(
-                                label = label,
-                                isSelected = selectedBgHex == hex,
-                                colorPreview = Color(hex),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                onBgHexChanged(hex)
-                                if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) onAccentHexChanged(0xFF000000L)
-                                else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) onAccentHexChanged(0xFFFFFFFFL)
-                            }
-                        }
-                        val isCustomBg = bgPresets.none { it.first == selectedBgHex }
-                        RainbowPickerChip(
-                            isSelected = isCustomBg,
-                            activeColor = if (isCustomBg) Color(selectedBgHex) else null,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            onPickerTargetRequested(ColorPickerTarget.BACKGROUND)
-                        }
-                    }
-                }
-
-                Column {
-                    SectionTitle(title = "Accent Color")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        accentPresets.forEach { hex ->
-                            ProfessionalSwatchCircle(
-                                color = Color(hex),
-                                isSelected = selectedAccentHex == hex,
-                                onClick = { onAccentHexChanged(hex) }
-                            )
-                        }
-                        val isCustomAccent = accentPresets.none { it == selectedAccentHex }
-                        RainbowCustomCircle(
-                            isSelected = isCustomAccent,
-                            activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
-                            onClick = { onPickerTargetRequested(ColorPickerTarget.ACCENT) }
-                        )
-                    }
-                }
-
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SectionTitle(title = "Opacity")
-                        Text(text = "${(opacity * 100).toInt()}%", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    ModernOpacitySlider(value = opacity, onValueChange = onOpacityChanged)
-                }
-
-                if (hasModeOption) {
-                    Column {
-                        SectionTitle(title = "Sizing Mode")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF141416))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsiveVal, label) ->
-                                val isSelected = isResponsive == responsiveVal
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(38.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                                        .clickable { onResponsiveChanged(responsiveVal) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContactAvatarPreview(photoUri: String?, initials: String) {
     val bitmap = remember(photoUri) {
         if (photoUri.isNullOrEmpty()) null
         else {
@@ -713,7 +617,7 @@ private fun ContactAvatarPreview(photoUri: String?, initials: String) {
 
     Box(
         modifier = Modifier
-            .size(72.dp)
+            .size(size)
             .clip(CircleShape)
             .background(Color(0xFF222226)),
         contentAlignment = Alignment.Center
@@ -729,7 +633,7 @@ private fun ContactAvatarPreview(photoUri: String?, initials: String) {
             Text(
                 text = initials.ifEmpty { "?" },
                 color = Color.White,
-                fontSize = 24.sp,
+                fontSize = (size.value * 0.36f).sp,
                 fontWeight = FontWeight.Bold
             )
         }

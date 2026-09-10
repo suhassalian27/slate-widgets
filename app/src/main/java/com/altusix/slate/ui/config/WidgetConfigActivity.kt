@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -18,10 +19,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.components.CustomColorPickerDialog
 import com.altusix.slate.ui.components.RainbowCustomCircle
+import com.altusix.slate.ui.components.SlateConfigScaffold
 import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
 import com.altusix.slate.widgets.ai.updateAllAiWidgets
@@ -92,11 +92,10 @@ class WidgetConfigActivity : ComponentActivity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var widgetClassName: String = ""
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
-        window.setBackgroundDrawableResource(android.R.color.transparent)
 
         appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -111,7 +110,6 @@ class WidgetConfigActivity : ComponentActivity() {
         val widgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
         widgetClassName = widgetInfo?.provider?.className ?: ""
 
-        // Catalog-based routing: Matches individual modules cleanly
         val isAppFolder = getAppFolderWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         val isAppLauncher = getAppLauncherWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         val isContacts = getContactsWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
@@ -139,13 +137,13 @@ class WidgetConfigActivity : ComponentActivity() {
         if (isContacts) {
             val forwardIntent = Intent(this, ContactsWidgetConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
             }
             startActivity(forwardIntent)
             finish()
             return
         }
 
-        // Forward Photos & Memories widgets to PhotosConfigActivity
         val isPhotos = getPhotosWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         if (isPhotos) {
             val forwardIntent = Intent(this, PhotosConfigActivity::class.java).apply {
@@ -157,7 +155,6 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        // Forward Camera photo frames to CameraWidgetConfigActivity (excluding launcher utilities)
         val isCamera = getCameraWidgetsCatalog().any {
             it.receiverClass.name == widgetClassName &&
                     !it.receiverClass.name.contains("ShutterLauncher") &&
@@ -173,7 +170,6 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        // Forward Productivity widgets to ProductivityEditActivity with the corresponding tab
         val isProductivity = getProductivityWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         if (isProductivity) {
             val tab = when {
@@ -201,9 +197,7 @@ class WidgetConfigActivity : ComponentActivity() {
         }
 
         setContent {
-            SlateConfigTheme {
-                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-
+            MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
                 val catalogItem = remember(widgetClassName) {
                     val allWidgets = getClockDigitalWidgetsCatalog() +
                             getClockAnalogWidgetsCatalog() +
@@ -225,6 +219,7 @@ class WidgetConfigActivity : ComponentActivity() {
 
                 val defaultWidgetOpacity = catalogItem?.defaultOpacity ?: 1.0f
                 val hasModeOption = catalogItem?.hasModeOption ?: false
+                val widgetName = catalogItem?.name ?: ""
 
                 var selectedBgHex by remember { mutableLongStateOf(0xFF000000L) }
                 var selectedAccentHex by remember { mutableLongStateOf(0xFFFFFFFFL) }
@@ -244,40 +239,215 @@ class WidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
-                ModalBottomSheet(
-                    onDismissRequest = { finish() },
-                    sheetState = sheetState,
-                    containerColor = Color(0xFF0A0A0C),
-                    contentColor = Color.White,
-                    dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF2C2C30)) },
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                val isLightBg = remember(selectedBgHex) { calculateLuminance(selectedBgHex) > 0.5f }
+                val textColor = if (isLightBg) Color.Black else Color.White
+
+                val bgPresets = listOf(
+                    0xFF161618L to "Matte",
+                    0xFF000000L to "AMOLED",
+                    0xFFFFFFFFL to "Light"
+                )
+
+                val accentPresets = if (isLightBg) {
+                    listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                } else {
+                    listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+                }
+
+                SlateConfigScaffold(
+                    title = "Customize Widget",
+                    subtitle = widgetName.ifEmpty { null },
+                    accentColor = Color(selectedAccentHex),
+                    onBackClick = { finish() },
+                    onSaveClick = {
+                        saveAndFinish(
+                            config = SlateWidgetConfig(
+                                themeMode = if (isLightBg) "LIGHT" else "DARK",
+                                backgroundColorHex = selectedBgHex,
+                                opacity = opacity,
+                                accentColorHex = selectedAccentHex
+                            ),
+                            isResponsive = isResponsive
+                        )
+                    },
+                    scrollable = true,
+                    previewHeight = 180.dp,
+                    previewContent = {
+                        val previewBg = Color(selectedBgHex).copy(alpha = opacity)
+
+                        Box(
+                            modifier = Modifier
+                                .size(148.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(previewBg)
+                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
+                                .padding(16.dp)
+                        ) {
+                            if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                        Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                    }
+
+                                    val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
+                                        generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
+                                    }
+
+                                    Image(
+                                        bitmap = arcBitmap.asImageBitmap(),
+                                        contentDescription = "Arc Preview",
+                                        modifier = Modifier.size(100.dp, 50.dp)
+                                    )
+
+                                    Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                        Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                    }
+                                    Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                    LinearProgressIndicator(
+                                        progress = { 0.85f },
+                                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                                        color = Color(selectedAccentHex),
+                                        trackColor = textColor.copy(alpha = 0.15f)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 ) {
-                    SlateWidgetConfigSheetContent(
-                        widgetClassName = widgetClassName,
-                        widgetName = catalogItem?.name ?: "",
-                        selectedBgHex = selectedBgHex,
-                        selectedAccentHex = selectedAccentHex,
-                        opacity = opacity,
-                        isResponsive = isResponsive,
-                        hasModeOption = hasModeOption,
-                        onBgHexChanged = { selectedBgHex = it },
-                        onAccentHexChanged = { selectedAccentHex = it },
-                        onOpacityChanged = { opacity = it },
-                        onResponsiveChanged = { isResponsive = it },
-                        onPickerTargetRequested = { activePickerTarget = it },
-                        onDismiss = { finish() },
-                        onApplyClicked = {
-                            saveAndFinish(
-                                config = SlateWidgetConfig(
-                                    themeMode = if (calculateLuminance(selectedBgHex) > 0.5f) "LIGHT" else "DARK",
-                                    backgroundColorHex = selectedBgHex,
-                                    opacity = opacity,
-                                    accentColorHex = selectedAccentHex
-                                ),
-                                isResponsive = isResponsive
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SectionTitle(title = "Background")
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            bgPresets.forEach { (hex, label) ->
+                                SelectableChip(
+                                    label = label,
+                                    isSelected = selectedBgHex == hex,
+                                    colorPreview = Color(hex),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    selectedBgHex = hex
+                                    if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) {
+                                        selectedAccentHex = 0xFF000000L
+                                    } else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) {
+                                        selectedAccentHex = 0xFFFFFFFFL
+                                    }
+                                }
+                            }
+
+                            val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+                            RainbowPickerChip(
+                                isSelected = isCustomBg,
+                                activeColor = if (isCustomBg) Color(selectedBgHex) else null,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                activePickerTarget = ColorPickerTarget.BACKGROUND
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionTitle(title = "Accent Color")
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            accentPresets.forEach { hex ->
+                                ProfessionalSwatchCircle(
+                                    color = Color(hex),
+                                    isSelected = selectedAccentHex == hex,
+                                    onClick = { selectedAccentHex = hex }
+                                )
+                            }
+
+                            val isCustomAccent = accentPresets.none { it == selectedAccentHex }
+                            RainbowCustomCircle(
+                                isSelected = isCustomAccent,
+                                activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
+                                onClick = { activePickerTarget = ColorPickerTarget.ACCENT }
                             )
                         }
-                    )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SectionTitle(title = "Surface Translucency")
+                            Text(
+                                text = "${(opacity * 100).toInt()}%",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        ModernOpacitySlider(
+                            value = opacity,
+                            onValueChange = { opacity = it }
+                        )
+                    }
+
+                    if (hasModeOption) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionTitle(title = "Sizing Mode")
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF141416))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsive, label) ->
+                                    val isSelected = isResponsive == responsive
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(38.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                                            .clickable { isResponsive = responsive },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 activePickerTarget?.let { target ->
@@ -340,287 +510,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
-    }
-}
-
-@Composable
-private fun SlateWidgetConfigSheetContent(
-    widgetClassName: String,
-    widgetName: String,
-    selectedBgHex: Long,
-    selectedAccentHex: Long,
-    opacity: Float,
-    isResponsive: Boolean,
-    hasModeOption: Boolean,
-    onBgHexChanged: (Long) -> Unit,
-    onAccentHexChanged: (Long) -> Unit,
-    onOpacityChanged: (Float) -> Unit,
-    onResponsiveChanged: (Boolean) -> Unit,
-    onPickerTargetRequested: (ColorPickerTarget) -> Unit,
-    onDismiss: () -> Unit,
-    onApplyClicked: () -> Unit
-) {
-    val isLightBg = remember(selectedBgHex) { calculateLuminance(selectedBgHex) > 0.5f }
-    val textColor = if (isLightBg) Color.Black else Color.White
-
-    val bgPresets = listOf(
-        0xFF161618L to "Matte",
-        0xFF000000L to "AMOLED",
-        0xFFFFFFFFL to "Light"
-    )
-
-    val accentPresets = if (isLightBg) {
-        listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-    } else {
-        listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.88f)
-            .padding(horizontal = 22.dp)
-            .padding(bottom = 24.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Cancel",
-                color = Color.Gray,
-                fontSize = 15.sp,
-                modifier = Modifier.clickable { onDismiss() }.padding(vertical = 8.dp)
-            )
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Customize Widget",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                if (widgetName.isNotEmpty()) {
-                    Text(
-                        text = widgetName,
-                        fontSize = 11.sp,
-                        color = Color(0xFF8E8E93),
-                        fontWeight = FontWeight.Normal
-                    )
-                }
-            }
-
-            Text(
-                text = "Apply",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                modifier = Modifier.clickable { onApplyClicked() }.padding(vertical = 8.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF141416))
-                .border(1.dp, Color(0xFF242428), RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            val previewBg = Color(selectedBgHex).copy(alpha = opacity)
-
-            Box(
-                modifier = Modifier
-                    .size(148.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(previewBg)
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
-                    .padding(16.dp)
-            ) {
-                if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                            Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
-                        }
-
-                        val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
-                            generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
-                        }
-
-                        Image(
-                            bitmap = arcBitmap.asImageBitmap(),
-                            contentDescription = "Arc Preview",
-                            modifier = Modifier.size(100.dp, 50.dp)
-                        )
-
-                        Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                            Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
-                        }
-                        Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
-                        LinearProgressIndicator(
-                            progress = { 0.85f },
-                            modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
-                            color = Color(selectedAccentHex),
-                            trackColor = textColor.copy(alpha = 0.15f)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-        ) {
-            SectionTitle(title = "Background")
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                bgPresets.forEach { (hex, label) ->
-                    val isSelected = selectedBgHex == hex
-                    SelectableChip(
-                        label = label,
-                        isSelected = isSelected,
-                        colorPreview = Color(hex),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        onBgHexChanged(hex)
-                        if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) {
-                            onAccentHexChanged(0xFF000000L)
-                        } else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) {
-                            onAccentHexChanged(0xFFFFFFFFL)
-                        }
-                    }
-                }
-
-                val isCustomBg = bgPresets.none { it.first == selectedBgHex }
-                RainbowPickerChip(
-                    isSelected = isCustomBg,
-                    activeColor = if (isCustomBg) Color(selectedBgHex) else null,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    onPickerTargetRequested(ColorPickerTarget.BACKGROUND)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            SectionTitle(title = "Accent Color")
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                accentPresets.forEach { hex ->
-                    val isSelected = selectedAccentHex == hex
-                    ProfessionalSwatchCircle(
-                        color = Color(hex),
-                        isSelected = isSelected,
-                        onClick = { onAccentHexChanged(hex) }
-                    )
-                }
-
-                val isCustomAccent = accentPresets.none { it == selectedAccentHex }
-                RainbowCustomCircle(
-                    isSelected = isCustomAccent,
-                    activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
-                    onClick = { onPickerTargetRequested(ColorPickerTarget.ACCENT) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionTitle(title = "Opacity")
-                Text(
-                    text = "${(opacity * 100).toInt()}%",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-
-            ModernOpacitySlider(
-                value = opacity,
-                onValueChange = onOpacityChanged,
-            )
-
-            if (hasModeOption) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                SectionTitle(title = "Sizing Mode")
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141416))
-                        .padding(4.dp)
-                ) {
-                    listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsive, label) ->
-                        val isSelected = isResponsive == responsive
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(38.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                                .clickable { onResponsiveChanged(responsive) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
     }
 }
 
@@ -835,16 +724,5 @@ fun ModernOpacitySlider(
                     .border(2.dp, Color(0xFF0A0A0C), CircleShape)
             )
         }
-    )
-}
-
-@Composable
-fun SlateConfigTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            background = Color.Transparent,
-            surface = Color(0xFF0A0A0C)
-        ),
-        content = content
     )
 }
