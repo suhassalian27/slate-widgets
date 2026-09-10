@@ -26,8 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.theme.ThemePreferences
-import com.altusix.slate.ui.components.SlateStudioScaffold
-import com.altusix.slate.ui.components.StudioTabItem
+import com.altusix.slate.ui.components.ConfigTabItem
+import com.altusix.slate.ui.components.SlateConfigScaffold
 
 class ProductivityConfigActivity : ComponentActivity() {
 
@@ -46,17 +46,17 @@ class ProductivityConfigActivity : ComponentActivity() {
         val accentColor = themePrefs.accentColor
 
         val tabs = listOf(
-            StudioTabItem("TOP3", "Top 3 Wins"),
-            StudioTabItem("TIMER", "Pomodoro"),
-            StudioTabItem("HABIT", "Habit"),
-            StudioTabItem("BOOKMARKS", "Bookmarks"),
-            StudioTabItem("CLIPBOARD", "Clipboard"),
-            StudioTabItem("SCREENTIME", "Screen Time"),
-            StudioTabItem("EISENHOWER", "Eisenhower"),
-            StudioTabItem("TIMELINE", "Timeline"),
-            StudioTabItem("GOAL", "Milestone"),
-            StudioTabItem("RINGS", "Rings"),
-            StudioTabItem("PIPELINE", "Pipeline")
+            ConfigTabItem("TOP3", "Top 3 Wins"),
+            ConfigTabItem("TIMER", "Pomodoro"),
+            ConfigTabItem("HABIT", "Habit"),
+            ConfigTabItem("BOOKMARKS", "Bookmarks"),
+            ConfigTabItem("CLIPBOARD", "Clipboard"),
+            ConfigTabItem("SCREENTIME", "Screen Time"),
+            ConfigTabItem("EISENHOWER", "Eisenhower"),
+            ConfigTabItem("TIMELINE", "Timeline"),
+            ConfigTabItem("GOAL", "Milestone"),
+            ConfigTabItem("RINGS", "Rings"),
+            ConfigTabItem("PIPELINE", "Pipeline")
         )
 
         setContent {
@@ -76,8 +76,9 @@ class ProductivityConfigActivity : ComponentActivity() {
                     finish()
                 }
 
-                SlateStudioScaffold(
-                    title = "Productivity Studio",
+                SlateConfigScaffold(
+                    title = "Productivity",
+                    subtitle = null,
                     accentColor = accentColor,
                     tabs = tabs,
                     selectedTabKey = selectedTab,
