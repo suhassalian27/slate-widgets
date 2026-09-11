@@ -67,8 +67,7 @@ fun SlateConfigScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
             // 1. Top Navigation Bar
             Row(

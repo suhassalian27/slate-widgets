@@ -198,6 +198,8 @@ object ProductivityStorageManager {
         val list = current.top3Tasks.toMutableList()
         if (index in list.indices) {
             val item = list[index]
+            // Smart Guard: Never check an empty task
+            if (item.title.isBlank()) return
             list[index] = item.copy(isCompleted = !item.isCompleted)
             saveConfig(context, widgetId, current.copy(top3Tasks = list))
         }

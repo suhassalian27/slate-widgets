@@ -379,7 +379,7 @@ private fun calculateLuminance(colorLong: Long): Float {
 
 
 // =========================================================================
-// 2. HABIT STREAK MATRIX (Edge-to-Edge Adaptive Grid & Proportional Typography)
+// 2. HABIT STREAK MATRIX (Balanced Proportional Scaling with Max Font Caps)
 // =========================================================================
 
 fun generateHabitMatrixBitmap(
@@ -394,7 +394,6 @@ fun generateHabitMatrixBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    // 1. True Fixed (2.0 aspect) vs Responsive Card Bounds
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w, h)
     } else {
@@ -419,28 +418,28 @@ fun generateHabitMatrixBitmap(
     val todayStr = sdf.format(todayCal.time)
     val isTodayDone = habit.history[todayStr] == true
 
-    // Compute live metrics
     val streak = calculateHabitStreak(habit.history)
     val (weekDone, _) = calculateWeekCompletion(habit.history)
 
     val cardW = cardRect.width()
     val cardH = cardRect.height()
+    val baseDim = minOf(cardH, cardW * 0.55f)
 
-    // 2. Uniform Symmetrical Margins
-    val padX = (cardW * 0.055f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
-    val padY = (cardH * 0.065f).coerceIn(10f * scaleFactor, 18f * scaleFactor)
+    // 1. Uniform Proportional Margins
+    val padX = cardW * 0.065f
+    val padY = cardH * 0.075f
 
     val contentLeft = cardRect.left + padX
     val contentRight = cardRect.right - padX
     val contentTop = cardRect.top + padY
     val contentBottom = cardRect.bottom - padY
 
-    // 3. Smooth Proportional Header (Scales directly with widget size without freezing)
-    val headerH = minOf(cardH * 0.25f, cardW * 0.16f).coerceIn(24f * scaleFactor, 52f * scaleFactor)
+    // 2. Controlled Header Bounds
+    val headerH = (baseDim * 0.24f).coerceIn(24f * scaleFactor, 46f * scaleFactor)
 
-    // Title & Subtitle Typography
-    val titleSize = headerH * 0.44f
-    val subSize = headerH * 0.30f
+    // Max Typography Caps: Title capped at 18sp, Subtitle capped at 12sp
+    val titleSize = (headerH * 0.48f).coerceAtMost(18f * scaleFactor)
+    val subSize = (headerH * 0.32f).coerceAtMost(12f * scaleFactor)
 
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
@@ -458,17 +457,13 @@ fun generateHabitMatrixBitmap(
     }
     canvas.drawText(metaText, contentLeft, contentTop + titleSize + subSize + (3f * scaleFactor), subPaint)
 
-    // Top-Right Action Checkmark
-    val toggleBtnR = headerH * 0.42f
+    // Check Action Button (Capped at 19dp radius)
+    val toggleBtnR = (headerH * 0.44f).coerceAtMost(19f * scaleFactor)
     val toggleBtnCx = contentRight - toggleBtnR
     val toggleBtnCy = contentTop + (headerH / 2f)
 
     val toggleBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isTodayDone) {
-            accentColor
-        } else {
-            if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(24, 255, 255, 255)
-        }
+        color = if (isTodayDone) accentColor else if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(24, 255, 255, 255)
         style = Paint.Style.FILL
     }
     canvas.drawCircle(toggleBtnCx, toggleBtnCy, toggleBtnR, toggleBgPaint)
@@ -477,7 +472,7 @@ fun generateHabitMatrixBitmap(
         val toggleBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (isLight) Color.argb(28, 0, 0, 0) else Color.argb(36, 255, 255, 255)
             style = Paint.Style.STROKE
-            strokeWidth = 1f * scaleFactor
+            strokeWidth = maxOf(1f * scaleFactor, toggleBtnR * 0.07f)
         }
         canvas.drawCircle(toggleBtnCx, toggleBtnCy, toggleBtnR, toggleBorder)
     }
@@ -489,7 +484,7 @@ fun generateHabitMatrixBitmap(
             secondaryTextColor
         }
         style = Paint.Style.STROKE
-        strokeWidth = (toggleBtnR * 0.17f).coerceIn(1.6f * scaleFactor, 3.0f * scaleFactor)
+        strokeWidth = (toggleBtnR * 0.16f).coerceIn(1.6f * scaleFactor, 2.6f * scaleFactor)
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
@@ -501,37 +496,23 @@ fun generateHabitMatrixBitmap(
     }
     canvas.drawPath(checkPath, checkPaint)
 
-    // 4. Edge-to-Edge Grid Calculation
-    val gridTop = contentTop + headerH + (6f * scaleFactor)
-    val gridBottom = contentBottom
-
+    // 3. Edge-to-Edge Dot Matrix Grid
+    val gridTop = contentTop + headerH + (baseDim * 0.04f)
     val availW = (contentRight - contentLeft).coerceAtLeast(10f)
-    val availH = (gridBottom - gridTop).coerceAtLeast(10f)
+    val availH = (contentBottom - gridTop).coerceAtLeast(10f)
 
-    // 7 rows (Monday = 0, Sunday = 6)
     val rows = 7
     val todayRow = (todayCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
 
-    // Maximum vertical step so dots never exceed the vertical area
-    val maxStepY = availH / rows.toFloat()
+    val rowPitch = availH / rows.toFloat()
+    val dotR = (rowPitch * 0.36f).coerceAtLeast(3f * scaleFactor)
 
-    // Target pitch: Prevent dots from becoming gigantic in portrait widgets
-    val targetStep = minOf(maxStepY, 26f * scaleFactor)
+    val cols = kotlin.math.round((availW - (2f * dotR)) / rowPitch).toInt().coerceAtLeast(5) + 1
+    val colPitch = (availW - (2f * dotR)) / (cols - 1).toFloat()
 
-    // Fit maximum columns edge-to-edge across availW
-    val cols = kotlin.math.ceil((availW / targetStep).toDouble()).toInt().coerceAtLeast(5)
-
-    // Force step to exactly divide availW -> 0px horizontal leftover
-    val step = availW / cols.toFloat()
-    val gap = step * 0.26f
-    val dotR = (step - gap) / 2f
-
-    // Start Column 0 aligned with contentLeft, ending flush with contentRight
-    val gridStartX = contentLeft + (step / 2f)
-
-    // Center the 7 rows vertically within the remaining grid area
-    val totalGridH = rows * step
-    val gridStartY = gridTop + ((availH - totalGridH) / 2f) + (step / 2f)
+    val totalGridH = (rows - 1) * rowPitch + (2f * dotR)
+    val gridStartY = gridTop + ((availH - totalGridH) / 2f) + dotR
+    val gridStartX = contentLeft + dotR
 
     val filledPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
@@ -544,13 +525,12 @@ fun generateHabitMatrixBitmap(
     val todayRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
         style = Paint.Style.STROKE
-        strokeWidth = (dotR * 0.30f).coerceIn(1.4f * scaleFactor, 2.4f * scaleFactor)
+        strokeWidth = (dotR * 0.28f).coerceIn(1.3f * scaleFactor, 2.2f * scaleFactor)
     }
 
     for (c in 0 until cols) {
         val weeksAgo = (cols - 1) - c
         for (r in 0 until rows) {
-            // Days after today in current week remain unrendered
             if (c == cols - 1 && r > todayRow) continue
 
             val dayOffset = (weeksAgo * 7) + (todayRow - r)
@@ -561,15 +541,14 @@ fun generateHabitMatrixBitmap(
             val isDone = habit.history[dateStr] == true
             val isToday = (c == cols - 1 && r == todayRow)
 
-            val dotCx = gridStartX + (c * step)
-            val dotCy = gridStartY + (r * step)
+            val dotCx = gridStartX + (c * colPitch)
+            val dotCy = gridStartY + (r * rowPitch)
 
             when {
                 isDone -> {
                     canvas.drawCircle(dotCx, dotCy, dotR, filledPaint)
                 }
                 isToday -> {
-                    // Outlined circular target for today's pending state
                     canvas.drawCircle(dotCx, dotCy, dotR - (todayRingPaint.strokeWidth / 2f), todayRingPaint)
                 }
                 else -> {
@@ -584,7 +563,7 @@ fun generateHabitMatrixBitmap(
 
 
 // =========================================================================
-// 3. DAILY TOP 3 WINS (4x2)
+// 3. DAILY TOP 3 WINS (Proportional with Clean Font Ceilings)
 // =========================================================================
 
 fun generateTop3TasksBitmap(
@@ -599,98 +578,210 @@ fun generateTop3TasksBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2.0f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // 1. Header (RULE OF 3 & Progress Counter)
-    val headerY = cardRect.top + 16f * scaleFactor
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardH, cardW * 0.55f)
+
+    val padX = cardW * 0.065f
+    val padY = cardH * 0.075f
+
+    val contentLeft = cardRect.left + padX
+    val contentRight = cardRect.right - padX
+    val contentTop = cardRect.top + padY
+    val contentBottom = cardRect.bottom - padY
+
+    // 1. Header (Capped at 15sp title)
+    val headerH = (baseDim * 0.22f).coerceIn(20f * scaleFactor, 40f * scaleFactor)
+    val titleSize = (headerH * 0.50f).coerceAtMost(15f * scaleFactor)
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 14f * scaleFactor
-        typeface = getSlateFont(context, 700)
+        textSize = titleSize
+        typeface = getSlateFont(context, 800)
+        letterSpacing = 0.04f
     }
-    canvas.drawText("DAILY TOP 3 WINS", cardRect.left + 18f * scaleFactor, headerY + 12f * scaleFactor, headerPaint)
+    val titleBaseline = contentTop + (headerH * 0.68f)
+    canvas.drawText("DAILY TOP 3 WINS", contentLeft, titleBaseline, titlePaint)
 
-    val completedCount = tasks.take(3).count { it.isCompleted }
-    val countBadgeText = "$completedCount/3 DONE"
-    val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = 11f * scaleFactor
-        typeface = getSlateFont(context, 700)
+    val validTasks = tasks.take(3).filter { it.title.isNotBlank() }
+    val isEmptyState = validTasks.isEmpty()
+    val validDone = validTasks.count { it.isCompleted }
+
+    // Badge Sizing (Capped at 11.5sp text, 24dp height)
+    val badgeText = if (isEmptyState) "+ SET WINS" else "$validDone/3 DONE"
+    val badgeH = (headerH * 0.84f).coerceAtMost(24f * scaleFactor)
+    val badgeTextSize = (badgeH * 0.46f).coerceAtMost(11.5f * scaleFactor)
+
+    val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isEmptyState) {
+            if (calculateLuminance(accentColor.toLong()) > 0.5f) Color.BLACK else Color.WHITE
+        } else if (validDone > 0) {
+            accentColor
+        } else {
+            secondaryTextColor
+        }
+        textSize = badgeTextSize
+        typeface = getSlateFont(context, 800)
+        letterSpacing = 0.03f
     }
-    val countBadgeW = countPaint.measureText(countBadgeText) + 16f * scaleFactor
-    val countBadgeH = 20f * scaleFactor
-    val countBadgeX = cardRect.right - 18f * scaleFactor - countBadgeW
-    val countRect = RectF(countBadgeX, headerY, countBadgeX + countBadgeW, headerY + countBadgeH)
-    val countBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(35, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
+
+    val badgeTextW = badgeTextPaint.measureText(badgeText)
+    val badgePadX = badgeH * 0.42f
+    val badgeW = badgeTextW + (badgePadX * 2f)
+    val badgeRect = RectF(
+        contentRight - badgeW,
+        contentTop + ((headerH - badgeH) / 2f),
+        contentRight,
+        contentTop + ((headerH + badgeH) / 2f)
+    )
+
+    val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = when {
+            isEmptyState -> accentColor
+            validDone > 0 -> Color.argb(35, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
+            else -> if (isLight) Color.argb(15, 0, 0, 0) else Color.argb(20, 255, 255, 255)
+        }
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(countRect, 8f * scaleFactor, 8f * scaleFactor, countBg)
-    canvas.drawText(countBadgeText, countBadgeX + 8f * scaleFactor, headerY + 14f * scaleFactor, countPaint)
+    val badgeCorner = badgeH * 0.30f
+    canvas.drawRoundRect(badgeRect, badgeCorner, badgeCorner, badgeBgPaint)
+    val badgeBaseline = badgeRect.centerY() - ((badgeTextPaint.fontMetrics.ascent + badgeTextPaint.fontMetrics.descent) / 2f)
+    canvas.drawText(badgeText, badgeRect.centerX() - (badgeTextW / 2f), badgeBaseline, badgeTextPaint)
 
-    // 2. Three Distinct Task Rows
-    val rowStartY = headerY + 32f * scaleFactor
-    val rowHeight = (cardRect.bottom - rowStartY - 12f * scaleFactor) / 3f
-    val checkRadius = 9f * scaleFactor
+    // 2. Priority List Rows (Task text capped at 15sp, Index at 12.5sp, Box capped at 22dp)
+    val listTop = contentTop + headerH + (baseDim * 0.04f)
+    val availableListH = contentBottom - listTop
+    val rowH = availableListH / 3f
 
-    for (i in 0 until minOf(3, tasks.size)) {
-        val task = tasks[i]
-        val rowCenterY = rowStartY + i * rowHeight + rowHeight / 2f
+    val numSize = (rowH * 0.32f).coerceAtMost(12.5f * scaleFactor)
+    val taskTextSize = (rowH * 0.38f).coerceAtMost(15f * scaleFactor)
+    val boxSize = minOf(rowH * 0.48f, cardW * 0.09f).coerceAtMost(22f * scaleFactor)
+    val boxRadius = boxSize * 0.28f
 
-        // Priority Badge Circle (01, 02, 03)
-        val numX = cardRect.left + 26f * scaleFactor
-        val numBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (task.isCompleted) Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(25, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-            style = Paint.Style.FILL
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(110, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+        textSize = numSize
+        typeface = getSlateFont(context, 700)
+    }
+
+    val taskTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = taskTextSize
+        typeface = getSlateFont(context, 600)
+    }
+
+    val placeholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(70, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+        textSize = taskTextSize * 0.95f
+        typeface = getSlateFont(context, 500)
+    }
+
+    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(16, 255, 255, 255)
+        strokeWidth = (baseDim * 0.008f).coerceIn(1f * scaleFactor, 1.8f * scaleFactor)
+    }
+
+    for (i in 0 until 3) {
+        val task = tasks.getOrNull(i)
+        val rowTop = listTop + (i * rowH)
+        val rowBottom = rowTop + rowH
+        val rowCenterY = (rowTop + rowBottom) / 2f
+
+        if (i > 0) {
+            canvas.drawLine(contentLeft, rowTop, contentRight, rowTop, divPaint)
         }
-        canvas.drawCircle(numX, rowCenterY, 9f * scaleFactor, numBgPaint)
 
-        val numTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (task.isCompleted) accentColor else secondaryTextColor
-            textSize = 9.5f * scaleFactor
-            typeface = getSlateFont(context, 700)
-            textAlign = Paint.Align.CENTER
-        }
-        canvas.drawText(String.format(Locale.getDefault(), "%02d", i + 1), numX, rowCenterY + 3.5f * scaleFactor, numTextPaint)
+        val indexStr = String.format(Locale.getDefault(), "%02d", i + 1)
+        val numBaseline = rowCenterY - ((numPaint.fontMetrics.ascent + numPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(indexStr, contentLeft, numBaseline, numPaint)
 
-        // Checkbox on Right
-        val checkX = cardRect.right - 26f * scaleFactor
-        drawCheckmarkIcon(canvas, checkX, rowCenterY, checkRadius, task.isCompleted, accentColor, secondaryTextColor, scaleFactor)
+        val textStartX = contentLeft + (numSize * 2.8f)
+        val boxRight = contentRight
+        val boxLeft = boxRight - boxSize
+        val maxTextW = (boxLeft - (baseDim * 0.05f)) - textStartX
 
-        // Task Title text with Strikethrough if completed
-        val textStartX = numX + 16f * scaleFactor
-        val maxTextW = checkX - checkRadius - textStartX - 10f * scaleFactor
+        val hasTitle = task != null && task.title.isNotBlank()
+        val isDone = hasTitle && task!!.isCompleted
 
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (task.isCompleted) Color.argb(120, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor)) else primaryTextColor
-            textSize = 12.5f * scaleFactor
-            typeface = getSlateFont(context, if (task.isCompleted) 400 else 600)
-            isStrikeThruText = task.isCompleted
-        }
-
-        var displayTitle = task.title
-        while (displayTitle.isNotEmpty() && textPaint.measureText("$displayTitle…") > maxTextW) {
-            displayTitle = displayTitle.dropLast(1)
-        }
-        val finalTitle = if (displayTitle != task.title) "$displayTitle…" else displayTitle
-        canvas.drawText(finalTitle, textStartX, rowCenterY + 4.5f * scaleFactor, textPaint)
-
-        // Divider stroke between rows
-        if (i < 2) {
-            val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(18, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-                strokeWidth = 1f * scaleFactor
+        if (hasTitle) {
+            taskTextPaint.color = if (isDone) {
+                Color.argb(100, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+            } else {
+                primaryTextColor
             }
-            val divY = rowStartY + (i + 1) * rowHeight
-            canvas.drawLine(cardRect.left + 18f * scaleFactor, divY, cardRect.right - 18f * scaleFactor, divY, divPaint)
+            taskTextPaint.isStrikeThruText = isDone
+            val textBaseline = rowCenterY - ((taskTextPaint.fontMetrics.ascent + taskTextPaint.fontMetrics.descent) / 2f)
+            val elided = android.text.TextUtils.ellipsize(
+                task!!.title,
+                android.text.TextPaint(taskTextPaint),
+                maxTextW,
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elided, textStartX, textBaseline, taskTextPaint)
+        } else {
+            val textBaseline = rowCenterY - ((placeholderPaint.fontMetrics.ascent + placeholderPaint.fontMetrics.descent) / 2f)
+            canvas.drawText("Set priority ${i + 1}...", textStartX, textBaseline, placeholderPaint)
+        }
+
+        val boxRect = RectF(boxLeft, rowCenterY - (boxSize / 2f), boxRight, rowCenterY + (boxSize / 2f))
+
+        if (hasTitle) {
+            if (isDone) {
+                val filledBoxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = accentColor
+                    style = Paint.Style.FILL
+                }
+                canvas.drawRoundRect(boxRect, boxRadius, boxRadius, filledBoxPaint)
+
+                val checkMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (calculateLuminance(accentColor.toLong()) > 0.5f) Color.BLACK else Color.WHITE
+                    style = Paint.Style.STROKE
+                    strokeWidth = (boxSize * 0.13f).coerceIn(1.8f * scaleFactor, 2.8f * scaleFactor)
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
+                }
+                val checkPath = Path().apply {
+                    val cx = boxRect.centerX()
+                    val cy = boxRect.centerY()
+                    val s = boxSize * 0.28f
+                    moveTo(cx - s, cy)
+                    lineTo(cx - (s * 0.25f), cy + (s * 0.75f))
+                    lineTo(cx + (s * 1.05f), cy - (s * 0.65f))
+                }
+                canvas.drawPath(checkPath, checkMarkPaint)
+            } else {
+                val emptyBoxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.argb(45, 0, 0, 0) else Color.argb(55, 255, 255, 255)
+                    style = Paint.Style.STROKE
+                    strokeWidth = (boxSize * 0.08f).coerceIn(1.3f * scaleFactor, 2.0f * scaleFactor)
+                }
+                canvas.drawRoundRect(boxRect, boxRadius, boxRadius, emptyBoxPaint)
+            }
+        } else {
+            val mutedBoxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+                style = Paint.Style.STROKE
+                strokeWidth = 1.0f * scaleFactor
+            }
+            canvas.drawRoundRect(boxRect, boxRadius, boxRadius, mutedBoxPaint)
         }
     }
 
@@ -1167,7 +1258,7 @@ fun generateBookmarkListBitmap(
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val ( bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 

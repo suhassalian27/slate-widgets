@@ -319,11 +319,21 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
         hDp: Int
     ): Bitmap {
         val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
-        return generatePomodoroTimerBitmap(context, prodConfig.focusTimer, config, isResponsive, wDp, hDp)
+        return generatePomodoroTimerBitmap(
+            context,
+            prodConfig.focusTimer,
+            config,
+            isResponsive,
+            wDp,
+            hDp
+        )
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        val appWidgetId = intent.getIntExtra(
+            AppWidgetManager.EXTRA_APPWIDGET_ID,
+            AppWidgetManager.INVALID_APPWIDGET_ID
+        )
         if (intent.action == ACTION_ADJUST_TIMER && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             val delta = intent.getIntExtra(EXTRA_DELTA_MINUTES, 0)
             ProductivityStorageManager.adjustFocusTimer(context, appWidgetId, delta)
@@ -334,11 +344,12 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        // Upper section -> Open Edit Studio
+        val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
+
         val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            putExtra(EXTRA_TAB, "TIMER")
-            data = Uri.parse("slate_prod://$appWidgetId/timer_settings")
+            putExtra(EXTRA_TAB, "TOP3")
+            data = Uri.parse("slate_prod://$appWidgetId/top3_edit")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val openPi = PendingIntent.getActivity(
@@ -347,51 +358,31 @@ class ProductivityPomodoroReceiver : BaseProductivityReceiver(R.layout.widget_pr
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.btn_timer_open, openPi)
+        views.setOnClickPendingIntent(R.id.btn_top3_open, openPi)
 
-        // Minus 5m Button (-5)
-        val minusIntent = Intent(context, this.javaClass).apply {
-            action = ACTION_ADJUST_TIMER
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            putExtra(EXTRA_DELTA_MINUTES, -5)
-            data = Uri.parse("slate_prod://$appWidgetId/timer_minus_5")
+        val targetIds = listOf(R.id.btn_top3_check_0, R.id.btn_top3_check_1, R.id.btn_top3_check_2)
+        for (i in targetIds.indices) {
+            val item = prodConfig.top3Tasks.getOrNull(i)
+            // If task is configured, clicking checkbox toggles it.
+            // If task is empty, clicking opens config directly to add it.
+            val pi = if (item != null && item.title.isNotBlank()) {
+                val checkIntent = Intent(context, this.javaClass).apply {
+                    action = ACTION_TOGGLE_TOP3
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    putExtra(EXTRA_INDEX, i)
+                    data = Uri.parse("slate_prod://$appWidgetId/top3_check_$i")
+                }
+                PendingIntent.getBroadcast(
+                    context,
+                    appWidgetId * 100 + 10 + i,
+                    checkIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                openPi
+            }
+            views.setOnClickPendingIntent(targetIds[i], pi)
         }
-        val minusPi = PendingIntent.getBroadcast(
-            context,
-            appWidgetId * 100 + 2,
-            minusIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.btn_timer_minus, minusPi)
-
-        // Center Toggle (Play/Pause) Pill
-        val toggleIntent = Intent(context, this.javaClass).apply {
-            action = ACTION_TOGGLE_TIMER
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            data = Uri.parse("slate_prod://$appWidgetId/timer_toggle")
-        }
-        val togglePi = PendingIntent.getBroadcast(
-            context,
-            appWidgetId * 100 + 3,
-            toggleIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.btn_timer_toggle, togglePi)
-
-        // Plus 5m Button (+5)
-        val plusIntent = Intent(context, this.javaClass).apply {
-            action = ACTION_ADJUST_TIMER
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            putExtra(EXTRA_DELTA_MINUTES, 5)
-            data = Uri.parse("slate_prod://$appWidgetId/timer_plus_5")
-        }
-        val plusPi = PendingIntent.getBroadcast(
-            context,
-            appWidgetId * 100 + 4,
-            plusIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.btn_timer_plus, plusPi)
     }
 }
 
@@ -467,6 +458,9 @@ class ProductivityTop3Receiver : BaseProductivityReceiver(R.layout.widget_produc
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
+        val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
+        val validTasks = prodConfig.top3Tasks.take(3).filter { it.title.isNotBlank() }
+
         val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "TOP3")
@@ -479,23 +473,39 @@ class ProductivityTop3Receiver : BaseProductivityReceiver(R.layout.widget_produc
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        // Background / header tap
         views.setOnClickPendingIntent(R.id.btn_top3_open, openPi)
 
         val targetIds = listOf(R.id.btn_top3_check_0, R.id.btn_top3_check_1, R.id.btn_top3_check_2)
-        for (i in targetIds.indices) {
-            val checkIntent = Intent(context, this.javaClass).apply {
-                action = ACTION_TOGGLE_TOP3
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                putExtra(EXTRA_INDEX, i)
-                data = Uri.parse("slate_prod://$appWidgetId/top3_check_$i")
+
+        // If no tasks are set, every touch area delegates to opening the config screen
+        if (validTasks.isEmpty()) {
+            for (targetId in targetIds) {
+                views.setOnClickPendingIntent(targetId, openPi)
             }
-            val checkPi = PendingIntent.getBroadcast(
-                context,
-                appWidgetId * 100 + 10 + i,
-                checkIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(targetIds[i], checkPi)
+            return
+        }
+
+        // Once configured, checkboxes toggle their task while blank slots open config
+        for (i in targetIds.indices) {
+            val item = prodConfig.top3Tasks.getOrNull(i)
+            val pi = if (item != null && item.title.isNotBlank()) {
+                val checkIntent = Intent(context, this.javaClass).apply {
+                    action = ACTION_TOGGLE_TOP3
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    putExtra(EXTRA_INDEX, i)
+                    data = Uri.parse("slate_prod://$appWidgetId/top3_check_$i")
+                }
+                PendingIntent.getBroadcast(
+                    context,
+                    appWidgetId * 100 + 10 + i,
+                    checkIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                openPi
+            }
+            views.setOnClickPendingIntent(targetIds[i], pi)
         }
     }
 }

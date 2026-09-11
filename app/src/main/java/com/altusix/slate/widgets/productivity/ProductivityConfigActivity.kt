@@ -410,6 +410,8 @@ private fun Top3Editor(
 
     for (i in 0 until 3) {
         val task = tasks.getOrElse(i) { Top3TaskItem("t_${i + 1}", "", false, i + 1) }
+        val canCheck = task.title.isNotBlank()
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -424,8 +426,14 @@ private fun Top3Editor(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (task.isCompleted) accentColor else Color(0xFF22222A))
-                    .clickable {
+                    .background(
+                        when {
+                            task.isCompleted -> accentColor
+                            canCheck -> Color(0xFF22222A)
+                            else -> Color(0xFF16161B)
+                        }
+                    )
+                    .clickable(enabled = canCheck) {
                         val updated = tasks.toMutableList()
                         while (updated.size <= i) updated.add(Top3TaskItem("t_${updated.size + 1}", "", false, updated.size + 1))
                         updated[i] = task.copy(isCompleted = !task.isCompleted)
@@ -443,7 +451,10 @@ private fun Top3Editor(
                 onValueChange = { newTitle: String ->
                     val updated = tasks.toMutableList()
                     while (updated.size <= i) updated.add(Top3TaskItem("t_${updated.size + 1}", "", false, updated.size + 1))
-                    updated[i] = task.copy(title = newTitle)
+                    updated[i] = task.copy(
+                        title = newTitle,
+                        isCompleted = if (newTitle.isBlank()) false else task.isCompleted
+                    )
                     onUpdate(updated)
                 },
                 placeholder = { Text("Priority ${i + 1} task...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
