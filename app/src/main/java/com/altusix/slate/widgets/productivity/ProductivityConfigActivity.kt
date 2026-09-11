@@ -51,6 +51,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 
 private enum class ProductivityColorTarget { BACKGROUND, ACCENT }
 
@@ -1051,55 +1053,229 @@ private fun RingsEditor(
     accentColor: Color,
     onUpdate: (List<HabitRingItem>) -> Unit
 ) {
-    SectionTitle(title = "Activity Rings (3 Metrics)")
+    SectionTitle(title = "Habit Rings (3 Metrics)")
+    Text(
+        text = "Customize each ring's habit name, daily target, and unit.",
+        fontSize = 12.sp,
+        color = Color(0xFF8E8E93)
+    )
+
+    val ringMeta = listOf(
+        Triple("Outer Ring", Color(0xFFFF5E3A), 0xFFFF5E3AL),
+        Triple("Middle Ring", Color(0xFF30D158), 0xFF30D158L),
+        Triple("Inner Ring", Color(0xFF0A84FF), 0xFF0A84FFL)
+    )
 
     for (i in 0 until 3) {
-        val ring = rings.getOrElse(i) { HabitRingItem("r_$i", "Activity ${i + 1}", 3, 5, "hrs", 0xFF0A84FF) }
-        Row(
+        val (ringTitle, ringColor, defaultHex) = ringMeta[i]
+        val ring = rings.getOrElse(i) {
+            HabitRingItem("r_$i", "Habit ${i + 1}", 0, if (i == 1) 30 else 4, if (i == 1) "mins" else "hrs", defaultHex)
+        }
+
+        fun updateCurrentRing(updated: HabitRingItem) {
+            val list = rings.toMutableList()
+            while (list.size <= i) {
+                val idx = list.size
+                list.add(HabitRingItem("r_$idx", "Habit ${idx + 1}", 0, 4, "hrs", ringMeta[idx].third))
+            }
+            list[i] = updated
+            onUpdate(list)
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF141418))
-                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(ring.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text("${ring.currentValue} / ${ring.targetValue} ${ring.unit}", color = Color(0xFF8E8E93), fontSize = 12.sp)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF22222A))
-                        .clickable {
-                            val updated = rings.toMutableList()
-                            while (updated.size <= i) updated.add(ring)
-                            updated[i] = ring.copy(currentValue = maxOf(0, ring.currentValue - 1))
-                            onUpdate(updated)
-                        },
-                    contentAlignment = Alignment.Center
+            // 1. Header: Colored ring dot + Title + Live progress badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("-", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(ringColor)
+                    )
+                    Text(
+                        text = ringTitle,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
-                Text("${ring.currentValue}", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(accentColor)
-                        .clickable {
-                            val updated = rings.toMutableList()
-                            while (updated.size <= i) updated.add(ring)
-                            updated[i] = ring.copy(currentValue = ring.currentValue + 1)
-                            onUpdate(updated)
-                        },
-                    contentAlignment = Alignment.Center
+
+                Text(
+                    text = "${ring.currentValue} / ${ring.targetValue} ${ring.unit}".trim(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ringColor
+                )
+            }
+
+            // 2. Habit Name
+            OutlinedTextField(
+                value = ring.label,
+                onValueChange = { updateCurrentRing(ring.copy(label = it)) },
+                label = { Text("Habit Name") },
+                placeholder = { Text("e.g. Focus, Reading, Workout") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = accentColor,
+                    unfocusedBorderColor = Color(0xFF24242C),
+                    focusedContainerColor = Color(0xFF0C0C0E),
+                    unfocusedContainerColor = Color(0xFF0C0C0E),
+                    focusedLabelColor = accentColor,
+                    unfocusedLabelColor = Color(0xFF8E8E93)
+                )
+            )
+
+            // 3. Clear Side-by-Side Target & Completed Inputs
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = if (ring.currentValue == 0) "" else "${ring.currentValue}",
+                    onValueChange = { str ->
+                        val num = str.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        updateCurrentRing(ring.copy(currentValue = num))
+                    },
+                    label = { Text("Completed") },
+                    placeholder = { Text("0") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentColor,
+                        unfocusedBorderColor = Color(0xFF24242C),
+                        focusedContainerColor = Color(0xFF0C0C0E),
+                        unfocusedContainerColor = Color(0xFF0C0C0E),
+                        focusedLabelColor = accentColor,
+                        unfocusedLabelColor = Color(0xFF8E8E93)
+                    )
+                )
+
+                OutlinedTextField(
+                    value = if (ring.targetValue == 0) "" else "${ring.targetValue}",
+                    onValueChange = { str ->
+                        val num = str.filter { it.isDigit() }.toIntOrNull() ?: 1
+                        updateCurrentRing(ring.copy(targetValue = maxOf(1, num)))
+                    },
+                    label = { Text("Daily Target") },
+                    placeholder = { Text("4") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentColor,
+                        unfocusedBorderColor = Color(0xFF24242C),
+                        focusedContainerColor = Color(0xFF0C0C0E),
+                        unfocusedContainerColor = Color(0xFF0C0C0E),
+                        focusedLabelColor = accentColor,
+                        unfocusedLabelColor = Color(0xFF8E8E93)
+                    )
+                )
+            }
+
+            // 4. Unit Selection Chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("hrs", "mins", "times", "cal", "km").forEach { preset ->
+                    val isSelected = ring.unit.equals(preset, ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) ringColor.copy(alpha = 0.2f) else Color(0xFF18181E))
+                            .border(
+                                1.dp,
+                                if (isSelected) ringColor else Color(0xFF24242C),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { updateCurrentRing(ring.copy(unit = preset)) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = preset,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else Color(0xFF8E8E93)
+                        )
+                    }
+                }
+            }
+
+            // 5. Quick Increment / Decrement Stepper
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF0C0C0E))
+                    .border(1.dp, Color(0xFF24242C), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Quick Adjust Completed",
+                    color = Color(0xFF8E8E93),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("+", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF22222A))
+                            .clickable { updateCurrentRing(ring.copy(currentValue = maxOf(0, ring.currentValue - 1))) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("-", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Text(
+                        text = "${ring.currentValue}",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                            .clickable { updateCurrentRing(ring.copy(currentValue = ring.currentValue + 1)) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("+", color = Color.Black, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

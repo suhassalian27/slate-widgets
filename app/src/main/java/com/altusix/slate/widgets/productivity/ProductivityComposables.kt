@@ -1238,7 +1238,7 @@ fun generateGoalMilestoneBitmap(
 }
 
 // =========================================================================
-// 7. WEEKLY HABIT RINGS (2x2)
+// 7. WEEKLY HABIT RINGS (Header-Free, Fully Adaptive 3-Way Responsive Engine)
 // =========================================================================
 
 fun generateHabitRingsBitmap(
@@ -1253,46 +1253,309 @@ fun generateHabitRingsBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
 
-    // Header
-    val headerY = cardRect.top + 16f * scaleFactor
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = 13.5f * scaleFactor
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText("HABIT RINGS", cardRect.left + 16f * scaleFactor, headerY + 12f * scaleFactor, headerPaint)
-
-    // 3 Concentric Rings
-    val cx = cardRect.centerX()
-    val cy = cardRect.top + cardRect.height() * 0.48f
-    val baseRadius = minOf(cardRect.width(), cardRect.height()) * 0.28f
-    val ringStroke = 6f * scaleFactor
-    val ringGap = 3.5f * scaleFactor
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardW, cardH)
+    val aspectRatio = cardW / cardH.coerceAtLeast(1f)
 
     val defaultColors = listOf(0xFFFF5E3A, 0xFF30D158, 0xFF0A84FF)
+    val activeRings = rings.take(3)
 
-    for (i in 0 until minOf(3, rings.size)) {
-        val ring = rings[i]
-        val r = baseRadius - i * (ringStroke + ringGap)
-        val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
-        val colorHex = defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+    // Average percentage for center display
+    val avgFraction = if (activeRings.isNotEmpty()) {
+        activeRings.map { (it.currentValue.toFloat() / it.targetValue.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f) }.average().toFloat()
+    } else 0f
+    val percentText = "${(avgFraction * 100).toInt()}%"
 
-        // Track
+    // =========================================================================
+    // LAYOUT 1: WIDE FORMAT (aspectRatio >= 1.35, e.g. 4x1, 4x2)
+    // Left: Rings | Right: Detailed 3-row habit breakdown
+    // =========================================================================
+    if (aspectRatio >= 1.35f) {
+        val padY = (cardH * 0.10f).coerceIn(10f * scaleFactor, 18f * scaleFactor)
+        val padX = (cardH * 0.14f).coerceIn(14f * scaleFactor, 24f * scaleFactor)
+
+        val contentLeft = cardRect.left + padX
+        val contentRight = cardRect.right - padX
+        val contentTop = cardRect.top + padY
+        val contentBottom = cardRect.bottom - padY
+
+        val availW = contentRight - contentLeft
+        val availH = contentBottom - contentTop
+
+        val ringBoxSize = minOf(availH, availW * 0.44f)
+        val cx = contentLeft + (ringBoxSize / 2f)
+        val cy = contentTop + (availH / 2f)
+
+        val maxRadius = ringBoxSize * 0.48f
+        val ringStroke = (ringBoxSize * 0.088f).coerceIn(5f * scaleFactor, 14f * scaleFactor)
+        val ringGap = ringStroke * 0.35f
+
+        // Draw Concentric Rings
+        for (i in 0 until minOf(3, activeRings.size)) {
+            val ring = activeRings[i]
+            val r = maxRadius - (i * (ringStroke + ringGap))
+            if (r <= 0f) continue
+
+            val colorHex = if (ring.colorHex != 0L) ring.colorHex.toInt() else defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+
+            val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(32, Color.red(colorHex), Color.green(colorHex), Color.blue(colorHex))
+                style = Paint.Style.STROKE
+                strokeWidth = ringStroke
+            }
+            canvas.drawCircle(cx, cy, r, trackPaint)
+
+            val progress = (ring.currentValue.toFloat() / ring.targetValue.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+            val sweepAngle = 360f * progress
+            if (sweepAngle > 0f) {
+                val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = colorHex
+                    style = Paint.Style.STROKE
+                    strokeWidth = ringStroke
+                    strokeCap = Paint.Cap.ROUND
+                }
+                val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
+                canvas.drawArc(arcRect, -90f, sweepAngle, false, progPaint)
+            }
+        }
+
+        // Center Percentage
+        val innermostRadius = maxRadius - (2 * (ringStroke + ringGap))
+        val percentTextSize = (innermostRadius * 0.65f).coerceIn(12f * scaleFactor, 26f * scaleFactor)
+        val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = percentTextSize
+            typeface = getSlateFont(context, 800)
+            textAlign = Paint.Align.CENTER
+        }
+        val percentBaseline = cy - ((percentPaint.fontMetrics.ascent + percentPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(percentText, cx, percentBaseline, percentPaint)
+
+        // Right Column: Vertical List of Habits
+        val listLeft = contentLeft + ringBoxSize + (availW * 0.08f)
+        val listRight = contentRight
+        val rowPitch = availH / minOf(3, activeRings.size).coerceAtLeast(1).toFloat()
+
+        val labelTextSize = (rowPitch * 0.38f).coerceIn(10.5f * scaleFactor, 15f * scaleFactor)
+        val dotR = maxOf(2.5f * scaleFactor, labelTextSize * 0.28f)
+
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = labelTextSize
+            typeface = getSlateFont(context, 600)
+        }
+
+        val valPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryTextColor
+            textSize = labelTextSize * 0.95f
+            typeface = getSlateFont(context, 600)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+        for (i in 0 until minOf(3, activeRings.size)) {
+            val ring = activeRings[i]
+            val rowCenterY = contentTop + (i * rowPitch) + (rowPitch / 2f)
+            val colorHex = if (ring.colorHex != 0L) ring.colorHex.toInt() else defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+
+            dotPaint.color = colorHex
+            canvas.drawCircle(listLeft + dotR, rowCenterY, dotR, dotPaint)
+
+            val valStr = "${ring.currentValue}/${ring.targetValue} ${ring.unit}".trim()
+            val valW = valPaint.measureText(valStr)
+            val valBaseline = rowCenterY - ((valPaint.fontMetrics.ascent + valPaint.fontMetrics.descent) / 2f)
+            canvas.drawText(valStr, listRight, valBaseline, valPaint)
+
+            val textStartX = listLeft + (dotR * 2.5f) + (6f * scaleFactor)
+            val maxLabelW = (listRight - valW - (8f * scaleFactor)) - textStartX
+            val labelBaseline = rowCenterY - ((labelPaint.fontMetrics.ascent + labelPaint.fontMetrics.descent) / 2f)
+
+            val displayLabel = ring.label.ifBlank { "Habit ${i + 1}" }
+            val elidedLabel = android.text.TextUtils.ellipsize(
+                displayLabel,
+                android.text.TextPaint(labelPaint),
+                maxLabelW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedLabel, textStartX, labelBaseline, labelPaint)
+        }
+
+        return bitmap
+    }
+
+    // =========================================================================
+    // LAYOUT 2: TALL / VERTICAL FORMAT (aspectRatio <= 0.82, e.g. 2x3, 2x4)
+    // Top: Maximize Ring Diameter | Bottom: Vertical 3-row Habit List
+    // =========================================================================
+    if (aspectRatio <= 0.82f) {
+        val pad = (cardW * 0.08f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+        val contentLeft = cardRect.left + pad
+        val contentRight = cardRect.right - pad
+        val contentTop = cardRect.top + pad
+        val contentBottom = cardRect.bottom - pad
+
+        val availW = contentRight - contentLeft
+        val availH = contentBottom - contentTop
+
+        // Rings take top section matching width
+        val ringDiameter = minOf(availW * 0.90f, availH * 0.52f)
+        val cx = cardRect.centerX()
+        val cy = contentTop + (ringDiameter / 2f)
+
+        val maxRadius = ringDiameter / 2f
+        val ringStroke = (ringDiameter * 0.088f).coerceIn(5.5f * scaleFactor, 14f * scaleFactor)
+        val ringGap = ringStroke * 0.35f
+
+        for (i in 0 until minOf(3, activeRings.size)) {
+            val ring = activeRings[i]
+            val r = maxRadius - (i * (ringStroke + ringGap))
+            if (r <= 0f) continue
+
+            val colorHex = if (ring.colorHex != 0L) ring.colorHex.toInt() else defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+
+            val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(32, Color.red(colorHex), Color.green(colorHex), Color.blue(colorHex))
+                style = Paint.Style.STROKE
+                strokeWidth = ringStroke
+            }
+            canvas.drawCircle(cx, cy, r, trackPaint)
+
+            val progress = (ring.currentValue.toFloat() / ring.targetValue.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+            val sweepAngle = 360f * progress
+            if (sweepAngle > 0f) {
+                val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = colorHex
+                    style = Paint.Style.STROKE
+                    strokeWidth = ringStroke
+                    strokeCap = Paint.Cap.ROUND
+                }
+                val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
+                canvas.drawArc(arcRect, -90f, sweepAngle, false, progPaint)
+            }
+        }
+
+        // Center Percentage
+        val innermostRadius = maxRadius - (2 * (ringStroke + ringGap))
+        val percentTextSize = (innermostRadius * 0.65f).coerceIn(12f * scaleFactor, 28f * scaleFactor)
+        val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = percentTextSize
+            typeface = getSlateFont(context, 800)
+            textAlign = Paint.Align.CENTER
+        }
+        val percentBaseline = cy - ((percentPaint.fontMetrics.ascent + percentPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(percentText, cx, percentBaseline, percentPaint)
+
+        // Bottom Section: Stacks 3 habits vertically to prevent any truncation
+        val listStartY = cy + maxRadius + (cardH * 0.04f)
+        val listAvailH = (contentBottom - listStartY).coerceAtLeast(10f)
+        val rowPitch = listAvailH / minOf(3, activeRings.size).coerceAtLeast(1).toFloat()
+
+        val labelTextSize = (rowPitch * 0.40f).coerceIn(10f * scaleFactor, 14f * scaleFactor)
+        val dotR = maxOf(2.5f * scaleFactor, labelTextSize * 0.28f)
+
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = labelTextSize
+            typeface = getSlateFont(context, 600)
+        }
+
+        val valPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryTextColor
+            textSize = labelTextSize * 0.95f
+            typeface = getSlateFont(context, 600)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+        for (i in 0 until minOf(3, activeRings.size)) {
+            val ring = activeRings[i]
+            val rowCenterY = listStartY + (i * rowPitch) + (rowPitch / 2f)
+            val colorHex = if (ring.colorHex != 0L) ring.colorHex.toInt() else defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+
+            dotPaint.color = colorHex
+            canvas.drawCircle(contentLeft + dotR, rowCenterY, dotR, dotPaint)
+
+            val valStr = "${ring.currentValue}/${ring.targetValue} ${ring.unit}".trim()
+            val valW = valPaint.measureText(valStr)
+            val valBaseline = rowCenterY - ((valPaint.fontMetrics.ascent + valPaint.fontMetrics.descent) / 2f)
+            canvas.drawText(valStr, contentRight, valBaseline, valPaint)
+
+            val textStartX = contentLeft + (dotR * 2.5f) + (6f * scaleFactor)
+            val maxLabelW = (contentRight - valW - (8f * scaleFactor)) - textStartX
+            val labelBaseline = rowCenterY - ((labelPaint.fontMetrics.ascent + labelPaint.fontMetrics.descent) / 2f)
+
+            val displayLabel = ring.label.ifBlank { "Habit ${i + 1}" }
+            val elidedLabel = android.text.TextUtils.ellipsize(
+                displayLabel,
+                android.text.TextPaint(labelPaint),
+                maxLabelW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedLabel, textStartX, labelBaseline, labelPaint)
+        }
+
+        return bitmap
+    }
+
+    // =========================================================================
+    // LAYOUT 3: SQUARE & BALANCED FORMAT (0.82 < aspectRatio < 1.35, e.g. 2x2, 3x3)
+    // Vertically Centered Unit: Maximize Rings + Clean Bottom Legend Row
+    // =========================================================================
+    val pad = (baseDim * 0.08f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+    val contentLeft = cardRect.left + pad
+    val contentRight = cardRect.right - pad
+    val contentTop = cardRect.top + pad
+    val contentBottom = cardRect.bottom - pad
+
+    val availW = contentRight - contentLeft
+    val availH = contentBottom - contentTop
+
+    val legendTextSize = (baseDim * 0.085f).coerceIn(10f * scaleFactor, 14f * scaleFactor)
+    val legendH = legendTextSize * 1.3f
+    val gap = (baseDim * 0.07f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    // Rings allocate ~80% of available height
+    val availRingH = (availH - legendH - gap).coerceAtLeast(20f)
+    val ringDiameter = minOf(availRingH, availW * 0.88f)
+    val cx = cardRect.centerX()
+
+    val totalBlockH = ringDiameter + gap + legendH
+    val startY = contentTop + ((availH - totalBlockH) / 2f).coerceAtLeast(0f)
+
+    val cy = startY + (ringDiameter / 2f)
+    val maxRadius = ringDiameter / 2f
+    val ringStroke = (ringDiameter * 0.088f).coerceIn(5.5f * scaleFactor, 14f * scaleFactor)
+    val ringGap = ringStroke * 0.38f
+
+    for (i in 0 until minOf(3, activeRings.size)) {
+        val ring = activeRings[i]
+        val r = maxRadius - (i * (ringStroke + ringGap))
+        if (r <= 0f) continue
+
+        val colorHex = if (ring.colorHex != 0L) ring.colorHex.toInt() else defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+
         val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(35, Color.red(colorHex), Color.green(colorHex), Color.blue(colorHex))
+            color = Color.argb(32, Color.red(colorHex), Color.green(colorHex), Color.blue(colorHex))
             style = Paint.Style.STROKE
             strokeWidth = ringStroke
         }
         canvas.drawCircle(cx, cy, r, trackPaint)
 
-        // Progress Arc
         val progress = (ring.currentValue.toFloat() / ring.targetValue.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
         val sweepAngle = 360f * progress
         if (sweepAngle > 0f) {
@@ -1302,44 +1565,58 @@ fun generateHabitRingsBitmap(
                 strokeWidth = ringStroke
                 strokeCap = Paint.Cap.ROUND
             }
+            val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
             canvas.drawArc(arcRect, -90f, sweepAngle, false, progPaint)
         }
     }
 
-    // Average percentage in center
-    val avgFraction = if (rings.isNotEmpty()) rings.map { it.currentValue.toFloat() / it.targetValue.coerceAtLeast(1).toFloat() }.average().toFloat() else 0.8f
-    val percentText = "${(avgFraction * 100).toInt()}%"
+    // Proportional Center Percentage
+    val innermostRadius = maxRadius - (2 * (ringStroke + ringGap))
+    val percentTextSize = (innermostRadius * 0.5f).coerceIn(14f * scaleFactor, 32f * scaleFactor)
     val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 14f * scaleFactor
-        typeface = getSlateFont(context, 800)
+        textSize = percentTextSize
+        typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(percentText, cx, cy + 5f * scaleFactor, percentPaint)
+    val percentBaseline = cy - ((percentPaint.fontMetrics.ascent + percentPaint.fontMetrics.descent) / 2f)
+    canvas.drawText(percentText, cx, percentBaseline, percentPaint)
 
-    // Bottom Legend (3 colored dots with labels)
-    val legendY = cardRect.bottom - 16f * scaleFactor
-    val dotRadius = 3f * scaleFactor
-    val startX = cardRect.left + 16f * scaleFactor
-    val availableW = cardRect.width() - 32f * scaleFactor
-    val legendColW = availableW / minOf(3, rings.size).coerceAtLeast(1)
+    // Bottom Legend (Evenly Distributes 3 Columns)
+    val legendCenterY = startY + ringDiameter + gap + (legendH / 2f)
+    val legendColW = availW / minOf(3, activeRings.size).coerceAtLeast(1)
+    val dotRadius = maxOf(2.5f * scaleFactor, legendTextSize * 0.28f)
 
-    for (i in 0 until minOf(3, rings.size)) {
-        val ring = rings[i]
-        val colX = startX + i * legendColW
-        val colorHex = defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = legendTextSize
+        typeface = getSlateFont(context, 600)
+    }
 
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colorHex; style = Paint.Style.FILL }
-        canvas.drawCircle(colX + dotRadius, legendY - 3f * scaleFactor, dotRadius, dotPaint)
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = secondaryTextColor
-            textSize = 9.5f * scaleFactor
-            typeface = getSlateFont(context, 600)
-        }
-        var lbl = ring.label
-        if (lbl.length > 8) lbl = lbl.take(7) + "…"
-        canvas.drawText(lbl, colX + dotRadius * 2 + 5f * scaleFactor, legendY, labelPaint)
+    for (i in 0 until minOf(3, activeRings.size)) {
+        val ring = activeRings[i]
+        val colX = contentLeft + (i * legendColW)
+        val colorHex = if (ring.colorHex != 0L) ring.colorHex.toInt() else defaultColors.getOrElse(i) { 0xFF30D158 }.toInt()
+
+        dotPaint.color = colorHex
+        val dotCy = legendCenterY
+        val dotCx = colX + dotRadius
+        canvas.drawCircle(dotCx, dotCy, dotRadius, dotPaint)
+
+        val labelBaseline = legendCenterY - ((labelPaint.fontMetrics.ascent + labelPaint.fontMetrics.descent) / 2f)
+        val textStartX = dotCx + dotRadius + (5f * scaleFactor)
+        val maxLabelW = (colX + legendColW) - textStartX - (3f * scaleFactor)
+
+        val displayLabel = ring.label.ifBlank { "Habit ${i + 1}" }
+        val elided = android.text.TextUtils.ellipsize(
+            displayLabel,
+            android.text.TextPaint(labelPaint),
+            maxLabelW.coerceAtLeast(10f),
+            android.text.TextUtils.TruncateAt.END
+        ).toString()
+        canvas.drawText(elided, textStartX, labelBaseline, labelPaint)
     }
 
     return bitmap
