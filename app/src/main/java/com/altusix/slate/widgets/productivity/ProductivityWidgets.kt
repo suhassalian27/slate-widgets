@@ -589,11 +589,20 @@ class ProductivityHabitRingsReceiver : BaseProductivityReceiver(R.layout.widget_
 }
 
 // =========================================================================
-// 8. MINIMAL TASK PIPELINE (4x1)
+// 8. MINIMAL TASK PIPELINE (Touch Targets: Cards vs Gaps)
 // =========================================================================
 
-class ProductivityPipelineReceiver : BaseProductivityReceiver(R.layout.widget_productivity_card_layout, targetAspect = 4.0f) {
+class ProductivityPipelineReceiver : BaseProductivityReceiver(
+    layoutResId = R.layout.widget_productivity_pipeline_layout,
+    targetAspect = 3.8f
+) {
     override val defaultTab: String = "PIPELINE"
+
+    companion object {
+        const val ACTION_PIPELINE_TODO = "com.altusix.slate.productivity.ACTION_PIPELINE_TODO"
+        const val ACTION_PIPELINE_ACTIVE = "com.altusix.slate.productivity.ACTION_PIPELINE_ACTIVE"
+        const val ACTION_PIPELINE_DONE = "com.altusix.slate.productivity.ACTION_PIPELINE_DONE"
+    }
 
     override fun renderWidgetBitmap(
         context: Context,
@@ -605,6 +614,81 @@ class ProductivityPipelineReceiver : BaseProductivityReceiver(R.layout.widget_pr
     ): Bitmap {
         val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
         return generateTaskPipelineBitmap(context, prodConfig.pipeline, config, isResponsive, wDp, hDp)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            when (intent.action) {
+                ACTION_PIPELINE_TODO -> {
+                    ProductivityStorageManager.advancePipelineStage(context, appWidgetId, "TODO")
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+                ACTION_PIPELINE_ACTIVE -> {
+                    ProductivityStorageManager.advancePipelineStage(context, appWidgetId, "ACTIVE")
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+                ACTION_PIPELINE_DONE -> {
+                    ProductivityStorageManager.advancePipelineStage(context, appWidgetId, "DONE")
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+            }
+        }
+        super.onReceive(context, intent)
+    }
+
+    override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra(EXTRA_TAB, "PIPELINE")
+            data = Uri.parse("slate_prod://$appWidgetId/pipeline_edit")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPi = PendingIntent.getActivity(
+            context,
+            appWidgetId * 100 + 1,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // 1. Background, progress bar, and both chevron gaps open Config Studio
+        views.setOnClickPendingIntent(R.id.btn_pipeline_open, openPi)
+        views.setOnClickPendingIntent(R.id.btn_pipeline_open_gap1, openPi)
+        views.setOnClickPendingIntent(R.id.btn_pipeline_open_gap2, openPi)
+
+        // 2. Individual card taps execute fast Kanban increments
+        val todoIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_PIPELINE_TODO
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/pipeline_todo")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_pipeline_todo,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 10, todoIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        val activeIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_PIPELINE_ACTIVE
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/pipeline_active")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_pipeline_active,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 11, activeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        val doneIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_PIPELINE_DONE
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/pipeline_done")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_pipeline_done,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 12, doneIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
     }
 }
 

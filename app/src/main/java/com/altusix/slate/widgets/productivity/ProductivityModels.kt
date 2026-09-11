@@ -630,6 +630,32 @@ object ProductivityStorageManager {
             ProductivityWidgetConfig.getDefaultConfig()
         }
     }
+
+    fun advancePipelineStage(context: Context, widgetId: Int, stage: String) {
+        val current = getConfig(context, widgetId)
+        val p = current.pipeline
+        val updated = when (stage) {
+            "TODO" -> p.copy(todoCount = p.todoCount + 1)
+            "ACTIVE" -> {
+                if (p.todoCount > 0) {
+                    p.copy(todoCount = p.todoCount - 1, inProgressCount = p.inProgressCount + 1)
+                } else {
+                    p.copy(inProgressCount = p.inProgressCount + 1)
+                }
+            }
+            "DONE" -> {
+                if (p.inProgressCount > 0) {
+                    p.copy(inProgressCount = p.inProgressCount - 1, doneCount = p.doneCount + 1)
+                } else if (p.todoCount > 0) {
+                    p.copy(todoCount = p.todoCount - 1, doneCount = p.doneCount + 1)
+                } else {
+                    p.copy(doneCount = p.doneCount + 1)
+                }
+            }
+            else -> p
+        }
+        saveConfig(context, widgetId, current.copy(pipeline = updated))
+    }
 }
 
 // =========================================================================

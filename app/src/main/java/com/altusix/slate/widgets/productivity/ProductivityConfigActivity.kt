@@ -1288,15 +1288,55 @@ private fun PipelineEditor(
     accentColor: Color,
     onUpdate: (TaskPipelineData) -> Unit
 ) {
-    SectionTitle(title = "Task Pipeline Stages")
+    val total = pipeline.todoCount + pipeline.inProgressCount + pipeline.doneCount
 
-    val stages = listOf(
-        Triple("To Do", pipeline.todoCount) { v: Int -> onUpdate(pipeline.copy(todoCount = v)) },
-        Triple("In Progress", pipeline.inProgressCount) { v: Int -> onUpdate(pipeline.copy(inProgressCount = v)) },
-        Triple("Done", pipeline.doneCount) { v: Int -> onUpdate(pipeline.copy(doneCount = v)) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SectionTitle(title = "Task Pipeline (Kanban Flow)")
+
+        if (total > 0) {
+            Text(
+                text = "Reset All",
+                color = Color(0xFFFF453A),
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onUpdate(TaskPipelineData(todoCount = 0, inProgressCount = 0, doneCount = 0)) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
+
+    Text(
+        text = "Tap cards directly on your home screen to advance tasks. Tap the gaps or chevrons (>) to open this studio.",
+        fontSize = 12.sp,
+        color = Color(0xFF8E8E93)
     )
 
-    stages.forEach { (label, count, setter) ->
+    data class PipelineStageMeta(
+        val title: String,
+        val count: Int,
+        val tagColor: Color,
+        val updateCount: (Int) -> TaskPipelineData
+    )
+
+    val stageList = listOf(
+        PipelineStageMeta("To Do Tasks", pipeline.todoCount, Color(0xFF8E8E93)) { newCount ->
+            pipeline.copy(todoCount = maxOf(0, newCount))
+        },
+        PipelineStageMeta("Active Tasks (In Progress)", pipeline.inProgressCount, Color(0xFFFF9F0A)) { newCount ->
+            pipeline.copy(inProgressCount = maxOf(0, newCount))
+        },
+        PipelineStageMeta("Done Tasks (Completed)", pipeline.doneCount, Color(0xFF30D158)) { newCount ->
+            pipeline.copy(doneCount = maxOf(0, newCount))
+        }
+    )
+
+    stageList.forEach { stage ->
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1304,31 +1344,59 @@ private fun PipelineEditor(
                 .background(Color(0xFF141418))
                 .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(stage.tagColor)
+                )
+                Text(
+                    text = stage.title,
+                    color = Color.White,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF22222A))
-                        .clickable { setter(maxOf(0, count - 1)) },
+                        .clickable { onUpdate(stage.updateCount(stage.count - 1)) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("-", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("-", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
-                Text("$count", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
+
+                Text(
+                    text = "${stage.count}",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.widthIn(min = 24.dp)
+                )
+
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
-                        .background(accentColor)
-                        .clickable { setter(count + 1) },
+                        .background(stage.tagColor)
+                        .clickable { onUpdate(stage.updateCount(stage.count + 1)) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("+", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("+", color = Color.Black, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

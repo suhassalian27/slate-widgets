@@ -1623,7 +1623,7 @@ fun generateHabitRingsBitmap(
 }
 
 // =========================================================================
-// 8. MINIMAL TASK PIPELINE (4x1)
+// 8. MINIMAL TASK PIPELINE (Concentric Bento Corners & Contoured Bar)
 // =========================================================================
 
 fun generateTaskPipelineBitmap(
@@ -1638,53 +1638,240 @@ fun generateTaskPipelineBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 4.0f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    // 1. Fixed (3.8:1) vs Responsive Outer Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 3.8f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
-    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    val cy = cardRect.centerY()
-    val stageW = (cardRect.width() - 32f * scaleFactor) / 3f
-    val stages = listOf(
-        Triple("${pipeline.todoCount} TO DO", Color.argb(120, 255, 255, 255), primaryTextColor),
-        Triple("${pipeline.inProgressCount} IN PROGRESS", 0xFFFF9500.toInt(), 0xFFFF9500.toInt()),
-        Triple("${pipeline.doneCount} COMPLETED", accentColor, accentColor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 2. Widget Outer Radius & Insets
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
+
+    val padX = (cardW * 0.038f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+    val padY = (cardH * 0.09f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+
+    val contentLeft = cardRect.left + padX
+    val contentRight = cardRect.right - padX
+    val availW = contentRight - contentLeft
+
+    // Concentric outer radius for inner elements: R_concentric = R_outer - pad
+    val outerCornerR = (outerRadius - minOf(padX, padY)).coerceAtLeast(6f * scaleFactor)
+
+    // 3. Progress Bar Geometry (Clipped to the widget's concentric bottom curve)
+    val barH = (cardH * 0.065f).coerceIn(3.5f * scaleFactor, 6f * scaleFactor)
+    val barGap = (cardH * 0.08f).coerceIn(4f * scaleFactor, 8f * scaleFactor)
+    val barBottom = cardRect.bottom - padY
+    val barTop = barBottom - barH
+    val barRect = RectF(contentLeft, barTop, contentRight, barBottom)
+
+    // 4. Stage Cards Geometry
+    val stageTop = cardRect.top + padY
+    val stageBottom = barTop - barGap
+    val stageH = (stageBottom - stageTop).coerceAtLeast(12f)
+
+    val chevronGap = (cardW * 0.040f).coerceIn(8f * scaleFactor, 20f * scaleFactor)
+    val chevronW = (stageH * 0.16f).coerceIn(3.5f * scaleFactor, 6.5f * scaleFactor)
+    val totalSpacing = 2f * (chevronGap * 2f + chevronW)
+    val subCardW = (availW - totalSpacing) / 3f
+
+    // Internal corner radius for facing inner edges
+    val innerCornerR = (stageH * 0.20f).coerceIn(4f * scaleFactor, 10f * scaleFactor)
+
+    // Standard Semantic Color Palette
+    val colorTodo = Color.parseColor("#8E8E93")
+    val colorActive = Color.parseColor("#FF9F0A")
+    val colorDone = Color.parseColor("#30D158")
+
+    data class StageSpec(
+        val label: String,
+        val count: Int,
+        val statusColor: Int,
+        val isDone: Boolean
     )
 
-    for (i in 0..2) {
-        val (text, dotColor, textColor) = stages[i]
-        val segX = cardRect.left + 16f * scaleFactor + i * stageW
+    val stages = listOf(
+        StageSpec("TO DO", pipeline.todoCount, colorTodo, false),
+        StageSpec("ACTIVE", pipeline.inProgressCount, colorActive, false),
+        StageSpec("DONE", pipeline.doneCount, colorDone, true)
+    )
 
-        val dotX = segX + 8f * scaleFactor
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = dotColor; style = Paint.Style.FILL }
-        canvas.drawCircle(dotX, cy, 4f * scaleFactor, dotPaint)
+    val subCardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val subCardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(24, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(0.75f * scaleFactor, 1f)
+    }
 
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = textColor
-            textSize = 12f * scaleFactor
-            typeface = getSlateFont(context, 700)
+    val numSize = (stageH * 0.38f).coerceIn(10f * scaleFactor, 26f * scaleFactor)
+    val labelSize = (stageH * 0.19f).coerceIn(6.5f * scaleFactor, 11f * scaleFactor)
+    val interTextGap = stageH * 0.04f
+
+    val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = numSize
+        typeface = getSlateFont(context, 800)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = labelSize
+        typeface = getSlateFont(context, 700)
+        letterSpacing = 0.04f
+        textAlign = Paint.Align.CENTER
+    }
+
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    val chevronPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(45, 0, 0, 0) else Color.argb(60, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = (stageH * 0.038f).coerceIn(1.2f * scaleFactor, 2.0f * scaleFactor)
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    // 5. Draw Stage Cards with Bento Outer Corner Matching
+    for (i in 0 until 3) {
+        val stage = stages[i]
+        val cardLeft = contentLeft + i * (subCardW + chevronGap * 2f + chevronW)
+        val subCardRect = RectF(cardLeft, stageTop, cardLeft + subCardW, stageBottom)
+
+        // Asymmetric Corner Paths: Outer corners mirror widget radius; inner corners stay clean
+        val cardPath = when (i) {
+            0 -> createCornerPath(subCardRect, outerCornerR, innerCornerR, innerCornerR, outerCornerR) // TO DO: Left curved
+            2 -> createCornerPath(subCardRect, innerCornerR, outerCornerR, outerCornerR, innerCornerR) // DONE: Right curved
+            else -> createCornerPath(subCardRect, innerCornerR, innerCornerR, innerCornerR, innerCornerR) // ACTIVE: Standard
         }
-        canvas.drawText(text, dotX + 8f * scaleFactor, cy + 4f * scaleFactor, textPaint)
 
-        // Divider arrow or line
+        canvas.drawPath(cardPath, subCardBgPaint)
+        canvas.drawPath(cardPath, subCardBorderPaint)
+
+        // Status Indicator Pip
+        if (stageH >= 22f * scaleFactor) {
+            val dotR = (stageH * 0.055f).coerceIn(1.8f * scaleFactor, 3.2f * scaleFactor)
+            val dotMarginX = (subCardW * 0.09f).coerceIn(4f * scaleFactor, 9f * scaleFactor)
+            val dotMarginY = (stageH * 0.12f).coerceIn(3.5f * scaleFactor, 7f * scaleFactor)
+            dotPaint.color = stage.statusColor
+            canvas.drawCircle(subCardRect.left + dotMarginX + dotR, subCardRect.top + dotMarginY + dotR, dotR, dotPaint)
+        }
+
+        // Centered Number & Label
+        val totalBlockH = numSize + interTextGap + labelSize
+        val blockTop = subCardRect.top + ((stageH - totalBlockH) / 2f)
+
+        numPaint.color = if (stage.isDone) colorDone else primaryTextColor
+        val numBaseline = blockTop + numSize
+        canvas.drawText("${stage.count}", subCardRect.centerX(), numBaseline, numPaint)
+
+        labelPaint.color = when (stage.label) {
+            "ACTIVE" -> colorActive
+            "DONE" -> colorDone
+            else -> secondaryTextColor
+        }
+        val labelBaseline = numBaseline + interTextGap + labelSize
+        canvas.drawText(stage.label, subCardRect.centerX(), labelBaseline, labelPaint)
+
+        // Chevron Arrow in Gaps
         if (i < 2) {
-            val divX = segX + stageW - 4f * scaleFactor
-            val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(40, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-                textSize = 13f * scaleFactor
-                typeface = getSlateFont(context, 400)
-                textAlign = Paint.Align.CENTER
+            val chevCenterX = subCardRect.right + chevronGap + (chevronW / 2f)
+            val chevCenterY = subCardRect.centerY()
+            val chHalfH = (stageH * 0.11f).coerceIn(2.5f * scaleFactor, 5f * scaleFactor)
+
+            val chevPath = Path().apply {
+                moveTo(chevCenterX - (chevronW / 2f), chevCenterY - chHalfH)
+                lineTo(chevCenterX + (chevronW / 2f), chevCenterY)
+                lineTo(chevCenterX - (chevronW / 2f), chevCenterY + chHalfH)
             }
-            canvas.drawText("›", divX, cy + 4f * scaleFactor, divPaint)
+            canvas.drawPath(chevPath, chevronPaint)
         }
     }
 
+    // 6. Multi-Stage Progress Bar (Contoured to the Widget's Bottom-Left & Bottom-Right Radii)
+    val totalTasks = (pipeline.todoCount + pipeline.inProgressCount + pipeline.doneCount).coerceAtLeast(0)
+    val safeTotal = totalTasks.coerceAtLeast(1).toFloat()
+
+    val doneFrac = if (totalTasks == 0) 0f else (pipeline.doneCount / safeTotal).coerceIn(0f, 1f)
+    val activeFrac = if (totalTasks == 0) 0f else (pipeline.inProgressCount / safeTotal).coerceIn(0f, 1f - doneFrac)
+
+    // Inner Concentric Container Mask: Guarantees bottom-left & bottom-right curves match the widget exactly
+    val innerMaskRect = RectF(contentLeft, cardRect.top + padY, contentRight, barBottom)
+    val innerMaskPath = createCornerPath(innerMaskRect, outerCornerR, outerCornerR, outerCornerR, outerCornerR)
+
+    canvas.save()
+    canvas.clipPath(innerMaskPath)
+
+    // 1. Base Track
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(barRect, trackPaint)
+
+    val doneWidth = availW * doneFrac
+    val activeWidth = availW * activeFrac
+
+    // 2. Active Segment (Amber)
+    if (activeWidth > 0f) {
+        val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorActive
+            style = Paint.Style.FILL
+        }
+        val activeRect = RectF(contentLeft + doneWidth, barTop, contentLeft + doneWidth + activeWidth, barBottom)
+        canvas.drawRect(activeRect, activePaint)
+    }
+
+    // 3. Completed Segment (Emerald Green)
+    if (doneWidth > 0f) {
+        val donePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorDone
+            style = Paint.Style.FILL
+        }
+        val doneRect = RectF(contentLeft, barTop, contentLeft + doneWidth, barBottom)
+        canvas.drawRect(doneRect, donePaint)
+    }
+
+    canvas.restore()
+
     return bitmap
+}
+
+/**
+ * Creates a Path with 4 distinct corner radii (Top-Left, Top-Right, Bottom-Right, Bottom-Left).
+ */
+private fun createCornerPath(
+    rect: RectF,
+    tl: Float,
+    tr: Float,
+    br: Float,
+    bl: Float
+): Path {
+    val path = Path()
+    val radii = floatArrayOf(
+        tl, tl,
+        tr, tr,
+        br, br,
+        bl, bl
+    )
+    path.addRoundRect(rect, radii, Path.Direction.CW)
+    return path
 }
 
 // =========================================================================

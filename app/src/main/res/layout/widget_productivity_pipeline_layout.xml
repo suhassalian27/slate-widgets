@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_productivity_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Canvas Surface -->
+    <ImageView
+        android:id="@+id/widget_canvas_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter" />
+
+    <!-- Full-Bleed Background Hitbox: Opens Config Studio -->
+    <FrameLayout
+        android:id="@+id/btn_pipeline_open"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent" />
+
+    <!-- Stage Cards & Clickable Inter-Card Gap Hitboxes -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="14dp">
+
+        <!-- Card 1: TO DO (+1 To Do) -->
+        <FrameLayout
+            android:id="@+id/btn_pipeline_todo"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2.8"
+            android:background="@android:color/transparent" />
+
+        <!-- Gap 1 / Chevron >: Opens Config Studio -->
+        <FrameLayout
+            android:id="@+id/btn_pipeline_open_gap1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.0"
+            android:background="@android:color/transparent" />
+
+        <!-- Card 2: ACTIVE (Promotes To Do -> Active) -->
+        <FrameLayout
+            android:id="@+id/btn_pipeline_active"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2.8"
+            android:background="@android:color/transparent" />
+
+        <!-- Gap 2 / Chevron >: Opens Config Studio -->
+        <FrameLayout
+            android:id="@+id/btn_pipeline_open_gap2"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.0"
+            android:background="@android:color/transparent" />
+
+        <!-- Card 3: DONE (Promotes Active -> Done) -->
+        <FrameLayout
+            android:id="@+id/btn_pipeline_done"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2.8"
+            android:background="@android:color/transparent" />
+    </LinearLayout>
+</FrameLayout>
