@@ -789,7 +789,7 @@ fun generateTop3TasksBitmap(
 }
 
 // =========================================================================
-// 4. EISENHOWER PRIORITY MATRIX (2x2)
+// 4. EISENHOWER PRIORITY MATRIX (4x2 - Canonical Colors & Top-Aligned)
 // =========================================================================
 
 fun generateEisenhowerMatrixBitmap(
@@ -804,192 +804,155 @@ fun generateEisenhowerMatrixBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    // 1. 4x2 Fixed (2:1 Ratio) vs Responsive Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // Header
-    val headerY = cardRect.top + 16f * scaleFactor
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = 13.5f * scaleFactor
-        typeface = getSlateFont(context, 700)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardH, cardW * 0.55f)
+
+    // 2. Uniform Margins & Crosshair Divider
+    val padX = cardW * 0.055f
+    val padY = cardH * 0.075f
+
+    val midX = cardRect.centerX()
+    val midY = cardRect.centerY()
+
+    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(25, 255, 255, 255)
+        strokeWidth = maxOf(1f * scaleFactor, baseDim * 0.008f)
     }
-    canvas.drawText("PRIORITY MATRIX", cardRect.left + 16f * scaleFactor, headerY + 12f * scaleFactor, headerPaint)
 
-    // 4 Quadrants
-    val matrixTop = headerY + 26f * scaleFactor
-    val matrixRect = RectF(cardRect.left + 12f * scaleFactor, matrixTop, cardRect.right - 12f * scaleFactor, cardRect.bottom - 12f * scaleFactor)
-    val midX = matrixRect.centerX()
-    val midY = matrixRect.centerY()
+    canvas.drawLine(midX, cardRect.top + padY, midX, cardRect.bottom - padY, divPaint)
+    canvas.drawLine(cardRect.left + padX, midY, cardRect.right - padX, midY, divPaint)
 
-    // Crosshair divider lines
-    val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(30, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-        strokeWidth = 1.2f * scaleFactor
-    }
-    canvas.drawLine(matrixRect.left, midY, matrixRect.right, midY, gridLinePaint)
-    canvas.drawLine(midX, matrixTop, midX, matrixRect.bottom, gridLinePaint)
+    // 3. Strict Canonical Eisenhower Color Palette
+    data class QuadrantSpec(
+        val quadKey: String,
+        val label: String,
+        val colorInt: Int,
+        val bounds: RectF
+    )
+
+    val innerGapX = cardW * 0.035f
+    val innerGapY = cardH * 0.045f
 
     val quadrants = listOf(
-        Triple("DO NOW", 0xFFFF3B30, tasks.filter { it.quadrant == "Q1_DO" }),
-        Triple("SCHEDULE", 0xFF0A84FF, tasks.filter { it.quadrant == "Q2_SCHEDULE" }),
-        Triple("DELEGATE", 0xFFFF9500, tasks.filter { it.quadrant == "Q3_DELEGATE" }),
-        Triple("ELIMINATE", 0xFF8E8E93, tasks.filter { it.quadrant == "Q4_DROP" })
+        QuadrantSpec("Q1_DO", "DO NOW", Color.parseColor("#FF453A"), RectF(cardRect.left + padX, cardRect.top + padY, midX - innerGapX, midY - innerGapY)),
+        QuadrantSpec("Q2_SCHEDULE", "SCHEDULE", Color.parseColor("#0A84FF"), RectF(midX + innerGapX, cardRect.top + padY, cardRect.right - padX, midY - innerGapY)),
+        QuadrantSpec("Q3_DELEGATE", "DELEGATE", Color.parseColor("#FF9F0A"), RectF(cardRect.left + padX, midY + innerGapY, midX - innerGapX, cardRect.bottom - padY)),
+        QuadrantSpec("Q4_DROP", "ELIMINATE", Color.parseColor("#8E8E93"), RectF(midX + innerGapX, midY + innerGapY, cardRect.right - padX, cardRect.bottom - padY))
     )
 
-    val quadrantRects = listOf(
-        RectF(matrixRect.left, matrixRect.top, midX, midY),
-        RectF(midX, matrixRect.top, matrixRect.right, midY),
-        RectF(matrixRect.left, midY, midX, matrixRect.bottom),
-        RectF(midX, midY, matrixRect.right, matrixRect.bottom)
-    )
+    val labelSize = (baseDim * 0.115f).coerceIn(11f * scaleFactor, 15f * scaleFactor)
+    val dotRadius = labelSize * 0.28f
 
-    for (i in 0..3) {
-        val (label, dotColor, qTasks) = quadrants[i]
-        val qRect = quadrantRects[i]
-
-        val dotX = qRect.left + 10f * scaleFactor
-        val dotY = qRect.top + 14f * scaleFactor
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = dotColor.toInt(); style = Paint.Style.FILL }
-        canvas.drawCircle(dotX, dotY, 3.5f * scaleFactor, dotPaint)
-
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = secondaryTextColor
-            textSize = 9.5f * scaleFactor
-            typeface = getSlateFont(context, 700)
-        }
-        canvas.drawText(label, dotX + 7f * scaleFactor, dotY + 3.5f * scaleFactor, labelPaint)
-
-        // Count Badge / Top Task preview
-        val topTask = qTasks.firstOrNull()?.title ?: "${qTasks.size} tasks"
-        val taskTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = primaryTextColor
-            textSize = 11f * scaleFactor
-            typeface = getSlateFont(context, 600)
-        }
-        var displayTask = topTask
-        val maxTaskW = qRect.width() - 20f * scaleFactor
-        while (displayTask.isNotEmpty() && taskTextPaint.measureText("$displayTask…") > maxTaskW) {
-            displayTask = displayTask.dropLast(1)
-        }
-        canvas.drawText(if (displayTask != topTask) "$displayTask…" else displayTask, dotX, dotY + 20f * scaleFactor, taskTextPaint)
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = labelSize
+        typeface = getSlateFont(context, 700)
+        letterSpacing = 0.05f
+        color = if (isLight) Color.parseColor("#1C1C1E") else Color.parseColor("#EBEBF5")
     }
 
-    return bitmap
-}
-
-// =========================================================================
-// 5. TIME-BLOCK DAY TIMELINE (4x2)
-// =========================================================================
-
-fun generateTimeBlockTimelineBitmap(
-    context: Context,
-    blocks: List<TimeBlockItem>,
-    slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2.0f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
-    }
-
-    val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
-    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
-
-    // 1. Header with live clock
-    val headerY = cardRect.top + 16f * scaleFactor
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val taskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 14f * scaleFactor
-        typeface = getSlateFont(context, 700)
+        typeface = getSlateFont(context, 500)
     }
-    canvas.drawText("TODAY'S SCHEDULE", cardRect.left + 18f * scaleFactor, headerY + 12f * scaleFactor, titlePaint)
 
-    val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val nowTimeStr = sdfTime.format(Date())
-    val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = 12f * scaleFactor
-        typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.RIGHT
+    val placeholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(65, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+        typeface = getSlateFont(context, 500)
     }
-    canvas.drawText("NOW  $nowTimeStr", cardRect.right - 18f * scaleFactor, headerY + 12f * scaleFactor, clockPaint)
 
-    // 2. Timeline Blocks (Display up to 3 blocks)
-    val blockStartY = headerY + 30f * scaleFactor
-    val blockH = (cardRect.bottom - blockStartY - 12f * scaleFactor) / 3f
-    val cal = Calendar.getInstance()
-    val currentHour = cal.get(Calendar.HOUR_OF_DAY)
-    val currentMin = cal.get(Calendar.MINUTE)
-    val currentMinutesVal = currentHour * 60 + currentMin
+    val bulletPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(90, 0, 0, 0) else Color.argb(120, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
 
-    for (i in 0 until minOf(3, blocks.size)) {
-        val block = blocks[i]
-        val blockTop = blockStartY + i * blockH
-        val bRect = RectF(cardRect.left + 16f * scaleFactor, blockTop + 3f * scaleFactor, cardRect.right - 16f * scaleFactor, blockTop + blockH - 3f * scaleFactor)
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
 
-        val blockStartMins = block.startHour * 60 + block.startMinute
-        val blockEndMins = block.endHour * 60 + block.endMinute
-        val isActive = currentMinutesVal in blockStartMins until blockEndMins
+    // 4. Render Quadrant Contents
+    quadrants.forEach { quad ->
+        val quadTasks = tasks.filter { it.quadrant == quad.quadKey && it.title.isNotBlank() }
+        val qLeft = quad.bounds.left
+        val qTop = quad.bounds.top
+        val qWidth = quad.bounds.width()
+        val qHeight = quad.bounds.height()
 
-        val bBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isActive) Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(20, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(bRect, 8f * scaleFactor, 8f * scaleFactor, bBgPaint)
+        // Quadrant Status Dot
+        dotPaint.color = quad.colorInt
+        val dotCy = qTop + (labelSize * 0.5f)
+        val dotCx = qLeft + dotRadius
+        canvas.drawCircle(dotCx, dotCy, dotRadius, dotPaint)
 
-        if (isActive) {
-            val activeIndicator = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = accentColor
-                style = Paint.Style.FILL
+        // Quadrant Label
+        val labelBaseline = qTop + labelSize
+        canvas.drawText(quad.label, dotCx + (dotRadius * 2.4f), labelBaseline, labelPaint)
+
+        // Top-Aligned Multi-Task List (Fixed 3-Row Pitch)
+        val listStartY = labelBaseline + (baseDim * 0.05f)
+        val availListH = (qTop + qHeight) - listStartY
+
+        val maxSlots = 3
+        val rowPitch = availListH / maxSlots.toFloat()
+        val taskTextSize = (rowPitch * 0.56f).coerceIn(11f * scaleFactor, 15.5f * scaleFactor)
+        val bulletR = maxOf(1.6f * scaleFactor, taskTextSize * 0.16f)
+
+        taskPaint.textSize = taskTextSize
+
+        if (quadTasks.isNotEmpty()) {
+            val displayCount = minOf(maxSlots, quadTasks.size)
+            for (i in 0 until displayCount) {
+                val item = quadTasks[i]
+                val itemCenterY = listStartY + (i * rowPitch) + (rowPitch / 2f)
+
+                val bCx = qLeft + bulletR
+                canvas.drawCircle(bCx, itemCenterY, bulletR, bulletPaint)
+
+                val textStartX = bCx + (bulletR * 2.5f) + (4f * scaleFactor)
+                val maxTextW = qLeft + qWidth - textStartX
+
+                val textBaseline = itemCenterY - ((taskPaint.fontMetrics.ascent + taskPaint.fontMetrics.descent) / 2f)
+                val elided = android.text.TextUtils.ellipsize(
+                    item.title,
+                    android.text.TextPaint(taskPaint),
+                    maxTextW,
+                    android.text.TextUtils.TruncateAt.END
+                ).toString()
+                canvas.drawText(elided, textStartX, textBaseline, taskPaint)
             }
-            val indRect = RectF(bRect.left, bRect.top, bRect.left + 4f * scaleFactor, bRect.bottom)
-            canvas.drawRoundRect(indRect, 2f * scaleFactor, 2f * scaleFactor, activeIndicator)
+        } else {
+            placeholderPaint.textSize = taskTextSize
+            val placeholderCenterY = listStartY + (rowPitch / 2f)
+            val placeholderBaseline = placeholderCenterY - ((placeholderPaint.fontMetrics.ascent + placeholderPaint.fontMetrics.descent) / 2f)
+            canvas.drawText("No tasks added", qLeft, placeholderBaseline, placeholderPaint)
         }
-
-        // Time span
-        val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isActive) accentColor else secondaryTextColor
-            textSize = 10.5f * scaleFactor
-            typeface = getSlateFont(context, 700)
-        }
-        canvas.drawText(block.timeSpanText, bRect.left + 12f * scaleFactor, bRect.centerY() + 3.5f * scaleFactor, timePaint)
-
-        // Block Title
-        val titleTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = primaryTextColor
-            textSize = 11.5f * scaleFactor
-            typeface = getSlateFont(context, if (isActive) 700 else 500)
-        }
-        canvas.drawText(block.title, bRect.left + 115f * scaleFactor, bRect.centerY() + 3.5f * scaleFactor, titleTextPaint)
-
-        // Tag pill on right
-        val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = secondaryTextColor
-            textSize = 9f * scaleFactor
-            typeface = getSlateFont(context, 700)
-            textAlign = Paint.Align.RIGHT
-        }
-        canvas.drawText(block.tag, bRect.right - 12f * scaleFactor, bRect.centerY() + 3.5f * scaleFactor, tagPaint)
     }
 
     return bitmap
 }
 
+
 // =========================================================================
-// 6. GOAL MILESTONE COUNTDOWN (2x2)
+// 6. GOAL MILESTONE COUNTDOWN (Balanced Margins & Safe Footer Anchoring)
 // =========================================================================
 
 fun generateGoalMilestoneBitmap(
@@ -1004,71 +967,272 @@ fun generateGoalMilestoneBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    // 1. True 1:1 Fixed Aspect vs Responsive Card Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 1.0f
         val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // 1. Goal Title Header
-    val headerY = cardRect.top + 16f * scaleFactor
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryTextColor
-        textSize = 11f * scaleFactor
-        typeface = getSlateFont(context, 700)
-    }
-    canvas.drawText(goal.title.uppercase(Locale.getDefault()), cardRect.left + 16f * scaleFactor, headerY + 10f * scaleFactor, titlePaint)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardW, cardH)
+    val aspectRatio = cardW / cardH.coerceAtLeast(1f)
 
-    // 2. Large Bold Percentage
+    // Resolved Strings
+    val titleText = goal.title.ifBlank { "Milestone Goal" }.uppercase(Locale.getDefault())
+    val rawDate = goal.deadlineDateText.trim()
+    val dueText = if (rawDate.isNotBlank()) {
+        if (rawDate.startsWith("DUE", ignoreCase = true)) rawDate.uppercase(Locale.getDefault())
+        else "DUE ${rawDate.uppercase(Locale.getDefault())}"
+    } else ""
+
+    val milestoneText = if (goal.milestoneTotal > 0) {
+        "MILESTONE ${goal.milestoneCurrent}/${goal.milestoneTotal}"
+    } else ""
+
     val percentText = "${goal.currentProgress}%"
-    val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = 34f * scaleFactor
-        typeface = getSlateFont(context, 800)
+    val progressFrac = (goal.currentProgress / 100f).coerceIn(0f, 1f)
+
+    // =========================================================================
+    // LAYOUT A: WIDE FORMAT (aspectRatio >= 1.55)
+    // =========================================================================
+    if (aspectRatio >= 1.55f) {
+        // Balanced margins: padX scales with card height to match vertical padding
+        val padY = (cardH * 0.13f).coerceIn(10f * scaleFactor, 16f * scaleFactor)
+        val padX = (cardH * 0.16f).coerceIn(14f * scaleFactor, 22f * scaleFactor)
+
+        val contentLeft = cardRect.left + padX
+        val contentRight = cardRect.right - padX
+        val contentTop = cardRect.top + padY
+        val contentBottom = cardRect.bottom - padY
+        val availW = contentRight - contentLeft
+
+        val titleSize = (cardH * 0.15f).coerceIn(10f * scaleFactor, 13.5f * scaleFactor)
+        val percentSize = (cardH * 0.38f).coerceIn(24f * scaleFactor, 42f * scaleFactor)
+        val metaSize = (cardH * 0.135f).coerceIn(9.5f * scaleFactor, 12.5f * scaleFactor)
+        val barH = (cardH * 0.09f).coerceIn(5.5f * scaleFactor, 9f * scaleFactor)
+
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryTextColor
+            textSize = titleSize
+            typeface = getSlateFont(context, 700)
+            letterSpacing = 0.03f
+        }
+
+        val duePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            textSize = metaSize
+            typeface = getSlateFont(context, 700)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = percentSize
+            typeface = getSlateFont(context, 800)
+        }
+
+        val milestonePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = metaSize
+            typeface = getSlateFont(context, 700)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        // Row 1: Title (Left) & Due Date (Right)
+        val row1Baseline = contentTop + titleSize
+        val dueW = if (dueText.isNotEmpty()) duePaint.measureText(dueText) else 0f
+        val maxTitleW = availW - dueW - (12f * scaleFactor)
+        val elidedTitle = android.text.TextUtils.ellipsize(
+            titleText,
+            android.text.TextPaint(titlePaint),
+            maxTitleW,
+            android.text.TextUtils.TruncateAt.END
+        ).toString()
+
+        canvas.drawText(elidedTitle, contentLeft, row1Baseline, titlePaint)
+        if (dueText.isNotEmpty()) {
+            canvas.drawText(dueText, contentRight, row1Baseline, duePaint)
+        }
+
+        // Row 2: Percentage (Left) & Milestone (Right)
+        val barY = contentBottom - barH
+        val row2Baseline = barY - (8f * scaleFactor)
+        canvas.drawText(percentText, contentLeft, row2Baseline, percentPaint)
+
+        if (milestoneText.isNotEmpty()) {
+            canvas.drawText(milestoneText, contentRight, row2Baseline, milestonePaint)
+        }
+
+        // Row 3: Progress Bar
+        val barRect = RectF(contentLeft, barY, contentRight, barY + barH)
+        val barRadius = barH / 2f
+
+        val barTrack = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(barRect, barRadius, barRadius, barTrack)
+
+        val progressW = barRect.width() * progressFrac
+        if (progressW > 0f) {
+            val progBar = RectF(barRect.left, barRect.top, barRect.left + maxOf(barH, progressW), barRect.bottom)
+            val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = accentColor
+                style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(progBar, barRadius, barRadius, progPaint)
+        }
+
+        return bitmap
     }
-    val percentY = headerY + 48f * scaleFactor
-    canvas.drawText(percentText, cardRect.left + 16f * scaleFactor, percentY, percentPaint)
 
-    // 3. Horizontal Progress Bar
-    val barY = percentY + 16f * scaleFactor
-    val barW = cardRect.width() - 32f * scaleFactor
-    val barH = 7f * scaleFactor
-    val barRect = RectF(cardRect.left + 16f * scaleFactor, barY, cardRect.left + 16f * scaleFactor + barW, barY + barH)
+    // =========================================================================
+    // LAYOUT B: SQUARE & TALL FORMAT (aspectRatio < 1.55)
+    // =========================================================================
 
-    val barTrack = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(30, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(barRect, barH / 2f, barH / 2f, barTrack)
+    // Proportional insets clearing rounded corner curves
+    val pad = (baseDim * 0.085f).coerceIn(14f * scaleFactor, 22f * scaleFactor)
+    val contentLeft = cardRect.left + pad
+    val contentRight = cardRect.right - pad
+    val contentTop = cardRect.top + pad
+    val contentBottom = cardRect.bottom - pad
 
-    val progressW = barW * (goal.currentProgress / 100f).coerceIn(0f, 1f)
-    if (progressW > 0f) {
-        val progBar = RectF(barRect.left, barRect.top, barRect.left + progressW, barRect.bottom)
-        val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor; style = Paint.Style.FILL }
-        canvas.drawRoundRect(progBar, barH / 2f, barH / 2f, progPaint)
-    }
+    val availW = (contentRight - contentLeft).coerceAtLeast(10f)
+    val availH = (contentBottom - contentTop).coerceAtLeast(10f)
 
-    // 4. Milestone & Deadline Info Pill Deck
-    val bottomY = cardRect.bottom - 26f * scaleFactor
-    val milestoneText = "MILESTONE ${goal.milestoneCurrent}/${goal.milestoneTotal}"
-    val deadlineText = "DUE ${goal.deadlineDateText.uppercase(Locale.getDefault())}"
+    // Typography sizing
+    val titleSize = (baseDim * 0.082f).coerceIn(10f * scaleFactor, 13.5f * scaleFactor)
+    val footerTextSize = (baseDim * 0.076f).coerceIn(9.5f * scaleFactor, 12.5f * scaleFactor)
+    val barH = (baseDim * 0.052f).coerceIn(5.5f * scaleFactor, 8.5f * scaleFactor)
 
     val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 10.5f * scaleFactor
+        textSize = footerTextSize
         typeface = getSlateFont(context, 700)
     }
-    canvas.drawText(milestoneText, cardRect.left + 16f * scaleFactor, bottomY, metaPaint)
 
     val duePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
-        textSize = 10.5f * scaleFactor
+        textSize = footerTextSize
         typeface = getSlateFont(context, 700)
-        textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText(deadlineText, cardRect.right - 16f * scaleFactor, bottomY, duePaint)
+
+    // Determine Single vs Stacked Footer layout
+    val milestoneW = if (milestoneText.isNotEmpty()) metaPaint.measureText(milestoneText) else 0f
+    val dueW = if (dueText.isNotEmpty()) duePaint.measureText(dueText) else 0f
+    val gapBetweenFooter = 10f * scaleFactor
+
+    val isFooterStacked = milestoneText.isNotEmpty() && dueText.isNotEmpty() &&
+            (milestoneW + dueW + gapBetweenFooter > availW)
+
+    val footerLinePitch = footerTextSize * 1.30f
+    val footerTotalH = if (isFooterStacked) (footerLinePitch + footerTextSize) else footerTextSize
+
+    // Anchor footer upwards from contentBottom so it never collides with the corner
+    val footerBottomY = contentBottom
+    val footerTopBoundary = footerBottomY - footerTotalH
+
+    // Upper Content Allocation: Distribute Title, Percentage, and Bar inside the safe zone
+    val availableUpperH = (footerTopBoundary - contentTop - (10f * scaleFactor)).coerceAtLeast(10f)
+    val percentSize = (availableUpperH * 0.44f).coerceIn(24f * scaleFactor, 44f * scaleFactor)
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = titleSize
+        typeface = getSlateFont(context, 700)
+        letterSpacing = 0.02f
+    }
+
+    val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = percentSize
+        typeface = getSlateFont(context, 800)
+    }
+
+    val gap1 = (availableUpperH * 0.12f).coerceIn(4f * scaleFactor, 10f * scaleFactor)
+    val gap2 = (availableUpperH * 0.15f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+
+    // 1. Draw Title
+    val titleY = contentTop + titleSize
+    val elidedTitle = android.text.TextUtils.ellipsize(
+        titleText,
+        android.text.TextPaint(titlePaint),
+        availW,
+        android.text.TextUtils.TruncateAt.END
+    ).toString()
+    canvas.drawText(elidedTitle, contentLeft, titleY, titlePaint)
+
+    // 2. Draw Percentage
+    val percentY = titleY + gap1 + (percentSize * 0.88f)
+    canvas.drawText(percentText, contentLeft, percentY, percentPaint)
+
+    // 3. Draw Progress Bar
+    val barY = percentY + gap2
+    val barRect = RectF(contentLeft, barY, contentRight, barY + barH)
+    val barRadius = barH / 2f
+
+    val barTrack = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(barRect, barRadius, barRadius, barTrack)
+
+    val progressW = barRect.width() * progressFrac
+    if (progressW > 0f) {
+        val progBar = RectF(barRect.left, barRect.top, barRect.left + maxOf(barH, progressW), barRect.bottom)
+        val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(progBar, barRadius, barRadius, progPaint)
+    }
+
+    // 4. Draw Footer Anchored Above contentBottom
+    if (isFooterStacked) {
+        val line2Baseline = footerBottomY - (duePaint.fontMetrics.descent * 0.5f)
+        val line1Baseline = line2Baseline - footerLinePitch
+
+        if (milestoneText.isNotEmpty()) {
+            val elidedMilestone = android.text.TextUtils.ellipsize(
+                milestoneText,
+                android.text.TextPaint(metaPaint),
+                availW,
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedMilestone, contentLeft, line1Baseline, metaPaint)
+        }
+
+        if (dueText.isNotEmpty()) {
+            val elidedDue = android.text.TextUtils.ellipsize(
+                dueText,
+                android.text.TextPaint(duePaint),
+                availW,
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedDue, contentLeft, line2Baseline, duePaint)
+        }
+    } else {
+        val baselineY = footerBottomY - (metaPaint.fontMetrics.descent * 0.5f)
+
+        if (milestoneText.isNotEmpty()) {
+            canvas.drawText(milestoneText, contentLeft, baselineY, metaPaint)
+        }
+
+        if (dueText.isNotEmpty()) {
+            duePaint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(dueText, contentRight, baselineY, duePaint)
+        }
+    }
 
     return bitmap
 }

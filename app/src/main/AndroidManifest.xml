@@ -3497,22 +3497,9 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x2" />
-        </receiver>
-
-        <!-- 5. Time-Block Day Timeline (4x2) -->
-        <receiver
-            android:name=".widgets.productivity.ProductivityTimelineReceiver"
-            android:exported="true"
-            android:label="Time-Block Day Timeline">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.altusix.slate.productivity.ACTION_EDIT_PRODUCTIVITY" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
+
 
         <!-- 6. Goal Milestone Countdown (2x2) -->
         <receiver

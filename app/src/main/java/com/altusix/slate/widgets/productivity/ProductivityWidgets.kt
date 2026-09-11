@@ -25,8 +25,7 @@ fun getProductivityWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Pomodoro Focus Dial", "2x2", "Productivity", ProductivityPomodoroReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Habit Streak Matrix", "4x2", "Productivity", ProductivityHabitMatrixReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Daily Top 3 Wins", "4x2", "Productivity", ProductivityTop3Receiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Eisenhower Priority Matrix", "2x2", "Productivity", ProductivityEisenhowerReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Time-Block Day Timeline", "4x2", "Productivity", ProductivityTimelineReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Eisenhower Priority Matrix", "4x2", "Productivity", ProductivityEisenhowerReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Goal Milestone Countdown", "2x2", "Productivity", ProductivityGoalReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Weekly Habit Rings", "2x2", "Productivity", ProductivityHabitRingsReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Minimal Task Pipeline", "4x1", "Productivity", ProductivityPipelineReceiver::class.java, hasModeOption = false),
@@ -43,7 +42,6 @@ fun updateAllProductivityWidgets(context: Context) {
         ProductivityHabitMatrixReceiver::class.java,
         ProductivityTop3Receiver::class.java,
         ProductivityEisenhowerReceiver::class.java,
-        ProductivityTimelineReceiver::class.java,
         ProductivityGoalReceiver::class.java,
         ProductivityHabitRingsReceiver::class.java,
         ProductivityPipelineReceiver::class.java,
@@ -511,10 +509,13 @@ class ProductivityTop3Receiver : BaseProductivityReceiver(R.layout.widget_produc
 }
 
 // =========================================================================
-// 4. EISENHOWER PRIORITY MATRIX (2x2)
+// 4. EISENHOWER PRIORITY MATRIX (4x2)
 // =========================================================================
 
-class ProductivityEisenhowerReceiver : BaseProductivityReceiver(R.layout.widget_productivity_card_layout, targetAspect = 1.0f) {
+class ProductivityEisenhowerReceiver : BaseProductivityReceiver(
+    layoutResId = R.layout.widget_productivity_card_layout,
+    targetAspect = 2.0f
+) {
     override val defaultTab: String = "EISENHOWER"
 
     override fun renderWidgetBitmap(
@@ -528,27 +529,24 @@ class ProductivityEisenhowerReceiver : BaseProductivityReceiver(R.layout.widget_
         val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
         return generateEisenhowerMatrixBitmap(context, prodConfig.eisenhowerTasks, config, isResponsive, wDp, hDp)
     }
-}
 
-// =========================================================================
-// 5. TIME-BLOCK DAY TIMELINE (4x2)
-// =========================================================================
-
-class ProductivityTimelineReceiver : BaseProductivityReceiver(R.layout.widget_productivity_card_layout, targetAspect = 2.0f) {
-    override val defaultTab: String = "TIMELINE"
-
-    override fun renderWidgetBitmap(
-        context: Context,
-        appWidgetId: Int,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int
-    ): Bitmap {
-        val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
-        return generateTimeBlockTimelineBitmap(context, prodConfig.timeBlocks, config, isResponsive, wDp, hDp)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
+        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra(EXTRA_TAB, "EISENHOWER")
+            data = Uri.parse("slate_prod://$appWidgetId/eisenhower_edit")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPi = PendingIntent.getActivity(
+            context,
+            appWidgetId * 100 + 1,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.btn_productivity_open, openPi)
     }
 }
+
 
 // =========================================================================
 // 6. GOAL MILESTONE COUNTDOWN (2x2)

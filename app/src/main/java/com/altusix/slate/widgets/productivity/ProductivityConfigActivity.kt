@@ -50,6 +50,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Close
 
 private enum class ProductivityColorTarget { BACKGROUND, ACCENT }
 
@@ -182,7 +183,6 @@ class ProductivityConfigActivity : ComponentActivity() {
                             "CLIPBOARD" -> ClipboardEditor(config.clipboardSnippets, accentColor) { config = config.copy(clipboardSnippets = it) }
                             "SCREENTIME" -> ScreenTimeEditor(this@ProductivityConfigActivity, config.screenTime, accentColor) { config = config.copy(screenTime = it) }
                             "EISENHOWER" -> EisenhowerEditor(config.eisenhowerTasks, accentColor) { config = config.copy(eisenhowerTasks = it) }
-                            "TIMELINE" -> TimelineEditor(config.timeBlocks, accentColor) { config = config.copy(timeBlocks = it) }
                             "GOAL" -> GoalEditor(config.goal, accentColor) { config = config.copy(goal = it) }
                             "RINGS" -> RingsEditor(config.habitRings, accentColor) { config = config.copy(habitRings = it) }
                             "PIPELINE" -> PipelineEditor(config.pipeline, accentColor) { config = config.copy(pipeline = it) }
@@ -361,10 +361,10 @@ private fun ProductivityWidgetLivePreview(
 ) {
     val context = LocalContext.current
 
-    // Geometry matched to widget aspect ratios
+    // Geometry matched to widget aspect ratios: Eisenhower is now 4x2 (260 to 130)
     val (wDp, hDp) = when (tab) {
         "PIPELINE" -> 280 to 70
-        "HABIT", "TOP3", "TIMELINE", "BOOKMARKS" -> 260 to 130
+        "HABIT", "TOP3", "TIMELINE", "BOOKMARKS", "EISENHOWER" -> 260 to 130
         else -> 140 to 140
     }
 
@@ -374,7 +374,6 @@ private fun ProductivityWidgetLivePreview(
             "HABIT" -> generateHabitMatrixBitmap(context, config.habit, slateConfig, isResponsive, wDp, hDp)
             "TOP3" -> generateTop3TasksBitmap(context, config.top3Tasks, slateConfig, isResponsive, wDp, hDp)
             "EISENHOWER" -> generateEisenhowerMatrixBitmap(context, config.eisenhowerTasks, slateConfig, isResponsive, wDp, hDp)
-            "TIMELINE" -> generateTimeBlockTimelineBitmap(context, config.timeBlocks, slateConfig, isResponsive, wDp, hDp)
             "GOAL" -> generateGoalMilestoneBitmap(context, config.goal, slateConfig, isResponsive, wDp, hDp)
             "RINGS" -> generateHabitRingsBitmap(context, config.habitRings, slateConfig, isResponsive, wDp, hDp)
             "PIPELINE" -> generateTaskPipelineBitmap(context, config.pipeline, slateConfig, isResponsive, wDp, hDp)
@@ -830,17 +829,24 @@ private fun EisenhowerEditor(
     accentColor: Color,
     onUpdate: (List<EisenhowerItem>) -> Unit
 ) {
-    SectionTitle(title = "Eisenhower Quadrants")
-
-    val quadrants = listOf(
-        "Q1_DO" to "Q1: Urgent & Important (Do)",
-        "Q2_SCHEDULE" to "Q2: Not Urgent & Important (Schedule)",
-        "Q3_DELEGATE" to "Q3: Urgent & Not Important (Delegate)",
-        "Q4_DROP" to "Q4: Not Urgent & Not Important (Drop)"
+    SectionTitle(title = "Eisenhower Matrix Quadrants")
+    Text(
+        text = "Add up to 3 priority items per quadrant. The widget will format and display them dynamically.",
+        fontSize = 12.sp,
+        color = Color(0xFF8E8E93)
     )
 
-    quadrants.forEachIndexed { index, (quadKey, label) ->
-        val item = tasks.firstOrNull { it.quadrant == quadKey } ?: EisenhowerItem("e_$index", "", quadKey)
+    val quadrants = listOf(
+        "Q1_DO" to Pair("Q1: Urgent & Important (Do Now)", Color(0xFFFF453A)),
+        "Q2_SCHEDULE" to Pair("Q2: Not Urgent & Important (Schedule)", Color(0xFF0A84FF)),
+        "Q3_DELEGATE" to Pair("Q3: Urgent & Not Important (Delegate)", Color(0xFFFF9F0A)),
+        "Q4_DROP" to Pair("Q4: Not Urgent & Not Important (Eliminate)", Color(0xFF8E8E93))
+    )
+
+    quadrants.forEach { (quadKey, meta) ->
+        val (label, quadColor) = meta
+        val quadTasks = tasks.filter { it.quadrant == quadKey }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -848,75 +854,111 @@ private fun EisenhowerEditor(
                 .background(Color(0xFF141418))
                 .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(label, fontSize = 12.sp, color = accentColor, fontWeight = FontWeight.Bold)
-            OutlinedTextField(
-                value = item.title,
-                onValueChange = { newTitle: String ->
-                    val updated = tasks.filter { it.quadrant != quadKey }.toMutableList()
-                    updated.add(item.copy(title = newTitle))
-                    onUpdate(updated)
-                },
-                placeholder = { Text("Task description...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = accentColor,
-                    unfocusedBorderColor = Color(0xFF24242C),
-                    focusedContainerColor = Color(0xFF0C0C0E),
-                    unfocusedContainerColor = Color(0xFF0C0C0E)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(quadColor))
+                    Text(text = label, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                if (quadTasks.size < 3) {
+                    Text(
+                        text = "+ Add Task",
+                        fontSize = 11.5.sp,
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable {
+                                val newId = "e_${System.currentTimeMillis()}"
+                                onUpdate(tasks + EisenhowerItem(newId, "", quadKey))
+                            }
+                            .padding(4.dp)
+                    )
+                }
+            }
+
+            if (quadTasks.isEmpty()) {
+                // Ensure at least one text field is visible when empty
+                OutlinedTextField(
+                    value = "",
+                    onValueChange = { newText ->
+                        if (newText.isNotBlank()) {
+                            val newId = "e_${System.currentTimeMillis()}"
+                            onUpdate(tasks + EisenhowerItem(newId, newText, quadKey))
+                        }
+                    },
+                    placeholder = { Text("Task description...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentColor,
+                        unfocusedBorderColor = Color(0xFF24242C),
+                        focusedContainerColor = Color(0xFF0C0C0E),
+                        unfocusedContainerColor = Color(0xFF0C0C0E)
+                    )
                 )
-            )
+            } else {
+                quadTasks.forEachIndexed { idx, item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = item.title,
+                            onValueChange = { newTitle ->
+                                val updated = tasks.map {
+                                    if (it.id == item.id) it.copy(title = newTitle) else it
+                                }
+                                onUpdate(updated)
+                            },
+                            placeholder = { Text("Task ${idx + 1}...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+                            modifier = Modifier.weight(1f),
+                            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = accentColor,
+                                unfocusedBorderColor = Color(0xFF24242C),
+                                focusedContainerColor = Color(0xFF0C0C0E),
+                                unfocusedContainerColor = Color(0xFF0C0C0E)
+                            )
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF1E1E24))
+                                .clickable {
+                                    onUpdate(tasks.filterNot { it.id == item.id })
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Delete",
+                                tint = Color(0xFFFF453A),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun TimelineEditor(
-    blocks: List<TimeBlockItem>,
-    accentColor: Color,
-    onUpdate: (List<TimeBlockItem>) -> Unit
-) {
-    SectionTitle(title = "Day Time-Blocks (4 Items)")
-
-    for (i in 0 until 4) {
-        val block = blocks.getOrElse(i) { TimeBlockItem("tb_$i", "", 9 + (i * 2), 0, 11 + (i * 2), 0, "FOCUS") }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF141418))
-                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text("Block ${i + 1} (${block.timeSpanText})", fontSize = 12.sp, color = accentColor, fontWeight = FontWeight.Bold)
-            OutlinedTextField(
-                value = block.title,
-                onValueChange = { newTitle: String ->
-                    val updated = blocks.toMutableList()
-                    while (updated.size <= i) updated.add(TimeBlockItem("tb_${updated.size}", "", 9, 0, 11, 0))
-                    updated[i] = block.copy(title = newTitle)
-                    onUpdate(updated)
-                },
-                placeholder = { Text("Activity / Focus session...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = accentColor,
-                    unfocusedBorderColor = Color(0xFF24242C),
-                    focusedContainerColor = Color(0xFF0C0C0E),
-                    unfocusedContainerColor = Color(0xFF0C0C0E)
-                )
-            )
-        }
-    }
-}
 
 @Composable
 private fun GoalEditor(
