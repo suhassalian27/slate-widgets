@@ -227,7 +227,7 @@ class AppFolderRow4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_appfo
 }
 
 // 6. 5-APP ROW (5x1)
-class AppFolderRow5Receiver : BaseAppFolderGridReceiver(5, R.layout.widget_appfolder_grid5row_layout) {
+class AppFolderRow5Receiver : BaseAppFolderGridReceiver(5, R.layout.widget_base_row_5) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolderRow5Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
