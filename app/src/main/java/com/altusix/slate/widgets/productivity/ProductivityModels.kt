@@ -4,6 +4,7 @@ import android.app.usage.UsageStatsManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,7 +40,7 @@ data class HabitItem(
     val streakCount: Int = 0,
     val targetDaysPerWeek: Int = 7,
     val colorHex: Long = 0xFF4CD964L,
-    val history: Map<String, Boolean> = emptyMap() // Clean start: no fake checkmarks
+    val history: Map<String, Boolean> = emptyMap()
 )
 
 data class Top3TaskItem(
@@ -142,12 +143,7 @@ data class ProductivityWidgetConfig(
         EisenhowerItem("e3", "", "Q3_DELEGATE"),
         EisenhowerItem("e4", "", "Q4_DROP")
     ),
-    val timeBlocks: List<TimeBlockItem> = listOf(
-        TimeBlockItem("tb1", "", 9, 0, 11, 0, "FOCUS"),
-        TimeBlockItem("tb2", "", 11, 0, 13, 0, "FOCUS"),
-        TimeBlockItem("tb3", "", 14, 0, 16, 0, "FOCUS"),
-        TimeBlockItem("tb4", "", 16, 0, 18, 0, "FOCUS")
-    ),
+    val timeBlocks: List<TimeBlockItem> = emptyList(),
     val goal: GoalMilestoneItem = GoalMilestoneItem(),
     val habitRings: List<HabitRingItem> = listOf(
         HabitRingItem("r1", "Focus", 0, 4, "hrs", 0xFFFF5E3A),
@@ -156,19 +152,19 @@ data class ProductivityWidgetConfig(
     ),
     val pipeline: TaskPipelineData = TaskPipelineData(),
     val bookmarks: List<BookmarkItem> = listOf(
-        BookmarkItem("b1", "", "", ""),
-        BookmarkItem("b2", "", "", ""),
-        BookmarkItem("b3", "", "", ""),
-        BookmarkItem("b4", "", "", "")
+        BookmarkItem("b1", "GitHub", "https://github.com", "github.com"),
+        BookmarkItem("b2", "YouTube", "https://youtube.com", "youtube.com"),
+        BookmarkItem("b3", "Reddit", "https://reddit.com", "reddit.com"),
+        BookmarkItem("b4", "X", "https://x.com", "x.com")
     ),
-    val clipboardSnippets: List<ClipboardSnippetItem> = listOf(
-        ClipboardSnippetItem("c1", "", ""),
-        ClipboardSnippetItem("c2", "", "")
-    ),
+    val showBookmarkFavicons: Boolean = true,
+    val showBookmarkUrl: Boolean = true,
+    val bookmarkPageIndex: Int = 0,
+    val clipboardSnippets: List<ClipboardSnippetItem> = emptyList(),
     val screenTime: ScreenTimeData = ScreenTimeData()
 ) {
     companion object {
-        fun getDefaultConfig(): ProductivityWidgetConfig = ProductivityWidgetConfig()
+        fun getDefaultConfig() = ProductivityWidgetConfig()
     }
 }
 
@@ -198,7 +194,6 @@ object ProductivityStorageManager {
         val list = current.top3Tasks.toMutableList()
         if (index in list.indices) {
             val item = list[index]
-            // Smart Guard: Never check an empty task
             if (item.title.isBlank()) return
             list[index] = item.copy(isCompleted = !item.isCompleted)
             saveConfig(context, widgetId, current.copy(top3Tasks = list))
@@ -307,6 +302,42 @@ object ProductivityStorageManager {
             cm?.setPrimaryClip(clip)
             Toast.makeText(context, "Copied \"${snippet.label}\"", Toast.LENGTH_SHORT).show()
         } catch (_: Exception) {}
+    }
+
+    fun advancePipelineStage(context: Context, widgetId: Int, stage: String) {
+        val current = getConfig(context, widgetId)
+        val p = current.pipeline
+        val updated = when (stage) {
+            "TODO" -> p.copy(todoCount = p.todoCount + 1)
+            "ACTIVE" -> {
+                if (p.todoCount > 0) {
+                    p.copy(todoCount = p.todoCount - 1, inProgressCount = p.inProgressCount + 1)
+                } else {
+                    p.copy(inProgressCount = p.inProgressCount + 1)
+                }
+            }
+            "DONE" -> {
+                if (p.inProgressCount > 0) {
+                    p.copy(inProgressCount = p.inProgressCount - 1, doneCount = p.doneCount + 1)
+                } else if (p.todoCount > 0) {
+                    p.copy(todoCount = p.todoCount - 1, doneCount = p.doneCount + 1)
+                } else {
+                    p.copy(doneCount = p.doneCount + 1)
+                }
+            }
+            else -> p
+        }
+        saveConfig(context, widgetId, current.copy(pipeline = updated))
+    }
+
+    fun cycleBookmarkPage(context: Context, widgetId: Int, delta: Int) {
+        val current = getConfig(context, widgetId)
+        val pageSize = 4
+        val totalPages = kotlin.math.ceil(current.bookmarks.size / pageSize.toFloat()).toInt().coerceAtLeast(1)
+        var newPage = current.bookmarkPageIndex + delta
+        if (newPage >= totalPages) newPage = 0
+        if (newPage < 0) newPage = totalPages - 1
+        saveConfig(context, widgetId, current.copy(bookmarkPageIndex = newPage))
     }
 
     fun resolveLiveScreenTime(context: Context): ScreenTimeData {
@@ -453,6 +484,9 @@ object ProductivityStorageManager {
             })
         }
         root.put("bookmarks", bArr)
+        root.put("showBookmarkFavicons", config.showBookmarkFavicons)
+        root.put("showBookmarkUrl", config.showBookmarkUrl)
+        root.put("bookmarkPageIndex", config.bookmarkPageIndex)
 
         val sArr = JSONArray()
         config.clipboardSnippets.forEach { s ->
@@ -599,6 +633,10 @@ object ProductivityStorageManager {
                 }
             }
 
+            val showFavicons = root.optBoolean("showBookmarkFavicons", true)
+            val showUrl = root.optBoolean("showBookmarkUrl", true)
+            val pageIndex = root.optInt("bookmarkPageIndex", 0)
+
             val sList = mutableListOf<ClipboardSnippetItem>()
             if (root.has("clipboardSnippets")) {
                 val arr = root.getJSONArray("clipboardSnippets")
@@ -623,6 +661,9 @@ object ProductivityStorageManager {
                 habitRings = if (ringsList.isNotEmpty()) ringsList else ProductivityWidgetConfig.getDefaultConfig().habitRings,
                 pipeline = pipeline,
                 bookmarks = if (bList.isNotEmpty()) bList else ProductivityWidgetConfig.getDefaultConfig().bookmarks,
+                showBookmarkFavicons = showFavicons,
+                showBookmarkUrl = showUrl,
+                bookmarkPageIndex = pageIndex,
                 clipboardSnippets = if (sList.isNotEmpty()) sList else ProductivityWidgetConfig.getDefaultConfig().clipboardSnippets,
                 screenTime = ScreenTimeData()
             )
@@ -630,36 +671,42 @@ object ProductivityStorageManager {
             ProductivityWidgetConfig.getDefaultConfig()
         }
     }
+}
 
-    fun advancePipelineStage(context: Context, widgetId: Int, stage: String) {
-        val current = getConfig(context, widgetId)
-        val p = current.pipeline
-        val updated = when (stage) {
-            "TODO" -> p.copy(todoCount = p.todoCount + 1)
-            "ACTIVE" -> {
-                if (p.todoCount > 0) {
-                    p.copy(todoCount = p.todoCount - 1, inProgressCount = p.inProgressCount + 1)
-                } else {
-                    p.copy(inProgressCount = p.inProgressCount + 1)
-                }
-            }
-            "DONE" -> {
-                if (p.inProgressCount > 0) {
-                    p.copy(inProgressCount = p.inProgressCount - 1, doneCount = p.doneCount + 1)
-                } else if (p.todoCount > 0) {
-                    p.copy(todoCount = p.todoCount - 1, doneCount = p.doneCount + 1)
-                } else {
-                    p.copy(doneCount = p.doneCount + 1)
-                }
-            }
-            else -> p
+// =========================================================================
+// 4. URL & DOMAIN EXTRACTION HELPERS
+// =========================================================================
+
+fun extractDomainAndTitle(inputUrl: String): Pair<String, String> {
+    var clean = inputUrl.trim()
+    if (clean.isBlank()) return "" to ""
+    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+        clean = "https://$clean"
+    }
+    return try {
+        val uri = android.net.Uri.parse(clean)
+        val host = uri.host?.removePrefix("www.") ?: clean
+        val parts = host.split(".")
+        val rawName = if (parts.size >= 2) parts[parts.size - 2] else host
+        val formattedTitle = when (rawName.lowercase(java.util.Locale.getDefault())) {
+            "github" -> "GitHub"
+            "youtube" -> "YouTube"
+            "reddit" -> "Reddit"
+            "x", "twitter" -> "X"
+            "figma" -> "Figma"
+            "notion" -> "Notion"
+            "linkedin" -> "LinkedIn"
+            "stackoverflow" -> "StackOverflow"
+            else -> rawName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
         }
-        saveConfig(context, widgetId, current.copy(pipeline = updated))
+        Pair(host, formattedTitle)
+    } catch (_: Exception) {
+        Pair(clean, clean)
     }
 }
 
 // =========================================================================
-// HABIT COMPUTATION HELPERS
+// 5. HABIT COMPUTATION HELPERS
 // =========================================================================
 
 fun calculateHabitStreak(history: Map<String, Boolean>): Int {

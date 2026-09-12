@@ -1875,95 +1875,296 @@ private fun createCornerPath(
 }
 
 // =========================================================================
-// 9. BOOKMARK LIST (4x2)
+// 9. BOOKMARK BENTO QUICK-LAUNCH DOCK (Adaptive Text vs Icon-Only Dock)
 // =========================================================================
 
 fun generateBookmarkListBitmap(
     context: Context,
-    bookmarks: List<BookmarkItem>,
+    prodConfig: ProductivityWidgetConfig,
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val ( bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val aspect = 2.0f
-        val cardW = minOf(w, h * aspect)
-        val cardH = cardW / aspect
-        RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // 1. Header
-    val headerY = cardRect.top + 16f * scaleFactor
-    drawGlobeIcon(canvas, cardRect.left + 24f * scaleFactor, headerY + 8f * scaleFactor, 7f * scaleFactor, accentColor, scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardH, cardW * 0.55f)
+
+    // 1. Uniform Symmetrical Insets
+    val padX = (cardW * 0.048f).coerceIn(10f * scaleFactor, 18f * scaleFactor)
+    val padY = (cardH * 0.075f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    val contentLeft = cardRect.left + padX
+    val contentRight = cardRect.right - padX
+    val contentTop = cardRect.top + padY
+    val contentBottom = cardRect.bottom - padY
+
+    val availW = contentRight - contentLeft
+    val availH = contentBottom - contentTop
+
+    // 2. Pagination Calculations
+    val bookmarks = prodConfig.bookmarks
+    val pageSize = 4
+    val totalPages = kotlin.math.ceil(bookmarks.size / pageSize.toFloat()).toInt().coerceAtLeast(1)
+    val currentPage = prodConfig.bookmarkPageIndex.coerceIn(0, totalPages - 1)
+
+    // 3. Header Section
+    val headerH = (baseDim * 0.19f).coerceIn(20f * scaleFactor, 36f * scaleFactor)
+    val titleSize = (headerH * 0.48f).coerceIn(10.5f * scaleFactor, 14f * scaleFactor)
 
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 13.5f * scaleFactor
-        typeface = getSlateFont(context, 700)
+        textSize = titleSize
+        typeface = getSlateFont(context, 800)
+        letterSpacing = 0.04f
     }
-    canvas.drawText("BOOKMARKS", cardRect.left + 38f * scaleFactor, headerY + 12f * scaleFactor, titlePaint)
 
-    val countBadgeText = "${bookmarks.size} LINKS"
-    val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val globeR = titleSize * 0.46f
+    drawGlobeIcon(canvas, contentLeft + globeR, contentTop + (headerH * 0.52f), globeR, accentColor, scaleFactor)
+    val titleBaseline = contentTop + (headerH * 0.68f)
+    canvas.drawText("BOOKMARKS", contentLeft + (globeR * 2.6f) + (4f * scaleFactor), titleBaseline, titlePaint)
+
+    val pageTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = 10f * scaleFactor
-        typeface = getSlateFont(context, 600)
+        textSize = (titleSize * 0.85f).coerceIn(9f * scaleFactor, 12f * scaleFactor)
+        typeface = getSlateFont(context, 700)
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText(countBadgeText, cardRect.right - 18f * scaleFactor, headerY + 12f * scaleFactor, countPaint)
 
-    // 2. Four Bookmark Rows
-    val rowStartY = headerY + 28f * scaleFactor
-    val rowH = (cardRect.bottom - rowStartY - 10f * scaleFactor) / 4f
-
-    for (i in 0 until minOf(4, bookmarks.size)) {
-        val b = bookmarks[i]
-        val rowCenterY = rowStartY + i * rowH + rowH / 2f
-
-        // Globe / Link Bullet
-        val bulletX = cardRect.left + 24f * scaleFactor
-        val bDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(bulletX, rowCenterY, 7f * scaleFactor, bDotPaint)
-
-        val innerDot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor; style = Paint.Style.FILL }
-        canvas.drawCircle(bulletX, rowCenterY, 2.5f * scaleFactor, innerDot)
-
-        // Title text
-        val titleTextX = bulletX + 16f * scaleFactor
-        val bTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    if (totalPages > 1) {
+        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryTextColor
-            textSize = 12f * scaleFactor
-            typeface = getSlateFont(context, 600)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.6f * scaleFactor
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
         }
-        canvas.drawText(b.title, titleTextX, rowCenterY + 4f * scaleFactor, bTitlePaint)
 
-        // Domain pill on right
-        val domainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = secondaryTextColor
-            textSize = 9.5f * scaleFactor
-            typeface = getSlateFont(context, 500)
-            textAlign = Paint.Align.RIGHT
+        val btnR = headerH * 0.38f
+        val nextCx = contentRight - btnR
+        val nextCy = contentTop + (headerH / 2f)
+        val prevCx = nextCx - (btnR * 2.4f)
+        val prevCy = nextCy
+        val arrowSize = btnR * 0.32f
+
+        // Draw Right Arrow >
+        val nextPath = Path().apply {
+            moveTo(nextCx - (arrowSize * 0.6f), nextCy - arrowSize)
+            lineTo(nextCx + (arrowSize * 0.6f), nextCy)
+            lineTo(nextCx - (arrowSize * 0.6f), nextCy + arrowSize)
         }
-        canvas.drawText("${b.domain} ↗", cardRect.right - 18f * scaleFactor, rowCenterY + 3.5f * scaleFactor, domainPaint)
+        canvas.drawPath(nextPath, arrowPaint)
 
-        if (i < 3) {
-            val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(16, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-                strokeWidth = 1f * scaleFactor
+        // Draw Left Arrow <
+        val prevPath = Path().apply {
+            moveTo(prevCx + (arrowSize * 0.6f), prevCy - arrowSize)
+            lineTo(prevCx - (arrowSize * 0.6f), prevCy)
+            lineTo(prevCx + (arrowSize * 0.6f), prevCy + arrowSize)
+        }
+        canvas.drawPath(prevPath, arrowPaint)
+
+        val pageStr = "${currentPage + 1}/${totalPages}"
+        val pageBaseline = nextCy - ((pageTextPaint.fontMetrics.ascent + pageTextPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(pageStr, prevCx - (btnR * 1.5f), pageBaseline, pageTextPaint)
+    } else {
+        val countText = "${bookmarks.size} SAVED"
+        val pageBaseline = contentTop + (headerH * 0.68f)
+        canvas.drawText(countText, contentRight, pageBaseline, pageTextPaint)
+    }
+
+    // 4. 2x2 Bento Grid Layout
+    val gridTop = contentTop + headerH + (baseDim * 0.04f)
+    val gridBottom = contentBottom
+    val gridAvailH = gridBottom - gridTop
+
+    val colGap = (cardW * 0.024f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val rowGap = (cardH * 0.038f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+
+    val itemW = (availW - colGap) / 2f
+    val itemH = (gridAvailH - rowGap) / 2f
+    val itemRadius = (itemH * 0.28f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    // SMART DETECTION: Switch to Icon-Only mode if tile cannot comfortably fit text
+    val isIconOnly = prodConfig.showBookmarkFavicons &&
+            (itemW / itemH < 1.45f || (itemW - (itemH * 0.70f)) < 44f * scaleFactor)
+
+    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
+    }
+
+    val bTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = (itemH * 0.27f).coerceIn(11f * scaleFactor, 15f * scaleFactor)
+        typeface = getSlateFont(context, 700)
+    }
+
+    val bDomainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = (itemH * 0.20f).coerceIn(8.5f * scaleFactor, 11.5f * scaleFactor)
+        typeface = getSlateFont(context, 500)
+    }
+
+    val pageOffset = currentPage * pageSize
+
+    for (row in 0 until 2) {
+        for (col in 0 until 2) {
+            val slotIndex = (row * 2) + col
+            val bookmarkIndex = pageOffset + slotIndex
+            val item = bookmarks.getOrNull(bookmarkIndex)
+
+            val boxLeft = contentLeft + col * (itemW + colGap)
+            val boxTop = gridTop + row * (itemH + rowGap)
+            val boxRect = RectF(boxLeft, boxTop, boxLeft + itemW, boxTop + itemH)
+
+            if (item != null && item.url.isNotBlank()) {
+                // Background Tile
+                canvas.drawRoundRect(boxRect, itemRadius, itemRadius, cardBgPaint)
+                canvas.drawRoundRect(boxRect, itemRadius, itemRadius, cardBorderPaint)
+
+                // -------------------------------------------------------------
+                // MODE A: ICON-ONLY DOCK (For Square / Small Widget Dimensions)
+                // -------------------------------------------------------------
+                if (isIconOnly) {
+                    val iconSize = (minOf(itemW, itemH) * 0.52f).coerceIn(24f * scaleFactor, 48f * scaleFactor)
+                    val iconRect = RectF(
+                        boxRect.centerX() - (iconSize / 2f),
+                        boxRect.centerY() - (iconSize / 2f),
+                        boxRect.centerX() + (iconSize / 2f),
+                        boxRect.centerY() + (iconSize / 2f)
+                    )
+
+                    val cachedBmp = FaviconHelper.getCachedFavicon(context, item.domain)
+                    if (cachedBmp != null) {
+                        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                        canvas.save()
+                        val clipPath = Path().apply {
+                            addRoundRect(iconRect, iconSize * 0.26f, iconSize * 0.26f, Path.Direction.CW)
+                        }
+                        canvas.clipPath(clipPath)
+                        canvas.drawBitmap(cachedBmp, null, iconRect, iconPaint)
+                        canvas.restore()
+                    } else {
+                        FaviconHelper.fetchFaviconAsync(context, item.domain)
+                        // Fallback centered monogram while downloading
+                        val monoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            color = primaryTextColor
+                            textSize = iconSize * 0.50f
+                            typeface = getSlateFont(context, 800)
+                            textAlign = Paint.Align.CENTER
+                        }
+                        val monoBaseline = boxRect.centerY() - ((monoPaint.fontMetrics.ascent + monoPaint.fontMetrics.descent) / 2f)
+                        val letter = item.title.firstOrNull()?.uppercaseChar()?.toString() ?: "•"
+                        canvas.drawText(letter, boxRect.centerX(), monoBaseline, monoPaint)
+                    }
+                }
+                // -------------------------------------------------------------
+                // MODE B: FULL TILES (Icon Left + Title/Domain Right)
+                // -------------------------------------------------------------
+                else {
+                    var textStartX = boxLeft + (itemH * 0.20f)
+
+                    if (prodConfig.showBookmarkFavicons) {
+                        val iconSize = (itemH * 0.62f).coerceIn(20f * scaleFactor, 40f * scaleFactor)
+                        val iconLeft = boxLeft + (itemH * 0.18f)
+                        val iconTop = boxTop + ((itemH - iconSize) / 2f)
+                        val iconRect = RectF(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+
+                        val cachedBmp = FaviconHelper.getCachedFavicon(context, item.domain)
+                        if (cachedBmp != null) {
+                            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                            canvas.save()
+                            val clipPath = Path().apply {
+                                addRoundRect(iconRect, iconSize * 0.26f, iconSize * 0.26f, Path.Direction.CW)
+                            }
+                            canvas.clipPath(clipPath)
+                            canvas.drawBitmap(cachedBmp, null, iconRect, iconPaint)
+                            canvas.restore()
+                        } else {
+                            FaviconHelper.fetchFaviconAsync(context, item.domain)
+                        }
+                        textStartX = iconRect.right + (itemH * 0.16f)
+                    }
+
+                    val maxTextW = (boxRect.right - (itemH * 0.14f)) - textStartX
+                    val (domainStr, defaultTitle) = extractDomainAndTitle(item.url)
+                    val displayTitle = item.title.ifBlank { defaultTitle }
+                    val displayDomain = item.domain.ifBlank { domainStr }
+
+                    val elidedTitle = android.text.TextUtils.ellipsize(
+                        displayTitle,
+                        android.text.TextPaint(bTitlePaint),
+                        maxTextW.coerceAtLeast(10f),
+                        android.text.TextUtils.TruncateAt.END
+                    ).toString()
+
+                    if (prodConfig.showBookmarkUrl) {
+                        val textStackH = bTitlePaint.textSize + bDomainPaint.textSize + (3f * scaleFactor)
+                        val textStackTop = boxTop + ((itemH - textStackH) / 2f)
+                        val tBaseline = textStackTop + bTitlePaint.textSize
+                        val dBaseline = tBaseline + bDomainPaint.textSize + (3f * scaleFactor)
+
+                        canvas.drawText(elidedTitle, textStartX, tBaseline, bTitlePaint)
+
+                        val elidedDomain = android.text.TextUtils.ellipsize(
+                            displayDomain,
+                            android.text.TextPaint(bDomainPaint),
+                            maxTextW.coerceAtLeast(10f),
+                            android.text.TextUtils.TruncateAt.END
+                        ).toString()
+                        canvas.drawText(elidedDomain, textStartX, dBaseline, bDomainPaint)
+                    } else {
+                        val tBaseline = boxRect.centerY() - ((bTitlePaint.fontMetrics.ascent + bTitlePaint.fontMetrics.descent) / 2f)
+                        canvas.drawText(elidedTitle, textStartX, tBaseline, bTitlePaint)
+                    }
+                }
+            } else {
+                // Empty placeholder slot
+                val emptyDashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(16, 255, 255, 255)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1f * scaleFactor
+                    pathEffect = DashPathEffect(floatArrayOf(6f * scaleFactor, 6f * scaleFactor), 0f)
+                }
+                canvas.drawRoundRect(boxRect, itemRadius, itemRadius, emptyDashPaint)
+
+                val addPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(60, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+                    textSize = (itemH * 0.22f).coerceIn(9f * scaleFactor, 12f * scaleFactor)
+                    typeface = getSlateFont(context, 600)
+                    textAlign = Paint.Align.CENTER
+                }
+                val addBaseline = boxRect.centerY() - ((addPaint.fontMetrics.ascent + addPaint.fontMetrics.descent) / 2f)
+                canvas.drawText("+ Add", boxRect.centerX(), addBaseline, addPaint)
             }
-            val divY = rowStartY + (i + 1) * rowH
-            canvas.drawLine(cardRect.left + 18f * scaleFactor, divY, cardRect.right - 18f * scaleFactor, divY, divPaint)
         }
     }
 

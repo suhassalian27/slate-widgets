@@ -693,11 +693,19 @@ class ProductivityPipelineReceiver : BaseProductivityReceiver(
 }
 
 // =========================================================================
-// 9. BOOKMARK LIST (4x2)
+// 9. BOOKMARKS QUICK LAUNCHER (Interactive Bento Grid with Pagination)
 // =========================================================================
 
-class ProductivityBookmarksReceiver : BaseProductivityReceiver(R.layout.widget_productivity_bookmarks_layout, targetAspect = 2.0f) {
+class ProductivityBookmarksReceiver : BaseProductivityReceiver(
+    layoutResId = R.layout.widget_productivity_bookmarks_layout,
+    targetAspect = 2.0f
+) {
     override val defaultTab: String = "BOOKMARKS"
+
+    companion object {
+        const val ACTION_BOOKMARK_PREV = "com.altusix.slate.productivity.ACTION_BOOKMARK_PREV"
+        const val ACTION_BOOKMARK_NEXT = "com.altusix.slate.productivity.ACTION_BOOKMARK_NEXT"
+    }
 
     override fun renderWidgetBitmap(
         context: Context,
@@ -708,45 +716,102 @@ class ProductivityBookmarksReceiver : BaseProductivityReceiver(R.layout.widget_p
         hDp: Int
     ): Bitmap {
         val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
-        return generateBookmarkListBitmap(context, prodConfig.bookmarks, config, isResponsive, wDp, hDp)
+        return generateBookmarkListBitmap(context, prodConfig, config, isResponsive, wDp, hDp)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            when (intent.action) {
+                ACTION_BOOKMARK_PREV -> {
+                    ProductivityStorageManager.cycleBookmarkPage(context, appWidgetId, -1)
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+                ACTION_BOOKMARK_NEXT -> {
+                    ProductivityStorageManager.cycleBookmarkPage(context, appWidgetId, 1)
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+            }
+        }
+        super.onReceive(context, intent)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
+        val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
+        val bookmarks = prodConfig.bookmarks
+        val pageSize = 4
+        val totalPages = kotlin.math.ceil(bookmarks.size / pageSize.toFloat()).toInt().coerceAtLeast(1)
+        val validPage = prodConfig.bookmarkPageIndex.coerceIn(0, totalPages - 1)
+
+        // 1. Header Tap -> Open Configuration Studio
+        val openConfigIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "BOOKMARKS")
             data = Uri.parse("slate_prod://$appWidgetId/bookmarks_edit")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val openPi = PendingIntent.getActivity(
+        val openConfigPi = PendingIntent.getActivity(
             context,
             appWidgetId * 100 + 1,
-            openIntent,
+            openConfigIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.btn_bookmark_header, openPi)
+        views.setOnClickPendingIntent(R.id.btn_bookmark_header, openConfigPi)
 
-        val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
-        val rowIds = listOf(R.id.btn_bookmark_0, R.id.btn_bookmark_1, R.id.btn_bookmark_2, R.id.btn_bookmark_3)
-        for (i in rowIds.indices) {
-            val item = prodConfig.bookmarks.getOrNull(i)
-            val targetPi = if (item != null && item.url.isNotBlank()) {
-                val urlToLaunch = if (!item.url.startsWith("http://") && !item.url.startsWith("https://")) {
+        // 2. Pagination Buttons
+        val prevIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_BOOKMARK_PREV
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/bookmarks_prev")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_bookmark_prev,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 10, prevIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        val nextIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_BOOKMARK_NEXT
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/bookmarks_next")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_bookmark_next,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 11, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        // 3. Four Grid Slots (Open URL directly in browser)
+        val slotIds = listOf(
+            R.id.btn_bookmark_slot_0,
+            R.id.btn_bookmark_slot_1,
+            R.id.btn_bookmark_slot_2,
+            R.id.btn_bookmark_slot_3
+        )
+
+        val pageStart = validPage * pageSize
+        for (i in 0 until 4) {
+            val item = bookmarks.getOrNull(pageStart + i)
+            if (item != null && item.url.isNotBlank()) {
+                val cleanUrl = if (!item.url.startsWith("http://") && !item.url.startsWith("https://")) {
                     "https://${item.url}"
-                } else item.url
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(urlToLaunch)).apply {
+                } else {
+                    item.url
+                }
+                val launchIntent = Intent(Intent.ACTION_VIEW, Uri.parse(cleanUrl)).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-                PendingIntent.getActivity(
+                val launchPi = PendingIntent.getActivity(
                     context,
                     appWidgetId * 100 + 20 + i,
-                    browserIntent,
+                    launchIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
+                views.setOnClickPendingIntent(slotIds[i], launchPi)
             } else {
-                openPi
+                // Empty slot taps open the configuration studio to add more links
+                views.setOnClickPendingIntent(slotIds[i], openConfigPi)
             }
-            views.setOnClickPendingIntent(rowIds[i], targetPi)
         }
     }
 }

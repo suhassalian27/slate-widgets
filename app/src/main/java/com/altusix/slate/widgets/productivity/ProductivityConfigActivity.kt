@@ -12,15 +12,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,30 +34,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.components.ConfigTabItem
 import com.altusix.slate.ui.components.CustomColorPickerDialog
 import com.altusix.slate.ui.components.RainbowCustomCircle
 import com.altusix.slate.ui.components.SlateConfigScaffold
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
+import java.util.Locale
+import kotlin.math.roundToInt
 
 private enum class ProductivityColorTarget { BACKGROUND, ACCENT }
 
@@ -132,6 +134,15 @@ class ProductivityConfigActivity : ComponentActivity() {
                     selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
                 }
 
+                LaunchedEffect(config.bookmarks) {
+                    config.bookmarks.forEach { bookmark ->
+                        val domain = bookmark.domain.ifBlank { extractDomainAndTitle(bookmark.url).first }
+                        if (domain.isNotBlank()) {
+                            FaviconHelper.fetchFaviconAsync(this@ProductivityConfigActivity, domain)
+                        }
+                    }
+                }
+
                 val currentSlateConfig = remember(selectedBgHex, selectedAccentHex, opacity) {
                     val themeMode = if (calculateLuminance(selectedBgHex) > 0.5f) "LIGHT" else "DARK"
                     SlateWidgetConfig(
@@ -181,7 +192,17 @@ class ProductivityConfigActivity : ComponentActivity() {
                             "TOP3" -> Top3Editor(config.top3Tasks, accentColor) { config = config.copy(top3Tasks = it) }
                             "TIMER" -> TimerEditor(config.focusTimer, accentColor) { config = config.copy(focusTimer = it) }
                             "HABIT" -> HabitEditor(config.habit, accentColor) { config = config.copy(habit = it) }
-                            "BOOKMARKS" -> BookmarksEditor(config.bookmarks, accentColor) { config = config.copy(bookmarks = it) }
+                            "BOOKMARKS" -> {
+                                BookmarkEditor(
+                                    bookmarks = config.bookmarks,
+                                    showFavicons = config.showBookmarkFavicons,
+                                    showUrl = config.showBookmarkUrl,
+                                    accentColor = accentColor,
+                                    onUpdateBookmarks = { config = config.copy(bookmarks = it) },
+                                    onToggleFavicons = { config = config.copy(showBookmarkFavicons = it) },
+                                    onToggleShowUrl = { config = config.copy(showBookmarkUrl = it) }
+                                )
+                            }
                             "CLIPBOARD" -> ClipboardEditor(config.clipboardSnippets, accentColor) { config = config.copy(clipboardSnippets = it) }
                             "SCREENTIME" -> ScreenTimeEditor(this@ProductivityConfigActivity, config.screenTime, accentColor) { config = config.copy(screenTime = it) }
                             "EISENHOWER" -> EisenhowerEditor(config.eisenhowerTasks, accentColor) { config = config.copy(eisenhowerTasks = it) }
@@ -363,7 +384,6 @@ private fun ProductivityWidgetLivePreview(
 ) {
     val context = LocalContext.current
 
-    // Geometry matched to widget aspect ratios: Eisenhower is now 4x2 (260 to 130)
     val (wDp, hDp) = when (tab) {
         "PIPELINE" -> 280 to 70
         "HABIT", "TOP3", "TIMELINE", "BOOKMARKS", "EISENHOWER" -> 260 to 130
@@ -379,7 +399,7 @@ private fun ProductivityWidgetLivePreview(
             "GOAL" -> generateGoalMilestoneBitmap(context, config.goal, slateConfig, isResponsive, wDp, hDp)
             "RINGS" -> generateHabitRingsBitmap(context, config.habitRings, slateConfig, isResponsive, wDp, hDp)
             "PIPELINE" -> generateTaskPipelineBitmap(context, config.pipeline, slateConfig, isResponsive, wDp, hDp)
-            "BOOKMARKS" -> generateBookmarkListBitmap(context, config.bookmarks, slateConfig, isResponsive, wDp, hDp)
+            "BOOKMARKS" -> generateBookmarkListBitmap(context, config, slateConfig, isResponsive, wDp, hDp)
             "SCREENTIME" -> {
                 val liveData = ProductivityStorageManager.resolveLiveScreenTime(context).copy(limitMinutes = config.screenTime.limitMinutes)
                 generateScreenTimeBitmap(context, liveData, slateConfig, isResponsive, wDp, hDp)
@@ -486,7 +506,7 @@ private fun TimerEditor(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF141416))
+            .background(Color(0xFF141418))
             .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
@@ -642,36 +662,115 @@ private fun HabitEditor(
 }
 
 @Composable
-private fun BookmarksEditor(
+private fun BookmarkEditor(
     bookmarks: List<BookmarkItem>,
+    showFavicons: Boolean,
+    showUrl: Boolean,
     accentColor: Color,
-    onUpdate: (List<BookmarkItem>) -> Unit
+    onUpdateBookmarks: (List<BookmarkItem>) -> Unit,
+    onToggleFavicons: (Boolean) -> Unit,
+    onToggleShowUrl: (Boolean) -> Unit
 ) {
-    SectionTitle(title = "Quick Launch Bookmarks (Up to 4)")
+    val context = LocalContext.current
+    var newBookmarkUrl by remember { mutableStateOf("") }
+    var newBookmarkTitle by remember { mutableStateOf("") }
 
-    for (i in 0 until 4) {
-        val item = bookmarks.getOrElse(i) { BookmarkItem("b_${i + 1}", "", "", "") }
-        Column(
+    val currentBookmarks by rememberUpdatedState(bookmarks)
+    val currentOnUpdate by rememberUpdatedState(onUpdateBookmarks)
+
+    SectionTitle(title = "Bookmarks & Quick Launch")
+
+    // 1. Display Toggles
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF141418))
+            .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF141418))
-                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Show Website Favicons", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("Render brand icons instead of plain text", color = Color(0xFF8E8E93), fontSize = 11.sp)
+            }
+            Switch(
+                checked = showFavicons,
+                onCheckedChange = onToggleFavicons,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Black,
+                    checkedTrackColor = accentColor,
+                    uncheckedTrackColor = Color(0xFF24242C)
+                )
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(Color(0xFF1E1E24))
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Show Domain / URL", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("Display subtitle domain under bookmark title", color = Color(0xFF8E8E93), fontSize = 11.sp)
+            }
+            Switch(
+                checked = showUrl,
+                onCheckedChange = onToggleShowUrl,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Black,
+                    checkedTrackColor = accentColor,
+                    uncheckedTrackColor = Color(0xFF24242C)
+                )
+            )
+        }
+    }
+
+    // 2. Add Bookmark Block
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF141418))
+            .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Add Bookmark", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
-                value = item.title,
-                onValueChange = { newTitle: String ->
-                    val updated = bookmarks.toMutableList()
-                    while (updated.size <= i) updated.add(BookmarkItem("b_${updated.size + 1}", "", "", ""))
-                    updated[i] = item.copy(title = newTitle)
-                    onUpdate(updated)
+                value = newBookmarkUrl,
+                onValueChange = { input ->
+                    newBookmarkUrl = input
+                    val (domain, autoTitle) = extractDomainAndTitle(input)
+                    if (newBookmarkTitle.isBlank() && autoTitle.isNotBlank()) {
+                        newBookmarkTitle = autoTitle
+                    }
                 },
-                placeholder = { Text("Slot ${i + 1} Label (e.g. GitHub)", color = Color(0xFF8E8E93), fontSize = 13.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                placeholder = { Text("Paste URL (e.g. github.com)", color = Color(0xFF8E8E93), fontSize = 12.5.sp) },
+                modifier = Modifier.weight(1.5f),
                 singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accentColor,
@@ -682,18 +781,12 @@ private fun BookmarksEditor(
             )
 
             OutlinedTextField(
-                value = item.url,
-                onValueChange = { newUrl: String ->
-                    val host = Uri.parse(if (!newUrl.startsWith("http")) "https://$newUrl" else newUrl).host ?: newUrl
-                    val updated = bookmarks.toMutableList()
-                    while (updated.size <= i) updated.add(BookmarkItem("b_${updated.size + 1}", "", "", ""))
-                    updated[i] = item.copy(url = newUrl, domain = host)
-                    onUpdate(updated)
-                },
-                placeholder = { Text("URL (e.g. github.com)", color = Color(0xFF8E8E93), fontSize = 13.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(color = Color(0xFF8E8E93), fontSize = 13.sp),
+                value = newBookmarkTitle,
+                onValueChange = { newBookmarkTitle = it },
+                placeholder = { Text("Title", color = Color(0xFF8E8E93), fontSize = 12.5.sp) },
+                modifier = Modifier.weight(1f),
                 singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accentColor,
@@ -702,6 +795,244 @@ private fun BookmarksEditor(
                     unfocusedContainerColor = Color(0xFF0C0C0E)
                 )
             )
+
+            Button(
+                onClick = {
+                    if (newBookmarkUrl.isNotBlank()) {
+                        val (domain, autoTitle) = extractDomainAndTitle(newBookmarkUrl)
+                        val title = newBookmarkTitle.ifBlank { autoTitle }
+                        val newItem = BookmarkItem(
+                            id = "b_${System.currentTimeMillis()}",
+                            title = title,
+                            url = newBookmarkUrl,
+                            domain = domain
+                        )
+                        currentOnUpdate(currentBookmarks + newItem)
+                        if (domain.isNotBlank()) {
+                            FaviconHelper.fetchFaviconAsync(context, domain)
+                        }
+                        newBookmarkUrl = ""
+                        newBookmarkTitle = ""
+                    }
+                },
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Text("Add", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+            }
+        }
+    }
+
+    // 3. Saved Bookmarks Header
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Saved Bookmarks (${bookmarks.size})",
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+        if (bookmarks.size > 1) {
+            Text(
+                text = "Hold & drag number to reorder",
+                fontSize = 11.sp,
+                color = Color(0xFF8E8E93)
+            )
+        }
+    }
+
+    // 4. Stable Drag & Drop Reorder List
+    val density = LocalDensity.current
+    val spacingPx = with(density) { 8.dp.toPx() }
+    var itemHeightPx by remember { mutableFloatStateOf(0f) }
+
+    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    val effectiveSlotHeight = if (itemHeightPx > 0f) itemHeightPx else with(density) { 62.dp.toPx() }
+
+    val currentHoverIndex = remember(draggedIndex, dragOffsetY, effectiveSlotHeight, bookmarks.size) {
+        draggedIndex?.let { startIdx ->
+            val delta = (dragOffsetY / effectiveSlotHeight).roundToInt()
+            (startIdx + delta).coerceIn(0, maxOf(0, bookmarks.size - 1))
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        bookmarks.forEachIndexed { index, item ->
+            key(item.id) {
+                val isBeingDragged = draggedIndex == index
+
+                val targetTranslationY = if (draggedIndex != null) {
+                    when {
+                        isBeingDragged -> dragOffsetY
+                        currentHoverIndex != null -> {
+                            val start = draggedIndex!!
+                            val hover = currentHoverIndex!!
+                            when {
+                                start < hover && index in (start + 1)..hover -> -effectiveSlotHeight
+                                start > hover && index in hover until start -> effectiveSlotHeight
+                                else -> 0f
+                            }
+                        }
+                        else -> 0f
+                    }
+                } else {
+                    0f
+                }
+
+                val animatedTranslationY by animateFloatAsState(
+                    targetValue = targetTranslationY,
+                    animationSpec = if (draggedIndex != null) tween(durationMillis = 150) else snap(),
+                    label = "bookmarkShift"
+                )
+
+                val currentIndex by rememberUpdatedState(index)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            if (coords.size.height > 0 && itemHeightPx == 0f) {
+                                itemHeightPx = coords.size.height.toFloat() + spacingPx
+                            }
+                        }
+                        .zIndex(if (isBeingDragged) 10f else 1f)
+                        .graphicsLayer {
+                            translationY = if (isBeingDragged) dragOffsetY else animatedTranslationY
+                            scaleX = if (isBeingDragged) 1.02f else 1f
+                            scaleY = if (isBeingDragged) 1.02f else 1f
+                        }
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isBeingDragged) Color(0xFF22222E) else Color(0xFF141418))
+                        .border(
+                            1.dp,
+                            if (isBeingDragged) accentColor else Color(0xFF24242C),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isBeingDragged) accentColor else Color(0xFF22222A))
+                            .pointerInput(item.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedIndex = currentIndex
+                                        dragOffsetY = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffsetY += dragAmount.y
+                                    },
+                                    onDragEnd = {
+                                        val from = draggedIndex
+                                        if (from != null && effectiveSlotHeight > 0f) {
+                                            val delta = (dragOffsetY / effectiveSlotHeight).roundToInt()
+                                            val to = (from + delta).coerceIn(0, currentBookmarks.size - 1)
+                                            if (from != to) {
+                                                val mutable = currentBookmarks.toMutableList()
+                                                val movedItem = mutable.removeAt(from)
+                                                mutable.add(to, movedItem)
+                                                currentOnUpdate(mutable)
+                                            }
+                                        }
+                                        draggedIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggedIndex = null
+                                        dragOffsetY = 0f
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            color = if (isBeingDragged) Color.Black else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = item.title,
+                        onValueChange = { newTitle ->
+                            currentOnUpdate(currentBookmarks.map {
+                                if (it.id == item.id) it.copy(title = newTitle) else it
+                            })
+                        },
+                        placeholder = { Text("Title", color = Color(0xFF8E8E93), fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            unfocusedBorderColor = Color(0xFF24242C),
+                            focusedContainerColor = Color(0xFF0C0C0E),
+                            unfocusedContainerColor = Color(0xFF0C0C0E)
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = item.url,
+                        onValueChange = { newUrl ->
+                            val (extractedDomain, autoTitle) = extractDomainAndTitle(newUrl)
+                            currentOnUpdate(currentBookmarks.map {
+                                if (it.id == item.id) {
+                                    it.copy(
+                                        url = newUrl,
+                                        domain = extractedDomain,
+                                        title = if (it.title.isBlank()) autoTitle else it.title
+                                    )
+                                } else it
+                            })
+                            if (extractedDomain.isNotBlank()) {
+                                FaviconHelper.fetchFaviconAsync(context, extractedDomain)
+                            }
+                        },
+                        placeholder = { Text("URL", color = Color(0xFF8E8E93), fontSize = 12.sp) },
+                        modifier = Modifier.weight(1.5f),
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color(0xFF8E8E93), fontSize = 12.sp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            unfocusedBorderColor = Color(0xFF24242C),
+                            focusedContainerColor = Color(0xFF0C0C0E),
+                            unfocusedContainerColor = Color(0xFF0C0C0E)
+                        )
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E1E24))
+                            .clickable {
+                                currentOnUpdate(currentBookmarks.filterNot { it.id == item.id })
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            tint = Color(0xFFFF453A),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -888,7 +1219,6 @@ private fun EisenhowerEditor(
             }
 
             if (quadTasks.isEmpty()) {
-                // Ensure at least one text field is visible when empty
                 OutlinedTextField(
                     value = "",
                     onValueChange = { newText ->
@@ -960,7 +1290,6 @@ private fun EisenhowerEditor(
         }
     }
 }
-
 
 @Composable
 private fun GoalEditor(
@@ -1091,7 +1420,6 @@ private fun RingsEditor(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. Header: Colored ring dot + Title + Live progress badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1123,7 +1451,6 @@ private fun RingsEditor(
                 )
             }
 
-            // 2. Habit Name
             OutlinedTextField(
                 value = ring.label,
                 onValueChange = { updateCurrentRing(ring.copy(label = it)) },
@@ -1143,7 +1470,6 @@ private fun RingsEditor(
                 )
             )
 
-            // 3. Clear Side-by-Side Target & Completed Inputs
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1195,7 +1521,6 @@ private fun RingsEditor(
                 )
             }
 
-            // 4. Unit Selection Chips
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1208,11 +1533,7 @@ private fun RingsEditor(
                             .height(34.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(if (isSelected) ringColor.copy(alpha = 0.2f) else Color(0xFF18181E))
-                            .border(
-                                1.dp,
-                                if (isSelected) ringColor else Color(0xFF24242C),
-                                RoundedCornerShape(8.dp)
-                            )
+                            .border(1.dp, if (isSelected) ringColor else Color(0xFF24242C), RoundedCornerShape(8.dp))
                             .clickable { updateCurrentRing(ring.copy(unit = preset)) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1226,7 +1547,6 @@ private fun RingsEditor(
                 }
             }
 
-            // 5. Quick Increment / Decrement Stepper
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

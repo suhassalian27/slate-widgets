@@ -161,7 +161,7 @@ fun SlateConfigScaffold(
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFF282A36), // Balanced center stage light
+                                    Color(0xFF282A36),
                                     Color(0xFF171820),
                                     Color(0xFF0E0F14),
                                     Color(0xFF090A0D)
@@ -182,7 +182,6 @@ fun SlateConfigScaffold(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Dot Grid Background
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val spacing = 22.dp.toPx()
                         val dotRadius = 1.0.dp.toPx()
@@ -209,7 +208,6 @@ fun SlateConfigScaffold(
                         }
                     }
 
-                    // Content renders cleanly without an artificial rectangular shadow
                     previewContent()
                 }
             }
@@ -264,14 +262,14 @@ fun SlateConfigScaffold(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // 4. Form Controls Section
+            // 4. Form Controls Section with 48.dp Bottom Clearance
             if (scrollable) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 48.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     content()
@@ -281,7 +279,7 @@ fun SlateConfigScaffold(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     content()
