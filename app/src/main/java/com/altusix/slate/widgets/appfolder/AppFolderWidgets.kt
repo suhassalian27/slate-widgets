@@ -207,7 +207,7 @@ class AppFolder4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_appfolde
 }
 
 // 2. 8-APP FOLDER (4x2)
-class AppFolder8Receiver : BaseAppFolderGridReceiver(8, R.layout.widget_appfolder_grid8_layout) {
+class AppFolder8Receiver : BaseAppFolderGridReceiver(8, R.layout.widget_base_grid_4x2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolder8Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 

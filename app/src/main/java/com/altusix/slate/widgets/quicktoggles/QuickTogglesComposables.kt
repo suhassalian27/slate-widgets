@@ -2,7 +2,10 @@ package com.altusix.slate.widgets.quicktoggles
 
 import android.content.Context
 import android.graphics.*
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.content.ContextCompat
+import com.altusix.slate.R
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
@@ -46,397 +49,64 @@ private fun drawCardBackground(
     return Triple(primaryTextColor, secondaryTextColor, bgColor)
 }
 
-// -------------------------------------------------------------------------
-// MATHEMATICAL VECTOR GLYPHS
-// -------------------------------------------------------------------------
-
-private fun drawWifiGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, isConnected: Boolean) {
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.12f
-        strokeCap = Paint.Cap.ROUND
-    }
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-
-    val dotRadius = size * 0.11f
-    val dotY = cy + size * 0.35f
-    canvas.drawCircle(cx, dotY, dotRadius, fillPaint)
-
-    // Inner Arc
-    val r1 = size * 0.38f
-    val rect1 = RectF(cx - r1, dotY - r1, cx + r1, dotY + r1)
-    canvas.drawArc(rect1, 225f, 90f, false, strokePaint)
-
-    // Outer Arc
-    val r2 = size * 0.68f
-    val rect2 = RectF(cx - r2, dotY - r2, cx + r2, dotY + r2)
-    canvas.drawArc(rect2, 225f, 90f, false, strokePaint)
+/**
+ * Draws an Android Vector Drawable scaled to [size] centered at ([cx], [cy]) with tint [color].
+ */
+private fun drawVectorDrawable(
+    context: Context,
+    canvas: Canvas,
+    @DrawableRes resId: Int,
+    cx: Float,
+    cy: Float,
+    size: Float,
+    color: Int
+) {
+    val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+    drawable.setTint(color)
+    val half = size / 2f
+    drawable.setBounds(
+        (cx - half).toInt(),
+        (cy - half).toInt(),
+        (cx + half).toInt(),
+        (cy + half).toInt()
+    )
+    drawable.draw(canvas)
 }
 
-private fun drawBluetoothGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.12f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    val h = size * 0.85f
-    val w = size * 0.42f
-    val top = cy - h / 2f
-    val bottom = cy + h / 2f
-    val midY = cy
-
-    // Vertical spine
-    canvas.drawLine(cx, top, cx, bottom, strokePaint)
-
-    // Upper & Lower wings
-    val path = Path().apply {
-        moveTo(cx - w, top + h * 0.28f)
-        lineTo(cx + w, bottom - h * 0.28f)
-        lineTo(cx, bottom)
-        lineTo(cx, top)
-        lineTo(cx + w, top + h * 0.28f)
-        lineTo(cx - w, bottom - h * 0.28f)
-    }
-    canvas.drawPath(path, strokePaint)
-}
-
-private fun drawTorchGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, isOn: Boolean) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    val h = size * 0.80f
-    val w = size * 0.38f
-    val top = cy - h / 2f
-    val bottom = cy + h / 2f
-
-    // Flashlight handle & head
-    val path = Path().apply {
-        // Head
-        moveTo(cx - w * 0.9f, top)
-        lineTo(cx + w * 0.9f, top)
-        lineTo(cx + w * 0.6f, top + h * 0.28f)
-        // Handle
-        lineTo(cx + w * 0.5f, bottom)
-        lineTo(cx - w * 0.5f, bottom)
-        lineTo(cx - w * 0.6f, top + h * 0.28f)
-        close()
-    }
-    canvas.drawPath(path, paint)
-
-    // Power indicator switch
-    val switchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(cx, cy + h * 0.08f, size * 0.07f, switchPaint)
-
-    // Radiance rays when ON
-    if (isOn) {
-        val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            style = Paint.Style.STROKE
-            strokeWidth = size * 0.09f
-            strokeCap = Paint.Cap.ROUND
-        }
-        canvas.drawLine(cx, top - size * 0.10f, cx, top - size * 0.28f, rayPaint)
-        canvas.drawLine(cx - size * 0.25f, top - size * 0.08f, cx - size * 0.38f, top - size * 0.24f, rayPaint)
-        canvas.drawLine(cx + size * 0.25f, top - size * 0.08f, cx + size * 0.38f, top - size * 0.24f, rayPaint)
-    }
-}
-
-private fun drawSoundGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, mode: AlertSliderMode) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    when (mode) {
-        AlertSliderMode.RING -> {
-            // Bell Body
-            val bellPath = Path().apply {
-                moveTo(cx - size * 0.36f, cy + size * 0.25f)
-                lineTo(cx + size * 0.36f, cy + size * 0.25f)
-                cubicTo(cx + size * 0.28f, cy - size * 0.10f, cx + size * 0.22f, cy - size * 0.38f, cx, cy - size * 0.38f)
-                cubicTo(cx - size * 0.22f, cy - size * 0.38f, cx - size * 0.28f, cy - size * 0.10f, cx - size * 0.36f, cy + size * 0.25f)
+/**
+ * Centralized Icon Mapper for all Toggle Types using the project's vector drawables.
+ */
+private fun drawToggleIcon(
+    context: Context,
+    canvas: Canvas,
+    type: ToggleType,
+    cx: Float,
+    cy: Float,
+    size: Float,
+    color: Int,
+    isEnabled: Boolean,
+    alertMode: AlertSliderMode? = null
+) {
+    val resId = when (type) {
+        ToggleType.WIFI -> R.drawable.ic_wifi
+        ToggleType.BLUETOOTH -> R.drawable.ic_bluetooth
+        ToggleType.TORCH -> R.drawable.ic_flashlight
+        ToggleType.RINGER, ToggleType.ALERT_SLIDER -> {
+            when (alertMode) {
+                AlertSliderMode.SILENT -> R.drawable.ic_bell_off
+                AlertSliderMode.VIBRATE -> R.drawable.ic_phone_vibrate
+                else -> R.drawable.ic_bell
             }
-            canvas.drawPath(bellPath, paint)
-
-            // Clapper Dot
-            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.FILL
-            }
-            canvas.drawCircle(cx, cy + size * 0.38f, size * 0.08f, dotPaint)
-            // Top knot
-            canvas.drawLine(cx, cy - size * 0.38f, cx, cy - size * 0.46f, paint)
         }
-        AlertSliderMode.VIBRATE -> {
-            // Center Phone
-            val phoneRect = RectF(cx - size * 0.22f, cy - size * 0.42f, cx + size * 0.22f, cy + size * 0.42f)
-            canvas.drawRoundRect(phoneRect, size * 0.08f, size * 0.08f, paint)
-
-            // Vibration brackets left & right
-            val waveL = Path().apply {
-                moveTo(cx - size * 0.36f, cy - size * 0.22f)
-                lineTo(cx - size * 0.46f, cy)
-                lineTo(cx - size * 0.36f, cy + size * 0.22f)
-            }
-            canvas.drawPath(waveL, paint)
-
-            val waveR = Path().apply {
-                moveTo(cx + size * 0.36f, cy - size * 0.22f)
-                lineTo(cx + size * 0.46f, cy)
-                lineTo(cx + size * 0.36f, cy + size * 0.22f)
-            }
-            canvas.drawPath(waveR, paint)
-        }
-        AlertSliderMode.SILENT -> {
-            // Muted Bell with Slash
-            val bellPath = Path().apply {
-                moveTo(cx - size * 0.36f, cy + size * 0.25f)
-                lineTo(cx + size * 0.36f, cy + size * 0.25f)
-                cubicTo(cx + size * 0.28f, cy - size * 0.10f, cx + size * 0.22f, cy - size * 0.38f, cx, cy - size * 0.38f)
-                cubicTo(cx - size * 0.22f, cy - size * 0.38f, cx - size * 0.28f, cy - size * 0.10f, cx - size * 0.36f, cy + size * 0.25f)
-            }
-            canvas.drawPath(bellPath, paint)
-
-            // Diagonal slash
-            val slashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.STROKE
-                strokeWidth = size * 0.12f
-                strokeCap = Paint.Cap.ROUND
-            }
-            canvas.drawLine(cx - size * 0.45f, cy + size * 0.45f, cx + size * 0.45f, cy - size * 0.45f, slashPaint)
-        }
+        ToggleType.AUTOROTATE -> if (isEnabled) R.drawable.ic_screen_rotation else R.drawable.ic_screen_rotation_lock
+        ToggleType.HOTSPOT -> if (isEnabled) R.drawable.ic_wifi_tethering else R.drawable.ic_wifi_tethering_off
+        ToggleType.LOCATION -> R.drawable.ic_map_pin
+        ToggleType.DARK_MODE -> if (isEnabled) R.drawable.ic_dark_mode else R.drawable.ic_light_mode
+        ToggleType.AIRPLANE -> R.drawable.ic_airplane
+        ToggleType.TIMEOUT -> R.drawable.ic_phone_lock
+        ToggleType.BATTERY_SAVER -> R.drawable.ic_battery_saver
     }
-}
-
-private fun drawAutoRotateGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, isAuto: Boolean) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    // Tilted Phone Box
-    canvas.save()
-    canvas.rotate(45f, cx, cy)
-    val phoneRect = RectF(cx - size * 0.22f, cy - size * 0.34f, cx + size * 0.22f, cy + size * 0.34f)
-    canvas.drawRoundRect(phoneRect, size * 0.06f, size * 0.06f, paint)
-    canvas.restore()
-
-    // Curved Orbit Arrows
-    val r = size * 0.48f
-    val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
-
-    // Top Right Arc
-    canvas.drawArc(arcRect, 270f, 75f, false, paint)
-    // Bottom Left Arc
-    canvas.drawArc(arcRect, 90f, 75f, false, paint)
-
-    // Arrowheads
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-    // Top arrow
-    val arrowTop = Path().apply {
-        moveTo(cx + r * 0.95f, cy - r * 0.35f)
-        lineTo(cx + r * 1.15f, cy - r * 0.05f)
-        lineTo(cx + r * 0.75f, cy - r * 0.05f)
-        close()
-    }
-    canvas.drawPath(arrowTop, fillPaint)
-}
-
-private fun drawHotspotGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.11f
-        strokeCap = Paint.Cap.ROUND
-    }
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-
-    // Center node
-    canvas.drawCircle(cx, cy, size * 0.14f, fillPaint)
-
-    // Outer Waves
-    val r1 = size * 0.34f
-    val rect1 = RectF(cx - r1, cy - r1, cx + r1, cy + r1)
-    canvas.drawArc(rect1, 135f, 90f, false, strokePaint)
-    canvas.drawArc(rect1, 315f, 90f, false, strokePaint)
-
-    val r2 = size * 0.54f
-    val rect2 = RectF(cx - r2, cy - r2, cx + r2, cy + r2)
-    canvas.drawArc(rect2, 135f, 90f, false, strokePaint)
-    canvas.drawArc(rect2, 315f, 90f, false, strokePaint)
-}
-
-private fun drawAirplaneGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-    val path = Path().apply {
-        moveTo(cx, cy - size * 0.44f) // Nose
-        lineTo(cx + size * 0.08f, cy - size * 0.15f)
-        lineTo(cx + size * 0.45f, cy + size * 0.08f) // Right wing tip
-        lineTo(cx + size * 0.45f, cy + size * 0.18f)
-        lineTo(cx + size * 0.08f, cy + size * 0.08f)
-        lineTo(cx + size * 0.08f, cy + size * 0.32f)
-        lineTo(cx + size * 0.22f, cy + size * 0.42f) // Right tail
-        lineTo(cx + size * 0.22f, cy + size * 0.48f)
-        lineTo(cx, cy + size * 0.42f)
-        lineTo(cx - size * 0.22f, cy + size * 0.48f)
-        lineTo(cx - size * 0.22f, cy + size * 0.42f) // Left tail
-        lineTo(cx - size * 0.08f, cy + size * 0.32f)
-        lineTo(cx - size * 0.08f, cy + size * 0.08f)
-        lineTo(cx - size * 0.45f, cy + size * 0.18f)
-        lineTo(cx - size * 0.45f, cy + size * 0.08f) // Left wing tip
-        lineTo(cx - size * 0.08f, cy - size * 0.15f)
-        close()
-    }
-    canvas.drawPath(path, fillPaint)
-}
-
-private fun drawDarkModeGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, isDark: Boolean) {
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-    if (isDark) {
-        // Crescent Moon
-        val r = size * 0.40f
-        val moonPath = Path().apply {
-            addCircle(cx, cy, r, Path.Direction.CW)
-        }
-        val cutoutPath = Path().apply {
-            addCircle(cx + r * 0.55f, cy - r * 0.35f, r * 0.85f, Path.Direction.CW)
-        }
-        moonPath.op(cutoutPath, Path.Op.DIFFERENCE)
-        canvas.drawPath(moonPath, fillPaint)
-    } else {
-        // Sun with rays
-        val r = size * 0.25f
-        canvas.drawCircle(cx, cy, r, fillPaint)
-
-        val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            style = Paint.Style.STROKE
-            strokeWidth = size * 0.10f
-            strokeCap = Paint.Cap.ROUND
-        }
-        for (i in 0 until 8) {
-            val angle = Math.toRadians((i * 45).toDouble())
-            val x1 = cx + (r * 1.35f) * Math.cos(angle).toFloat()
-            val y1 = cy + (r * 1.35f) * Math.sin(angle).toFloat()
-            val x2 = cx + (r * 1.75f) * Math.cos(angle).toFloat()
-            val y2 = cy + (r * 1.75f) * Math.sin(angle).toFloat()
-            canvas.drawLine(x1, y1, x2, y2, rayPaint)
-        }
-    }
-}
-
-private fun drawLocationGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-
-    val r = size * 0.32f
-    val pinY = cy - size * 0.10f
-    val path = Path().apply {
-        arcTo(RectF(cx - r, pinY - r, cx + r, pinY + r), 140f, 260f)
-        lineTo(cx, cy + size * 0.44f)
-        close()
-    }
-    canvas.drawPath(path, paint)
-    canvas.drawCircle(cx, pinY, size * 0.11f, fillPaint)
-}
-
-private fun drawTimeoutGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-    val r = size * 0.42f
-    canvas.drawCircle(cx, cy, r, paint)
-
-    // Clock Hands (12 & 3)
-    val handPath = Path().apply {
-        moveTo(cx, cy - r * 0.65f)
-        lineTo(cx, cy)
-        lineTo(cx + r * 0.55f, cy)
-    }
-    canvas.drawPath(handPath, paint)
-}
-
-private fun drawBatterySaverGlyph(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = size * 0.10f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-
-    // Battery Body
-    val w = size * 0.70f
-    val h = size * 0.40f
-    val rect = RectF(cx - w / 2f, cy - h / 2f, cx + w / 2f - size * 0.08f, cy + h / 2f)
-    canvas.drawRoundRect(rect, size * 0.08f, size * 0.08f, paint)
-
-    // Battery Tip
-    val tipRect = RectF(cx + w / 2f - size * 0.08f, cy - h * 0.22f, cx + w / 2f, cy + h * 0.22f)
-    canvas.drawRoundRect(tipRect, size * 0.04f, size * 0.04f, fillPaint)
-
-    // Lightning Bolt in center
-    val bolt = Path().apply {
-        moveTo(cx - size * 0.02f, cy - size * 0.16f)
-        lineTo(cx - size * 0.14f, cy + size * 0.02f)
-        lineTo(cx - size * 0.02f, cy + size * 0.02f)
-        lineTo(cx - size * 0.06f, cy + size * 0.18f)
-        lineTo(cx + size * 0.12f, cy - size * 0.02f)
-        lineTo(cx + size * 0.00f, cy - size * 0.02f)
-        close()
-    }
-    canvas.drawPath(bolt, fillPaint)
+    drawVectorDrawable(context, canvas, resId, cx, cy, size, color)
 }
 
 // =========================================================================
@@ -528,22 +198,22 @@ fun generateControlCenterDeckBitmap(
         }
 
         // Draw Icon
-        val iconSize = minOf(cellW * 0.38f, cellH * 0.42f)
+        val iconSize = minOf(cellW * 0.38f, cellH * 0.44f)
         val iconCx = cellRect.left + cellW * 0.28f
         val iconCy = cellRect.centerY()
         val iconColor = if (isEnabled) accentColor else secondaryTextColor
 
-        when (item.type) {
-            ToggleType.WIFI -> drawWifiGlyph(canvas, iconCx, iconCy, iconSize, iconColor, isEnabled)
-            ToggleType.BLUETOOTH -> drawBluetoothGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            ToggleType.TORCH -> drawTorchGlyph(canvas, iconCx, iconCy, iconSize, iconColor, isEnabled)
-            ToggleType.RINGER -> drawSoundGlyph(canvas, iconCx, iconCy, iconSize, iconColor, state.alertSlider)
-            ToggleType.AUTOROTATE -> drawAutoRotateGlyph(canvas, iconCx, iconCy, iconSize, iconColor, isEnabled)
-            ToggleType.HOTSPOT -> drawHotspotGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            ToggleType.LOCATION -> drawLocationGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            ToggleType.DARK_MODE -> drawDarkModeGlyph(canvas, iconCx, iconCy, iconSize, iconColor, isEnabled)
-            else -> {}
-        }
+        drawToggleIcon(
+            context = context,
+            canvas = canvas,
+            type = item.type,
+            cx = iconCx,
+            cy = iconCy,
+            size = iconSize,
+            color = iconColor,
+            isEnabled = isEnabled,
+            alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+        )
 
         // Draw Texts (Label + Subtitle)
         val textLeft = cellRect.left + cellW * 0.52f
@@ -636,17 +306,20 @@ fun generateMinimalistToolbarBitmap(
 
         val cx = pillRect.centerX()
         val cy = pillRect.centerY() - 2f * scaleFactor
-        val iconSize = pillH * 0.40f
+        val iconSize = pillH * 0.42f
         val iconColor = if (isEnabled) accentColor else secondaryTextColor
 
-        when (item.type) {
-            ToggleType.WIFI -> drawWifiGlyph(canvas, cx, cy, iconSize, iconColor, isEnabled)
-            ToggleType.BLUETOOTH -> drawBluetoothGlyph(canvas, cx, cy, iconSize, iconColor)
-            ToggleType.TORCH -> drawTorchGlyph(canvas, cx, cy, iconSize, iconColor, isEnabled)
-            ToggleType.RINGER -> drawSoundGlyph(canvas, cx, cy, iconSize, iconColor, state.alertSlider)
-            ToggleType.AUTOROTATE -> drawAutoRotateGlyph(canvas, cx, cy, iconSize, iconColor, isEnabled)
-            else -> {}
-        }
+        drawToggleIcon(
+            context = context,
+            canvas = canvas,
+            type = item.type,
+            cx = cx,
+            cy = cy,
+            size = iconSize,
+            color = iconColor,
+            isEnabled = isEnabled,
+            alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+        )
 
         // Active Status Dot underneath
         if (isEnabled) {
@@ -704,7 +377,7 @@ fun generateConnectivityBentoBitmap(
     val iconCx = topTileRect.left + topTileRect.height() * 0.42f
     val iconCy = topTileRect.centerY()
     val iconSize = topTileRect.height() * 0.44f
-    drawWifiGlyph(canvas, iconCx, iconCy, iconSize, if (state.wifi.isEnabled) accentColor else secondaryTextColor, state.wifi.isEnabled)
+    drawVectorDrawable(context, canvas, R.drawable.ic_wifi, iconCx, iconCy, iconSize, if (state.wifi.isEnabled) accentColor else secondaryTextColor)
 
     val textX = iconCx + topTileRect.height() * 0.42f
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -729,7 +402,7 @@ fun generateConnectivityBentoBitmap(
 
     val btIconCx = bottomTileRect.left + bottomTileRect.height() * 0.42f
     val btIconCy = bottomTileRect.centerY()
-    drawBluetoothGlyph(canvas, btIconCx, btIconCy, iconSize, if (state.bluetooth.isEnabled) accentColor else secondaryTextColor)
+    drawVectorDrawable(context, canvas, R.drawable.ic_bluetooth, btIconCx, btIconCy, iconSize, if (state.bluetooth.isEnabled) accentColor else secondaryTextColor)
 
     canvas.drawText("Bluetooth", textX, bottomTileRect.centerY() - 2f * scaleFactor, titlePaint)
     subPaint.color = if (state.bluetooth.isEnabled) accentColor else secondaryTextColor
@@ -799,16 +472,20 @@ fun generateQuadActionMatrixBitmap(
 
         val iconCx = rect.centerX()
         val iconCy = rect.centerY() - 8f * scaleFactor
-        val iconSize = cellH * 0.38f
+        val iconSize = cellH * 0.40f
         val color = if (isEnabled) accentColor else secondaryTextColor
 
-        when (item.type) {
-            ToggleType.WIFI -> drawWifiGlyph(canvas, iconCx, iconCy, iconSize, color, isEnabled)
-            ToggleType.BLUETOOTH -> drawBluetoothGlyph(canvas, iconCx, iconCy, iconSize, color)
-            ToggleType.TORCH -> drawTorchGlyph(canvas, iconCx, iconCy, iconSize, color, isEnabled)
-            ToggleType.RINGER -> drawSoundGlyph(canvas, iconCx, iconCy, iconSize, color, state.alertSlider)
-            else -> {}
-        }
+        drawToggleIcon(
+            context = context,
+            canvas = canvas,
+            type = item.type,
+            cx = iconCx,
+            cy = iconCy,
+            size = iconSize,
+            color = color,
+            isEnabled = isEnabled,
+            alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+        )
 
         val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = if (isEnabled) primaryTextColor else secondaryTextColor
@@ -855,13 +532,11 @@ fun generateAlertSliderHorizontalBitmap(
 
     val fontBold = getSlateFont(context, 700)
 
-    // Slider Track Container
     val trackPadH = 14f * scaleFactor
     val trackPadV = 16f * scaleFactor
     val trackRect = RectF(cardRect.left + trackPadH, cardRect.top + trackPadV, cardRect.right - trackPadH, cardRect.bottom - trackPadV)
     val trackRadius = trackRect.height() / 2f
 
-    // Track Background (Sunken groove)
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(32, 255, 255, 255)
         style = Paint.Style.FILL
@@ -894,9 +569,15 @@ fun generateAlertSliderHorizontalBitmap(
         val nCx = trackRect.left + i * notchW + notchW / 2f
         val isCurrent = (i == activeIdx)
 
-        val iconSize = thumbRect.height() * 0.38f
+        val iconSize = thumbRect.height() * 0.40f
         val iconColor = if (isCurrent) Color.BLACK else secondaryTextColor
-        drawSoundGlyph(canvas, nCx, trackRect.centerY() - 6f * scaleFactor, iconSize, iconColor, nMode)
+
+        val resId = when (nMode) {
+            AlertSliderMode.SILENT -> R.drawable.ic_bell_off
+            AlertSliderMode.VIBRATE -> R.drawable.ic_phone_vibrate
+            AlertSliderMode.RING -> R.drawable.ic_bell
+        }
+        drawVectorDrawable(context, canvas, resId, nCx, trackRect.centerY() - 6f * scaleFactor, iconSize, iconColor)
 
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = if (isCurrent) Color.BLACK else secondaryTextColor
@@ -955,7 +636,6 @@ fun generateAlertSliderVerticalBitmap(
 
     val notchCount = 3
     val notchH = trackRect.height() / notchCount.toFloat()
-    // Top is Ring, Middle is Vibrate, Bottom is Silent
     val modes = listOf(AlertSliderMode.RING, AlertSliderMode.VIBRATE, AlertSliderMode.SILENT)
     val activeIdx = modes.indexOf(mode)
 
@@ -980,9 +660,15 @@ fun generateAlertSliderVerticalBitmap(
         val nCy = trackRect.top + i * notchH + notchH / 2f
         val isCurrent = (i == activeIdx)
 
-        val iconSize = thumbRect.width() * 0.40f
+        val iconSize = thumbRect.width() * 0.42f
         val iconColor = if (isCurrent) Color.BLACK else secondaryTextColor
-        drawSoundGlyph(canvas, trackRect.centerX(), nCy - 4f * scaleFactor, iconSize, iconColor, nMode)
+
+        val resId = when (nMode) {
+            AlertSliderMode.RING -> R.drawable.ic_bell
+            AlertSliderMode.VIBRATE -> R.drawable.ic_phone_vibrate
+            AlertSliderMode.SILENT -> R.drawable.ic_bell_off
+        }
+        drawVectorDrawable(context, canvas, resId, trackRect.centerX(), nCy - 4f * scaleFactor, iconSize, iconColor)
 
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = if (isCurrent) Color.BLACK else secondaryTextColor
@@ -1054,9 +740,9 @@ fun generateFlashlightTorchBitmap(
     canvas.drawCircle(cx, cy, btnRadius, ringPaint)
 
     // Torch Icon
-    val iconSize = btnRadius * 0.90f
+    val iconSize = btnRadius * 0.95f
     val iconColor = if (isTorchOn) Color.BLACK else secondaryTextColor
-    drawTorchGlyph(canvas, cx, cy, iconSize, iconColor, isTorchOn)
+    drawVectorDrawable(context, canvas, R.drawable.ic_flashlight, cx, cy, iconSize, iconColor)
 
     // Label Underneath
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1122,17 +808,20 @@ fun generateTogglePillBitmap(
     val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = badgeBg }
     canvas.drawCircle(iconCx, iconCy, iconR, badgePaint)
 
-    val iconSize = iconR * 1.15f
+    val iconSize = iconR * 1.18f
     val iconColor = if (item.isEnabled) accentColor else secondaryTextColor
 
-    when (item.type) {
-        ToggleType.WIFI -> drawWifiGlyph(canvas, iconCx, iconCy, iconSize, iconColor, item.isEnabled)
-        ToggleType.BLUETOOTH -> drawBluetoothGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-        ToggleType.TORCH -> drawTorchGlyph(canvas, iconCx, iconCy, iconSize, iconColor, item.isEnabled)
-        ToggleType.RINGER -> drawSoundGlyph(canvas, iconCx, iconCy, iconSize, iconColor, AlertSliderMode.RING)
-        ToggleType.AUTOROTATE -> drawAutoRotateGlyph(canvas, iconCx, iconCy, iconSize, iconColor, item.isEnabled)
-        else -> {}
-    }
+    drawToggleIcon(
+        context = context,
+        canvas = canvas,
+        type = item.type,
+        cx = iconCx,
+        cy = iconCy,
+        size = iconSize,
+        color = iconColor,
+        isEnabled = item.isEnabled,
+        alertMode = AlertSliderMode.RING
+    )
 
     // Texts
     val textLeft = iconCx + iconR + 12f * scaleFactor
@@ -1233,18 +922,19 @@ fun generateSystemUtilityDeckBitmap(
 
         val iconCx = rect.left + rect.height() * 0.38f
         val iconCy = rect.centerY()
-        val iconSize = rect.height() * 0.40f
+        val iconSize = rect.height() * 0.42f
         val iconColor = if (isEnabled) accentColor else secondaryTextColor
 
-        when (item.type) {
-            ToggleType.TIMEOUT -> drawTimeoutGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            ToggleType.AUTOROTATE -> drawAutoRotateGlyph(canvas, iconCx, iconCy, iconSize, iconColor, isEnabled)
-            ToggleType.BATTERY_SAVER -> drawBatterySaverGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            ToggleType.DARK_MODE -> drawDarkModeGlyph(canvas, iconCx, iconCy, iconSize, iconColor, isEnabled)
-            ToggleType.AIRPLANE -> drawAirplaneGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            ToggleType.HOTSPOT -> drawHotspotGlyph(canvas, iconCx, iconCy, iconSize, iconColor)
-            else -> {}
-        }
+        drawToggleIcon(
+            context = context,
+            canvas = canvas,
+            type = item.type,
+            cx = iconCx,
+            cy = iconCy,
+            size = iconSize,
+            color = iconColor,
+            isEnabled = isEnabled
+        )
 
         val textLeft = iconCx + rect.height() * 0.35f
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1294,14 +984,20 @@ fun generateMicroToggleBitmap(
 
     val cx = cardRect.centerX()
     val cy = cardRect.centerY() - 7f * scaleFactor
-    val iconSize = cardRect.width() * 0.38f
+    val iconSize = cardRect.width() * 0.42f
     val iconColor = if (item.isEnabled) accentColor else secondaryTextColor
 
-    if (item.type == ToggleType.TORCH) {
-        drawTorchGlyph(canvas, cx, cy, iconSize, iconColor, item.isEnabled)
-    } else if (item.type == ToggleType.RINGER) {
-        drawSoundGlyph(canvas, cx, cy, iconSize, iconColor, alertMode ?: AlertSliderMode.RING)
-    }
+    drawToggleIcon(
+        context = context,
+        canvas = canvas,
+        type = item.type,
+        cx = cx,
+        cy = cy,
+        size = iconSize,
+        color = iconColor,
+        isEnabled = item.isEnabled,
+        alertMode = alertMode
+    )
 
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = if (item.isEnabled) primaryTextColor else secondaryTextColor
