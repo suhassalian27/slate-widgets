@@ -161,7 +161,11 @@ data class ProductivityWidgetConfig(
     val showBookmarkFavicons: Boolean = true,
     val showBookmarkUrl: Boolean = true,
     val bookmarkPageIndex: Int = 0,
-    val clipboardSnippets: List<ClipboardSnippetItem> = emptyList(),
+    val clipboardSnippets: List<ClipboardSnippetItem> = listOf(
+        ClipboardSnippetItem("c1", "Email", "hello@example.com"),
+        ClipboardSnippetItem("c2", "Address", "742 Evergreen Terrace")
+    ),
+    val clipboardPageIndex: Int = 0, // <-- ADD THIS
     val screenTime: ScreenTimeData = ScreenTimeData()
 ) {
     companion object {
@@ -596,6 +600,7 @@ object ProductivityStorageManager {
             })
         }
         root.put("clipboardSnippets", sArr)
+        root.put("clipboardPageIndex", config.clipboardPageIndex)
 
         return root.toString()
     }
@@ -749,6 +754,8 @@ object ProductivityStorageManager {
                 }
             }
 
+            val clipPageIndex = root.optInt("clipboardPageIndex", 0)
+
             ProductivityWidgetConfig(
                 focusTimer = timer,
                 habit = habit,
@@ -763,11 +770,36 @@ object ProductivityStorageManager {
                 showBookmarkUrl = showUrl,
                 bookmarkPageIndex = pageIndex,
                 clipboardSnippets = if (sList.isNotEmpty()) sList else ProductivityWidgetConfig.getDefaultConfig().clipboardSnippets,
+                clipboardPageIndex = clipPageIndex,
                 screenTime = ScreenTimeData()
             )
         } catch (_: Exception) {
             ProductivityWidgetConfig.getDefaultConfig()
         }
+    }
+
+    fun cycleClipboardPage(context: Context, widgetId: Int, delta: Int) {
+        val current = getConfig(context, widgetId)
+        val pageSize = 4 // Shows 4 snippets per page
+        val totalPages = kotlin.math.ceil(current.clipboardSnippets.size / pageSize.toFloat()).toInt().coerceAtLeast(1)
+        var newPage = current.clipboardPageIndex + delta
+        if (newPage >= totalPages) newPage = 0
+        if (newPage < 0) newPage = totalPages - 1
+        saveConfig(context, widgetId, current.copy(clipboardPageIndex = newPage))
+    }
+
+    fun copySnippetBySlot(context: Context, widgetId: Int, slotIndex: Int) {
+        val config = getConfig(context, widgetId)
+        val pageSize = 4 // Shows 4 snippets per page
+        val realIndex = (config.clipboardPageIndex * pageSize) + slotIndex
+        val snippet = config.clipboardSnippets.getOrNull(realIndex) ?: return
+        try {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = ClipData.newPlainText(snippet.label.ifBlank { "Slate" }, snippet.content)
+            cm?.setPrimaryClip(clip)
+            val displayName = snippet.label.ifBlank { snippet.content.take(16) }
+            Toast.makeText(context, "Copied \"$displayName\"", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {}
     }
 }
 

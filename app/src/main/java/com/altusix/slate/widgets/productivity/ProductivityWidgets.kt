@@ -853,11 +853,23 @@ class ProductivityScreenTimeReceiver : BaseProductivityReceiver(R.layout.widget_
 }
 
 // =========================================================================
-// 11. CLIPBOARD VAULT (2x2)
+// 11. CLIPBOARD (4-Card Bento Deck: Touch & Pagination Routing)
 // =========================================================================
 
-class ProductivityClipboardReceiver : BaseProductivityReceiver(R.layout.widget_productivity_clipboard_layout, targetAspect = 1.0f) {
+class ProductivityClipboardReceiver : BaseProductivityReceiver(
+    layoutResId = R.layout.widget_productivity_clipboard_layout,
+    targetAspect = 2.0f
+) {
     override val defaultTab: String = "CLIPBOARD"
+
+    companion object {
+        const val ACTION_CLIPBOARD_PREV = "com.altusix.slate.productivity.ACTION_CLIPBOARD_PREV"
+        const val ACTION_CLIPBOARD_NEXT = "com.altusix.slate.productivity.ACTION_CLIPBOARD_NEXT"
+        const val ACTION_CLIPBOARD_COPY_0 = "com.altusix.slate.productivity.ACTION_CLIPBOARD_COPY_0"
+        const val ACTION_CLIPBOARD_COPY_1 = "com.altusix.slate.productivity.ACTION_CLIPBOARD_COPY_1"
+        const val ACTION_CLIPBOARD_COPY_2 = "com.altusix.slate.productivity.ACTION_CLIPBOARD_COPY_2"
+        const val ACTION_CLIPBOARD_COPY_3 = "com.altusix.slate.productivity.ACTION_CLIPBOARD_COPY_3"
+    }
 
     override fun renderWidgetBitmap(
         context: Context,
@@ -868,39 +880,118 @@ class ProductivityClipboardReceiver : BaseProductivityReceiver(R.layout.widget_p
         hDp: Int
     ): Bitmap {
         val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
-        return generateClipboardVaultBitmap(context, prodConfig.clipboardSnippets, config, isResponsive, wDp, hDp)
+        return generateClipboardVaultBitmap(context, prodConfig, config, isResponsive, wDp, hDp)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            when (intent.action) {
+                ACTION_CLIPBOARD_PREV -> {
+                    ProductivityStorageManager.cycleClipboardPage(context, appWidgetId, -1)
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+                ACTION_CLIPBOARD_NEXT -> {
+                    ProductivityStorageManager.cycleClipboardPage(context, appWidgetId, 1)
+                    updateSingleWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
+                    return
+                }
+                ACTION_CLIPBOARD_COPY_0 -> {
+                    ProductivityStorageManager.copySnippetBySlot(context, appWidgetId, 0)
+                    return
+                }
+                ACTION_CLIPBOARD_COPY_1 -> {
+                    ProductivityStorageManager.copySnippetBySlot(context, appWidgetId, 1)
+                    return
+                }
+                ACTION_CLIPBOARD_COPY_2 -> {
+                    ProductivityStorageManager.copySnippetBySlot(context, appWidgetId, 2)
+                    return
+                }
+                ACTION_CLIPBOARD_COPY_3 -> {
+                    ProductivityStorageManager.copySnippetBySlot(context, appWidgetId, 3)
+                    return
+                }
+            }
+        }
+        super.onReceive(context, intent)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        val openIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
+        val prodConfig = ProductivityStorageManager.getConfig(context, appWidgetId)
+        val snippets = prodConfig.clipboardSnippets
+        val pageSize = 4
+        val totalPages = kotlin.math.ceil(snippets.size / pageSize.toFloat()).toInt().coerceAtLeast(1)
+        val validPage = prodConfig.clipboardPageIndex.coerceIn(0, totalPages - 1)
+
+        // 1. Intent to Open Configuration Studio
+        val openConfigIntent = Intent(context, ProductivityConfigActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             putExtra(EXTRA_TAB, "CLIPBOARD")
             data = Uri.parse("slate_prod://$appWidgetId/clipboard_edit")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val openPi = PendingIntent.getActivity(
+        val openConfigPi = PendingIntent.getActivity(
             context,
             appWidgetId * 100 + 1,
-            openIntent,
+            openConfigIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.btn_clip_header, openPi)
+        views.setOnClickPendingIntent(R.id.btn_clipboard_header, openConfigPi)
 
-        val clipTargets = listOf(R.id.btn_clip_0, R.id.btn_clip_1)
-        for (i in clipTargets.indices) {
-            val copyIntent = Intent(context, this.javaClass).apply {
-                action = ACTION_COPY_CLIPBOARD
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                putExtra(EXTRA_INDEX, i)
-                data = Uri.parse("slate_prod://$appWidgetId/clip_copy_$i")
+        // 2. Pagination Buttons
+        val prevIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_CLIPBOARD_PREV
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/clipboard_prev")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_clipboard_prev,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 10, prevIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        val nextIntent = Intent(context, this.javaClass).apply {
+            action = ACTION_CLIPBOARD_NEXT
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("slate_prod://$appWidgetId/clipboard_next")
+        }
+        views.setOnClickPendingIntent(
+            R.id.btn_clipboard_next,
+            PendingIntent.getBroadcast(context, appWidgetId * 100 + 11, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        )
+
+        // 3. Four Slots (Copy if filled; Open Studio if empty '+ Add')
+        val slotIds = listOf(
+            R.id.btn_clipboard_slot_0,
+            R.id.btn_clipboard_slot_1,
+            R.id.btn_clipboard_slot_2,
+            R.id.btn_clipboard_slot_3
+        )
+        val actions = listOf(
+            ACTION_CLIPBOARD_COPY_0,
+            ACTION_CLIPBOARD_COPY_1,
+            ACTION_CLIPBOARD_COPY_2,
+            ACTION_CLIPBOARD_COPY_3
+        )
+
+        val pageOffset = validPage * pageSize
+        for (i in 0 until 4) {
+            val item = snippets.getOrNull(pageOffset + i)
+            if (item != null && item.content.isNotBlank()) {
+                val copyIntent = Intent(context, this.javaClass).apply {
+                    action = actions[i]
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    data = Uri.parse("slate_prod://$appWidgetId/clipboard_copy_$i")
+                }
+                views.setOnClickPendingIntent(
+                    slotIds[i],
+                    PendingIntent.getBroadcast(context, appWidgetId * 100 + 20 + i, copyIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                )
+            } else {
+                // Clicking an empty '+ Add' card opens the configuration screen
+                views.setOnClickPendingIntent(slotIds[i], openConfigPi)
             }
-            val copyPi = PendingIntent.getBroadcast(
-                context,
-                appWidgetId * 100 + 30 + i,
-                copyIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(clipTargets[i], copyPi)
         }
     }
 }

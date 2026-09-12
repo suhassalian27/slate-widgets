@@ -2500,12 +2500,12 @@ private fun drawSpectrumRibbon(
 }
 
 // =========================================================================
-// 11. CLIPBOARD VAULT (2x2)
+// 11. CLIPBOARD (4x2 Minimalist 4-Card Bento Deck)
 // =========================================================================
 
 fun generateClipboardVaultBitmap(
     context: Context,
-    snippets: List<ClipboardSnippetItem>,
+    prodConfig: ProductivityWidgetConfig,
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
@@ -2515,72 +2515,263 @@ fun generateClipboardVaultBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    // 4x2 Fixed Aspect (2.0:1) vs Responsive Outer Bounds
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // 1. Header
-    val headerY = cardRect.top + 16f * scaleFactor
-    drawClipboardIcon(canvas, cardRect.left + 22f * scaleFactor, headerY + 8f * scaleFactor, 14f * scaleFactor, accentColor, scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardH, cardW * 0.55f)
+
+    // 1. Uniform Symmetrical Insets
+    val padX = (cardW * 0.048f).coerceIn(10f * scaleFactor, 18f * scaleFactor)
+    val padY = (cardH * 0.075f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    val contentLeft = cardRect.left + padX
+    val contentRight = cardRect.right - padX
+    val contentTop = cardRect.top + padY
+    val contentBottom = cardRect.bottom - padY
+
+    val availW = contentRight - contentLeft
+    val availH = contentBottom - contentTop
+
+    // 2. Pagination Calculations (4 snippets per page)
+    val snippets = prodConfig.clipboardSnippets
+    val pageSize = 4
+    val totalPages = kotlin.math.ceil(snippets.size / pageSize.toFloat()).toInt().coerceAtLeast(1)
+    val currentPage = prodConfig.clipboardPageIndex.coerceIn(0, totalPages - 1)
+
+    // 3. Header: Clean "CLIPBOARD" Text Only (No Icon, No "Saved" text)
+    val headerH = (baseDim * 0.20f).coerceIn(20f * scaleFactor, 34f * scaleFactor)
+    val titleSize = (headerH * 0.52f).coerceIn(11f * scaleFactor, 15f * scaleFactor)
 
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = 13f * scaleFactor
-        typeface = getSlateFont(context, 700)
+        textSize = titleSize
+        typeface = getSlateFont(context, 800)
+        letterSpacing = 0.05f
     }
-    canvas.drawText("CLIPBOARD VAULT", cardRect.left + 36f * scaleFactor, headerY + 12f * scaleFactor, titlePaint)
+    val titleBaseline = contentTop + (headerH * 0.70f)
+    canvas.drawText("CLIPBOARD", contentLeft, titleBaseline, titlePaint)
 
-    // 2. Pinned Snippet Cards (Display 2 snippets)
-    val snippetStartY = headerY + 28f * scaleFactor
-    val snippetH = (cardRect.bottom - snippetStartY - 14f * scaleFactor) / 2f
-
-    for (i in 0 until minOf(2, snippets.size)) {
-        val snippet = snippets[i]
-        val sTop = snippetStartY + i * snippetH
-        val sRect = RectF(cardRect.left + 14f * scaleFactor, sTop + 3f * scaleFactor, cardRect.right - 14f * scaleFactor, sTop + snippetH - 3f * scaleFactor)
-
-        val sBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(25, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(sRect, 10f * scaleFactor, 10f * scaleFactor, sBgPaint)
-
-        // Snippet Label
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
-            textSize = 10f * scaleFactor
-            typeface = getSlateFont(context, 700)
-        }
-        canvas.drawText(snippet.label.uppercase(Locale.getDefault()), sRect.left + 10f * scaleFactor, sRect.top + 14f * scaleFactor, labelPaint)
-
-        // Snippet Content preview
-        val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = primaryTextColor
-            textSize = 11.5f * scaleFactor
-            typeface = getSlateFont(context, 500)
-        }
-        var displayContent = snippet.content.replace("\n", " ")
-        val maxContentW = sRect.width() - 44f * scaleFactor
-        while (displayContent.isNotEmpty() && contentPaint.measureText("$displayContent…") > maxContentW) {
-            displayContent = displayContent.dropLast(1)
-        }
-        canvas.drawText(if (displayContent != snippet.content.replace("\n", " ")) "$displayContent…" else displayContent, sRect.left + 10f * scaleFactor, sRect.top + 29f * scaleFactor, contentPaint)
-
-        // Copy icon pill on right
-        val copyX = sRect.right - 24f * scaleFactor
-        val copyY = sRect.centerY()
-        val copyTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Interactive Slide Indicators (< 1/3 >) only when more than 1 page exists
+    if (totalPages > 1) {
+        val pageTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = secondaryTextColor
-            textSize = 12f * scaleFactor
+            textSize = (titleSize * 0.85f).coerceIn(9f * scaleFactor, 12f * scaleFactor)
             typeface = getSlateFont(context, 700)
-            textAlign = Paint.Align.CENTER
+            textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText("📋", copyX, copyY + 4f * scaleFactor, copyTextPaint)
+
+        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            style = Paint.Style.STROKE
+            strokeWidth = 1.6f * scaleFactor
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        val btnR = headerH * 0.38f
+        val nextCx = contentRight - btnR
+        val nextCy = contentTop + (headerH / 2f)
+        val prevCx = nextCx - (btnR * 2.5f)
+        val prevCy = nextCy
+        val arrowSize = btnR * 0.32f
+
+        // Draw Right Arrow >
+        val nextPath = Path().apply {
+            moveTo(nextCx - (arrowSize * 0.6f), nextCy - arrowSize)
+            lineTo(nextCx + (arrowSize * 0.6f), nextCy)
+            lineTo(nextCx - (arrowSize * 0.6f), nextCy + arrowSize)
+        }
+        canvas.drawPath(nextPath, arrowPaint)
+
+        // Draw Left Arrow <
+        val prevPath = Path().apply {
+            moveTo(prevCx + (arrowSize * 0.6f), prevCy - arrowSize)
+            lineTo(prevCx - (arrowSize * 0.6f), prevCy)
+            lineTo(prevCx + (arrowSize * 0.6f), prevCy + arrowSize)
+        }
+        canvas.drawPath(prevPath, arrowPaint)
+
+        val pageStr = "${currentPage + 1}/${totalPages}"
+        val pageBaseline = nextCy - ((pageTextPaint.fontMetrics.ascent + pageTextPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(pageStr, prevCx - (btnR * 1.5f), pageBaseline, pageTextPaint)
+    }
+
+    // 4. 2x2 Bento Grid Layout (4 Snippet Cards per page)
+    val gridTop = contentTop + headerH + (baseDim * 0.04f)
+    val gridBottom = contentBottom
+    val gridAvailH = gridBottom - gridTop
+
+    val colGap = (cardW * 0.024f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val rowGap = (cardH * 0.038f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+
+    val itemW = (availW - colGap) / 2f
+    val itemH = (gridAvailH - rowGap) / 2f
+    val itemRadius = (itemH * 0.28f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
+    }
+
+    val pageOffset = currentPage * pageSize
+
+    for (row in 0 until 2) {
+        for (col in 0 until 2) {
+            val slotIndex = (row * 2) + col
+            val snippetIndex = pageOffset + slotIndex
+            val snippet = snippets.getOrNull(snippetIndex)
+
+            val boxLeft = contentLeft + col * (itemW + colGap)
+            val boxTop = gridTop + row * (itemH + rowGap)
+            val boxRect = RectF(boxLeft, boxTop, boxLeft + itemW, boxTop + itemH)
+
+            if (snippet != null && snippet.content.isNotBlank()) {
+                canvas.drawRoundRect(boxRect, itemRadius, itemRadius, cardBgPaint)
+                canvas.drawRoundRect(boxRect, itemRadius, itemRadius, cardBorderPaint)
+
+                val innerPadX = 12f * scaleFactor
+                val innerPadY = (itemH * 0.16f).coerceIn(6f * scaleFactor, 11f * scaleFactor)
+
+                // "COPY" Pill on the top-right
+                val copyPillText = "COPY"
+                val pillTextSize = (itemH * 0.20f).coerceIn(8.5f * scaleFactor, 11f * scaleFactor)
+                val copyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.argb(180, 0, 0, 0) else Color.argb(200, 255, 255, 255)
+                    textSize = pillTextSize
+                    typeface = getSlateFont(context, 800)
+                    letterSpacing = 0.05f
+                }
+                val copyW = copyPaint.measureText(copyPillText)
+                val pillH = pillTextSize * 1.55f
+                val pillW = copyW + (10f * scaleFactor)
+                val pillRight = boxRect.right - innerPadX
+                val pillTop = boxRect.top + innerPadY
+                val pillRect = RectF(pillRight - pillW, pillTop, pillRight, pillTop + pillH)
+
+                val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+                    style = Paint.Style.FILL
+                }
+                canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBgPaint)
+
+                val copyBaseline = pillRect.centerY() - ((copyPaint.fontMetrics.ascent + copyPaint.fontMetrics.descent) / 2f)
+                canvas.drawText(copyPillText, pillRect.left + (5f * scaleFactor), copyBaseline, copyPaint)
+
+                val hasLabel = snippet.label.isNotBlank()
+
+                if (hasLabel) {
+                    // 1. Label on top-left (accent color)
+                    val labelTextSize = (itemH * 0.22f).coerceIn(9f * scaleFactor, 12f * scaleFactor)
+                    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = accentColor
+                        textSize = labelTextSize
+                        typeface = getSlateFont(context, 700)
+                        letterSpacing = 0.04f
+                    }
+                    val labelBaseline = pillRect.centerY() - ((labelPaint.fontMetrics.ascent + labelPaint.fontMetrics.descent) / 2f)
+                    val maxLabelW = (pillRect.left - (6f * scaleFactor)) - (boxRect.left + innerPadX)
+                    val elidedLabel = android.text.TextUtils.ellipsize(
+                        snippet.label.uppercase(Locale.getDefault()),
+                        android.text.TextPaint(labelPaint),
+                        maxLabelW.coerceAtLeast(10f),
+                        android.text.TextUtils.TruncateAt.END
+                    ).toString()
+                    canvas.drawText(elidedLabel, boxRect.left + innerPadX, labelBaseline, labelPaint)
+
+                    // 2. Content below label
+                    val contentSize = (itemH * 0.26f).coerceIn(10.5f * scaleFactor, 14f * scaleFactor)
+                    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = primaryTextColor
+                        textSize = contentSize
+                        typeface = getSlateFont(context, 500)
+                    }
+                    val singleLine = snippet.content.trim().replace("\n", " ")
+                    val contentY = boxRect.bottom - innerPadY - (contentPaint.fontMetrics.descent * 0.2f)
+                    val maxContentW = (boxRect.right - innerPadX) - (boxRect.left + innerPadX)
+                    val elidedContent = android.text.TextUtils.ellipsize(
+                        singleLine,
+                        android.text.TextPaint(contentPaint),
+                        maxContentW.coerceAtLeast(10f),
+                        android.text.TextUtils.TruncateAt.END
+                    ).toString()
+                    canvas.drawText(elidedContent, boxRect.left + innerPadX, contentY, contentPaint)
+                } else {
+                    // No label: Content takes the main card area with larger font size
+                    val contentSize = (itemH * 0.30f).coerceIn(11.5f * scaleFactor, 15f * scaleFactor)
+                    val contentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = primaryTextColor
+                        textSize = contentSize
+                        typeface = getSlateFont(context, 500)
+                    }
+                    val singleLine = snippet.content.trim().replace("\n", " ")
+                    val maxContentW = (pillRect.left - (6f * scaleFactor)) - (boxRect.left + innerPadX)
+                    val contentBaseline = boxRect.centerY() - ((contentPaint.fontMetrics.ascent + contentPaint.fontMetrics.descent) / 2f)
+                    val elidedContent = android.text.TextUtils.ellipsize(
+                        singleLine,
+                        android.text.TextPaint(contentPaint),
+                        maxContentW.coerceAtLeast(10f),
+                        android.text.TextUtils.TruncateAt.END
+                    ).toString()
+                    canvas.drawText(elidedContent, boxRect.left + innerPadX, contentBaseline, contentPaint)
+                }
+            } else {
+                // Empty placeholder card
+                val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(16, 255, 255, 255)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1f * scaleFactor
+                    pathEffect = DashPathEffect(floatArrayOf(6f * scaleFactor, 6f * scaleFactor), 0f)
+                }
+                canvas.drawRoundRect(boxRect, itemRadius, itemRadius, dashPaint)
+
+                val addPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(60, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
+                    textSize = (itemH * 0.22f).coerceIn(9.5f * scaleFactor, 12f * scaleFactor)
+                    typeface = getSlateFont(context, 600)
+                    textAlign = Paint.Align.CENTER
+                }
+                val addBaseline = boxRect.centerY() - ((addPaint.fontMetrics.ascent + addPaint.fontMetrics.descent) / 2f)
+                canvas.drawText("+ Add", boxRect.centerX(), addBaseline, addPaint)
+            }
+        }
     }
 
     return bitmap
+}
+
+// Overload for List<ClipboardSnippetItem> parameter
+fun generateClipboardVaultBitmap(
+    context: Context,
+    snippets: List<ClipboardSnippetItem>,
+    slateConfig: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val tempConfig = ProductivityWidgetConfig(clipboardSnippets = snippets)
+    return generateClipboardVaultBitmap(context, tempConfig, slateConfig, isResponsive, wDp, hDp)
 }

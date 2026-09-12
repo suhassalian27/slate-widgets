@@ -1,46 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/layout_productivity_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Canvas Surface -->
     <ImageView
         android:id="@+id/widget_canvas_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY"
-        android:contentDescription="Clipboard Vault Surface" />
+        android:scaleType="fitCenter" />
 
+    <!-- Interactive Touch Grid -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Header Target -->
-        <FrameLayout
-            android:id="@+id/btn_clip_header"
+        <!-- Top Header: Title opens Config, Prev/Next change pages -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.26"
-            android:clickable="true"
-            android:focusable="true" />
+            android:layout_weight="0.22"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="0dp">
 
-        <!-- Snippet Item 0 Target -->
-        <FrameLayout
-            android:id="@+id/btn_clip_0"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="0.37"
-            android:clickable="true"
-            android:focusable="true" />
+            <FrameLayout
+                android:id="@+id/btn_clipboard_header"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@android:color/transparent" />
 
-        <!-- Snippet Item 1 Target -->
-        <FrameLayout
-            android:id="@+id/btn_clip_1"
+            <FrameLayout
+                android:id="@+id/btn_clipboard_prev"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent" />
+
+            <FrameLayout
+                android:id="@+id/btn_clipboard_next"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
+        <!-- 2x2 Grid of 4 Snippet Slots -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.37"
-            android:clickable="true"
-            android:focusable="true" />
+            android:layout_weight="0.78"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="8dp">
+
+            <!-- Row 1: Slot 0 & Slot 1 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:id="@+id/btn_clipboard_slot_0"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent" />
+
+                <FrameLayout
+                    android:id="@+id/btn_clipboard_slot_1"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent" />
+            </LinearLayout>
+
+            <!-- Row 2: Slot 2 & Slot 3 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:id="@+id/btn_clipboard_slot_2"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent" />
+
+                <FrameLayout
+                    android:id="@+id/btn_clipboard_slot_3"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
-</RelativeLayout>
+</FrameLayout>

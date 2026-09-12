@@ -55,6 +55,8 @@ import com.altusix.slate.ui.components.RainbowCustomCircle
 import com.altusix.slate.ui.components.SlateConfigScaffold
 import java.util.Locale
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.painterResource
+import com.altusix.slate.R
 
 private enum class ProductivityColorTarget { BACKGROUND, ACCENT }
 
@@ -386,7 +388,7 @@ private fun ProductivityWidgetLivePreview(
 
     val (wDp, hDp) = when (tab) {
         "PIPELINE" -> 280 to 70
-        "HABIT", "TOP3", "TIMELINE", "BOOKMARKS", "EISENHOWER" -> 260 to 130
+        "HABIT", "TOP3", "TIMELINE", "BOOKMARKS", "EISENHOWER", "CLIPBOARD" -> 260 to 130
         else -> 140 to 140
     }
 
@@ -404,7 +406,7 @@ private fun ProductivityWidgetLivePreview(
                 val liveData = ProductivityStorageManager.resolveLiveScreenTime(context).copy(limitMinutes = config.screenTime.limitMinutes)
                 generateScreenTimeBitmap(context, liveData, slateConfig, isResponsive, wDp, hDp)
             }
-            "CLIPBOARD" -> generateClipboardVaultBitmap(context, config.clipboardSnippets, slateConfig, isResponsive, wDp, hDp)
+            "CLIPBOARD" -> generateClipboardVaultBitmap(context, config, slateConfig, isResponsive, wDp, hDp)
             else -> generateTop3TasksBitmap(context, config.top3Tasks, slateConfig, isResponsive, wDp, hDp)
         }
     }
@@ -1043,31 +1045,99 @@ private fun ClipboardEditor(
     accentColor: Color,
     onUpdate: (List<ClipboardSnippetItem>) -> Unit
 ) {
-    SectionTitle(title = "Clipboard Vault (2 Slots)")
+    val context = LocalContext.current
+    var newContent by remember { mutableStateOf("") }
+    var newLabel by remember { mutableStateOf("") }
 
-    for (i in 0 until 2) {
-        val item = snippets.getOrElse(i) { ClipboardSnippetItem("c_${i + 1}", "", "") }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF141418))
-                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    val currentSnippets by rememberUpdatedState(snippets)
+    val currentOnUpdate by rememberUpdatedState(onUpdate)
+
+    SectionTitle(title = "Clipboard Quick Vault")
+
+    // 1. Quick-Add Snippet Card (Always on top)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF141418))
+            .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Text("Add New Snippet", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+
+            // Button with ic_clipboard_paste drawable
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF22222A))
+                    .clickable {
+                        try {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            val clipText = cm?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                            if (clipText.isNotBlank()) {
+                                newContent = clipText
+                                // Title is kept intentionally empty
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_clipboard_paste),
+                    contentDescription = "Paste",
+                    tint = accentColor,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "Paste Clipboard",
+                    color = accentColor,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Multiline Content (The actual text to copy)
+        OutlinedTextField(
+            value = newContent,
+            onValueChange = { input ->
+                newContent = input
+                // Title is NOT auto-filled; remains optional
+            },
+            placeholder = { Text("Enter text or code to copy...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3,
+            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = accentColor,
+                unfocusedBorderColor = Color(0xFF24242C),
+                focusedContainerColor = Color(0xFF0C0C0E),
+                unfocusedContainerColor = Color(0xFF0C0C0E)
+            )
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Optional Label
             OutlinedTextField(
-                value = item.label,
-                onValueChange = { newLabel: String ->
-                    val updated = snippets.toMutableList()
-                    while (updated.size <= i) updated.add(ClipboardSnippetItem("c_${updated.size + 1}", "", ""))
-                    updated[i] = item.copy(label = newLabel)
-                    onUpdate(updated)
-                },
-                placeholder = { Text("Slot ${i + 1} Label (e.g. Address, IBAN)", color = Color(0xFF8E8E93), fontSize = 13.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                value = newLabel,
+                onValueChange = { newLabel = it },
+                placeholder = { Text("Title (Optional)", color = Color(0xFF8E8E93), fontSize = 12.5.sp) },
+                modifier = Modifier.weight(1f),
                 singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accentColor,
@@ -1077,26 +1147,232 @@ private fun ClipboardEditor(
                 )
             )
 
-            OutlinedTextField(
-                value = item.content,
-                onValueChange = { newContent: String ->
-                    val updated = snippets.toMutableList()
-                    while (updated.size <= i) updated.add(ClipboardSnippetItem("c_${updated.size + 1}", "", ""))
-                    updated[i] = item.copy(content = newContent)
-                    onUpdate(updated)
+            // Add Button
+            Button(
+                onClick = {
+                    if (newContent.isNotBlank()) {
+                        val newItem = ClipboardSnippetItem(
+                            id = "c_${System.currentTimeMillis()}",
+                            label = newLabel.trim(), // Stays empty if not provided
+                            content = newContent.trim()
+                        )
+                        currentOnUpdate(listOf(newItem) + currentSnippets)
+                        newContent = ""
+                        newLabel = ""
+                    }
                 },
-                placeholder = { Text("Text content to copy...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(color = Color(0xFF8E8E93), fontSize = 13.sp),
-                maxLines = 3,
                 shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = accentColor,
-                    unfocusedBorderColor = Color(0xFF24242C),
-                    focusedContainerColor = Color(0xFF0C0C0E),
-                    unfocusedContainerColor = Color(0xFF0C0C0E)
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text("Add", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+            }
+        }
+    }
+
+    // 2. Saved Snippets Header
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Saved Snippets (${snippets.size})",
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+        if (snippets.size > 1) {
+            Text(
+                text = "Hold & drag number to reorder",
+                fontSize = 11.sp,
+                color = Color(0xFF8E8E93)
             )
+        }
+    }
+
+    // 3. Drag & Drop Reorderable List
+    val density = LocalDensity.current
+    val spacingPx = with(density) { 8.dp.toPx() }
+    var itemHeightPx by remember { mutableFloatStateOf(0f) }
+
+    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    val effectiveSlotHeight = if (itemHeightPx > 0f) itemHeightPx else with(density) { 62.dp.toPx() }
+
+    val currentHoverIndex = remember(draggedIndex, dragOffsetY, effectiveSlotHeight, snippets.size) {
+        draggedIndex?.let { startIdx ->
+            val delta = (dragOffsetY / effectiveSlotHeight).roundToInt()
+            (startIdx + delta).coerceIn(0, maxOf(0, snippets.size - 1))
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        snippets.forEachIndexed { index, item ->
+            key(item.id) {
+                val isBeingDragged = draggedIndex == index
+
+                val targetTranslationY = if (draggedIndex != null) {
+                    when {
+                        isBeingDragged -> dragOffsetY
+                        currentHoverIndex != null -> {
+                            val start = draggedIndex!!
+                            val hover = currentHoverIndex!!
+                            when {
+                                start < hover && index in (start + 1)..hover -> -effectiveSlotHeight
+                                start > hover && index in hover until start -> effectiveSlotHeight
+                                else -> 0f
+                            }
+                        }
+                        else -> 0f
+                    }
+                } else {
+                    0f
+                }
+
+                val animatedTranslationY by animateFloatAsState(
+                    targetValue = targetTranslationY,
+                    animationSpec = if (draggedIndex != null) tween(durationMillis = 150) else snap(),
+                    label = "clipShift"
+                )
+
+                val currentIndex by rememberUpdatedState(index)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            if (coords.size.height > 0 && itemHeightPx == 0f) {
+                                itemHeightPx = coords.size.height.toFloat() + spacingPx
+                            }
+                        }
+                        .zIndex(if (isBeingDragged) 10f else 1f)
+                        .graphicsLayer {
+                            translationY = if (isBeingDragged) dragOffsetY else animatedTranslationY
+                            scaleX = if (isBeingDragged) 1.02f else 1f
+                            scaleY = if (isBeingDragged) 1.02f else 1f
+                        }
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isBeingDragged) Color(0xFF22222E) else Color(0xFF141418))
+                        .border(
+                            1.dp,
+                            if (isBeingDragged) accentColor else Color(0xFF24242C),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Reorder Handle
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isBeingDragged) accentColor else Color(0xFF22222A))
+                            .pointerInput(item.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedIndex = currentIndex
+                                        dragOffsetY = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffsetY += dragAmount.y
+                                    },
+                                    onDragEnd = {
+                                        val from = draggedIndex
+                                        if (from != null && effectiveSlotHeight > 0f) {
+                                            val delta = (dragOffsetY / effectiveSlotHeight).roundToInt()
+                                            val to = (from + delta).coerceIn(0, currentSnippets.size - 1)
+                                            if (from != to) {
+                                                val mutable = currentSnippets.toMutableList()
+                                                val moved = mutable.removeAt(from)
+                                                mutable.add(to, moved)
+                                                currentOnUpdate(mutable)
+                                            }
+                                        }
+                                        draggedIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggedIndex = null
+                                        dragOffsetY = 0f
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            color = if (isBeingDragged) Color.Black else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Editable Title
+                    OutlinedTextField(
+                        value = item.label,
+                        onValueChange = { newText ->
+                            currentOnUpdate(currentSnippets.map {
+                                if (it.id == item.id) it.copy(label = newText) else it
+                            })
+                        },
+                        placeholder = { Text("Title (Optional)", color = Color(0xFF8E8E93), fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            unfocusedBorderColor = Color(0xFF24242C),
+                            focusedContainerColor = Color(0xFF0C0C0E),
+                            unfocusedContainerColor = Color(0xFF0C0C0E)
+                        )
+                    )
+
+                    // Editable Content
+                    OutlinedTextField(
+                        value = item.content,
+                        onValueChange = { newContentText ->
+                            currentOnUpdate(currentSnippets.map {
+                                if (it.id == item.id) it.copy(content = newContentText) else it
+                            })
+                        },
+                        placeholder = { Text("Content", color = Color(0xFF8E8E93), fontSize = 12.sp) },
+                        modifier = Modifier.weight(1.6f),
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color(0xFF8E8E93), fontSize = 12.sp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            unfocusedBorderColor = Color(0xFF24242C),
+                            focusedContainerColor = Color(0xFF0C0C0E),
+                            unfocusedContainerColor = Color(0xFF0C0C0E)
+                        )
+                    )
+
+                    // Remove Button
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E1E24))
+                            .clickable {
+                                currentOnUpdate(currentSnippets.filterNot { it.id == item.id })
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            tint = Color(0xFFFF453A),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
