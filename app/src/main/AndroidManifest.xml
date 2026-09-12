@@ -34,6 +34,12 @@
     <!-- Productivity Screen Time Permission -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Quick Toggles Permissions -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
 
 
@@ -3585,6 +3591,235 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- ========================================================================= -->
+        <!-- QUICK TOGGLES WIDGETS (14 RECEIVERS)                                       -->
+        <!-- ========================================================================= -->
+
+        <activity
+            android:name=".widgets.quicktoggles.QuickTogglesConfigActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Slate" />
+
+        <!-- 1. Control Center Deck (4x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesControlCenterReceiver"
+            android:exported="true"
+            android:label="Control Center Deck">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+                <action android:name="android.intent.action.AIRPLANE_MODE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 2. Minimalist Action Toolbar (4x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesToolbarReceiver"
+            android:exported="true"
+            android:label="Minimalist Action Toolbar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 3. Connectivity Duo Bento (2x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesConnectivityReceiver"
+            android:exported="true"
+            android:label="Connectivity Duo Bento">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 4. Quad Action Matrix (2x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesQuadReceiver"
+            android:exported="true"
+            android:label="Quad Action Matrix">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 5. Tactile Alert Slider (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesAlertSliderHReceiver"
+            android:exported="true"
+            android:label="Tactile Alert Slider">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_SET_SLIDER_MODE" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 6. Vertical Alert Slider (1x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesAlertSliderVReceiver"
+            android:exported="true"
+            android:label="Vertical Alert Slider">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_SET_SLIDER_MODE" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
+
+        <!-- 7. Flashlight Torch Switch (2x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesTorchSwitchReceiver"
+            android:exported="true"
+            android:label="Flashlight Torch Switch">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. Wi-Fi Network Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesWifiPillReceiver"
+            android:exported="true"
+            android:label="Wi-Fi Network Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 9. Bluetooth Device Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesBluetoothPillReceiver"
+            android:exported="true"
+            android:label="Bluetooth Device Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 10. Sound Mode Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesSoundPillReceiver"
+            android:exported="true"
+            android:label="Sound Mode Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 11. Auto-Rotate Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesRotatePillReceiver"
+            android:exported="true"
+            android:label="Auto-Rotate Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 12. System Utility Deck (4x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesUtilityDeckReceiver"
+            android:exported="true"
+            android:label="System Utility Deck">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_TIMEOUT" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+                <action android:name="android.intent.action.AIRPLANE_MODE" />
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 13. Micro Toggle: Flashlight (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroTorchReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Flashlight">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- 14. Micro Toggle: Sound Mode (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroSoundReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Sound Mode">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
+                <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
         </receiver>
 
     </application>
