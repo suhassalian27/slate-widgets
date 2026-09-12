@@ -1108,51 +1108,123 @@ private fun ScreenTimeEditor(
     accentColor: Color,
     onUpdate: (ScreenTimeData) -> Unit
 ) {
-    SectionTitle(title = "Usage Access")
-    Text("Slate reads daily app usage directly from Android's UsageStats subsystem.", fontSize = 12.sp, color = Color(0xFF8E8E93))
+    var isPermissionGranted by remember { mutableStateOf(hasUsageStatsPermission(activity)) }
 
-    Button(
-        onClick = {
-            try { activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) } catch (_: Exception) {}
-        },
-        modifier = Modifier.fillMaxWidth().height(42.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E24))
-    ) {
-        Text("Grant / Check Usage Access", color = accentColor, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    // Re-check permission automatically when user returns from settings
+    DisposableEffect(Unit) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isPermissionGranted = hasUsageStatsPermission(activity)
+            }
+        }
+        activity.lifecycle.addObserver(observer)
+        onDispose { activity.lifecycle.removeObserver(observer) }
     }
 
-    Spacer(Modifier.height(4.dp))
-    SectionTitle(title = "Daily Screen Time Target")
+    SectionTitle(title = "Usage Access Permission")
 
-    Row(
+    if (isPermissionGranted) {
+        // Access Granted Status Card
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF141418))
+                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF30D158).copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Active",
+                    tint = Color(0xFF30D158),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Usage Access Active",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "Slate is reading daily screen time and device unlock statistics.",
+                    color = Color(0xFF8E8E93),
+                    fontSize = 12.sp
+                )
+            }
+        }
+    } else {
+        // Permission Required Card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1A1412))
+                .border(1.dp, Color(0xFFFF9F0A).copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Permission Required",
+                color = Color(0xFFFF9F0A),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Android requires explicit Usage Access permission for apps to view screen time and device unlocks.",
+                color = Color(0xFFD1D1D6),
+                fontSize = 12.5.sp
+            )
+            Button(
+                onClick = {
+                    try {
+                        activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    } catch (_: Exception) {}
+                },
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9F0A))
+            ) {
+                Text(
+                    text = "Grant Usage Access in Settings",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    // Widget Info Card
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF141418))
-            .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column {
-            Text("Usage Limit", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text("${screenTime.limitMinutes / 60}h ${screenTime.limitMinutes % 60}m daily goal", color = Color(0xFF8E8E93), fontSize = 12.sp)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(
-                onClick = { onUpdate(screenTime.copy(limitMinutes = maxOf(60, screenTime.limitMinutes - 30))) },
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22222A)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) { Text("-30m", color = Color.White, fontSize = 12.sp) }
-            Button(
-                onClick = { onUpdate(screenTime.copy(limitMinutes = screenTime.limitMinutes + 30)) },
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) { Text("+30m", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-        }
+        Text("About Screen Time Balance", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = "Displays total screen time and unlocks with a 6-segment 24h timeline track. The widget updates in the background as you use your device.",
+            color = Color(0xFF8E8E93),
+            fontSize = 12.sp
+        )
     }
 }
 

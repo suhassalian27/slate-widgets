@@ -2172,7 +2172,7 @@ fun generateBookmarkListBitmap(
 }
 
 // =========================================================================
-// 10. SCREEN TIME BALANCE (2x2)
+// 10. SCREEN TIME BALANCE (Collision-Proof Bento Dashboard)
 // =========================================================================
 
 fun generateScreenTimeBitmap(
@@ -2187,85 +2187,316 @@ fun generateScreenTimeBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 1.0f
         val size = minOf(w, h)
-        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
     }
 
     val (primaryTextColor, secondaryTextColor) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    // 1. Header
-    val headerY = cardRect.top + 16f * scaleFactor
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val baseDim = minOf(cardW, cardH)
+    val aspectRatio = cardW / cardH.coerceAtLeast(1f)
+
+    // Symmetrical insets
+    val padX = (cardW * 0.08f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+    val padY = (cardH * 0.08f).coerceIn(12f * scaleFactor, 22f * scaleFactor)
+
+    val contentLeft = cardRect.left + padX
+    val contentRight = cardRect.right - padX
+    val contentTop = cardRect.top + padY
+    val contentBottom = cardRect.bottom - padY
+
+    val availW = contentRight - contentLeft
+    val availH = contentBottom - contentTop
+
+    // Top apps palette
+    val palette = listOf(
+        accentColor,
+        Color.parseColor("#387CFF"), // Cobalt Blue
+        Color.parseColor("#00C7BE"), // Cyan / Teal
+        Color.parseColor("#FF9F0A")  // Warm Amber
+    )
+
+    val totalMins = screenTime.totalMinutesToday
+    val hours = totalMins / 60
+    val mins = totalMins % 60
+    val formattedTime = if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+
+    val apps = if (screenTime.topCategories.isNotEmpty()) {
+        screenTime.topCategories
+    } else {
+        listOf("No usage" to 0)
+    }
+
+    // =========================================================================
+    // LAYOUT 1: WIDE FORMAT (aspectRatio >= 1.55, e.g. 4x1, 4x2)
+    // Isolated 2-Column Split: Left (Hero) vs Right (Apps), Spectrum at Bottom
+    // =========================================================================
+    if (aspectRatio >= 1.55f) {
+        val ribbonH = (cardH * 0.08f).coerceIn(5f * scaleFactor, 8f * scaleFactor)
+        val ribbonY = contentBottom - ribbonH
+        val ribbonRect = RectF(contentLeft, ribbonY, contentRight, ribbonY + ribbonH)
+
+        val upperTop = contentTop
+        val upperBottom = ribbonY - (10f * scaleFactor)
+        val upperH = upperBottom - upperTop
+
+        // Left Column: 45% of width (Guarantees zero overlap with right column)
+        val leftColW = availW * 0.44f
+        val rightColLeft = contentLeft + (availW * 0.50f)
+        val rightColW = contentRight - rightColLeft
+
+        // Header: Screen Time
+        val titleSize = (cardH * 0.13f).coerceIn(9.5f * scaleFactor, 13f * scaleFactor)
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryTextColor
+            textSize = titleSize
+            typeface = getSlateFont(context, 700)
+            letterSpacing = 0.04f
+        }
+        val headerY = upperTop + titleSize
+        canvas.drawText("SCREEN TIME", contentLeft, headerY, titlePaint)
+
+        // Hero Time (Left Column)
+        var heroSize = (upperH * 0.60f).coerceIn(22f * scaleFactor, 42f * scaleFactor)
+        val heroPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = heroSize
+            typeface = getSlateFont(context, 800)
+        }
+        while (heroPaint.measureText(formattedTime) > leftColW && heroSize > 12f * scaleFactor) {
+            heroSize -= 1f * scaleFactor
+            heroPaint.textSize = heroSize
+        }
+        val heroBaseline = upperBottom - (2f * scaleFactor)
+        canvas.drawText(formattedTime, contentLeft, heroBaseline, heroPaint)
+
+        // Right Column: Unlocks Header + Top Apps Rows
+        val unlockText = if (screenTime.pickupsCount > 0) "${screenTime.pickupsCount} UNLOCKS" else ""
+        if (unlockText.isNotEmpty()) {
+            val unlockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = secondaryTextColor
+                textSize = titleSize * 0.92f
+                typeface = getSlateFont(context, 700)
+                textAlign = Paint.Align.RIGHT
+                letterSpacing = 0.03f
+            }
+            canvas.drawText(unlockText, contentRight, headerY, unlockPaint)
+        }
+
+        // Right Column App Rows
+        val displayApps = apps.take(2)
+        val appRowStartY = headerY + (8f * scaleFactor)
+        val appRowAvailH = upperBottom - appRowStartY
+        val rowPitch = appRowAvailH / displayApps.size.coerceAtLeast(1).toFloat()
+
+        val appTextSize = (rowPitch * 0.46f).coerceIn(9.5f * scaleFactor, 13f * scaleFactor)
+        val appLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = appTextSize
+            typeface = getSlateFont(context, 600)
+        }
+        val appDurPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryTextColor
+            textSize = appTextSize * 0.95f
+            typeface = getSlateFont(context, 600)
+            textAlign = Paint.Align.RIGHT
+        }
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        val dotR = maxOf(2f * scaleFactor, appTextSize * 0.26f)
+
+        displayApps.forEachIndexed { i, (appName, appMins) ->
+            val rowCenterY = appRowStartY + (i * rowPitch) + (rowPitch / 2f)
+            val durStr = if (appMins >= 60) "${appMins / 60}h ${appMins % 60}m" else "${appMins}m"
+
+            dotPaint.color = palette.getOrElse(i) { palette[0] }
+            canvas.drawCircle(rightColLeft + dotR, rowCenterY, dotR, dotPaint)
+
+            val baseline = rowCenterY - ((appLabelPaint.fontMetrics.ascent + appLabelPaint.fontMetrics.descent) / 2f)
+            canvas.drawText(durStr, contentRight, baseline, appDurPaint)
+
+            val durW = appDurPaint.measureText(durStr)
+            val textStartX = rightColLeft + (dotR * 2.5f) + (4f * scaleFactor)
+            val maxLabelW = (contentRight - durW - (8f * scaleFactor)) - textStartX
+
+            val elided = android.text.TextUtils.ellipsize(
+                appName,
+                android.text.TextPaint(appLabelPaint),
+                maxLabelW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elided, textStartX, baseline, appLabelPaint)
+        }
+
+        // Bottom Spectrum Track
+        drawSpectrumRibbon(canvas, ribbonRect, apps, totalMins, palette, isLight, scaleFactor)
+        return bitmap
+    }
+
+    // =========================================================================
+    // LAYOUT 2: SQUARE & TALL FORMAT (2x2 Dashboard)
+    // Full-Width Stacked Layout: Title + Hero + Spectrum + Full-Width App Rows
+    // =========================================================================
+    val titleSize = (baseDim * 0.076f).coerceIn(9.5f * scaleFactor, 12.5f * scaleFactor)
+    var heroSize = (baseDim * 0.25f).coerceIn(24f * scaleFactor, 42f * scaleFactor)
+    val ribbonH = (baseDim * 0.052f).coerceIn(5.5f * scaleFactor, 8.5f * scaleFactor)
+
+    val displayApps = apps.take(2)
+    val appRowPitch = (baseDim * 0.14f).coerceIn(16f * scaleFactor, 24f * scaleFactor)
+    val appListH = displayApps.size * appRowPitch
+
+    val gap1 = (baseDim * 0.05f).coerceIn(5f * scaleFactor, 10f * scaleFactor)
+    val gap2 = (baseDim * 0.06f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val gap3 = (baseDim * 0.08f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    val totalBlockH = titleSize + gap1 + heroSize + gap2 + ribbonH + gap3 + appListH
+    val startY = contentTop + ((availH - totalBlockH) / 2f).coerceAtLeast(0f)
+
+    // 1. Collision-Safe Header
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = 10.5f * scaleFactor
+        textSize = titleSize
         typeface = getSlateFont(context, 700)
+        letterSpacing = 0.05f
     }
-    canvas.drawText("SCREEN TIME", cardRect.left + 16f * scaleFactor, headerY + 10f * scaleFactor, headerPaint)
+    val titleY = startY + titleSize
+    val titleW = titlePaint.measureText("SCREEN TIME")
 
-    // 2. Large Time Display
-    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = 30f * scaleFactor
-        typeface = getSlateFont(context, 800)
-    }
-    val timeY = headerY + 44f * scaleFactor
-    canvas.drawText(screenTime.formattedHoursMinutes, cardRect.left + 16f * scaleFactor, timeY, timePaint)
-
-    // 3. Limit Progress Bar
-    val barY = timeY + 14f * scaleFactor
-    val barW = cardRect.width() - 32f * scaleFactor
-    val barH = 6f * scaleFactor
-    val barRect = RectF(cardRect.left + 16f * scaleFactor, barY, cardRect.left + 16f * scaleFactor + barW, barY + barH)
-
-    val barBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(30, Color.red(primaryTextColor), Color.green(primaryTextColor), Color.blue(primaryTextColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(barRect, barH / 2f, barH / 2f, barBg)
-
-    val progW = barW * screenTime.progressFraction
-    if (progW > 0f) {
-        val progPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor; style = Paint.Style.FILL }
-        canvas.drawRoundRect(RectF(barRect.left, barRect.top, barRect.left + progW, barRect.bottom), barH / 2f, barH / 2f, progPaint)
-    }
-
-    // 4. Limit Text & Pickups Pill
-    val metaY = barY + 18f * scaleFactor
-    val limitText = "Goal: ${screenTime.limitMinutes / 60}h ${screenTime.limitMinutes % 60}m"
-    val limitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val unlockText = if (screenTime.pickupsCount > 0) "${screenTime.pickupsCount} UNLOCKS" else ""
+    val unlockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = 10f * scaleFactor
-        typeface = getSlateFont(context, 600)
-    }
-    canvas.drawText(limitText, cardRect.left + 16f * scaleFactor, metaY, limitPaint)
-
-    val pickupsText = "${screenTime.pickupsCount} pickups"
-    val pickupsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = 10f * scaleFactor
+        textSize = titleSize * 0.95f
         typeface = getSlateFont(context, 700)
+        letterSpacing = 0.03f
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText(pickupsText, cardRect.right - 16f * scaleFactor, metaY, pickupsPaint)
+    val unlockW = if (unlockText.isNotEmpty()) unlockPaint.measureText(unlockText) else 0f
 
-    // 5. Category Split Bars at Bottom
-    val catY = cardRect.bottom - 22f * scaleFactor
-    val catColW = barW / screenTime.topCategories.size.coerceAtLeast(1)
-    for (i in screenTime.topCategories.indices) {
-        val (catName, mins) = screenTime.topCategories[i]
-        val colX = cardRect.left + 16f * scaleFactor + i * catColW
-        val catText = "$catName ${mins}m"
-        val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = secondaryTextColor
-            textSize = 9f * scaleFactor
-            typeface = getSlateFont(context, 500)
+    // Draw header elements with collision detection
+    if (titleW + unlockW + (16f * scaleFactor) <= availW) {
+        canvas.drawText("SCREEN TIME", contentLeft, titleY, titlePaint)
+        if (unlockText.isNotEmpty()) {
+            canvas.drawText(unlockText, contentRight, titleY, unlockPaint)
         }
-        canvas.drawText(catText, colX, catY, catPaint)
+    } else {
+        // Narrow space: Draw single title to prevent collisions
+        canvas.drawText("SCREEN TIME", contentLeft, titleY, titlePaint)
+    }
+
+    // 2. Hero Time Display
+    val heroPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = heroSize
+        typeface = getSlateFont(context, 800)
+    }
+    while (heroPaint.measureText(formattedTime) > availW && heroSize > 14f * scaleFactor) {
+        heroSize -= 1f * scaleFactor
+        heroPaint.textSize = heroSize
+    }
+    val heroY = titleY + gap1 + (heroSize * 0.88f)
+    canvas.drawText(formattedTime, contentLeft, heroY, heroPaint)
+
+    // 3. Spectrum Ribbon Track
+    val ribbonY = heroY + gap2
+    val ribbonRect = RectF(contentLeft, ribbonY, contentRight, ribbonY + ribbonH)
+    drawSpectrumRibbon(canvas, ribbonRect, apps, totalMins, palette, isLight, scaleFactor)
+
+    // 4. Full-Width Bento App Rows (Full names, zero truncation into "K...")
+    val appStartY = ribbonY + ribbonH + gap3
+    val rowTextSize = (appRowPitch * 0.48f).coerceIn(10f * scaleFactor, 13f * scaleFactor)
+    val dotR = maxOf(2.5f * scaleFactor, rowTextSize * 0.26f)
+
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = rowTextSize
+        typeface = getSlateFont(context, 600)
+    }
+
+    val durPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryTextColor
+        textSize = rowTextSize * 0.95f
+        typeface = getSlateFont(context, 600)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    displayApps.forEachIndexed { i, (appName, appMins) ->
+        val rowCenterY = appStartY + (i * appRowPitch) + (appRowPitch / 2f)
+        val durStr = if (appMins >= 60) "${appMins / 60}h ${appMins % 60}m" else "${appMins}m"
+
+        // Colored indicator
+        dotPaint.color = palette.getOrElse(i) { palette[0] }
+        canvas.drawCircle(contentLeft + dotR, rowCenterY, dotR, dotPaint)
+
+        // Duration text on right
+        val baseline = rowCenterY - ((labelPaint.fontMetrics.ascent + labelPaint.fontMetrics.descent) / 2f)
+        canvas.drawText(durStr, contentRight, baseline, durPaint)
+
+        // Full-width app title
+        val textStartX = contentLeft + (dotR * 2.8f) + (6f * scaleFactor)
+        val durW = durPaint.measureText(durStr)
+        val maxLabelW = (contentRight - durW - (8f * scaleFactor)) - textStartX
+
+        val elided = android.text.TextUtils.ellipsize(
+            appName,
+            android.text.TextPaint(labelPaint),
+            maxLabelW.coerceAtLeast(10f),
+            android.text.TextUtils.TruncateAt.END
+        ).toString()
+        canvas.drawText(elided, textStartX, baseline, labelPaint)
     }
 
     return bitmap
+}
+
+/**
+ * Draws a segmented horizontal spectrum track with smooth micro-gaps.
+ */
+private fun drawSpectrumRibbon(
+    canvas: Canvas,
+    barRect: RectF,
+    apps: List<Pair<String, Int>>,
+    totalMins: Int,
+    palette: List<Int>,
+    isLight: Boolean,
+    scaleFactor: Float
+) {
+    val radius = barRect.height() / 2f
+    val safeTotal = totalMins.coerceAtLeast(1).toFloat()
+
+    // Base background track
+    val trackBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(barRect, radius, radius, trackBg)
+
+    val gapW = 2.5f * scaleFactor
+    var currentX = barRect.left
+    val totalW = barRect.width()
+
+    val segPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    apps.take(3).forEachIndexed { idx, (_, mins) ->
+        val segW = (totalW * (mins / safeTotal)).coerceAtLeast(0f)
+        if (segW > (gapW * 1.5f)) {
+            val drawW = segW - gapW
+            val segRect = RectF(currentX, barRect.top, currentX + drawW, barRect.bottom)
+            segPaint.color = palette.getOrElse(idx) { palette[0] }
+            canvas.drawRoundRect(segRect, radius, radius, segPaint)
+            currentX += segW
+        }
+    }
 }
 
 // =========================================================================

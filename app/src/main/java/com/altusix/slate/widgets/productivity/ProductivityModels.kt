@@ -4,6 +4,7 @@ import android.app.usage.UsageStatsManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import org.json.JSONArray
@@ -343,38 +344,135 @@ object ProductivityStorageManager {
     fun resolveLiveScreenTime(context: Context): ScreenTimeData {
         try {
             val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-            if (usageStatsManager != null) {
-                val cal = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }
-                val startTime = cal.timeInMillis
-                val endTime = System.currentTimeMillis()
-                val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startTime, endTime)
-                if (!stats.isNullOrEmpty()) {
-                    var totalMs = 0L
-                    for (stat in stats) {
-                        totalMs += stat.totalTimeInForeground
+                ?: return ScreenTimeData()
+
+            // 1. Midnight today in device timezone
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startTime = cal.timeInMillis
+            val endTime = System.currentTimeMillis()
+
+            val events = usageStatsManager.queryEvents(startTime, endTime) ?: return ScreenTimeData()
+            val event = android.app.usage.UsageEvents.Event()
+
+            // 2. Identify launcher & system packages to ignore
+            val pm = context.packageManager
+            val launcherPkg = try {
+                val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                pm.resolveActivity(intent, 0)?.activityInfo?.packageName
+            } catch (_: Exception) { null }
+
+            val ignoredPackages = setOfNotNull(
+                launcherPkg,
+                "com.android.systemui",
+                "com.google.android.apps.nexuslauncher",
+                "com.sec.android.app.launcher",
+                context.packageName
+            )
+
+            var unlockCount = 0
+            val appDurations = mutableMapOf<String, Long>()
+            var currentForegroundApp: String? = null
+            var sessionStartTime = 0L
+            var isScreenInteractive = true
+
+            // 3. Replay exact interactive events
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName
+                val timestamp = event.timeStamp
+
+                when (event.eventType) {
+                    // KEYGUARD_HIDDEN (18) = Exact device unlock
+                    18 -> unlockCount++
+
+                    // SCREEN_INTERACTIVE (15)
+                    15 -> isScreenInteractive = true
+
+                    // SCREEN_NON_INTERACTIVE (16)
+                    16 -> {
+                        isScreenInteractive = false
+                        if (currentForegroundApp != null && sessionStartTime > 0L) {
+                            val elapsed = timestamp - sessionStartTime
+                            if (elapsed > 0 && currentForegroundApp !in ignoredPackages) {
+                                appDurations[currentForegroundApp] = (appDurations[currentForegroundApp] ?: 0L) + elapsed
+                            }
+                            currentForegroundApp = null
+                            sessionStartTime = 0L
+                        }
                     }
-                    val totalMins = (totalMs / (1000 * 60)).toInt()
-                    if (totalMins > 0) {
-                        return ScreenTimeData(
-                            totalMinutesToday = totalMins,
-                            limitMinutes = 270,
-                            pickupsCount = maxOf(25, (totalMins / 6)),
-                            topCategories = listOf(
-                                "Productivity" to (totalMins * 0.55).toInt(),
-                                "Communication" to (totalMins * 0.28).toInt(),
-                                "Other" to (totalMins * 0.17).toInt()
-                            )
-                        )
+
+                    // ACTIVITY_RESUMED (1)
+                    1 -> {
+                        if (currentForegroundApp != null && sessionStartTime > 0L) {
+                            val elapsed = timestamp - sessionStartTime
+                            if (elapsed > 0 && currentForegroundApp !in ignoredPackages) {
+                                appDurations[currentForegroundApp] = (appDurations[currentForegroundApp] ?: 0L) + elapsed
+                            }
+                        }
+                        if (isScreenInteractive && pkg !in ignoredPackages) {
+                            currentForegroundApp = pkg
+                            sessionStartTime = timestamp
+                        } else {
+                            currentForegroundApp = null
+                            sessionStartTime = 0L
+                        }
+                    }
+
+                    // ACTIVITY_PAUSED (2)
+                    2 -> {
+                        if (currentForegroundApp == pkg && sessionStartTime > 0L) {
+                            val elapsed = timestamp - sessionStartTime
+                            if (elapsed > 0 && pkg !in ignoredPackages) {
+                                appDurations[pkg] = (appDurations[pkg] ?: 0L) + elapsed
+                            }
+                            currentForegroundApp = null
+                            sessionStartTime = 0L
+                        }
                     }
                 }
             }
-        } catch (_: Exception) {}
-        return ScreenTimeData()
+
+            // Close trailing active session
+            if (currentForegroundApp != null && sessionStartTime > 0L && isScreenInteractive) {
+                val elapsed = endTime - sessionStartTime
+                if (elapsed > 0 && currentForegroundApp !in ignoredPackages) {
+                    appDurations[currentForegroundApp] = (appDurations[currentForegroundApp] ?: 0L) + elapsed
+                }
+            }
+
+            // 4. Resolve human-readable App Labels & Top Apps
+            val sortedApps = appDurations.entries
+                .filter { it.value >= 60_000L } // Minimum 1 minute
+                .sortedByDescending { it.value }
+
+            val topCategories = sortedApps.take(3).map { entry ->
+                val appName = try {
+                    val appInfo = pm.getApplicationInfo(entry.key, 0)
+                    pm.getApplicationLabel(appInfo).toString()
+                } catch (_: Exception) {
+                    entry.key.split(".").lastOrNull()?.replaceFirstChar { it.uppercase() } ?: entry.key
+                }
+                val minutes = (entry.value / (1000 * 60)).toInt()
+                Pair(appName, minutes)
+            }
+
+            val totalMs = appDurations.values.sum()
+            val totalMinutes = (totalMs / (1000 * 60)).toInt()
+
+            return ScreenTimeData(
+                totalMinutesToday = totalMinutes,
+                limitMinutes = 240,
+                pickupsCount = unlockCount,
+                topCategories = topCategories
+            )
+        } catch (_: Exception) {
+            return ScreenTimeData()
+        }
     }
 
     // =========================================================================
@@ -756,4 +854,23 @@ fun calculateWeekCompletion(history: Map<String, Boolean>): Pair<Int, Int> {
         cal.add(Calendar.DAY_OF_YEAR, 1)
     }
     return Pair(completed, 7)
+}
+
+fun hasUsageStatsPermission(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager ?: return false
+    val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        appOps.unsafeCheckOpNoThrow(
+            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            context.packageName
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        appOps.checkOpNoThrow(
+            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            context.packageName
+        )
+    }
+    return mode == android.app.AppOpsManager.MODE_ALLOWED
 }
