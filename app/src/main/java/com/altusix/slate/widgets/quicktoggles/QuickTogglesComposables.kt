@@ -380,7 +380,7 @@ fun generateMinimalistToolbarBitmap(
 
     val outerRadius = getStandardCornerRadius(scaleFactor)
     val pad = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(6f * scaleFactor, 10f * scaleFactor)
-    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(5f * scaleFactor, 8f * scaleFactor)
+    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.06f).coerceIn(4f * scaleFactor, 8f * scaleFactor)
     val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
@@ -393,8 +393,10 @@ fun generateMinimalistToolbarBitmap(
     val pillW = (contentRect.width() - (gap * (count - 1))) / count
     val pillH = contentRect.height()
 
-    val defaultInnerR = pillH * 0.32f
-    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(pillH * 0.48f)
+    // Balanced Bento corner radius: governed by width to prevent ballooning
+    val minDim = minOf(pillW, pillH)
+    val defaultInnerR = (minDim * 0.22f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val outerCornerR = (outerRadius - pad).coerceIn(defaultInnerR, minDim * 0.38f)
 
     for (i in 0 until count) {
         val item = items[i]
@@ -410,14 +412,23 @@ fun generateMinimalistToolbarBitmap(
         val path = createCornerPath(pillRect, tl, tr, br, bl)
 
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isEnabled) accentColor else (if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+            color = if (isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
             style = Paint.Style.FILL
         }
         canvas.drawPath(path, bgPaint)
 
+        if (!isEnabled) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(18, 255, 255, 255)
+                style = Paint.Style.STROKE
+                strokeWidth = 1f * scaleFactor
+            }
+            canvas.drawPath(path, borderPaint)
+        }
+
         val cx = pillRect.centerX()
         val cy = pillRect.centerY()
-        val iconSize = pillH * 0.46f
+        val iconSize = (minDim * 0.44f).coerceIn(18f * scaleFactor, 26f * scaleFactor)
         val iconColor = if (isEnabled) activeContentColor else secondaryTextColor
 
         drawToggleIcon(
