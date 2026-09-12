@@ -41,29 +41,25 @@ fun getQuickTogglesWidgetsCatalog(): List<SlateWidgetInfo> {
 fun updateAllQuickTogglesWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context) ?: return
     val receivers = listOf(
-        QuickTogglesControlCenterReceiver::class.java,
-        QuickTogglesToolbarReceiver::class.java,
-        QuickTogglesConnectivityReceiver::class.java,
-        QuickTogglesQuadReceiver::class.java,
-        QuickTogglesAlertSliderHReceiver::class.java,
-        QuickTogglesAlertSliderVReceiver::class.java,
-        QuickTogglesTorchSwitchReceiver::class.java,
-        QuickTogglesWifiPillReceiver::class.java,
-        QuickTogglesBluetoothPillReceiver::class.java,
-        QuickTogglesSoundPillReceiver::class.java,
-        QuickTogglesRotatePillReceiver::class.java,
-        QuickTogglesUtilityDeckReceiver::class.java,
-        QuickTogglesMicroTorchReceiver::class.java,
-        QuickTogglesMicroSoundReceiver::class.java
+        QuickTogglesControlCenterReceiver(),
+        QuickTogglesToolbarReceiver(),
+        QuickTogglesConnectivityReceiver(),
+        QuickTogglesQuadReceiver(),
+        QuickTogglesAlertSliderHReceiver(),
+        QuickTogglesAlertSliderVReceiver(),
+        QuickTogglesTorchSwitchReceiver(),
+        QuickTogglesWifiPillReceiver(),
+        QuickTogglesBluetoothPillReceiver(),
+        QuickTogglesSoundPillReceiver(),
+        QuickTogglesRotatePillReceiver(),
+        QuickTogglesUtilityDeckReceiver(),
+        QuickTogglesMicroTorchReceiver(),
+        QuickTogglesMicroSoundReceiver()
     )
-    for (receiverClass in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiverClass).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
+        for (id in ids) {
+            receiver.updateSingleWidget(context, manager, id)
         }
     }
 }
@@ -145,6 +141,8 @@ abstract class BaseQuickTogglesReceiver(
         const val EXTRA_SLIDER_MODE = "extra_slider_mode"
     }
 
+    open fun getLayoutResId(wDp: Int, hDp: Int, isResponsive: Boolean): Int = layoutResId
+
     abstract fun renderWidgetBitmap(
         context: Context,
         appWidgetId: Int,
@@ -177,7 +175,7 @@ abstract class BaseQuickTogglesReceiver(
                 val success = QuickTogglesStateManager.toggleAutoRotate(context)
                 if (!success) {
                     try {
-                        context.startActivity(QuickTogglesStateManager.createWriteSettingsIntent())
+                        context.startActivity(QuickTogglesStateManager.createWriteSettingsIntent(context))
                     } catch (_: Exception) {
                         context.startActivity(QuickTogglesStateManager.createDisplaySettingsIntent())
                     }
@@ -190,12 +188,24 @@ abstract class BaseQuickTogglesReceiver(
                 updateAllQuickTogglesWidgets(context)
                 return
             }
-            // Real-time system state updates
+            // Real-time system hardware broadcasts & screen wake
+            "android.net.wifi.WIFI_AP_STATE_CHANGED" -> {
+                val apState = intent.getIntExtra("wifi_state", 0)
+                context.getSharedPreferences("slate_toggles_prefs", Context.MODE_PRIVATE)
+                    .edit().putBoolean("hotspot_broadcast_state", apState == 13).apply()
+                updateAllQuickTogglesWidgets(context)
+                return
+            }
             "android.net.wifi.WIFI_STATE_CHANGED",
+            "android.net.wifi.STATE_CHANGE",
             "android.net.conn.CONNECTIVITY_CHANGE",
             "android.bluetooth.adapter.action.STATE_CHANGED",
+            "android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED",
             "android.media.RINGER_MODE_CHANGED",
+            "android.location.PROVIDERS_CHANGED",
+            "android.location.MODE_CHANGED",
             Intent.ACTION_AIRPLANE_MODE_CHANGED,
+            Intent.ACTION_USER_PRESENT,
             "android.os.action.POWER_SAVE_MODE_CHANGED" -> {
                 updateAllQuickTogglesWidgets(context)
                 return
@@ -225,34 +235,17 @@ abstract class BaseQuickTogglesReceiver(
 
             val isResponsive = if (id == -1) false else parseAndLockIsResponsive(context, id)
             val bitmap = renderWidgetBitmap(context, id, config, isResponsive, wDp, hDp)
-            val views = RemoteViews(context.packageName, layoutResId)
 
-            // Dynamically select target ImageView ID based on layout
-            val imageViewId = if (layoutResId == R.layout.widget_base_grid_4x2) R.id.widget_image_view else R.id.widget_canvas_surface
+            // Dynamic layout resolution based on orientation/aspect ratio
+            val activeLayoutId = getLayoutResId(wDp, hDp, isResponsive)
+            val views = RemoteViews(context.packageName, activeLayoutId)
+
+            val isSharedGrid = activeLayoutId == R.layout.widget_base_grid_4x2 || activeLayoutId == R.layout.widget_base_grid_2x4
+            val imageViewId = if (isSharedGrid) R.id.widget_image_view else R.id.widget_canvas_surface
             views.setImageViewBitmap(imageViewId, bitmap)
 
-            val rootLayoutId = if (layoutResId == R.layout.widget_base_grid_4x2) R.id.layout_grid_root else R.id.layout_toggles_root
-
-            // Letterbox margins for Fixed Aspect mode
-            if (!isResponsive) {
-                val density = context.resources.displayMetrics.density
-                val currentAspect = wDp.toFloat() / hDp.toFloat().coerceAtLeast(1f)
-                val padH: Int
-                val padV: Int
-
-                if (currentAspect > targetAspect) {
-                    val contentW = hDp * targetAspect
-                    padH = (((wDp - contentW) / 2f) * density).toInt()
-                    padV = 0
-                } else {
-                    val contentH = wDp / targetAspect
-                    padH = 0
-                    padV = (((hDp - contentH) / 2f) * density).toInt()
-                }
-                views.setViewPadding(rootLayoutId, padH, padV, padH, padV)
-            } else {
-                views.setViewPadding(rootLayoutId, 0, 0, 0, 0)
-            }
+            val rootLayoutId = if (isSharedGrid) R.id.layout_grid_root else R.id.layout_toggles_root
+            views.setViewPadding(rootLayoutId, 0, 0, 0, 0)
 
             setupTouchTargets(context, views, id)
             manager.updateAppWidget(id, views)
@@ -272,44 +265,60 @@ abstract class BaseQuickTogglesReceiver(
         }
         return PendingIntent.getBroadcast(
             context,
-            appWidgetId * 100 + requestCode,
+            appWidgetId * 1000 + requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
-    protected fun createActivityPendingIntent(context: Context, intent: Intent, appWidgetId: Int, requestCode: Int): PendingIntent {
+    protected fun createTrampolineActivityPendingIntent(context: Context, targetIntent: Intent, appWidgetId: Int, requestCode: Int): PendingIntent {
+        val trampolineIntent = Intent(context, QuickTogglesTrampolineActivity::class.java).apply {
+            putExtra(QuickTogglesTrampolineActivity.EXTRA_TARGET_INTENT, targetIntent)
+            data = Uri.parse("slate_toggles_trampoline://$appWidgetId/$requestCode")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
         return PendingIntent.getActivity(
             context,
-            appWidgetId * 100 + requestCode,
-            intent,
+            appWidgetId * 1000 + requestCode,
+            trampolineIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 }
 
 // =========================================================================
-// 1. CONTROL CENTER DECK (4x2)
+// 1. CONTROL CENTER DECK (4x2 or 2x4 Dynamic Grid)
 // =========================================================================
 
 class QuickTogglesControlCenterReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_grid_4x2, targetAspect = 2.0f) {
+
+    override fun getLayoutResId(wDp: Int, hDp: Int, isResponsive: Boolean): Int {
+        val isTallMode = isResponsive && (wDp.toFloat() / hDp.toFloat() < 1.15f)
+        return if (isTallMode) R.layout.widget_base_grid_2x4 else R.layout.widget_base_grid_4x2
+    }
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateControlCenterDeckBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        // Row 1: Slots 0 to 3
-        views.setOnClickPendingIntent(R.id.touch_slot_0, createActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0))
-        views.setOnClickPendingIntent(R.id.touch_slot_1, createActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1))
+        // Slot 0: Wi-Fi
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0))
+        // Slot 1: Bluetooth
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1))
+        // Slot 2: Torch
         views.setOnClickPendingIntent(R.id.touch_slot_2, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 2))
+        // Slot 3: Sound
         views.setOnClickPendingIntent(R.id.touch_slot_3, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 3))
-
-        // Row 2: Slots 4 to 7
+        // Slot 4: Auto-Rotate
         views.setOnClickPendingIntent(R.id.touch_slot_4, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 4))
-        views.setOnClickPendingIntent(R.id.touch_slot_5, createActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(), appWidgetId, 5))
-        views.setOnClickPendingIntent(R.id.touch_slot_6, createActivityPendingIntent(context, QuickTogglesStateManager.createLocationIntent(), appWidgetId, 6))
-        views.setOnClickPendingIntent(R.id.touch_slot_7, createActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 7))
+        // Slot 5: Hotspot
+        views.setOnClickPendingIntent(R.id.touch_slot_5, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 5))
+        // Slot 6: Location
+        views.setOnClickPendingIntent(R.id.touch_slot_6, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createLocationIntent(), appWidgetId, 6))
+        // Slot 7: Dark Mode
+        views.setOnClickPendingIntent(R.id.touch_slot_7, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 7))
     }
 }
 
@@ -324,8 +333,8 @@ class QuickTogglesToolbarReceiver : BaseQuickTogglesReceiver(R.layout.widget_tog
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_0, createActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0))
-        views.setOnClickPendingIntent(R.id.btn_toggle_1, createActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1))
+        views.setOnClickPendingIntent(R.id.btn_toggle_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0))
+        views.setOnClickPendingIntent(R.id.btn_toggle_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1))
         views.setOnClickPendingIntent(R.id.btn_toggle_2, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 2))
         views.setOnClickPendingIntent(R.id.btn_toggle_3, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 3))
         views.setOnClickPendingIntent(R.id.btn_toggle_4, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 4))
@@ -343,8 +352,8 @@ class QuickTogglesConnectivityReceiver : BaseQuickTogglesReceiver(R.layout.widge
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_wifi, createActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 10))
-        views.setOnClickPendingIntent(R.id.btn_toggle_bt, createActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 11))
+        views.setOnClickPendingIntent(R.id.btn_toggle_wifi, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 10))
+        views.setOnClickPendingIntent(R.id.btn_toggle_bt, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 11))
     }
 }
 
@@ -359,8 +368,8 @@ class QuickTogglesQuadReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggle
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_tl, createActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 20))
-        views.setOnClickPendingIntent(R.id.btn_toggle_tr, createActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 21))
+        views.setOnClickPendingIntent(R.id.btn_toggle_tl, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 20))
+        views.setOnClickPendingIntent(R.id.btn_toggle_tr, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 21))
         views.setOnClickPendingIntent(R.id.btn_toggle_bl, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 22))
         views.setOnClickPendingIntent(R.id.btn_toggle_br, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 23))
     }
@@ -426,7 +435,7 @@ class QuickTogglesWifiPillReceiver : BaseQuickTogglesReceiver(R.layout.widget_to
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_pill, createActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 60))
+        views.setOnClickPendingIntent(R.id.btn_toggle_pill, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 60))
     }
 }
 
@@ -441,7 +450,7 @@ class QuickTogglesBluetoothPillReceiver : BaseQuickTogglesReceiver(R.layout.widg
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_pill, createActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 70))
+        views.setOnClickPendingIntent(R.id.btn_toggle_pill, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 70))
     }
 }
 
@@ -486,18 +495,12 @@ class QuickTogglesUtilityDeckReceiver : BaseQuickTogglesReceiver(R.layout.widget
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        // 0: Timeout (Direct cycle)
         views.setOnClickPendingIntent(R.id.btn_util_0, createBroadcastPendingIntent(context, ACTION_CYCLE_TIMEOUT, appWidgetId, 100))
-        // 1: Auto-Rotate (Direct toggle)
         views.setOnClickPendingIntent(R.id.btn_util_1, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 101))
-        // 2: Battery Saver
-        views.setOnClickPendingIntent(R.id.btn_util_2, createActivityPendingIntent(context, QuickTogglesStateManager.createBatterySaverIntent(), appWidgetId, 102))
-        // 3: Dark Mode
-        views.setOnClickPendingIntent(R.id.btn_util_3, createActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 103))
-        // 4: Airplane Mode
-        views.setOnClickPendingIntent(R.id.btn_util_4, createActivityPendingIntent(context, QuickTogglesStateManager.createAirplaneIntent(), appWidgetId, 104))
-        // 5: Hotspot
-        views.setOnClickPendingIntent(R.id.btn_util_5, createActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(), appWidgetId, 105))
+        views.setOnClickPendingIntent(R.id.btn_util_2, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBatterySaverIntent(), appWidgetId, 102))
+        views.setOnClickPendingIntent(R.id.btn_util_3, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 103))
+        views.setOnClickPendingIntent(R.id.btn_util_4, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createAirplaneIntent(), appWidgetId, 104))
+        views.setOnClickPendingIntent(R.id.btn_util_5, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 105))
     }
 }
 

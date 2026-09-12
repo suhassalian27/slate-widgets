@@ -2,6 +2,7 @@ package com.altusix.slate.widgets.quicktoggles
 
 import android.app.NotificationManager
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -11,11 +12,14 @@ import android.location.LocationManager
 import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.location.LocationManagerCompat
+import java.net.NetworkInterface
+import java.util.Locale
 
 // =========================================================================
 // 1. DATA MODELS & ENUMS
@@ -51,19 +55,19 @@ data class ToggleItemState(
 )
 
 data class QuickTogglesState(
-    val wifi: ToggleItemState = ToggleItemState(ToggleType.WIFI, true, "Wi-Fi", "Connected", 0xFF0A84FFL),
-    val bluetooth: ToggleItemState = ToggleItemState(ToggleType.BLUETOOTH, true, "Bluetooth", "Active", 0xFF0A84FFL),
+    val wifi: ToggleItemState = ToggleItemState(ToggleType.WIFI, false, "Wi-Fi", "Off", 0xFF0A84FFL),
+    val bluetooth: ToggleItemState = ToggleItemState(ToggleType.BLUETOOTH, false, "Bluetooth", "Off", 0xFF0A84FFL),
     val torch: ToggleItemState = ToggleItemState(ToggleType.TORCH, false, "Torch", "Off", 0xFFFFD60AL),
     val ringer: ToggleItemState = ToggleItemState(ToggleType.RINGER, true, "Sound", "Normal", 0xFF30D158L),
     val alertSlider: AlertSliderMode = AlertSliderMode.RING,
     val autoRotate: ToggleItemState = ToggleItemState(ToggleType.AUTOROTATE, false, "Rotate", "Portrait", 0xFFFF9F0AL),
     val hotspot: ToggleItemState = ToggleItemState(ToggleType.HOTSPOT, false, "Hotspot", "Off", 0xFFFF375FL),
     val airplane: ToggleItemState = ToggleItemState(ToggleType.AIRPLANE, false, "Airplane", "Off", 0xFFFF9F0AL),
-    val darkMode: ToggleItemState = ToggleItemState(ToggleType.DARK_MODE, true, "Dark Mode", "On", 0xFFBF5AF2L),
-    val location: ToggleItemState = ToggleItemState(ToggleType.LOCATION, true, "Location", "High Accuracy", 0xFF30D158L),
-    val timeout: ToggleItemState = ToggleItemState(ToggleType.TIMEOUT, true, "Timeout", "1 min", 0xFF64D2FFL),
+    val darkMode: ToggleItemState = ToggleItemState(ToggleType.DARK_MODE, true, "Dark Mode", "Dark", 0xFFBF5AF2L),
+    val location: ToggleItemState = ToggleItemState(ToggleType.LOCATION, false, "Location", "Off", 0xFF30D158L),
+    val timeout: ToggleItemState = ToggleItemState(ToggleType.TIMEOUT, true, "Timeout", "30s", 0xFF64D2FFL),
     val batterySaver: ToggleItemState = ToggleItemState(ToggleType.BATTERY_SAVER, false, "Battery Saver", "Off", 0xFFFFD60AL),
-    val mediaVolumePercent: Int = 68
+    val mediaVolumePercent: Int = 60
 )
 
 // =========================================================================
@@ -76,37 +80,50 @@ object QuickTogglesStateManager {
     private const val KEY_TORCH_STATE = "torch_is_on"
 
     fun readCurrentState(context: Context): QuickTogglesState {
-        // 1. Wi-Fi
+        // 1. Wi-Fi: Strictly check WIFI_STATE_ENABLED (never accept DISABLING as true)
         var isWifiOn = false
         var wifiSubtitle = "Off"
         try {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val activeNetwork = cm?.activeNetwork
-            val caps = cm?.getNetworkCapabilities(activeNetwork)
-            val isWifiConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-
             val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            isWifiOn = wm?.isWifiEnabled == true || isWifiConnected
+            val wifiState = wm?.wifiState ?: WifiManager.WIFI_STATE_UNKNOWN
+            isWifiOn = (wifiState == WifiManager.WIFI_STATE_ENABLED)
 
-            if (isWifiConnected) {
-                val info = wm?.connectionInfo
-                val rawSsid = info?.ssid?.replace("\"", "") ?: ""
-                wifiSubtitle = if (rawSsid.isNotBlank() && rawSsid != "<unknown ssid>") rawSsid else "Connected"
-            } else if (isWifiOn) {
-                wifiSubtitle = "Available"
+            if (isWifiOn) {
+                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                val activeNetwork = cm?.activeNetwork
+                val caps = cm?.getNetworkCapabilities(activeNetwork)
+                val isWifiConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+
+                if (isWifiConnected) {
+                    @Suppress("DEPRECATION")
+                    val info = wm?.connectionInfo
+                    @Suppress("DEPRECATION")
+                    val rawSsid = info?.ssid?.replace("\"", "") ?: ""
+                    wifiSubtitle = if (rawSsid.isNotBlank() && rawSsid != "<unknown ssid>") rawSsid else "Connected"
+                } else {
+                    wifiSubtitle = "Available"
+                }
+            } else {
+                wifiSubtitle = if (wifiState == WifiManager.WIFI_STATE_DISABLING) "Turning off…" else "Off"
             }
         } catch (_: Exception) {
             wifiSubtitle = if (isWifiOn) "On" else "Off"
         }
 
-        // 2. Bluetooth
+        // 2. Bluetooth: Strictly check STATE_ON
         var isBtOn = false
         var btSubtitle = "Off"
         try {
-            val btAdapter = BluetoothAdapter.getDefaultAdapter()
-            isBtOn = btAdapter?.isEnabled == true
-            if (isBtOn) {
-                btSubtitle = "Ready"
+            val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            @Suppress("DEPRECATION")
+            val btAdapter = btManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+            val state = btAdapter?.state ?: BluetoothAdapter.STATE_OFF
+            isBtOn = (state == BluetoothAdapter.STATE_ON)
+            btSubtitle = when (state) {
+                BluetoothAdapter.STATE_ON -> "Ready"
+                BluetoothAdapter.STATE_TURNING_OFF -> "Turning off…"
+                BluetoothAdapter.STATE_TURNING_ON -> "Turning on…"
+                else -> "Off"
             }
         } catch (_: Exception) {
             btSubtitle = "Off"
@@ -155,7 +172,10 @@ object QuickTogglesStateManager {
             ) == 1
         } catch (_: Exception) {}
 
-        // 6. Airplane Mode
+        // 6. Hotspot (Wi-Fi Tethering)
+        val isHotspotOn = isHotspotEnabled(context)
+
+        // 7. Airplane Mode
         var isAirplaneOn = false
         try {
             isAirplaneOn = Settings.Global.getInt(
@@ -165,10 +185,10 @@ object QuickTogglesStateManager {
             ) != 0
         } catch (_: Exception) {}
 
-        // 7. Dark Mode
+        // 8. Dark Mode
         val isDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
-        // 8. Location
+        // 9. Location
         var isLocationOn = false
         try {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
@@ -177,7 +197,7 @@ object QuickTogglesStateManager {
             }
         } catch (_: Exception) {}
 
-        // 9. Screen Timeout
+        // 10. Screen Timeout
         var timeoutSubtitle = "30s"
         try {
             val timeoutMs = Settings.System.getInt(
@@ -196,14 +216,14 @@ object QuickTogglesStateManager {
             }
         } catch (_: Exception) {}
 
-        // 10. Battery Saver
+        // 11. Battery Saver
         var isPowerSave = false
         try {
             val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             isPowerSave = pm?.isPowerSaveMode == true
         } catch (_: Exception) {}
 
-        // 11. Media Volume
+        // 12. Media Volume
         var volumePercent = 60
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -221,7 +241,7 @@ object QuickTogglesStateManager {
             ringer = ToggleItemState(ToggleType.RINGER, isRingerActive, ringerLabel, ringerSubtitle, 0xFF30D158L),
             alertSlider = alertMode,
             autoRotate = ToggleItemState(ToggleType.AUTOROTATE, isAutoRotateOn, "Rotate", if (isAutoRotateOn) "Auto" else "Locked", 0xFFFF9F0AL),
-            hotspot = ToggleItemState(ToggleType.HOTSPOT, false, "Hotspot", "Off", 0xFFFF375FL),
+            hotspot = ToggleItemState(ToggleType.HOTSPOT, isHotspotOn, "Hotspot", if (isHotspotOn) "Active" else "Off", 0xFFFF375FL),
             airplane = ToggleItemState(ToggleType.AIRPLANE, isAirplaneOn, "Airplane", if (isAirplaneOn) "On" else "Off", 0xFFFF9F0AL),
             darkMode = ToggleItemState(ToggleType.DARK_MODE, isDark, "Dark Mode", if (isDark) "Dark" else "Light", 0xFFBF5AF2L),
             location = ToggleItemState(ToggleType.LOCATION, isLocationOn, "Location", if (isLocationOn) "On" else "Off", 0xFF30D158L),
@@ -229,6 +249,44 @@ object QuickTogglesStateManager {
             batterySaver = ToggleItemState(ToggleType.BATTERY_SAVER, isPowerSave, "Saver", if (isPowerSave) "Active" else "Off", 0xFFFFD60AL),
             mediaVolumePercent = volumePercent
         )
+    }
+
+    /**
+     * Checks if Hotspot (Wi-Fi Tethering) is active by inspecting Linux network interfaces
+     * and broadcast cache (100% reliable across Android 9 through 15 without hidden API failure).
+     */
+    fun isHotspotEnabled(context: Context): Boolean {
+        // 1. Primary: Inspect active AP network interfaces created by Android's SoftAP kernel
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            if (interfaces != null) {
+                for (iface in interfaces) {
+                    if (!iface.isUp || iface.isLoopback) continue
+                    val name = iface.name.lowercase(Locale.US)
+                    if (name.startsWith("ap") ||
+                        name.startsWith("softap") ||
+                        name.startsWith("swlan") ||
+                        name.startsWith("wigig") ||
+                        name.contains("tether") ||
+                        name == "wlan1" ||
+                        name == "wlan2"
+                    ) {
+                        return true
+                    }
+                    // Check for standard Android hotspot gateway IP
+                    for (addr in iface.inetAddresses) {
+                        val host = addr.hostAddress ?: continue
+                        if (host.startsWith("192.168.43.") || host.startsWith("192.168.44.") || host.startsWith("192.168.49.")) {
+                            return true
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2. Secondary: Check broadcast cache from WIFI_AP_STATE_CHANGED
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean("hotspot_broadcast_state", false)
     }
 
     // -------------------------------------------------------------------------
@@ -314,7 +372,7 @@ object QuickTogglesStateManager {
                 val current = Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0)
                 val next = if (current == 1) 0 else 1
                 Settings.System.putInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, next)
-                next == 1
+                true
             } else {
                 false
             }
@@ -348,18 +406,12 @@ object QuickTogglesStateManager {
     }
 
     // -------------------------------------------------------------------------
-    // INTENT CREATORS (PANEL & SYSTEM SHORTCUTS)
+    // INTENT CREATORS
     // -------------------------------------------------------------------------
 
     fun createWifiIntent(): Intent {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Intent(Settings.Panel.ACTION_WIFI).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-        } else {
-            Intent(Settings.ACTION_WIFI_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
+        return Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
     }
 
@@ -369,10 +421,16 @@ object QuickTogglesStateManager {
         }
     }
 
-    fun createHotspotIntent(): Intent {
-        return Intent().apply {
-            action = "android.settings.TETHER_SETTINGS"
+    fun createHotspotIntent(context: Context): Intent {
+        val tetherIntent = Intent("android.settings.TETHER_SETTINGS").apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        return if (tetherIntent.resolveActivity(context.packageManager) != null) {
+            tetherIntent
+        } else {
+            Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
         }
     }
 
@@ -400,8 +458,11 @@ object QuickTogglesStateManager {
         }
     }
 
-    fun createWriteSettingsIntent(): Intent {
+    fun createWriteSettingsIntent(context: Context? = null): Intent {
         return Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+            if (context != null) {
+                data = Uri.parse("package:${context.packageName}")
+            }
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
     }

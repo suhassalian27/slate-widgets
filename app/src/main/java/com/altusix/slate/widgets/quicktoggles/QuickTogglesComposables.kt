@@ -50,6 +50,22 @@ private fun drawCardBackground(
 }
 
 /**
+ * Creates a rounded rectangle path with individual corner radii.
+ */
+private fun createCornerPath(
+    rect: RectF,
+    tl: Float,
+    tr: Float,
+    br: Float,
+    bl: Float
+): Path {
+    val path = Path()
+    val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+    path.addRoundRect(rect, radii, Path.Direction.CW)
+    return path
+}
+
+/**
  * Draws an Android Vector Drawable scaled to [size] centered at ([cx], [cy]) with tint [color].
  */
 private fun drawVectorDrawable(
@@ -110,7 +126,7 @@ private fun drawToggleIcon(
 }
 
 // =========================================================================
-// 1. CONTROL CENTER DECK (4x2 - 8 TILES)
+// 1. CONTROL CENTER DECK (4x2 - Full Bento Dashboard)
 // =========================================================================
 
 fun generateControlCenterDeckBitmap(
@@ -125,31 +141,52 @@ fun generateControlCenterDeckBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
-        val targetAspect = 2.0f
-        val currentAspect = w / h
-        if (currentAspect > targetAspect) {
-            val contentW = h * targetAspect
-            RectF((w - contentW) / 2f, 0f, (w + contentW) / 2f, h)
-        } else {
-            val contentH = w / targetAspect
-            RectF(0f, (h - contentH) / 2f, w, (h + contentH) / 2f)
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h
+        var cardW = cardH * targetRatio
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetRatio
         }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
     val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    val paddingH = 12f * scaleFactor
-    val paddingV = 10f * scaleFactor
-    val contentRect = RectF(cardRect.left + paddingH, cardRect.top + paddingV, cardRect.right - paddingH, cardRect.bottom - paddingV)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
 
-    val cols = 4
-    val rows = 2
-    val gap = 7f * scaleFactor
+    // Equal padding on all 4 sides
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.04f).coerceIn(5f * scaleFactor, 10f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+
+    // Responsive columns: Automatically switches to 2x4 in tall portrait widgets
+    val isTallMode = isResponsive && (cardRect.width() / cardRect.height() < 1.15f)
+    val cols = if (isTallMode) 2 else 4
+    val rows = if (isTallMode) 4 else 2
+
     val cellW = (contentRect.width() - (gap * (cols - 1))) / cols
     val cellH = (contentRect.height() - (gap * (rows - 1))) / rows
-    val cellRadius = 12f * scaleFactor
+
+    // Concentric corner radius matches the outer widget curve
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(cellW, cellH) * 0.22f)
+    val outerCornerR = (outerRadius - pad)
+        .coerceAtLeast(defaultInnerR)
+        .coerceAtMost(minOf(cellW, cellH) * 0.48f)
+
+    // Dynamic contrast colors for solid accent tiles
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+    val activeSubColor = if (isAccentLight) Color.argb(185, 0, 0, 0) else Color.argb(200, 255, 255, 255)
 
     val toggles = listOf(
         state.wifi,
@@ -162,8 +199,39 @@ fun generateControlCenterDeckBitmap(
         state.darkMode
     )
 
-    val fontRegular = getSlateFont(context, 400)
+    val fontRegular = getSlateFont(context, 500)
     val fontBold = getSlateFont(context, 700)
+
+    val showSubtitle = cellH >= 46f * scaleFactor
+    val showTitle = cellH >= 34f * scaleFactor
+
+    val titleSize = (cellH * 0.17f).coerceIn(9.5f * scaleFactor, 12.5f * scaleFactor)
+    val subSize = (cellH * 0.13f).coerceIn(8.0f * scaleFactor, 10.5f * scaleFactor)
+    val iconSize = if (showSubtitle && showTitle) {
+        (cellH * 0.36f).coerceIn(20f * scaleFactor, 30f * scaleFactor)
+    } else if (showTitle) {
+        (cellH * 0.44f).coerceIn(22f * scaleFactor, 36f * scaleFactor)
+    } else {
+        (minOf(cellW, cellH) * 0.55f).coerceIn(24f * scaleFactor, 42f * scaleFactor)
+    }
+
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
+    }
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = fontBold
+        textSize = titleSize
+        textAlign = Paint.Align.CENTER
+    }
+
+    val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = fontRegular
+        textSize = subSize
+        textAlign = Paint.Align.CENTER
+    }
 
     for (idx in toggles.indices) {
         val r = idx / cols
@@ -175,62 +243,104 @@ fun generateControlCenterDeckBitmap(
         val item = toggles[idx]
         val isEnabled = item.isEnabled
 
-        // Cell background
-        val tileBgColor = if (isEnabled) {
-            Color.argb(42, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-        } else {
-            Color.argb(22, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
-        }
-        val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = tileBgColor
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(cellRect, cellRadius, cellRadius, tilePaint)
+        // Outer-facing corners match the widget's outer border radius
+        val tl = if (r == 0 && c == 0) outerCornerR else defaultInnerR
+        val tr = if (r == 0 && c == cols - 1) outerCornerR else defaultInnerR
+        val br = if (r == rows - 1 && c == cols - 1) outerCornerR else defaultInnerR
+        val bl = if (r == rows - 1 && c == 0) outerCornerR else defaultInnerR
+        val cellPath = createCornerPath(cellRect, tl, tr, br, bl)
 
-        // Active border
+        // Solid accent background when active
         if (isEnabled) {
-            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = Color.argb(90, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-                style = Paint.Style.STROKE
-                strokeWidth = 1.2f * scaleFactor
-            }
-            canvas.drawRoundRect(cellRect, cellRadius, cellRadius, borderPaint)
+            tilePaint.color = accentColor
+            canvas.drawPath(cellPath, tilePaint)
+        } else {
+            tilePaint.color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+            canvas.drawPath(cellPath, tilePaint)
+
+            borderPaint.color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(18, 255, 255, 255)
+            canvas.drawPath(cellPath, borderPaint)
         }
 
-        // Draw Icon
-        val iconSize = minOf(cellW * 0.38f, cellH * 0.44f)
-        val iconCx = cellRect.left + cellW * 0.28f
-        val iconCy = cellRect.centerY()
-        val iconColor = if (isEnabled) accentColor else secondaryTextColor
+        val cx = cellRect.centerX()
+        val iconColor = if (isEnabled) activeContentColor else secondaryTextColor
 
-        drawToggleIcon(
-            context = context,
-            canvas = canvas,
-            type = item.type,
-            cx = iconCx,
-            cy = iconCy,
-            size = iconSize,
-            color = iconColor,
-            isEnabled = isEnabled,
-            alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
-        )
+        if (showSubtitle && showTitle) {
+            val iconCy = cellRect.top + (cellH * 0.34f)
+            drawToggleIcon(
+                context = context,
+                canvas = canvas,
+                type = item.type,
+                cx = cx,
+                cy = iconCy,
+                size = iconSize,
+                color = iconColor,
+                isEnabled = isEnabled,
+                alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+            )
 
-        // Draw Texts (Label + Subtitle)
-        val textLeft = cellRect.left + cellW * 0.52f
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isEnabled) primaryTextColor else secondaryTextColor
-            typeface = fontBold
-            textSize = 10.5f * scaleFactor
+            // Title
+            titlePaint.color = if (isEnabled) activeContentColor else primaryTextColor
+            val titleBaseline = iconCy + (iconSize / 2f) + (titleSize * 0.95f) + (2f * scaleFactor)
+            val maxTextW = cellW - (10f * scaleFactor)
+            val elidedTitle = android.text.TextUtils.ellipsize(
+                item.label,
+                android.text.TextPaint(titlePaint),
+                maxTextW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedTitle, cx, titleBaseline, titlePaint)
+
+            // Subtitle
+            subPaint.color = if (isEnabled) activeSubColor else secondaryTextColor
+            val subBaseline = titleBaseline + subSize + (2.5f * scaleFactor)
+            val elidedSub = android.text.TextUtils.ellipsize(
+                item.subtitle,
+                android.text.TextPaint(subPaint),
+                maxTextW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedSub, cx, subBaseline, subPaint)
+
+        } else if (showTitle) {
+            val iconCy = cellRect.top + (cellH * 0.40f)
+            drawToggleIcon(
+                context = context,
+                canvas = canvas,
+                type = item.type,
+                cx = cx,
+                cy = iconCy,
+                size = iconSize,
+                color = iconColor,
+                isEnabled = isEnabled,
+                alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+            )
+
+            titlePaint.color = if (isEnabled) activeContentColor else primaryTextColor
+            val titleBaseline = cellRect.bottom - (cellH * 0.16f)
+            val maxTextW = cellW - (10f * scaleFactor)
+            val elidedTitle = android.text.TextUtils.ellipsize(
+                item.label,
+                android.text.TextPaint(titlePaint),
+                maxTextW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedTitle, cx, titleBaseline, titlePaint)
+
+        } else {
+            // Compact icon-only fallback
+            drawToggleIcon(
+                context = context,
+                canvas = canvas,
+                type = item.type,
+                cx = cx,
+                cy = cellRect.centerY(),
+                size = iconSize,
+                color = iconColor,
+                isEnabled = isEnabled,
+                alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+            )
         }
-        canvas.drawText(item.label, textLeft, cellRect.centerY() - 1f * scaleFactor, titlePaint)
-
-        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isEnabled) accentColor else Color.argb(120, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
-            typeface = fontRegular
-            textSize = 8.5f * scaleFactor
-        }
-        val subText = if (item.subtitle.length > 8) item.subtitle.take(7) + "…" else item.subtitle
-        canvas.drawText(subText, textLeft, cellRect.centerY() + 10f * scaleFactor, subPaint)
     }
 
     return bitmap
@@ -266,17 +376,25 @@ fun generateMinimalistToolbarBitmap(
 
     val (_, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    val paddingH = 10f * scaleFactor
-    val paddingV = 6f * scaleFactor
-    val contentRect = RectF(cardRect.left + paddingH, cardRect.top + paddingV, cardRect.right - paddingH, cardRect.bottom - paddingV)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(6f * scaleFactor, 10f * scaleFactor)
+    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(5f * scaleFactor, 8f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
 
     val items = listOf(state.wifi, state.bluetooth, state.torch, state.ringer, state.autoRotate)
     val count = items.size
-    val gap = 8f * scaleFactor
     val pillW = (contentRect.width() - (gap * (count - 1))) / count
     val pillH = contentRect.height()
-    val pillRadius = pillH * 0.40f
+
+    val defaultInnerR = pillH * 0.32f
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(pillH * 0.48f)
 
     for (i in 0 until count) {
         val item = items[i]
@@ -284,30 +402,23 @@ fun generateMinimalistToolbarBitmap(
         val left = contentRect.left + i * (pillW + gap)
         val pillRect = RectF(left, contentRect.top, left + pillW, contentRect.top + pillH)
 
-        val pillBg = if (isEnabled) {
-            Color.argb(45, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-        } else {
-            Color.argb(20, Color.red(secondaryTextColor), Color.green(secondaryTextColor), Color.blue(secondaryTextColor))
-        }
+        val tl = if (i == 0) outerCornerR else defaultInnerR
+        val bl = if (i == 0) outerCornerR else defaultInnerR
+        val tr = if (i == count - 1) outerCornerR else defaultInnerR
+        val br = if (i == count - 1) outerCornerR else defaultInnerR
+
+        val path = createCornerPath(pillRect, tl, tr, br, bl)
+
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = pillBg
+            color = if (isEnabled) accentColor else (if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(22, 255, 255, 255))
             style = Paint.Style.FILL
         }
-        canvas.drawRoundRect(pillRect, pillRadius, pillRadius, bgPaint)
-
-        if (isEnabled) {
-            val bPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = Color.argb(90, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-                style = Paint.Style.STROKE
-                strokeWidth = 1.2f * scaleFactor
-            }
-            canvas.drawRoundRect(pillRect, pillRadius, pillRadius, bPaint)
-        }
+        canvas.drawPath(path, bgPaint)
 
         val cx = pillRect.centerX()
-        val cy = pillRect.centerY() - 2f * scaleFactor
-        val iconSize = pillH * 0.42f
-        val iconColor = if (isEnabled) accentColor else secondaryTextColor
+        val cy = pillRect.centerY()
+        val iconSize = pillH * 0.46f
+        val iconColor = if (isEnabled) activeContentColor else secondaryTextColor
 
         drawToggleIcon(
             context = context,
@@ -320,15 +431,6 @@ fun generateMinimalistToolbarBitmap(
             isEnabled = isEnabled,
             alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
         )
-
-        // Active Status Dot underneath
-        if (isEnabled) {
-            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = accentColor
-                style = Paint.Style.FILL
-            }
-            canvas.drawCircle(cx, pillRect.bottom - 5.5f * scaleFactor, 1.8f * scaleFactor, dotPaint)
-        }
     }
 
     return bitmap
@@ -357,38 +459,52 @@ fun generateConnectivityBentoBitmap(
 
     val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    val pad = 12f * scaleFactor
-    val contentW = cardRect.width() - pad * 2
-    val halfH = (cardRect.height() - pad * 3) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.04f).coerceIn(5f * scaleFactor, 10f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
-    val topTileRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + contentW, cardRect.top + pad + halfH)
-    val bottomTileRect = RectF(cardRect.left + pad, topTileRect.bottom + pad, cardRect.left + pad + contentW, topTileRect.bottom + pad + halfH)
-    val tileRadius = 14f * scaleFactor
+    val halfH = (contentRect.height() - gap) / 2f
+    val topTileRect = RectF(contentRect.left, contentRect.top, contentRect.right, contentRect.top + halfH)
+    val bottomTileRect = RectF(contentRect.left, topTileRect.bottom + gap, contentRect.right, contentRect.bottom)
 
-    val fontRegular = getSlateFont(context, 400)
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(halfH * 0.25f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(halfH * 0.48f)
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+    val activeSubColor = if (isAccentLight) Color.argb(185, 0, 0, 0) else Color.argb(200, 255, 255, 255)
+
+    val fontRegular = getSlateFont(context, 500)
     val fontBold = getSlateFont(context, 700)
+    val iconSize = topTileRect.height() * 0.42f
 
     // --- Top: Wi-Fi Card ---
-    val wifiBg = if (state.wifi.isEnabled) Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(22, 255, 255, 255)
-    val wifiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = wifiBg }
-    canvas.drawRoundRect(topTileRect, tileRadius, tileRadius, wifiPaint)
+    val topPath = createCornerPath(topTileRect, outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
+    val topPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (state.wifi.isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(topPath, topPaint)
 
-    val iconCx = topTileRect.left + topTileRect.height() * 0.42f
+    val iconCx = topTileRect.left + topTileRect.height() * 0.44f
     val iconCy = topTileRect.centerY()
-    val iconSize = topTileRect.height() * 0.44f
-    drawVectorDrawable(context, canvas, R.drawable.ic_wifi, iconCx, iconCy, iconSize, if (state.wifi.isEnabled) accentColor else secondaryTextColor)
+    drawVectorDrawable(context, canvas, R.drawable.ic_wifi, iconCx, iconCy, iconSize, if (state.wifi.isEnabled) activeContentColor else secondaryTextColor)
 
-    val textX = iconCx + topTileRect.height() * 0.42f
+    val textX = iconCx + topTileRect.height() * 0.38f
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = primaryTextColor
+        this.color = if (state.wifi.isEnabled) activeContentColor else primaryTextColor
         typeface = fontBold
         textSize = 13.5f * scaleFactor
     }
     canvas.drawText("Wi-Fi", textX, topTileRect.centerY() - 2f * scaleFactor, titlePaint)
 
     val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (state.wifi.isEnabled) accentColor else secondaryTextColor
+        this.color = if (state.wifi.isEnabled) activeSubColor else secondaryTextColor
         typeface = fontRegular
         textSize = 10.5f * scaleFactor
     }
@@ -396,16 +512,20 @@ fun generateConnectivityBentoBitmap(
     canvas.drawText(wifiSub, textX, topTileRect.centerY() + 13f * scaleFactor, subPaint)
 
     // --- Bottom: Bluetooth Card ---
-    val btBg = if (state.bluetooth.isEnabled) Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(22, 255, 255, 255)
-    val btPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = btBg }
-    canvas.drawRoundRect(bottomTileRect, tileRadius, tileRadius, btPaint)
+    val bottomPath = createCornerPath(bottomTileRect, defaultInnerR, defaultInnerR, outerCornerR, outerCornerR)
+    val bottomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (state.bluetooth.isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(bottomPath, bottomPaint)
 
-    val btIconCx = bottomTileRect.left + bottomTileRect.height() * 0.42f
     val btIconCy = bottomTileRect.centerY()
-    drawVectorDrawable(context, canvas, R.drawable.ic_bluetooth, btIconCx, btIconCy, iconSize, if (state.bluetooth.isEnabled) accentColor else secondaryTextColor)
+    drawVectorDrawable(context, canvas, R.drawable.ic_bluetooth, iconCx, btIconCy, iconSize, if (state.bluetooth.isEnabled) activeContentColor else secondaryTextColor)
 
+    titlePaint.color = if (state.bluetooth.isEnabled) activeContentColor else primaryTextColor
     canvas.drawText("Bluetooth", textX, bottomTileRect.centerY() - 2f * scaleFactor, titlePaint)
-    subPaint.color = if (state.bluetooth.isEnabled) accentColor else secondaryTextColor
+
+    subPaint.color = if (state.bluetooth.isEnabled) activeSubColor else secondaryTextColor
     val btSub = if (state.bluetooth.subtitle.length > 14) state.bluetooth.subtitle.take(13) + "…" else state.bluetooth.subtitle
     canvas.drawText(btSub, textX, bottomTileRect.centerY() + 13f * scaleFactor, subPaint)
 
@@ -435,14 +555,23 @@ fun generateQuadActionMatrixBitmap(
 
     val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    val pad = 10f * scaleFactor
-    val gap = 8f * scaleFactor
-    val contentW = cardRect.width() - pad * 2
-    val contentH = cardRect.height() - pad * 2
-    val cellW = (contentW - gap) / 2f
-    val cellH = (contentH - gap) / 2f
-    val cellRadius = 14f * scaleFactor
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.04f).coerceIn(5f * scaleFactor, 10f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+
+    val cellW = (contentRect.width() - gap) / 2f
+    val cellH = (contentRect.height() - gap) / 2f
+
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(cellW, cellH) * 0.25f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minOf(cellW, cellH) * 0.48f)
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
 
     val quads = listOf(state.wifi, state.bluetooth, state.torch, state.ringer)
     val fontBold = getSlateFont(context, 700)
@@ -450,30 +579,30 @@ fun generateQuadActionMatrixBitmap(
     for (i in 0 until 4) {
         val r = i / 2
         val c = i % 2
-        val left = cardRect.left + pad + c * (cellW + gap)
-        val top = cardRect.top + pad + r * (cellH + gap)
+        val left = contentRect.left + c * (cellW + gap)
+        val top = contentRect.top + r * (cellH + gap)
         val rect = RectF(left, top, left + cellW, top + cellH)
 
         val item = quads[i]
         val isEnabled = item.isEnabled
 
-        val bg = if (isEnabled) Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(22, 255, 255, 255)
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg }
-        canvas.drawRoundRect(rect, cellRadius, cellRadius, p)
+        val tl = if (r == 0 && c == 0) outerCornerR else defaultInnerR
+        val tr = if (r == 0 && c == 1) outerCornerR else defaultInnerR
+        val br = if (r == 1 && c == 1) outerCornerR else defaultInnerR
+        val bl = if (r == 1 && c == 0) outerCornerR else defaultInnerR
 
-        if (isEnabled) {
-            val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(80, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-                style = Paint.Style.STROKE
-                strokeWidth = 1.2f * scaleFactor
-            }
-            canvas.drawRoundRect(rect, cellRadius, cellRadius, bp)
+        val path = createCornerPath(rect, tl, tr, br, bl)
+
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+            style = Paint.Style.FILL
         }
+        canvas.drawPath(path, p)
 
         val iconCx = rect.centerX()
         val iconCy = rect.centerY() - 8f * scaleFactor
-        val iconSize = cellH * 0.40f
-        val color = if (isEnabled) accentColor else secondaryTextColor
+        val iconSize = cellH * 0.42f
+        val color = if (isEnabled) activeContentColor else secondaryTextColor
 
         drawToggleIcon(
             context = context,
@@ -488,7 +617,7 @@ fun generateQuadActionMatrixBitmap(
         )
 
         val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isEnabled) primaryTextColor else secondaryTextColor
+            this.color = if (isEnabled) activeContentColor else primaryTextColor
             typeface = fontBold
             textSize = 10.5f * scaleFactor
             textAlign = Paint.Align.CENTER
@@ -527,14 +656,18 @@ fun generateAlertSliderHorizontalBitmap(
         }
     }
 
-    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
+    val (_, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
 
     val fontBold = getSlateFont(context, 700)
 
-    val trackPadH = 14f * scaleFactor
-    val trackPadV = 16f * scaleFactor
-    val trackRect = RectF(cardRect.left + trackPadH, cardRect.top + trackPadV, cardRect.right - trackPadH, cardRect.bottom - trackPadV)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.07f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+    val trackRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
     val trackRadius = trackRect.height() / 2f
 
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -548,7 +681,6 @@ fun generateAlertSliderHorizontalBitmap(
     val modes = listOf(AlertSliderMode.SILENT, AlertSliderMode.VIBRATE, AlertSliderMode.RING)
     val activeIdx = modes.indexOf(mode)
 
-    // Illuminated Sliding Thumb
     val thumbPad = 4f * scaleFactor
     val thumbLeft = trackRect.left + activeIdx * notchW + thumbPad
     val thumbRight = trackRect.left + (activeIdx + 1) * notchW - thumbPad
@@ -563,14 +695,13 @@ fun generateAlertSliderHorizontalBitmap(
     }
     canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, thumbPaint)
 
-    // Draw Notch Icons & Text
     for (i in 0 until notchCount) {
         val nMode = modes[i]
         val nCx = trackRect.left + i * notchW + notchW / 2f
         val isCurrent = (i == activeIdx)
 
         val iconSize = thumbRect.height() * 0.40f
-        val iconColor = if (isCurrent) Color.BLACK else secondaryTextColor
+        val iconColor = if (isCurrent) activeContentColor else secondaryTextColor
 
         val resId = when (nMode) {
             AlertSliderMode.SILENT -> R.drawable.ic_bell_off
@@ -580,7 +711,7 @@ fun generateAlertSliderHorizontalBitmap(
         drawVectorDrawable(context, canvas, resId, nCx, trackRect.centerY() - 6f * scaleFactor, iconSize, iconColor)
 
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isCurrent) Color.BLACK else secondaryTextColor
+            this.color = if (isCurrent) activeContentColor else secondaryTextColor
             typeface = fontBold
             textSize = 9.5f * scaleFactor
             textAlign = Paint.Align.CENTER
@@ -621,11 +752,16 @@ fun generateAlertSliderVerticalBitmap(
 
     val (_, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+
     val fontBold = getSlateFont(context, 700)
 
-    val trackPadH = 12f * scaleFactor
-    val trackPadV = 14f * scaleFactor
-    val trackRect = RectF(cardRect.left + trackPadH, cardRect.top + trackPadV, cardRect.right - trackPadH, cardRect.bottom - trackPadV)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(8f * scaleFactor, 14f * scaleFactor)
+    val trackRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
     val trackRadius = trackRect.width() / 2f
 
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -639,7 +775,6 @@ fun generateAlertSliderVerticalBitmap(
     val modes = listOf(AlertSliderMode.RING, AlertSliderMode.VIBRATE, AlertSliderMode.SILENT)
     val activeIdx = modes.indexOf(mode)
 
-    // Sliding Thumb
     val thumbPad = 4f * scaleFactor
     val thumbTop = trackRect.top + activeIdx * notchH + thumbPad
     val thumbBottom = trackRect.top + (activeIdx + 1) * notchH - thumbPad
@@ -654,14 +789,13 @@ fun generateAlertSliderVerticalBitmap(
     }
     canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, thumbPaint)
 
-    // Draw Icons in 3 vertical notches
     for (i in 0 until notchCount) {
         val nMode = modes[i]
         val nCy = trackRect.top + i * notchH + notchH / 2f
         val isCurrent = (i == activeIdx)
 
         val iconSize = thumbRect.width() * 0.42f
-        val iconColor = if (isCurrent) Color.BLACK else secondaryTextColor
+        val iconColor = if (isCurrent) activeContentColor else secondaryTextColor
 
         val resId = when (nMode) {
             AlertSliderMode.RING -> R.drawable.ic_bell
@@ -671,7 +805,7 @@ fun generateAlertSliderVerticalBitmap(
         drawVectorDrawable(context, canvas, resId, trackRect.centerX(), nCy - 4f * scaleFactor, iconSize, iconColor)
 
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isCurrent) Color.BLACK else secondaryTextColor
+            this.color = if (isCurrent) activeContentColor else secondaryTextColor
             typeface = fontBold
             textSize = 8.5f * scaleFactor
             textAlign = Paint.Align.CENTER
@@ -707,11 +841,15 @@ fun generateFlashlightTorchBitmap(
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
     val fontBold = getSlateFont(context, 700)
 
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+
     val cx = cardRect.centerX()
     val cy = cardRect.centerY() - 10f * scaleFactor
     val btnRadius = minOf(cardRect.width(), cardRect.height()) * 0.28f
 
-    // Ambient Halo Glow when ON
     if (isTorchOn) {
         val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
@@ -724,14 +862,12 @@ fun generateFlashlightTorchBitmap(
         canvas.drawCircle(cx, cy, btnRadius * 1.8f, glowPaint)
     }
 
-    // Button Base
     val btnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isTorchOn) accentColor else Color.argb(30, 255, 255, 255)
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, btnRadius, btnPaint)
 
-    // Button Outline Ring
     val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isTorchOn) Color.argb(180, 255, 255, 255) else Color.argb(60, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -739,12 +875,10 @@ fun generateFlashlightTorchBitmap(
     }
     canvas.drawCircle(cx, cy, btnRadius, ringPaint)
 
-    // Torch Icon
     val iconSize = btnRadius * 0.95f
-    val iconColor = if (isTorchOn) Color.BLACK else secondaryTextColor
+    val iconColor = if (isTorchOn) activeContentColor else secondaryTextColor
     drawVectorDrawable(context, canvas, R.drawable.ic_flashlight, cx, cy, iconSize, iconColor)
 
-    // Label Underneath
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = primaryTextColor
         typeface = fontBold
@@ -795,6 +929,11 @@ fun generateTogglePillBitmap(
     val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+
     val fontRegular = getSlateFont(context, 400)
     val fontBold = getSlateFont(context, 700)
 
@@ -803,13 +942,13 @@ fun generateTogglePillBitmap(
     val iconCx = cardRect.left + padH + iconR
     val iconCy = cardRect.centerY()
 
-    // Circular icon badge
-    val badgeBg = if (item.isEnabled) Color.argb(45, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(22, 255, 255, 255)
+    // Full solid accent color on active badge
+    val badgeBg = if (item.isEnabled) accentColor else Color.argb(22, 255, 255, 255)
     val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = badgeBg }
     canvas.drawCircle(iconCx, iconCy, iconR, badgePaint)
 
     val iconSize = iconR * 1.18f
-    val iconColor = if (item.isEnabled) accentColor else secondaryTextColor
+    val iconColor = if (item.isEnabled) activeContentColor else secondaryTextColor
 
     drawToggleIcon(
         context = context,
@@ -823,7 +962,6 @@ fun generateTogglePillBitmap(
         alertMode = AlertSliderMode.RING
     )
 
-    // Texts
     val textLeft = iconCx + iconR + 12f * scaleFactor
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = primaryTextColor
@@ -873,17 +1011,26 @@ fun generateSystemUtilityDeckBitmap(
 
     val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
-    val padH = 12f * scaleFactor
-    val padV = 10f * scaleFactor
-    val contentRect = RectF(cardRect.left + padH, cardRect.top + padV, cardRect.right - padH, cardRect.bottom - padV)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.05f).coerceIn(6f * scaleFactor, 12f * scaleFactor)
+    val gap = (minOf(cardRect.width(), cardRect.height()) * 0.04f).coerceIn(5f * scaleFactor, 10f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
     val cols = 3
     val rows = 2
-    val gap = 8f * scaleFactor
     val cellW = (contentRect.width() - (gap * (cols - 1))) / cols
     val cellH = (contentRect.height() - (gap * (rows - 1))) / rows
-    val cellRadius = 14f * scaleFactor
+
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(cellW, cellH) * 0.22f)
+    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minOf(cellW, cellH) * 0.48f)
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+    val activeSubColor = if (isAccentLight) Color.argb(185, 0, 0, 0) else Color.argb(200, 255, 255, 255)
 
     val utilities = listOf(
         state.timeout,
@@ -907,23 +1054,22 @@ fun generateSystemUtilityDeckBitmap(
         val item = utilities[i]
         val isEnabled = item.isEnabled
 
-        val bg = if (isEnabled) Color.argb(38, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)) else Color.argb(22, 255, 255, 255)
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg }
-        canvas.drawRoundRect(rect, cellRadius, cellRadius, p)
+        val tl = if (r == 0 && c == 0) outerCornerR else defaultInnerR
+        val tr = if (r == 0 && c == cols - 1) outerCornerR else defaultInnerR
+        val br = if (r == rows - 1 && c == cols - 1) outerCornerR else defaultInnerR
+        val bl = if (r == rows - 1 && c == 0) outerCornerR else defaultInnerR
+        val path = createCornerPath(rect, tl, tr, br, bl)
 
-        if (isEnabled) {
-            val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(80, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
-                style = Paint.Style.STROKE
-                strokeWidth = 1.2f * scaleFactor
-            }
-            canvas.drawRoundRect(rect, cellRadius, cellRadius, bp)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+            style = Paint.Style.FILL
         }
+        canvas.drawPath(path, p)
 
         val iconCx = rect.left + rect.height() * 0.38f
         val iconCy = rect.centerY()
         val iconSize = rect.height() * 0.42f
-        val iconColor = if (isEnabled) accentColor else secondaryTextColor
+        val iconColor = if (isEnabled) activeContentColor else secondaryTextColor
 
         drawToggleIcon(
             context = context,
@@ -938,14 +1084,14 @@ fun generateSystemUtilityDeckBitmap(
 
         val textLeft = iconCx + rect.height() * 0.35f
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = primaryTextColor
+            this.color = if (isEnabled) activeContentColor else primaryTextColor
             typeface = fontBold
             textSize = 11.5f * scaleFactor
         }
         canvas.drawText(item.label, textLeft, rect.centerY() - 2f * scaleFactor, titlePaint)
 
         val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isEnabled) accentColor else secondaryTextColor
+            this.color = if (isEnabled) activeSubColor else secondaryTextColor
             typeface = fontRegular
             textSize = 9.5f * scaleFactor
         }
@@ -982,10 +1128,29 @@ fun generateMicroToggleBitmap(
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
     val fontBold = getSlateFont(context, 700)
 
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(6f * scaleFactor, 10f * scaleFactor)
+    val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+    val innerR = (outerRadius - pad).coerceAtLeast(8f * scaleFactor)
+
+    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
+            ((accentColor shr 8 and 0xFF) * 0.7152f) +
+            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
+    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+
+    // Solid accent card when active (matches reference 1x1 toggle widget)
+    if (item.isEnabled) {
+        val solidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(innerRect, innerR, innerR, solidPaint)
+    }
+
     val cx = cardRect.centerX()
     val cy = cardRect.centerY() - 7f * scaleFactor
     val iconSize = cardRect.width() * 0.42f
-    val iconColor = if (item.isEnabled) accentColor else secondaryTextColor
+    val iconColor = if (item.isEnabled) activeContentColor else secondaryTextColor
 
     drawToggleIcon(
         context = context,
@@ -1000,7 +1165,7 @@ fun generateMicroToggleBitmap(
     )
 
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (item.isEnabled) primaryTextColor else secondaryTextColor
+        this.color = if (item.isEnabled) activeContentColor else secondaryTextColor
         typeface = fontBold
         textSize = 10f * scaleFactor
         textAlign = Paint.Align.CENTER

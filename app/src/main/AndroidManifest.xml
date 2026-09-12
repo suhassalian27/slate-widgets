@@ -41,6 +41,14 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
+    <!-- Quick Toggles System Permissions -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+
 
 
     <application
@@ -109,6 +117,15 @@
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
             android:noHistory="true" />
+
+        <!-- Quick Toggles Trampoline Activity for Instant Return Refresh -->
+        <activity
+            android:name=".widgets.quicktoggles.QuickTogglesTrampolineActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true" />
 
         <!-- Slate Media Notification Listener Service -->
         <service
@@ -3597,26 +3614,24 @@
         <!-- QUICK TOGGLES WIDGETS (14 RECEIVERS)                                       -->
         <!-- ========================================================================= -->
 
-        <activity
-            android:name=".widgets.quicktoggles.QuickTogglesConfigActivity"
-            android:exported="true"
-            android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.Slate" />
-
         <!-- 1. Control Center Deck (4x2) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesControlCenterReceiver"
-            android:exported="true"
-            android:label="Control Center Deck">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
-                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
-                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
                 <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.net.wifi.STATE_CHANGE" />
+                <action android:name="android.net.wifi.WIFI_AP_STATE_CHANGED" />
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
                 <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED" />
                 <action android:name="android.media.RINGER_MODE_CHANGED" />
                 <action android:name="android.intent.action.AIRPLANE_MODE" />
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+                <action android:name="android.location.PROVIDERS_CHANGED" />
+                <action android:name="android.location.MODE_CHANGED" />
+                <action android:name="android.intent.action.USER_PRESENT" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
