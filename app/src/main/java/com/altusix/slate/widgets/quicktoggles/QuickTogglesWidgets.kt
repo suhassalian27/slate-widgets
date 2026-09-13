@@ -27,7 +27,7 @@ fun getQuickTogglesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Quad Action Matrix", "2x2", "Quick Toggles", QuickTogglesQuadReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Tactile Alert Slider", "2x1", "Quick Toggles", QuickTogglesAlertSliderHReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Vertical Alert Slider", "1x2", "Quick Toggles", QuickTogglesAlertSliderVReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Flashlight Torch Switch", "2x2", "Quick Toggles", QuickTogglesTorchSwitchReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Flashlight Torch Switch", "2x2", "Quick Toggles", QuickTogglesTorchSwitchReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Wi-Fi Network Pill", "2x1", "Quick Toggles", QuickTogglesWifiPillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Bluetooth Device Pill", "2x1", "Quick Toggles", QuickTogglesBluetoothPillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Sound Mode Pill", "2x1", "Quick Toggles", QuickTogglesSoundPillReceiver::class.java, hasModeOption = false),
@@ -247,7 +247,8 @@ abstract class BaseQuickTogglesReceiver(
                 R.layout.widget_base_column_2,
                 R.layout.widget_base_grid_2x2,
                 R.layout.widget_base_row_3,
-                R.layout.widget_base_column_3
+                R.layout.widget_base_column_3,
+                R.layout.widget_base_single
             )
 
             val isSharedGrid = activeLayoutId in sharedGridLayouts
@@ -433,16 +434,20 @@ class QuickTogglesAlertSliderVReceiver : BaseQuickTogglesReceiver(R.layout.widge
 // 7. FLASHLIGHT TORCH SWITCH (2x2)
 // =========================================================================
 
-class QuickTogglesTorchSwitchReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggles_torch_2x2_layout, targetAspect = 1.0f) {
+class QuickTogglesTorchSwitchReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_single, targetAspect = 1.0f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateFlashlightTorchBitmap(context, state.torch.isEnabled, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_torch, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 50))
+        views.setOnClickPendingIntent(
+            R.id.touch_slot_0,
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 50)
+        )
     }
 }
+
 
 // =========================================================================
 // 8. WI-FI NETWORK PILL (2x1)

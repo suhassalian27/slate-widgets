@@ -1036,7 +1036,7 @@ fun generateAlertSliderVerticalBitmap(
 }
 
 // =========================================================================
-// 7. FLASHLIGHT TORCH SWITCH (2x2)
+// 7. FLASHLIGHT TORCH SWITCH (2x2 - Cinematic Spotlight)
 // =========================================================================
 
 fun generateFlashlightTorchBitmap(
@@ -1051,69 +1051,148 @@ fun generateFlashlightTorchBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
-    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
-    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
-    val fontBold = getSlateFont(context, 700)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val isLight = slateConfig.themeMode == "LIGHT"
+    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(
+        canvas = canvas,
+        rect = cardRect,
+        config = slateConfig,
+        scaleFactor = scaleFactor,
+        customCornerRadius = outerRadius
+    )
 
-    val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
-            ((accentColor shr 8 and 0xFF) * 0.7152f) +
-            ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
-    val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
-
+    val cw = cardRect.width()
+    val ch = cardRect.height()
     val cx = cardRect.centerX()
-    val cy = cardRect.centerY() - 10f * scaleFactor
-    val btnRadius = minOf(cardRect.width(), cardRect.height()) * 0.28f
+    val cy = cardRect.centerY()
+
+    // Clip light projection to the card's squircle boundary
+    canvas.save()
+    val cardClipPath = Path().apply {
+        addRoundRect(cardRect, outerRadius, outerRadius, Path.Direction.CW)
+    }
+    canvas.clipPath(cardClipPath)
 
     if (isTorchOn) {
-        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(
-                cx, cy, btnRadius * 1.8f,
-                intArrayOf(Color.argb(90, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)), Color.TRANSPARENT),
-                floatArrayOf(0.4f, 1.0f),
-                Shader.TileMode.CLAMP
-            )
+        // 1. Flashlight Icon anchored at bottom-center
+        val iconSize = (minOf(cw, ch) * 0.22f).coerceIn(24f * scaleFactor, 46f * scaleFactor)
+        val iconCx = cx
+        val iconCy = cardRect.bottom - (ch * 0.22f)
+        val lensY = iconCy - (iconSize / 2f)
+
+        // 2. Parabolic Spotlight Beam
+        val curveStartY = cardRect.top + (ch * 0.48f)
+        val curveDipY = lensY - (6f * scaleFactor)
+
+        val beamPath = Path().apply {
+            moveTo(cardRect.left - 5f, cardRect.top - 5f)
+            lineTo(cardRect.right + 5f, cardRect.top - 5f)
+            lineTo(cardRect.right + 5f, curveStartY)
+            quadTo(iconCx, curveDipY, cardRect.left - 5f, curveStartY)
+            close()
         }
-        canvas.drawCircle(cx, cy, btnRadius * 1.8f, glowPaint)
+
+        // 3. Radiant Light Gradient (Clean fade tailored for both Dark & Light backgrounds)
+        val beamPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            shader = if (isLight) {
+                RadialGradient(
+                    iconCx, curveDipY, ch * 0.88f,
+                    intArrayOf(
+                        Color.argb(240, 255, 236, 190), // Warm golden core
+                        Color.argb(200, 255, 214, 150),
+                        Color.argb(125, 245, 185, 115),
+                        Color.argb(45, 235, 170, 95),
+                        Color.argb(0, 255, 215, 150)    // Transparent warm amber falloff
+                    ),
+                    floatArrayOf(0.0f, 0.26f, 0.55f, 0.82f, 1.0f),
+                    Shader.TileMode.CLAMP
+                )
+            } else {
+                RadialGradient(
+                    iconCx, curveDipY, ch * 0.88f,
+                    intArrayOf(
+                        Color.argb(255, 255, 248, 222), // Glowing white-gold core
+                        Color.argb(225, 255, 212, 148), // Warm golden light
+                        Color.argb(140, 225, 148, 78),  // Amber diffusion
+                        Color.argb(55, 145, 85, 35),    // Soft outer glow
+                        Color.argb(0, 255, 210, 140)    // Transparent amber falloff
+                    ),
+                    floatArrayOf(0.0f, 0.24f, 0.54f, 0.80f, 1.0f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+        }
+        canvas.drawPath(beamPath, beamPaint)
+
+        // 4. Optical Lens Edge Contour
+        val edgePath = Path().apply {
+            moveTo(cardRect.left, curveStartY)
+            quadTo(iconCx, curveDipY, cardRect.right, curveStartY)
+        }
+        val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1.6f * scaleFactor
+            shader = if (isLight) {
+                RadialGradient(
+                    iconCx, curveDipY, cw * 0.65f,
+                    intArrayOf(
+                        Color.argb(130, 215, 145, 65), // Warm amber contour on white
+                        Color.argb(40, 215, 145, 65),
+                        Color.TRANSPARENT
+                    ),
+                    floatArrayOf(0.0f, 0.65f, 1.0f),
+                    Shader.TileMode.CLAMP
+                )
+            } else {
+                RadialGradient(
+                    iconCx, curveDipY, cw * 0.65f,
+                    intArrayOf(
+                        Color.argb(180, 255, 248, 230), // Glowing edge on dark
+                        Color.argb(70, 255, 205, 130),
+                        Color.TRANSPARENT
+                    ),
+                    floatArrayOf(0.0f, 0.55f, 1.0f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+        }
+        canvas.drawPath(edgePath, edgePaint)
+
+        // 5. High-contrast flashlight icon (Dark on white, White on dark)
+        val torchIconColor = if (isLight) Color.argb(230, 24, 24, 26) else Color.WHITE
+        drawVectorDrawable(
+            context = context,
+            canvas = canvas,
+            resId = R.drawable.ic_flashlight_filled,
+            cx = iconCx,
+            cy = iconCy,
+            size = iconSize,
+            color = torchIconColor
+        )
+
+    } else {
+        // Minimalist OFF state
+        val iconSize = (minOf(cw, ch) * 0.30f).coerceIn(28f * scaleFactor, 52f * scaleFactor)
+        drawVectorDrawable(
+            context = context,
+            canvas = canvas,
+            resId = R.drawable.ic_flashlight,
+            cx = cx,
+            cy = cy,
+            size = iconSize,
+            color = secondaryTextColor
+        )
     }
 
-    val btnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isTorchOn) accentColor else Color.argb(30, 255, 255, 255)
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(cx, cy, btnRadius, btnPaint)
-
-    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isTorchOn) Color.argb(180, 255, 255, 255) else Color.argb(60, 255, 255, 255)
-        style = Paint.Style.STROKE
-        strokeWidth = 2.5f * scaleFactor
-    }
-    canvas.drawCircle(cx, cy, btnRadius, ringPaint)
-
-    val iconSize = btnRadius * 0.95f
-    val iconColor = if (isTorchOn) activeContentColor else secondaryTextColor
-    drawVectorDrawable(context, canvas, R.drawable.ic_flashlight, cx, cy, iconSize, iconColor)
-
-    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = primaryTextColor
-        typeface = fontBold
-        textSize = 14f * scaleFactor
-        textAlign = Paint.Align.CENTER
-    }
-    canvas.drawText("FLASHLIGHT", cx, cardRect.bottom - 24f * scaleFactor, labelPaint)
-
-    val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (isTorchOn) accentColor else secondaryTextColor
-        typeface = fontBold
-        textSize = 11f * scaleFactor
-        textAlign = Paint.Align.CENTER
-    }
-    canvas.drawText(if (isTorchOn) "ON" else "OFF", cx, cardRect.bottom - 10f * scaleFactor, statusPaint)
-
+    canvas.restore()
     return bitmap
 }
 
