@@ -818,7 +818,7 @@ fun generateQuadActionMatrixBitmap(
 }
 
 // =========================================================================
-// 5. TACTILE ALERT SLIDER (HORIZONTAL 2x1)
+// 5. TACTILE ALERT SLIDER (HORIZONTAL 2x1 - Pure Pill Surface)
 // =========================================================================
 
 fun generateAlertSliderHorizontalBitmap(
@@ -833,19 +833,30 @@ fun generateAlertSliderHorizontalBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val targetAspect = 2.0f
-        val currentAspect = w / h
-        if (currentAspect > targetAspect) {
-            val contentW = h * targetAspect
-            RectF((w - contentW) / 2f, 0f, (w + contentW) / 2f, h)
-        } else {
-            val contentH = w / targetAspect
-            RectF(0f, (h - contentH) / 2f, w, (h + contentH) / 2f)
+        var cardH = h
+        var cardW = cardH * targetAspect
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetAspect
         }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val (_, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
+    // Outer card pill curvature
+    val outerPillRadius = cardRect.height() / 2f
+    val (_, secondaryTextColor, _) = drawCardBackground(
+        canvas = canvas,
+        rect = cardRect,
+        config = slateConfig,
+        scaleFactor = scaleFactor,
+        customCornerRadius = outerPillRadius
+    )
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
@@ -853,66 +864,70 @@ fun generateAlertSliderHorizontalBitmap(
             ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
     val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
 
-    val fontBold = getSlateFont(context, 700)
-
-    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.07f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
-    val trackRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
-    val trackRadius = trackRect.height() / 2f
-
-    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(32, 255, 255, 255)
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(trackRect, trackRadius, trackRadius, trackPaint)
+    // Inset active zone (No gray track drawn underneath)
+    val pad = (cardRect.height() * 0.06f).coerceIn(4f * scaleFactor, 8f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
     val notchCount = 3
-    val notchW = trackRect.width() / notchCount.toFloat()
+    val notchW = contentRect.width() / notchCount.toFloat()
     val modes = listOf(AlertSliderMode.SILENT, AlertSliderMode.VIBRATE, AlertSliderMode.RING)
-    val activeIdx = modes.indexOf(mode)
+    val activeIdx = modes.indexOf(mode).coerceAtLeast(0)
 
-    val thumbPad = 4f * scaleFactor
-    val thumbLeft = trackRect.left + activeIdx * notchW + thumbPad
-    val thumbRight = trackRect.left + (activeIdx + 1) * notchW - thumbPad
-    val thumbTop = trackRect.top + thumbPad
-    val thumbBottom = trackRect.bottom - thumbPad
+    // Solid Accent Sliding Thumb
+    val thumbLeft = contentRect.left + (activeIdx * notchW)
+    val thumbRight = contentRect.left + ((activeIdx + 1) * notchW)
+    val thumbTop = contentRect.top
+    val thumbBottom = contentRect.bottom
     val thumbRect = RectF(thumbLeft, thumbTop, thumbRight, thumbBottom)
-    val thumbRadius = thumbRect.height() / 2f
+
+    // Concentric pill cap radius
+    val outerCornerR = outerPillRadius - pad
+    val innerCornerR = (thumbRect.height() * 0.24f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    val tl = if (activeIdx == 0) outerCornerR else innerCornerR
+    val bl = if (activeIdx == 0) outerCornerR else innerCornerR
+    val tr = if (activeIdx == 2) outerCornerR else innerCornerR
+    val br = if (activeIdx == 2) outerCornerR else innerCornerR
+
+    val thumbPath = createCornerPath(thumbRect, tl, tr, br, bl)
 
     val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, thumbPaint)
+    canvas.drawPath(thumbPath, thumbPaint)
+
+    // Base icon size
+    val baseIconSize = (thumbRect.height() * 0.44f).coerceIn(20f * scaleFactor, 36f * scaleFactor)
 
     for (i in 0 until notchCount) {
         val nMode = modes[i]
-        val nCx = trackRect.left + i * notchW + notchW / 2f
+        val nCx = contentRect.left + (i * notchW) + (notchW / 2f)
+        val nCy = contentRect.centerY()
         val isCurrent = (i == activeIdx)
 
-        val iconSize = thumbRect.height() * 0.40f
         val iconColor = if (isCurrent) activeContentColor else secondaryTextColor
-
         val resId = when (nMode) {
             AlertSliderMode.SILENT -> R.drawable.ic_bell_off
             AlertSliderMode.VIBRATE -> R.drawable.ic_phone_vibrate
             AlertSliderMode.RING -> R.drawable.ic_bell
         }
-        drawVectorDrawable(context, canvas, resId, nCx, trackRect.centerY() - 6f * scaleFactor, iconSize, iconColor)
 
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isCurrent) activeContentColor else secondaryTextColor
-            typeface = fontBold
-            textSize = 9.5f * scaleFactor
-            textAlign = Paint.Align.CENTER
+        // Optical weight balancing
+        val effectiveIconSize = when (nMode) {
+            AlertSliderMode.VIBRATE -> baseIconSize * 1.12f
+            AlertSliderMode.RING -> baseIconSize * 0.84f
+            AlertSliderMode.SILENT -> baseIconSize * 0.84f
         }
-        canvas.drawText(nMode.label, nCx, trackRect.centerY() + 14f * scaleFactor, labelPaint)
+
+        drawVectorDrawable(context, canvas, resId, nCx, nCy, effectiveIconSize, iconColor)
     }
 
     return bitmap
 }
 
 // =========================================================================
-// 6. VERTICAL ALERT SLIDER (1x2)
+// 6. VERTICAL ALERT SLIDER (1x2 - Pure Pill Surface)
 // =========================================================================
 
 fun generateAlertSliderVerticalBitmap(
@@ -927,19 +942,30 @@ fun generateAlertSliderVerticalBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val targetAspect = 0.5f
-        val currentAspect = w / h
-        if (currentAspect > targetAspect) {
-            val contentW = h * targetAspect
-            RectF((w - contentW) / 2f, 0f, (w + contentW) / 2f, h)
-        } else {
-            val contentH = w / targetAspect
-            RectF(0f, (h - contentH) / 2f, w, (h + contentH) / 2f)
+        var cardW = w
+        var cardH = cardW / targetAspect
+        if (cardH > h) {
+            cardH = h
+            cardW = cardH * targetAspect
         }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val (_, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
+    // Outer card vertical pill curvature
+    val outerPillRadius = cardRect.width() / 2f
+    val (_, secondaryTextColor, _) = drawCardBackground(
+        canvas = canvas,
+        rect = cardRect,
+        config = slateConfig,
+        scaleFactor = scaleFactor,
+        customCornerRadius = outerPillRadius
+    )
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
 
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
@@ -947,59 +973,63 @@ fun generateAlertSliderVerticalBitmap(
             ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
     val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
 
-    val fontBold = getSlateFont(context, 700)
-
-    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(8f * scaleFactor, 14f * scaleFactor)
-    val trackRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
-    val trackRadius = trackRect.width() / 2f
-
-    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(32, 255, 255, 255)
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(trackRect, trackRadius, trackRadius, trackPaint)
+    // Inset active zone (No gray track drawn underneath)
+    val pad = (cardRect.width() * 0.06f).coerceIn(4f * scaleFactor, 8f * scaleFactor)
+    val contentRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
 
     val notchCount = 3
-    val notchH = trackRect.height() / notchCount.toFloat()
+    val notchH = contentRect.height() / notchCount.toFloat()
     val modes = listOf(AlertSliderMode.RING, AlertSliderMode.VIBRATE, AlertSliderMode.SILENT)
-    val activeIdx = modes.indexOf(mode)
+    val activeIdx = modes.indexOf(mode).coerceAtLeast(0)
 
-    val thumbPad = 4f * scaleFactor
-    val thumbTop = trackRect.top + activeIdx * notchH + thumbPad
-    val thumbBottom = trackRect.top + (activeIdx + 1) * notchH - thumbPad
-    val thumbLeft = trackRect.left + thumbPad
-    val thumbRight = trackRect.right - thumbPad
+    // Solid Accent Sliding Thumb
+    val thumbTop = contentRect.top + (activeIdx * notchH)
+    val thumbBottom = contentRect.top + ((activeIdx + 1) * notchH)
+    val thumbLeft = contentRect.left
+    val thumbRight = contentRect.right
     val thumbRect = RectF(thumbLeft, thumbTop, thumbRight, thumbBottom)
-    val thumbRadius = thumbRect.width() / 2f
+
+    // Concentric pill cap radius
+    val outerCornerR = outerPillRadius - pad
+    val innerCornerR = (thumbRect.width() * 0.24f).coerceIn(8f * scaleFactor, 16f * scaleFactor)
+
+    val tl = if (activeIdx == 0) outerCornerR else innerCornerR
+    val tr = if (activeIdx == 0) outerCornerR else innerCornerR
+    val bl = if (activeIdx == 2) outerCornerR else innerCornerR
+    val br = if (activeIdx == 2) outerCornerR else innerCornerR
+
+    val thumbPath = createCornerPath(thumbRect, tl, tr, br, bl)
 
     val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, thumbPaint)
+    canvas.drawPath(thumbPath, thumbPaint)
+
+    // Base icon size
+    val baseIconSize = (thumbRect.width() * 0.44f).coerceIn(20f * scaleFactor, 36f * scaleFactor)
 
     for (i in 0 until notchCount) {
         val nMode = modes[i]
-        val nCy = trackRect.top + i * notchH + notchH / 2f
+        val nCx = contentRect.centerX()
+        val nCy = contentRect.top + (i * notchH) + (notchH / 2f)
         val isCurrent = (i == activeIdx)
 
-        val iconSize = thumbRect.width() * 0.42f
         val iconColor = if (isCurrent) activeContentColor else secondaryTextColor
-
         val resId = when (nMode) {
             AlertSliderMode.RING -> R.drawable.ic_bell
             AlertSliderMode.VIBRATE -> R.drawable.ic_phone_vibrate
             AlertSliderMode.SILENT -> R.drawable.ic_bell_off
         }
-        drawVectorDrawable(context, canvas, resId, trackRect.centerX(), nCy - 4f * scaleFactor, iconSize, iconColor)
 
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isCurrent) activeContentColor else secondaryTextColor
-            typeface = fontBold
-            textSize = 8.5f * scaleFactor
-            textAlign = Paint.Align.CENTER
+        // Optical weight balancing
+        val effectiveIconSize = when (nMode) {
+            AlertSliderMode.VIBRATE -> baseIconSize * 1.12f
+            AlertSliderMode.RING -> baseIconSize * 0.84f
+            AlertSliderMode.SILENT -> baseIconSize * 0.84f
         }
-        canvas.drawText(nMode.label, trackRect.centerX(), nCy + 13f * scaleFactor, labelPaint)
+
+        drawVectorDrawable(context, canvas, resId, nCx, nCy, effectiveIconSize, iconColor)
     }
 
     return bitmap

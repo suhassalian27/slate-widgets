@@ -245,7 +245,9 @@ abstract class BaseQuickTogglesReceiver(
                 R.layout.widget_base_grid_2x4,
                 R.layout.widget_base_row_5,
                 R.layout.widget_base_column_2,
-                R.layout.widget_base_grid_2x2
+                R.layout.widget_base_grid_2x2,
+                R.layout.widget_base_row_3,
+                R.layout.widget_base_column_3
             )
 
             val isSharedGrid = activeLayoutId in sharedGridLayouts
@@ -394,16 +396,17 @@ class QuickTogglesQuadReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_g
 // 5. TACTILE ALERT SLIDER (HORIZONTAL 2x1)
 // =========================================================================
 
-class QuickTogglesAlertSliderHReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggles_slider_2x1_layout, targetAspect = 2.0f) {
+class QuickTogglesAlertSliderHReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_row_3, targetAspect = 2.0f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateAlertSliderHorizontalBitmap(context, state.alertSlider, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_slider_silent, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 30, EXTRA_SLIDER_MODE, AlertSliderMode.SILENT.name))
-        views.setOnClickPendingIntent(R.id.btn_slider_vibrate, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 31, EXTRA_SLIDER_MODE, AlertSliderMode.VIBRATE.name))
-        views.setOnClickPendingIntent(R.id.btn_slider_ring, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 32, EXTRA_SLIDER_MODE, AlertSliderMode.RING.name))
+        // Slot 0: Silent, Slot 1: Vibrate, Slot 2: Ring
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 30, EXTRA_SLIDER_MODE, AlertSliderMode.SILENT.name))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 31, EXTRA_SLIDER_MODE, AlertSliderMode.VIBRATE.name))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 32, EXTRA_SLIDER_MODE, AlertSliderMode.RING.name))
     }
 }
 
@@ -411,18 +414,20 @@ class QuickTogglesAlertSliderHReceiver : BaseQuickTogglesReceiver(R.layout.widge
 // 6. VERTICAL ALERT SLIDER (1x2)
 // =========================================================================
 
-class QuickTogglesAlertSliderVReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggles_slider_1x2_layout, targetAspect = 0.5f) {
+class QuickTogglesAlertSliderVReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_column_3, targetAspect = 0.5f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateAlertSliderVerticalBitmap(context, state.alertSlider, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_slider_ring, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 40, EXTRA_SLIDER_MODE, AlertSliderMode.RING.name))
-        views.setOnClickPendingIntent(R.id.btn_slider_vibrate, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 41, EXTRA_SLIDER_MODE, AlertSliderMode.VIBRATE.name))
-        views.setOnClickPendingIntent(R.id.btn_slider_silent, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 42, EXTRA_SLIDER_MODE, AlertSliderMode.SILENT.name))
+        // Slot 0: Ring (Top), Slot 1: Vibrate (Middle), Slot 2: Silent (Bottom)
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 40, EXTRA_SLIDER_MODE, AlertSliderMode.RING.name))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 41, EXTRA_SLIDER_MODE, AlertSliderMode.VIBRATE.name))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createBroadcastPendingIntent(context, ACTION_SET_SLIDER_MODE, appWidgetId, 42, EXTRA_SLIDER_MODE, AlertSliderMode.SILENT.name))
     }
 }
+
 
 // =========================================================================
 // 7. FLASHLIGHT TORCH SWITCH (2x2)
