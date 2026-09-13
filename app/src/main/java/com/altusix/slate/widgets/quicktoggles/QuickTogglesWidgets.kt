@@ -243,6 +243,7 @@ abstract class BaseQuickTogglesReceiver(
             val isSharedGrid = activeLayoutId == R.layout.widget_base_grid_4x2
                     || activeLayoutId == R.layout.widget_base_grid_2x4
                     || activeLayoutId == R.layout.widget_base_row_5
+                    || activeLayoutId == R.layout.widget_base_column_2
 
             val imageViewId = if (isSharedGrid) R.id.widget_image_view else R.id.widget_canvas_surface
             views.setImageViewBitmap(imageViewId, bitmap)
@@ -292,7 +293,6 @@ abstract class BaseQuickTogglesReceiver(
 // =========================================================================
 // 1. CONTROL CENTER DECK (4x2 or 2x4 Dynamic Grid)
 // =========================================================================
-
 class QuickTogglesControlCenterReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_grid_4x2, targetAspect = 2.0f) {
 
     override fun getLayoutResId(wDp: Int, hDp: Int, isResponsive: Boolean): Int {
@@ -328,7 +328,6 @@ class QuickTogglesControlCenterReceiver : BaseQuickTogglesReceiver(R.layout.widg
 // =========================================================================
 // 2. MINIMALIST ACTION TOOLBAR (4x1)
 // =========================================================================
-
 class QuickTogglesToolbarReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_row_5, targetAspect = 4.0f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
@@ -348,15 +347,15 @@ class QuickTogglesToolbarReceiver : BaseQuickTogglesReceiver(R.layout.widget_bas
 // 3. CONNECTIVITY DUO BENTO (2x2)
 // =========================================================================
 
-class QuickTogglesConnectivityReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggles_connectivity_2x2_layout, targetAspect = 1.0f) {
+class QuickTogglesConnectivityReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_column_2, targetAspect = 1.0f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateConnectivityBentoBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_wifi, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 10))
-        views.setOnClickPendingIntent(R.id.btn_toggle_bt, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 11))
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 10))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 11))
     }
 }
 

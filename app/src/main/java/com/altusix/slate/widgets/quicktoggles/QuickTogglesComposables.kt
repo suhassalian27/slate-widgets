@@ -448,7 +448,7 @@ fun generateMinimalistToolbarBitmap(
 }
 
 // =========================================================================
-// 3. CONNECTIVITY DUO BENTO (2x2)
+// 3. CONNECTIVITY DUO BENTO (2x2 - Adaptive Stack)
 // =========================================================================
 
 fun generateConnectivityBentoBitmap(
@@ -463,7 +463,9 @@ fun generateConnectivityBentoBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
@@ -482,7 +484,7 @@ fun generateConnectivityBentoBitmap(
     val bottomTileRect = RectF(contentRect.left, topTileRect.bottom + gap, contentRect.right, contentRect.bottom)
 
     val defaultInnerR = (scaleFactor * 8f).coerceAtMost(halfH * 0.25f)
-    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(halfH * 0.48f)
+    val outerCornerR = (outerRadius - pad).coerceIn(defaultInnerR, halfH * 0.48f)
 
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
             ((accentColor shr 8 and 0xFF) * 0.7152f) +
@@ -492,53 +494,137 @@ fun generateConnectivityBentoBitmap(
 
     val fontRegular = getSlateFont(context, 500)
     val fontBold = getSlateFont(context, 700)
-    val iconSize = topTileRect.height() * 0.42f
 
-    // --- Top: Wi-Fi Card ---
     val topPath = createCornerPath(topTileRect, outerCornerR, outerCornerR, defaultInnerR, defaultInnerR)
-    val topPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (state.wifi.isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
-        style = Paint.Style.FILL
-    }
-    canvas.drawPath(topPath, topPaint)
-
-    val iconCx = topTileRect.left + topTileRect.height() * 0.44f
-    val iconCy = topTileRect.centerY()
-    drawVectorDrawable(context, canvas, R.drawable.ic_wifi, iconCx, iconCy, iconSize, if (state.wifi.isEnabled) activeContentColor else secondaryTextColor)
-
-    val textX = iconCx + topTileRect.height() * 0.38f
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (state.wifi.isEnabled) activeContentColor else primaryTextColor
-        typeface = fontBold
-        textSize = 13.5f * scaleFactor
-    }
-    canvas.drawText("Wi-Fi", textX, topTileRect.centerY() - 2f * scaleFactor, titlePaint)
-
-    val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (state.wifi.isEnabled) activeSubColor else secondaryTextColor
-        typeface = fontRegular
-        textSize = 10.5f * scaleFactor
-    }
-    val wifiSub = if (state.wifi.subtitle.length > 14) state.wifi.subtitle.take(13) + "…" else state.wifi.subtitle
-    canvas.drawText(wifiSub, textX, topTileRect.centerY() + 13f * scaleFactor, subPaint)
-
-    // --- Bottom: Bluetooth Card ---
     val bottomPath = createCornerPath(bottomTileRect, defaultInnerR, defaultInnerR, outerCornerR, outerCornerR)
-    val bottomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (state.bluetooth.isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
-        style = Paint.Style.FILL
+
+    fun drawDuoTile(
+        tileRect: RectF,
+        path: Path,
+        item: ToggleItemState,
+        iconResId: Int
+    ) {
+        val isEnabled = item.isEnabled
+        val tileW = tileRect.width()
+        val tileH = tileRect.height()
+        val tileAspect = tileW / tileH
+
+        // Adaptive Tier Switch
+        val isHorizontal = tileAspect >= 1.35f && tileW >= 120f * scaleFactor
+        val isVerticalStack = !isHorizontal && tileH >= 50f * scaleFactor && tileW >= 48f * scaleFactor
+
+        val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+            style = Paint.Style.FILL
+        }
+        canvas.drawPath(path, tilePaint)
+
+        if (!isEnabled) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(18, 255, 255, 255)
+                style = Paint.Style.STROKE
+                strokeWidth = 1f * scaleFactor
+            }
+            canvas.drawPath(path, borderPaint)
+        }
+
+        val contentColor = if (isEnabled) activeContentColor else (if (isLight) Color.BLACK else Color.WHITE)
+        val subColor = if (isEnabled) activeSubColor else secondaryTextColor
+
+        if (isHorizontal) {
+            // Tier 1: Horizontal Layout (Icon Left, Text Right)
+            val iconSize = (tileH * 0.42f).coerceIn(20f * scaleFactor, 36f * scaleFactor)
+            val iconPadX = (tileW * 0.08f).coerceIn(12f * scaleFactor, 24f * scaleFactor)
+            val iconCx = tileRect.left + iconPadX + (iconSize / 2f)
+            val iconCy = tileRect.centerY()
+
+            drawVectorDrawable(context, canvas, iconResId, iconCx, iconCy, iconSize, contentColor)
+
+            val textX = iconCx + (iconSize / 2f) + (12f * scaleFactor)
+            val maxTextW = (tileRect.right - (12f * scaleFactor)) - textX
+
+            val titleSize = (tileH * 0.21f).coerceIn(11.5f * scaleFactor, 16f * scaleFactor)
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = contentColor
+                typeface = fontBold
+                textSize = titleSize
+            }
+            val elidedTitle = android.text.TextUtils.ellipsize(
+                item.label,
+                android.text.TextPaint(titlePaint),
+                maxTextW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedTitle, textX, tileRect.centerY() - 2f * scaleFactor, titlePaint)
+
+            val subSize = (tileH * 0.15f).coerceIn(9.5f * scaleFactor, 12f * scaleFactor)
+            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = subColor
+                typeface = fontRegular
+                textSize = subSize
+            }
+            val elidedSub = android.text.TextUtils.ellipsize(
+                item.subtitle,
+                android.text.TextPaint(subPaint),
+                maxTextW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedSub, textX, tileRect.centerY() + 14f * scaleFactor, subPaint)
+
+        } else if (isVerticalStack) {
+            // Tier 2: Vertical Stack (Centered Icon on Top, Text Below)
+            val showSub = tileH >= 65f * scaleFactor
+            val iconSize = (tileH * 0.36f).coerceIn(20f * scaleFactor, 34f * scaleFactor)
+            val iconCx = tileRect.centerX()
+            val iconCy = if (showSub) tileRect.top + (tileH * 0.34f) else tileRect.top + (tileH * 0.40f)
+
+            drawVectorDrawable(context, canvas, iconResId, iconCx, iconCy, iconSize, contentColor)
+
+            val maxTextW = tileW - (12f * scaleFactor)
+            val titleSize = (tileH * 0.17f).coerceIn(10.5f * scaleFactor, 13.5f * scaleFactor)
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = contentColor
+                typeface = fontBold
+                textSize = titleSize
+                textAlign = Paint.Align.CENTER
+            }
+            val titleBaseline = iconCy + (iconSize / 2f) + (titleSize * 0.95f) + (2f * scaleFactor)
+            val elidedTitle = android.text.TextUtils.ellipsize(
+                item.label,
+                android.text.TextPaint(titlePaint),
+                maxTextW.coerceAtLeast(10f),
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedTitle, iconCx, titleBaseline, titlePaint)
+
+            if (showSub) {
+                val subSize = (tileH * 0.13f).coerceIn(8.5f * scaleFactor, 11f * scaleFactor)
+                val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.color = subColor
+                    typeface = fontRegular
+                    textSize = subSize
+                    textAlign = Paint.Align.CENTER
+                }
+                val subBaseline = titleBaseline + subSize + (2.5f * scaleFactor)
+                val elidedSub = android.text.TextUtils.ellipsize(
+                    item.subtitle,
+                    android.text.TextPaint(subPaint),
+                    maxTextW.coerceAtLeast(10f),
+                    android.text.TextUtils.TruncateAt.END
+                ).toString()
+                canvas.drawText(elidedSub, iconCx, subBaseline, subPaint)
+            }
+
+        } else {
+            // Tier 3: Compact Icon-Only Fallback
+            val iconSize = (minOf(tileW, tileH) * 0.52f).coerceIn(22f * scaleFactor, 42f * scaleFactor)
+            drawVectorDrawable(context, canvas, iconResId, tileRect.centerX(), tileRect.centerY(), iconSize, contentColor)
+        }
     }
-    canvas.drawPath(bottomPath, bottomPaint)
 
-    val btIconCy = bottomTileRect.centerY()
-    drawVectorDrawable(context, canvas, R.drawable.ic_bluetooth, iconCx, btIconCy, iconSize, if (state.bluetooth.isEnabled) activeContentColor else secondaryTextColor)
-
-    titlePaint.color = if (state.bluetooth.isEnabled) activeContentColor else primaryTextColor
-    canvas.drawText("Bluetooth", textX, bottomTileRect.centerY() - 2f * scaleFactor, titlePaint)
-
-    subPaint.color = if (state.bluetooth.isEnabled) activeSubColor else secondaryTextColor
-    val btSub = if (state.bluetooth.subtitle.length > 14) state.bluetooth.subtitle.take(13) + "…" else state.bluetooth.subtitle
-    canvas.drawText(btSub, textX, bottomTileRect.centerY() + 13f * scaleFactor, subPaint)
+    // Render Wi-Fi (Top) and Bluetooth (Bottom)
+    drawDuoTile(topTileRect, topPath, state.wifi, R.drawable.ic_wifi)
+    drawDuoTile(bottomTileRect, bottomPath, state.bluetooth, R.drawable.ic_bluetooth)
 
     return bitmap
 }
