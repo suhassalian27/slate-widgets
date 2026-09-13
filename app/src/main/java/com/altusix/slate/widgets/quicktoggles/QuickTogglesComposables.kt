@@ -630,7 +630,7 @@ fun generateConnectivityBentoBitmap(
 }
 
 // =========================================================================
-// 4. QUAD ACTION MATRIX (2x2)
+// 4. QUAD ACTION MATRIX (2x2 - Adaptive Quad Bento)
 // =========================================================================
 
 fun generateQuadActionMatrixBitmap(
@@ -645,7 +645,9 @@ fun generateQuadActionMatrixBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
@@ -662,16 +664,47 @@ fun generateQuadActionMatrixBitmap(
     val cellW = (contentRect.width() - gap) / 2f
     val cellH = (contentRect.height() - gap) / 2f
 
-    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(cellW, cellH) * 0.25f)
-    val outerCornerR = (outerRadius - pad).coerceAtLeast(defaultInnerR).coerceAtMost(minOf(cellW, cellH) * 0.48f)
+    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(cellW, cellH) * 0.22f)
+    val outerCornerR = (outerRadius - pad).coerceIn(defaultInnerR, minOf(cellW, cellH) * 0.48f)
 
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
             ((accentColor shr 8 and 0xFF) * 0.7152f) +
             ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
     val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
+    val activeSubColor = if (isAccentLight) Color.argb(185, 0, 0, 0) else Color.argb(200, 255, 255, 255)
 
     val quads = listOf(state.wifi, state.bluetooth, state.torch, state.ringer)
+    val fontRegular = getSlateFont(context, 500)
     val fontBold = getSlateFont(context, 700)
+
+    val showSubtitle = cellH >= 66f * scaleFactor && cellW >= 64f * scaleFactor
+    val showTitle = cellH >= 40f * scaleFactor && cellW >= 42f * scaleFactor
+
+    val titleSize = (cellH * 0.17f).coerceIn(9.5f * scaleFactor, 13f * scaleFactor)
+    val subSize = (cellH * 0.13f).coerceIn(8.0f * scaleFactor, 10.5f * scaleFactor)
+    val iconSize = when {
+        showSubtitle -> (cellH * 0.35f).coerceIn(20f * scaleFactor, 32f * scaleFactor)
+        showTitle -> (cellH * 0.42f).coerceIn(22f * scaleFactor, 36f * scaleFactor)
+        else -> (minOf(cellW, cellH) * 0.52f).coerceIn(22f * scaleFactor, 42f * scaleFactor)
+    }
+
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * scaleFactor
+    }
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = fontBold
+        textSize = titleSize
+        textAlign = Paint.Align.CENTER
+    }
+
+    val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = fontRegular
+        textSize = subSize
+        textAlign = Paint.Align.CENTER
+    }
 
     for (i in 0 until 4) {
         val r = i / 2
@@ -690,36 +723,95 @@ fun generateQuadActionMatrixBitmap(
 
         val path = createCornerPath(rect, tl, tr, br, bl)
 
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
-            style = Paint.Style.FILL
+        if (isEnabled) {
+            tilePaint.color = accentColor
+            canvas.drawPath(path, tilePaint)
+        } else {
+            tilePaint.color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+            canvas.drawPath(path, tilePaint)
+
+            borderPaint.color = if (isLight) Color.argb(12, 0, 0, 0) else Color.argb(18, 255, 255, 255)
+            canvas.drawPath(path, borderPaint)
         }
-        canvas.drawPath(path, p)
 
-        val iconCx = rect.centerX()
-        val iconCy = rect.centerY() - 8f * scaleFactor
-        val iconSize = cellH * 0.42f
-        val color = if (isEnabled) activeContentColor else secondaryTextColor
+        val cx = rect.centerX()
+        val iconColor = if (isEnabled) activeContentColor else secondaryTextColor
 
-        drawToggleIcon(
-            context = context,
-            canvas = canvas,
-            type = item.type,
-            cx = iconCx,
-            cy = iconCy,
-            size = iconSize,
-            color = color,
-            isEnabled = isEnabled,
-            alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
-        )
+        when {
+            showSubtitle -> {
+                val iconCy = rect.top + (cellH * 0.34f)
+                drawToggleIcon(
+                    context = context,
+                    canvas = canvas,
+                    type = item.type,
+                    cx = cx,
+                    cy = iconCy,
+                    size = iconSize,
+                    color = iconColor,
+                    isEnabled = isEnabled,
+                    alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+                )
 
-        val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = if (isEnabled) activeContentColor else primaryTextColor
-            typeface = fontBold
-            textSize = 10.5f * scaleFactor
-            textAlign = Paint.Align.CENTER
+                titlePaint.color = if (isEnabled) activeContentColor else primaryTextColor
+                val titleBaseline = iconCy + (iconSize / 2f) + (titleSize * 0.95f) + (2f * scaleFactor)
+                val maxTextW = cellW - (10f * scaleFactor)
+                val elidedTitle = android.text.TextUtils.ellipsize(
+                    item.label,
+                    android.text.TextPaint(titlePaint),
+                    maxTextW.coerceAtLeast(10f),
+                    android.text.TextUtils.TruncateAt.END
+                ).toString()
+                canvas.drawText(elidedTitle, cx, titleBaseline, titlePaint)
+
+                subPaint.color = if (isEnabled) activeSubColor else secondaryTextColor
+                val subBaseline = titleBaseline + subSize + (2.5f * scaleFactor)
+                val elidedSub = android.text.TextUtils.ellipsize(
+                    item.subtitle,
+                    android.text.TextPaint(subPaint),
+                    maxTextW.coerceAtLeast(10f),
+                    android.text.TextUtils.TruncateAt.END
+                ).toString()
+                canvas.drawText(elidedSub, cx, subBaseline, subPaint)
+            }
+            showTitle -> {
+                val iconCy = rect.top + (cellH * 0.40f)
+                drawToggleIcon(
+                    context = context,
+                    canvas = canvas,
+                    type = item.type,
+                    cx = cx,
+                    cy = iconCy,
+                    size = iconSize,
+                    color = iconColor,
+                    isEnabled = isEnabled,
+                    alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+                )
+
+                titlePaint.color = if (isEnabled) activeContentColor else primaryTextColor
+                val titleBaseline = rect.bottom - (cellH * 0.16f)
+                val maxTextW = cellW - (10f * scaleFactor)
+                val elidedTitle = android.text.TextUtils.ellipsize(
+                    item.label,
+                    android.text.TextPaint(titlePaint),
+                    maxTextW.coerceAtLeast(10f),
+                    android.text.TextUtils.TruncateAt.END
+                ).toString()
+                canvas.drawText(elidedTitle, cx, titleBaseline, titlePaint)
+            }
+            else -> {
+                drawToggleIcon(
+                    context = context,
+                    canvas = canvas,
+                    type = item.type,
+                    cx = cx,
+                    cy = rect.centerY(),
+                    size = iconSize,
+                    color = iconColor,
+                    isEnabled = isEnabled,
+                    alertMode = if (item.type == ToggleType.RINGER) state.alertSlider else null
+                )
+            }
         }
-        canvas.drawText(item.label, rect.centerX(), rect.bottom - 11f * scaleFactor, tp)
     }
 
     return bitmap

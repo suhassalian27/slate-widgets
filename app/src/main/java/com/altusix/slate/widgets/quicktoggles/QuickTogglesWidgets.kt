@@ -240,13 +240,22 @@ abstract class BaseQuickTogglesReceiver(
             val activeLayoutId = getLayoutResId(wDp, hDp, isResponsive)
             val views = RemoteViews(context.packageName, activeLayoutId)
 
-            val isSharedGrid = activeLayoutId == R.layout.widget_base_grid_4x2
-                    || activeLayoutId == R.layout.widget_base_grid_2x4
-                    || activeLayoutId == R.layout.widget_base_row_5
-                    || activeLayoutId == R.layout.widget_base_column_2
+            val sharedGridLayouts = setOf(
+                R.layout.widget_base_grid_4x2,
+                R.layout.widget_base_grid_2x4,
+                R.layout.widget_base_row_5,
+                R.layout.widget_base_column_2,
+                R.layout.widget_base_grid_2x2
+            )
 
+            val isSharedGrid = activeLayoutId in sharedGridLayouts
             val imageViewId = if (isSharedGrid) R.id.widget_image_view else R.id.widget_canvas_surface
             views.setImageViewBitmap(imageViewId, bitmap)
+
+            if (activeLayoutId != R.layout.widget_base_grid_2x2) {
+                val rootLayoutId = if (isSharedGrid) R.id.layout_grid_root else R.id.layout_toggles_root
+                views.setViewPadding(rootLayoutId, 0, 0, 0, 0)
+            }
 
             val rootLayoutId = if (isSharedGrid) R.id.layout_grid_root else R.id.layout_toggles_root
             views.setViewPadding(rootLayoutId, 0, 0, 0, 0)
@@ -363,17 +372,21 @@ class QuickTogglesConnectivityReceiver : BaseQuickTogglesReceiver(R.layout.widge
 // 4. QUAD ACTION MATRIX (2x2)
 // =========================================================================
 
-class QuickTogglesQuadReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggles_quad_2x2_layout, targetAspect = 1.0f) {
+class QuickTogglesQuadReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_grid_2x2, targetAspect = 1.0f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateQuadActionMatrixBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_toggle_tl, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 20))
-        views.setOnClickPendingIntent(R.id.btn_toggle_tr, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 21))
-        views.setOnClickPendingIntent(R.id.btn_toggle_bl, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 22))
-        views.setOnClickPendingIntent(R.id.btn_toggle_br, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 23))
+        // slot_0: Wi-Fi (Top-Left)
+        views.setOnClickPendingIntent(R.id.slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 20))
+        // slot_1: Bluetooth (Top-Right)
+        views.setOnClickPendingIntent(R.id.slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 21))
+        // slot_2: Torch (Bottom-Left)
+        views.setOnClickPendingIntent(R.id.slot_2, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 22))
+        // slot_3: Sound (Bottom-Right)
+        views.setOnClickPendingIntent(R.id.slot_3, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 23))
     }
 }
 
