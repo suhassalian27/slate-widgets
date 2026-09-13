@@ -248,7 +248,8 @@ abstract class BaseQuickTogglesReceiver(
                 R.layout.widget_base_grid_2x2,
                 R.layout.widget_base_row_3,
                 R.layout.widget_base_column_3,
-                R.layout.widget_base_single
+                R.layout.widget_base_single,
+                R.layout.widget_base_grid_3x2
             )
 
             val isSharedGrid = activeLayoutId in sharedGridLayouts
@@ -513,19 +514,19 @@ class QuickTogglesRotatePillReceiver : BaseQuickTogglesReceiver(R.layout.widget_
 // 12. SYSTEM UTILITY DECK (4x2)
 // =========================================================================
 
-class QuickTogglesUtilityDeckReceiver : BaseQuickTogglesReceiver(R.layout.widget_toggles_utility_4x2_layout, targetAspect = 2.0f) {
+class QuickTogglesUtilityDeckReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_grid_3x2, targetAspect = 2.0f) {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateSystemUtilityDeckBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.btn_util_0, createBroadcastPendingIntent(context, ACTION_CYCLE_TIMEOUT, appWidgetId, 100))
-        views.setOnClickPendingIntent(R.id.btn_util_1, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 101))
-        views.setOnClickPendingIntent(R.id.btn_util_2, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBatterySaverIntent(), appWidgetId, 102))
-        views.setOnClickPendingIntent(R.id.btn_util_3, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 103))
-        views.setOnClickPendingIntent(R.id.btn_util_4, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createAirplaneIntent(), appWidgetId, 104))
-        views.setOnClickPendingIntent(R.id.btn_util_5, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 105))
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createBroadcastPendingIntent(context, ACTION_CYCLE_TIMEOUT, appWidgetId, 100))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 101))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBatterySaverIntent(), appWidgetId, 102))
+        views.setOnClickPendingIntent(R.id.touch_slot_3, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 103))
+        views.setOnClickPendingIntent(R.id.touch_slot_4, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createAirplaneIntent(), appWidgetId, 104))
+        views.setOnClickPendingIntent(R.id.touch_slot_5, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 105))
     }
 }
 
