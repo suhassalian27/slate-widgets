@@ -17,7 +17,6 @@ class QuickTogglesTrampolineActivity : Activity() {
     }
 
     private var hasLaunched = false
-    private val handler = Handler(Looper.getMainLooper())
 
     private val dynamicSystemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -26,41 +25,34 @@ class QuickTogglesTrampolineActivity : Activity() {
                 getSharedPreferences("slate_toggles_prefs", Context.MODE_PRIVATE)
                     .edit().putBoolean("hotspot_broadcast_state", state == 13).apply()
             }
-            updateAllQuickTogglesWidgets(this@QuickTogglesTrampolineActivity)
+            updateAllQuickTogglesWidgets(applicationContext)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        registerSystemReceivers()
+        handleLaunch(intent)
+    }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleLaunch(intent)
+    }
+
+    private fun handleLaunch(intent: Intent?) {
         val targetIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
+            intent?.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
-            intent.getParcelableExtra(EXTRA_TARGET_INTENT)
-        }
-
-        val filter = IntentFilter().apply {
-            addAction("android.net.wifi.WIFI_STATE_CHANGED")
-            addAction("android.net.wifi.STATE_CHANGE")
-            addAction("android.net.wifi.WIFI_AP_STATE_CHANGED")
-            addAction("android.bluetooth.adapter.action.STATE_CHANGED")
-            addAction("android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED")
-            addAction("android.location.PROVIDERS_CHANGED")
-            addAction("android.location.MODE_CHANGED")
-            addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(dynamicSystemReceiver, filter, Context.RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(dynamicSystemReceiver, filter)
+            intent?.getParcelableExtra(EXTRA_TARGET_INTENT)
         }
 
         if (targetIntent != null) {
             try {
-                startActivity(targetIntent)
                 hasLaunched = true
+                startActivity(targetIntent)
             } catch (_: Exception) {
                 finish()
             }
@@ -69,34 +61,47 @@ class QuickTogglesTrampolineActivity : Activity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (hasLaunched) {
-            // Stage 1: Immediate check upon closing settings
-            updateAllQuickTogglesWidgets(this)
+    private fun registerSystemReceivers() {
+        val filter = IntentFilter().apply {
+            addAction("android.net.wifi.WIFI_STATE_CHANGED")
+            addAction("android.net.wifi.STATE_CHANGE")
+            addAction("android.net.wifi.WIFI_AP_STATE_CHANGED")
+            addAction("android.net.conn.CONNECTIVITY_CHANGE")
+            addAction("android.bluetooth.adapter.action.STATE_CHANGED")
+            addAction("android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED")
+            addAction("android.location.PROVIDERS_CHANGED")
+            addAction("android.location.MODE_CHANGED")
+            addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+            addAction("android.os.action.POWER_SAVE_MODE_CHANGED")
+            addAction("android.app.action.INTERRUPTION_FILTER_CHANGED")
+        }
 
-            // Stage 2: 400ms for fast switches
-            handler.postDelayed({ updateAllQuickTogglesWidgets(applicationContext) }, 400)
-
-            // Stage 3: 1200ms for Wi-Fi / Bluetooth chip power cycling
-            handler.postDelayed({ updateAllQuickTogglesWidgets(applicationContext) }, 1200)
-
-            // Stage 4: 2200ms for slow Hotspot SoftAP interface bindings
-            handler.postDelayed({
-                updateAllQuickTogglesWidgets(applicationContext)
-                finish()
-            }, 2200)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(dynamicSystemReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(dynamicSystemReceiver, filter)
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        updateAllQuickTogglesWidgets(applicationContext)
+    override fun onResume() {
+        super.onResume()
+        if (hasLaunched) {
+            val appContext = applicationContext
+            // Stage 1: Immediate refresh
+            updateAllQuickTogglesWidgets(appContext)
+
+            // Multi-stage background refreshes for hardware state stabilization
+            val handler = Handler(Looper.getMainLooper())
+            handler.postDelayed({ updateAllQuickTogglesWidgets(appContext) }, 400)
+            handler.postDelayed({ updateAllQuickTogglesWidgets(appContext) }, 1200)
+            handler.postDelayed({ updateAllQuickTogglesWidgets(appContext) }, 2200)
+
+            finish()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
         try {
             unregisterReceiver(dynamicSystemReceiver)
         } catch (_: Exception) {}

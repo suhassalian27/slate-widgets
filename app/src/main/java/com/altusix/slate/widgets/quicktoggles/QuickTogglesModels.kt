@@ -37,7 +37,9 @@ enum class ToggleType {
     LOCATION,
     TIMEOUT,
     BATTERY_SAVER,
-    ALERT_SLIDER
+    ALERT_SLIDER,
+    DND,
+    DATA
 }
 
 enum class AlertSliderMode(val label: String) {
@@ -66,7 +68,9 @@ data class QuickTogglesState(
     val darkMode: ToggleItemState = ToggleItemState(ToggleType.DARK_MODE, true, "Dark Mode", "Dark", 0xFFBF5AF2L),
     val location: ToggleItemState = ToggleItemState(ToggleType.LOCATION, false, "Location", "Off", 0xFF30D158L),
     val timeout: ToggleItemState = ToggleItemState(ToggleType.TIMEOUT, true, "Timeout", "30s", 0xFF64D2FFL),
-    val batterySaver: ToggleItemState = ToggleItemState(ToggleType.BATTERY_SAVER, false, "Battery Saver", "Off", 0xFFFFD60AL),
+    val batterySaver: ToggleItemState = ToggleItemState(ToggleType.BATTERY_SAVER, false, "Saver", "Off", 0xFFFFD60AL),
+    val dnd: ToggleItemState = ToggleItemState(ToggleType.DND, false, "Do Not Disturb", "Off", 0xFFBF5AF2L),
+    val data: ToggleItemState = ToggleItemState(ToggleType.DATA, true, "Mobile Data", "Settings", 0xFF30D158L),
     val mediaVolumePercent: Int = 60
 )
 
@@ -135,28 +139,24 @@ object QuickTogglesStateManager {
 
         // 4. Ringer & Alert Slider
         var alertMode = AlertSliderMode.RING
-        var ringerSubtitle = "Normal"
+        var ringerSubtitle = "Ring"
         var isRingerActive = true
-        var ringerLabel = "Sound"
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             when (am?.ringerMode) {
                 AudioManager.RINGER_MODE_SILENT -> {
                     alertMode = AlertSliderMode.SILENT
                     ringerSubtitle = "Silent"
-                    ringerLabel = "Silent"
                     isRingerActive = false
                 }
                 AudioManager.RINGER_MODE_VIBRATE -> {
                     alertMode = AlertSliderMode.VIBRATE
                     ringerSubtitle = "Vibrate"
-                    ringerLabel = "Vibrate"
                     isRingerActive = true
                 }
                 else -> {
                     alertMode = AlertSliderMode.RING
                     ringerSubtitle = "Ring"
-                    ringerLabel = "Sound"
                     isRingerActive = true
                 }
             }
@@ -223,7 +223,7 @@ object QuickTogglesStateManager {
             isPowerSave = pm?.isPowerSaveMode == true
         } catch (_: Exception) {}
 
-        // 12. Media Volume
+// 12. Media Volume
         var volumePercent = 60
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -234,11 +234,40 @@ object QuickTogglesStateManager {
             }
         } catch (_: Exception) {}
 
+        // 13. Mobile Data Check
+        var isDataConnected = false
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val activeNetwork = cm?.activeNetwork
+            val caps = cm?.getNetworkCapabilities(activeNetwork)
+            isDataConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+        } catch (_: Exception) {}
+
+
+
+        // DND (Do Not Disturb) - inspects Global zen_mode with optimistic fallback
+        var isDndActive = false
+        try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val lastToggleTime = prefs.getLong("last_dnd_toggle_time", 0L)
+            if (System.currentTimeMillis() - lastToggleTime < 1500L) {
+                isDndActive = prefs.getBoolean("last_dnd_target_state", false)
+            } else {
+                val zenMode = Settings.Global.getInt(context.contentResolver, "zen_mode", 0)
+                isDndActive = zenMode != 0
+            }
+        } catch (_: Exception) {
+            try {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                isDndActive = nm?.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
+            } catch (_: Exception) {}
+        }
+
         return QuickTogglesState(
             wifi = ToggleItemState(ToggleType.WIFI, isWifiOn, "Wi-Fi", wifiSubtitle, 0xFF0A84FFL),
             bluetooth = ToggleItemState(ToggleType.BLUETOOTH, isBtOn, "Bluetooth", btSubtitle, 0xFF0A84FFL),
             torch = ToggleItemState(ToggleType.TORCH, isTorchOn, "Torch", if (isTorchOn) "On" else "Off", 0xFFFFD60AL),
-            ringer = ToggleItemState(ToggleType.RINGER, isRingerActive, ringerLabel, ringerSubtitle, 0xFF30D158L),
+            ringer = ToggleItemState(ToggleType.RINGER, isRingerActive, "Sound", ringerSubtitle, 0xFF30D158L),
             alertSlider = alertMode,
             autoRotate = ToggleItemState(ToggleType.AUTOROTATE, isAutoRotateOn, "Rotate", if (isAutoRotateOn) "Auto" else "Locked", 0xFFFF9F0AL),
             hotspot = ToggleItemState(ToggleType.HOTSPOT, isHotspotOn, "Hotspot", if (isHotspotOn) "Active" else "Off", 0xFFFF375FL),
@@ -247,6 +276,8 @@ object QuickTogglesStateManager {
             location = ToggleItemState(ToggleType.LOCATION, isLocationOn, "Location", if (isLocationOn) "On" else "Off", 0xFF30D158L),
             timeout = ToggleItemState(ToggleType.TIMEOUT, true, "Timeout", timeoutSubtitle, 0xFF64D2FFL),
             batterySaver = ToggleItemState(ToggleType.BATTERY_SAVER, isPowerSave, "Saver", if (isPowerSave) "Active" else "Off", 0xFFFFD60AL),
+            dnd = ToggleItemState(ToggleType.DND, isDndActive, "DND", if (isDndActive) "On" else "Off", 0xFFBF5AF2L),
+            data = ToggleItemState(ToggleType.DATA, isDataConnected, "Cellular", if (isDataConnected) "Connected" else "Mobile", 0xFF30D158L),
             mediaVolumePercent = volumePercent
         )
     }
@@ -470,6 +501,45 @@ object QuickTogglesStateManager {
     fun createNotificationPolicyIntent(): Intent {
         return Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+    }
+
+    fun createDataSettingsIntent(): Intent {
+        return Intent(Settings.ACTION_DATA_ROAMING_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+    }
+
+    fun createDndSettingsIntent(): Intent {
+        return Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+    }
+
+    fun toggleDnd(context: Context): Boolean {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
+        return if (nm.isNotificationPolicyAccessGranted) {
+            val isCurrentlyOn = try {
+                Settings.Global.getInt(context.contentResolver, "zen_mode", 0) != 0
+            } catch (_: Exception) {
+                nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
+            }
+            val target = if (isCurrentlyOn) {
+                NotificationManager.INTERRUPTION_FILTER_ALL
+            } else {
+                NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            }
+            nm.setInterruptionFilter(target)
+
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putLong("last_dnd_toggle_time", System.currentTimeMillis())
+                .putBoolean("last_dnd_target_state", !isCurrentlyOn)
+                .apply()
+
+            !isCurrentlyOn
+        } else {
+            false
         }
     }
 }

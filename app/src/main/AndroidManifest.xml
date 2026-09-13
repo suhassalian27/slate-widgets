@@ -118,14 +118,6 @@
             android:excludeFromRecents="true"
             android:noHistory="true" />
 
-        <!-- Quick Toggles Trampoline Activity for Instant Return Refresh -->
-        <activity
-            android:name=".widgets.quicktoggles.QuickTogglesTrampolineActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:taskAffinity=""
-            android:launchMode="singleTask"
-            android:excludeFromRecents="true" />
 
         <!-- Slate Media Notification Listener Service -->
         <service
@@ -3611,15 +3603,30 @@
         </receiver>
 
         <!-- ========================================================================= -->
-        <!-- QUICK TOGGLES WIDGETS (14 RECEIVERS)                                       -->
+        <!-- QUICK TOGGLES TRAMPOLINE ACTIVITY                                          -->
         <!-- ========================================================================= -->
 
-        <!-- 1. Control Center Deck (4x2) -->
+        <activity
+            android:name=".widgets.quicktoggles.QuickTogglesTrampolineActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:exported="false" />
+
+        <!-- ========================================================================= -->
+        <!-- QUICK TOGGLES WIDGETS (COMPOSITE & MULTI-SLOT)                            -->
+        <!-- ========================================================================= -->
+
+        <!-- 1. Control Center Deck (4x2 / 2x4 Dynamic) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesControlCenterReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="Control Center Deck">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_TORCH" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
                 <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
                 <action android:name="android.net.wifi.STATE_CHANGE" />
                 <action android:name="android.net.wifi.WIFI_AP_STATE_CHANGED" />
@@ -3734,7 +3741,29 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 8. Wi-Fi Network Pill (2x1) -->
+        <!-- 8. System Utility Deck (4x2) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesUtilityDeckReceiver"
+            android:exported="true"
+            android:label="System Utility Deck">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_TIMEOUT" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+                <action android:name="android.intent.action.AIRPLANE_MODE" />
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+                <action android:name="android.net.wifi.WIFI_AP_STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- ========================================================================= -->
+        <!-- 2x1 PILL TOGGLES                                                          -->
+        <!-- ========================================================================= -->
+
+        <!-- Wi-Fi Network Pill (2x1) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesWifiPillReceiver"
             android:exported="true"
@@ -3742,13 +3771,14 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x1" />
         </receiver>
 
-        <!-- 9. Bluetooth Device Pill (2x1) -->
+        <!-- Bluetooth Device Pill (2x1) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesBluetoothPillReceiver"
             android:exported="true"
@@ -3756,13 +3786,14 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x1" />
         </receiver>
 
-        <!-- 10. Sound Mode Pill (2x1) -->
+        <!-- Sound Mode Pill (2x1) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesSoundPillReceiver"
             android:exported="true"
@@ -3777,7 +3808,7 @@
                 android:resource="@xml/widget_info_2x1" />
         </receiver>
 
-        <!-- 11. Auto-Rotate Pill (2x1) -->
+        <!-- Auto-Rotate Pill (2x1) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesRotatePillReceiver"
             android:exported="true"
@@ -3791,24 +3822,96 @@
                 android:resource="@xml/widget_info_2x1" />
         </receiver>
 
-        <!-- 12. System Utility Deck (4x2) -->
+        <!-- Hotspot Pill (2x1) -->
         <receiver
-            android:name=".widgets.quicktoggles.QuickTogglesUtilityDeckReceiver"
+            android:name=".widgets.quicktoggles.QuickTogglesHotspotPillReceiver"
             android:exported="true"
-            android:label="System Utility Deck">
+            android:label="Hotspot Pill">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_TIMEOUT" />
-                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+                <action android:name="android.net.wifi.WIFI_AP_STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- Airplane Mode Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesAirplanePillReceiver"
+            android:exported="true"
+            android:label="Airplane Mode Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.AIRPLANE_MODE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- Dark Mode Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesDarkModePillReceiver"
+            android:exported="true"
+            android:label="Dark Mode Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- Location Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesLocationPillReceiver"
+            android:exported="true"
+            android:label="Location Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.location.PROVIDERS_CHANGED" />
+                <action android:name="android.location.MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- Battery Saver Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesBatterySaverPillReceiver"
+            android:exported="true"
+            android:label="Battery Saver Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x2" />
+                android:resource="@xml/widget_info_2x1" />
         </receiver>
 
-        <!-- 13. Micro Toggle: Flashlight (1x1) -->
+        <!-- Do Not Disturb Pill (2x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesDndPillReceiver"
+            android:exported="true"
+            android:label="Do Not Disturb Pill">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_DND" />
+                <action android:name="android.app.action.INTERRUPTION_FILTER_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- ========================================================================= -->
+        <!-- 1x1 MICRO TOGGLES                                                         -->
+        <!-- ========================================================================= -->
+
+        <!-- Micro Toggle: Flashlight (1x1) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesMicroTorchReceiver"
             android:exported="true"
@@ -3822,7 +3925,7 @@
                 android:resource="@xml/widget_info_1x1" />
         </receiver>
 
-        <!-- 14. Micro Toggle: Sound Mode (1x1) -->
+        <!-- Micro Toggle: Sound Mode (1x1) -->
         <receiver
             android:name=".widgets.quicktoggles.QuickTogglesMicroSoundReceiver"
             android:exported="true"
@@ -3831,6 +3934,135 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.altusix.slate.toggles.ACTION_CYCLE_SOUND" />
                 <action android:name="android.media.RINGER_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Wi-Fi (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroWifiReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Wi-Fi">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Bluetooth (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroBluetoothReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Bluetooth">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+                <action android:name="android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Auto-Rotate (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroRotateReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Auto-Rotate">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_ROTATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Hotspot (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroHotspotReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Hotspot">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.net.wifi.WIFI_AP_STATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Airplane (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroAirplaneReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Airplane">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.AIRPLANE_MODE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Dark Mode (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroDarkModeReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Dark Mode">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Location (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroLocationReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Location">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.location.PROVIDERS_CHANGED" />
+                <action android:name="android.location.MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: Battery Saver (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroBatterySaverReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: Battery Saver">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- Micro Toggle: DND (1x1) -->
+        <receiver
+            android:name=".widgets.quicktoggles.QuickTogglesMicroDndReceiver"
+            android:exported="true"
+            android:label="Micro Toggle: DND">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.altusix.slate.toggles.ACTION_TOGGLE_DND" />
+                <action android:name="android.app.action.INTERRUPTION_FILTER_CHANGED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

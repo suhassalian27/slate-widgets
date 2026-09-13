@@ -25,10 +25,17 @@ private fun drawCardBackground(
     rect: RectF,
     config: SlateWidgetConfig,
     scaleFactor: Float,
-    customCornerRadius: Float? = null
+    customCornerRadius: Float? = null,
+    drawBorder: Boolean = true
 ): Triple<Int, Int, Int> {
     val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
+    var bgColor = getSafeBgColor(config)
+
+    // Safety Guard: If opacity or alpha is 0/uninitialized, fall back to solid theme background
+    if (Color.alpha(bgColor) < 20) {
+        bgColor = if (isLight) Color.WHITE else Color.rgb(24, 24, 26)
+    }
+
     val cornerRadius = customCornerRadius ?: getStandardCornerRadius(scaleFactor)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -37,12 +44,14 @@ private fun drawCardBackground(
     }
     canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
 
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(28, 0, 0, 0) else Color.argb(32, 255, 255, 255)
-        style = Paint.Style.STROKE
-        strokeWidth = 1.2f * scaleFactor
+    if (drawBorder) {
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(28, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.2f * scaleFactor
+        }
+        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
     }
-    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
 
     val primaryTextColor = if (isLight) Color.BLACK else Color.WHITE
     val secondaryTextColor = if (isLight) Color.argb(170, 0, 0, 0) else Color.argb(170, 255, 255, 255)
@@ -121,6 +130,8 @@ private fun drawToggleIcon(
         ToggleType.AIRPLANE -> R.drawable.ic_airplane
         ToggleType.TIMEOUT -> R.drawable.ic_phone_lock
         ToggleType.BATTERY_SAVER -> R.drawable.ic_battery_saver
+        ToggleType.DND -> if (isEnabled) R.drawable.ic_do_not_disturb_on else R.drawable.ic_do_not_disturb_off
+        ToggleType.DATA -> R.drawable.ic_wifi
     }
     drawVectorDrawable(context, canvas, resId, cx, cy, size, color)
 }
@@ -1197,12 +1208,13 @@ fun generateFlashlightTorchBitmap(
 }
 
 // =========================================================================
-// 8. GENERIC TOGGLE PILL (2x1 - WI-FI, BLUETOOTH, SOUND, ROTATE)
+// 8. GENERIC TOGGLE PILL (2x1 - Pure Borderless Pill)
 // =========================================================================
 
 fun generateTogglePillBitmap(
     context: Context,
     item: ToggleItemState,
+    alertMode: AlertSliderMode? = null,
     slateConfig: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
@@ -1212,20 +1224,32 @@ fun generateTogglePillBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val targetAspect = 2.0f
-        val currentAspect = w / h
-        if (currentAspect > targetAspect) {
-            val contentW = h * targetAspect
-            RectF((w - contentW) / 2f, 0f, (w + contentW) / 2f, h)
-        } else {
-            val contentH = w / targetAspect
-            RectF(0f, (h - contentH) / 2f, w, (h + contentH) / 2f)
+        var cardH = h
+        var cardW = cardH * targetAspect
+        if (cardW > w) {
+            cardW = w
+            cardH = cardW / targetAspect
         }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
+    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(
+        canvas = canvas,
+        rect = cardRect,
+        config = slateConfig,
+        scaleFactor = scaleFactor,
+        customCornerRadius = outerRadius,
+        drawBorder = false
+    )
     val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
+    val isLight = slateConfig.themeMode == "LIGHT"
 
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
             ((accentColor shr 8 and 0xFF) * 0.7152f) +
@@ -1235,46 +1259,85 @@ fun generateTogglePillBitmap(
     val fontRegular = getSlateFont(context, 400)
     val fontBold = getSlateFont(context, 700)
 
-    val padH = 14f * scaleFactor
-    val iconR = cardRect.height() * 0.28f
-    val iconCx = cardRect.left + padH + iconR
-    val iconCy = cardRect.centerY()
+    val cw = cardRect.width()
+    val ch = cardRect.height()
+    val isCompact = cw < 120f * scaleFactor
 
-    // Full solid accent color on active badge
-    val badgeBg = if (item.isEnabled) accentColor else Color.argb(22, 255, 255, 255)
-    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = badgeBg }
-    canvas.drawCircle(iconCx, iconCy, iconR, badgePaint)
+    if (isCompact) {
+        val iconR = (minOf(cw, ch) * 0.36f).coerceIn(16f * scaleFactor, 36f * scaleFactor)
+        val cx = cardRect.centerX()
+        val cy = cardRect.centerY()
 
-    val iconSize = iconR * 1.18f
-    val iconColor = if (item.isEnabled) activeContentColor else secondaryTextColor
+        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (item.isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+        }
+        canvas.drawCircle(cx, cy, iconR, badgePaint)
 
-    drawToggleIcon(
-        context = context,
-        canvas = canvas,
-        type = item.type,
-        cx = iconCx,
-        cy = iconCy,
-        size = iconSize,
-        color = iconColor,
-        isEnabled = item.isEnabled,
-        alertMode = AlertSliderMode.RING
-    )
+        val iconSize = iconR * 1.15f
+        val iconColor = if (item.isEnabled) activeContentColor else secondaryTextColor
+        drawToggleIcon(context, canvas, item.type, cx, cy, iconSize, iconColor, item.isEnabled, alertMode)
 
-    val textLeft = iconCx + iconR + 12f * scaleFactor
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = primaryTextColor
-        typeface = fontBold
-        textSize = 14.5f * scaleFactor
+    } else {
+        val padH = (cw * 0.08f).coerceIn(10f * scaleFactor, 18f * scaleFactor)
+        val iconR = (ch * 0.28f).coerceIn(16f * scaleFactor, 28f * scaleFactor)
+        val iconCx = cardRect.left + padH + iconR
+        val iconCy = cardRect.centerY()
+
+        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (item.isEnabled) accentColor else (if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255))
+        }
+        canvas.drawCircle(iconCx, iconCy, iconR, badgePaint)
+
+        val iconSize = iconR * 1.15f
+        val iconColor = if (item.isEnabled) activeContentColor else secondaryTextColor
+        drawToggleIcon(context, canvas, item.type, iconCx, iconCy, iconSize, iconColor, item.isEnabled, alertMode)
+
+        val textLeft = iconCx + iconR + (12f * scaleFactor)
+        val maxTextW = (cardRect.right - (12f * scaleFactor) - textLeft).coerceAtLeast(10f)
+
+        val showSub = ch >= 48f * scaleFactor && item.subtitle.isNotBlank()
+        val titleSize = (ch * 0.22f).coerceIn(11.5f * scaleFactor, 15f * scaleFactor)
+
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = primaryTextColor
+            typeface = fontBold
+            textSize = titleSize
+        }
+
+        if (showSub) {
+            val titleY = cardRect.centerY() - (2f * scaleFactor)
+            val elidedTitle = android.text.TextUtils.ellipsize(
+                item.label,
+                android.text.TextPaint(titlePaint),
+                maxTextW,
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedTitle, textLeft, titleY, titlePaint)
+
+            val subSize = (ch * 0.16f).coerceIn(9.5f * scaleFactor, 12f * scaleFactor)
+            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = if (item.isEnabled) accentColor else secondaryTextColor
+                typeface = fontRegular
+                textSize = subSize
+            }
+            val elidedSub = android.text.TextUtils.ellipsize(
+                item.subtitle,
+                android.text.TextPaint(subPaint),
+                maxTextW,
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedSub, textLeft, cardRect.centerY() + (13f * scaleFactor), subPaint)
+        } else {
+            val titleY = cardRect.centerY() + (titleSize * 0.35f)
+            val elidedTitle = android.text.TextUtils.ellipsize(
+                item.label,
+                android.text.TextPaint(titlePaint),
+                maxTextW,
+                android.text.TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(elidedTitle, textLeft, titleY, titlePaint)
+        }
     }
-    canvas.drawText(item.label, textLeft, cardRect.centerY() - 2f * scaleFactor, titlePaint)
-
-    val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (item.isEnabled) accentColor else secondaryTextColor
-        typeface = fontRegular
-        textSize = 11f * scaleFactor
-    }
-    val sub = if (item.subtitle.length > 18) item.subtitle.take(17) + "…" else item.subtitle
-    canvas.drawText(sub, textLeft, cardRect.centerY() + 14f * scaleFactor, subPaint)
 
     return bitmap
 }
@@ -1524,7 +1587,7 @@ fun generateSystemUtilityDeckBitmap(
 }
 
 // =========================================================================
-// 10. MICRO TOGGLE (1x1 - TORCH OR SOUND)
+// 10. MICRO TOGGLE (1x1 - Centered Large Icon, No Text)
 // =========================================================================
 
 fun generateMicroToggleBitmap(
@@ -1540,26 +1603,34 @@ fun generateMicroToggleBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    val cardRect = if (isResponsive) RectF(0f, 0f, w, h) else {
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
         val size = minOf(w, h)
         RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
     }
 
-    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(canvas, cardRect, slateConfig, scaleFactor)
-    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
-    val fontBold = getSlateFont(context, 700)
-
     val outerRadius = getStandardCornerRadius(scaleFactor)
-    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.08f).coerceIn(6f * scaleFactor, 10f * scaleFactor)
-    val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
-    val innerR = (outerRadius - pad).coerceAtLeast(8f * scaleFactor)
+    val (primaryTextColor, secondaryTextColor, _) = drawCardBackground(
+        canvas = canvas,
+        rect = cardRect,
+        config = slateConfig,
+        scaleFactor = scaleFactor,
+        customCornerRadius = outerRadius,
+        drawBorder = false
+    )
 
+    val accentColor = androidx.compose.ui.graphics.Color(slateConfig.accentColorHex).toArgb()
     val isAccentLight = (((accentColor shr 16 and 0xFF) * 0.2126f) +
             ((accentColor shr 8 and 0xFF) * 0.7152f) +
             ((accentColor and 0xFF) * 0.0722f)) / 255f > 0.65f
     val activeContentColor = if (isAccentLight) Color.BLACK else Color.WHITE
 
-    // Solid accent card when active (matches reference 1x1 toggle widget)
+    val pad = (minOf(cardRect.width(), cardRect.height()) * 0.06f).coerceIn(4f * scaleFactor, 8f * scaleFactor)
+    val innerRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+    val innerR = (outerRadius - pad).coerceAtLeast(6f * scaleFactor)
+
+    // Solid accent fill when active
     if (item.isEnabled) {
         val solidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColor
@@ -1569,8 +1640,8 @@ fun generateMicroToggleBitmap(
     }
 
     val cx = cardRect.centerX()
-    val cy = cardRect.centerY() - 7f * scaleFactor
-    val iconSize = cardRect.width() * 0.42f
+    val cy = cardRect.centerY()
+    val iconSize = (minOf(cardRect.width(), cardRect.height()) * 0.52f).coerceIn(28f * scaleFactor, 58f * scaleFactor)
     val iconColor = if (item.isEnabled) activeContentColor else secondaryTextColor
 
     drawToggleIcon(
@@ -1584,15 +1655,6 @@ fun generateMicroToggleBitmap(
         isEnabled = item.isEnabled,
         alertMode = alertMode
     )
-
-    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = if (item.isEnabled) activeContentColor else secondaryTextColor
-        typeface = fontBold
-        textSize = 10f * scaleFactor
-        textAlign = Paint.Align.CENTER
-    }
-    val label = if (item.type == ToggleType.RINGER) (alertMode?.label ?: "Sound") else item.label
-    canvas.drawText(label, cx, cardRect.bottom - 10f * scaleFactor, labelPaint)
 
     return bitmap
 }
