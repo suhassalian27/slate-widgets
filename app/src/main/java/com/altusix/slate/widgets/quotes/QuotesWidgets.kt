@@ -336,12 +336,26 @@ class QuotesOrganicPebbleReceiver : BaseQuotesReceiver(targetAspect = 0f) {
     }
 }
 
-// 12. Vertical Capsule (2x2)
-class QuotesVerticalCapsuleReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
+// 12. Vertical Capsule (2x2) - Fixed Mode Only
+class QuotesVerticalCapsuleReceiver : BaseQuotesReceiver(targetAspect = 0f) {
     override val widgetTypeTag: String = "CAPSULE"
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
-        return generateVerticalCapsuleBitmap(context, quote, config, isResponsive, wDp, hDp)
+        return generateVerticalCapsuleBitmap(
+            context = context,
+            quote = quote,
+            config = config,
+            isResponsive = false,
+            wDp = wDp,
+            hDp = hDp
+        )
     }
 }
 

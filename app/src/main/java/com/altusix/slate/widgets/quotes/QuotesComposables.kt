@@ -1681,8 +1681,7 @@ fun generateOrganicPebbleBitmap(
 }
 
 // =========================================================================
-// 12. VERTICAL CAPSULE (2x2)
-// Slender pill with stacked typography and anchored progress pin
+// 12. VERTICAL CAPSULE (2x2) - FIXED ASPECT (0.46) SCALED STADIUM
 // =========================================================================
 
 fun generateVerticalCapsuleBitmap(
@@ -1698,21 +1697,27 @@ fun generateVerticalCapsuleBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
-    // 1. Slender Pill Geometry
-    val capsuleH = h * 0.94f
-    val capsuleW = minOf(w * 0.46f, capsuleH * 0.48f)
-    val capsuleLeft = (w - capsuleW) / 2f
-    val capsuleTop = (h - capsuleH) / 2f
-    val capsuleRect = RectF(capsuleLeft, capsuleTop, capsuleLeft + capsuleW, capsuleTop + capsuleH)
-    val cornerRadius = capsuleW / 2f
+    // 1. Fixed Aspect Ratio (Height ≈ 2.17x Width)
+    val targetAspect = 0.46f
+    val margin = 3f * scaleFactor
+    val availW = w - (margin * 2f)
+    val availH = h - (margin * 2f)
 
-    // 2. Base Capsule & Border
-    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.argb(45, 0, 0, 0)
-        style = Paint.Style.FILL
+    // Expand to the maximum proportional dimensions that fit in the cell
+    val (cw, ch) = if (availW / availH > targetAspect) {
+        // Height-constrained: scale to maximum height
+        (availH * targetAspect) to availH
+    } else {
+        // Width-constrained: scale to maximum width
+        availW to (availW / targetAspect)
     }
-    canvas.drawRoundRect(RectF(capsuleRect).apply { offset(0f, 3f * scaleFactor) }, cornerRadius, cornerRadius, shadowPaint)
 
+    val l = (w - cw) / 2f
+    val t = (h - ch) / 2f
+    val capsuleRect = RectF(l, t, l + cw, t + ch)
+    val cornerRadius = cw / 2f
+
+    // 2. Base Capsule Surface & Subtle Border
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.bg
         style = Paint.Style.FILL
@@ -1726,18 +1731,22 @@ fun generateVerticalCapsuleBitmap(
     }
     canvas.drawRoundRect(capsuleRect, cornerRadius, cornerRadius, borderPaint)
 
-    val padH = capsuleW * 0.20f
+    // 3. Proportional Typography (Locked to cw & ch)
+    val padH = cw * 0.18f
     val textLeft = capsuleRect.left + padH
-    val maxTextW = capsuleW - (padH * 2f)
+    val maxTextW = cw - (padH * 2f)
 
-    // 3. Stacked Typography (Upper section)
-    val textTop = capsuleRect.top + (capsuleW * 0.55f)
-    val textBottomLimit = capsuleRect.top + (capsuleH * 0.62f)
+    // Begins below the upper curved dome
+    val textTop = capsuleRect.top + (cornerRadius * 0.80f)
+    val textBottomLimit = capsuleRect.top + (ch * 0.60f)
+
+    val initialTextSize = cw * 0.145f
+    val minTextSize = cw * 0.082f
 
     val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 500)
         color = theme.primaryText
-        letterSpacing = 0.01f
+        letterSpacing = 0.015f
     }
 
     val finalBottom = drawAutoFitText(
@@ -1748,26 +1757,27 @@ fun generateVerticalCapsuleBitmap(
         bottomLimit = textBottomLimit,
         maxWidth = maxTextW,
         paint = quotePaint,
-        initialTextSize = 14f * scaleFactor,
-        minTextSize = 9.5f * scaleFactor,
+        initialTextSize = initialTextSize,
+        minTextSize = minTextSize,
         maxLines = 7,
         lineSpacingRatio = 1.34f,
         verticalCenter = false
     )
 
-    // 4. Vertical Anchor Line & Accent Dot
-    val lineX = textLeft + (8f * scaleFactor)
-    val lineTop = maxOf(finalBottom + (14f * scaleFactor), capsuleRect.top + capsuleH * 0.64f)
-    val dotRadius = 3.5f * scaleFactor
-    val dotCy = capsuleRect.bottom - (capsuleW * 0.46f)
+    // 4. Proportional Vertical Anchor Line & Accent Dot
+    val lineX = textLeft + (cw * 0.06f)
+    val dotRadius = cw * 0.055f
+    val dotCy = capsuleRect.bottom - (cornerRadius * 0.85f)
+    val lineTop = maxOf(finalBottom + (ch * 0.04f), capsuleRect.top + ch * 0.64f)
 
+    val lineStroke = (cw * 0.014f).coerceAtLeast(1.4f * scaleFactor)
     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.secondaryText
         style = Paint.Style.STROKE
-        strokeWidth = 1.2f * scaleFactor
-        alpha = if (theme.isLight) 90 else 120
+        strokeWidth = lineStroke
+        alpha = if (theme.isLight) 100 else 140
     }
-    canvas.drawLine(lineX, lineTop, lineX, dotCy - dotRadius, linePaint)
+    canvas.drawLine(lineX, lineTop, lineX, dotCy - dotRadius - (3f * scaleFactor), linePaint)
 
     val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.accent
@@ -1779,8 +1789,8 @@ fun generateVerticalCapsuleBitmap(
 }
 
 // =========================================================================
-// 13. HORIZON RIPPLE (4x2)
-// Minimalist split card with geometric sunset water ripples
+// 13. HORIZON RIPPLE (4x2 / RESPONSIVE)
+// Adaptive minimalist sunset with scale-invariant geometric water ripples
 // =========================================================================
 
 fun generateHorizonRippleBitmap(
@@ -1796,21 +1806,22 @@ fun generateHorizonRippleBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
+    // 1. Card Bounds Calculation
     val cardRect = if (isResponsive) {
         RectF(0f, 0f, w, h)
     } else {
-        val aspect = 2.05f
+        val targetAspect = 2.05f
         var cardH = h
-        var cardW = cardH * aspect
+        var cardW = cardH * targetAspect
         if (cardW > w) {
             cardW = w
-            cardH = cardW / aspect
+            cardH = cardW / targetAspect
         }
         RectF((w - cardW) / 2f, (h - cardH) / 2f, (w + cardW) / 2f, (h + cardH) / 2f)
     }
     val cornerRadius = getStandardCornerRadius(scaleFactor)
 
-    // 1. Base Surface & Border
+    // 2. Base Surface & Subtle Rim
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.bg }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
@@ -1821,75 +1832,167 @@ fun generateHorizonRippleBitmap(
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, borderPaint)
 
-    // 2. Right Sunset Emblem
-    val rightSectionW = cardRect.width() * 0.44f
-    val sunCx = cardRect.right - (rightSectionW / 2f) - (8f * scaleFactor)
-    val sunCy = cardRect.centerY() - (6f * scaleFactor)
-    val sunR = minOf(rightSectionW * 0.38f, cardRect.height() * 0.28f)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val isPortrait = cardW < (cardH * 1.15f)
 
-    val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = theme.accent
-        style = Paint.Style.FILL
-    }
+    // -------------------------------------------------------------------------
+    // SCALE-INVARIANT SUN EMBLEM DRAW FUNCTION
+    // All ripple widths, gaps, and thicknesses are strict ratios of sunR.
+    // -------------------------------------------------------------------------
+    fun drawScaleInvariantSun(sunCx: Float, sunCy: Float, sunR: Float) {
+        val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = theme.accent
+            style = Paint.Style.FILL
+        }
 
-    // Upper Semicircle Sun
-    val sunRect = RectF(sunCx - sunR, sunCy - sunR, sunCx + sunR, sunCy + sunR)
-    canvas.drawArc(sunRect, 180f, 180f, true, sunPaint)
+        // A. Upper Semicircle
+        val sunArcRect = RectF(sunCx - sunR, sunCy - sunR, sunCx + sunR, sunCy + sunR)
+        canvas.drawArc(sunArcRect, 180f, 180f, true, sunPaint)
 
-    // Subtle Horizon Hairline
-    val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = theme.accent
-        style = Paint.Style.STROKE
-        strokeWidth = 0.8f * scaleFactor
-        alpha = 80
-    }
-    canvas.drawLine(sunCx - (sunR * 1.35f), sunCy, sunCx + (sunR * 1.35f), sunCy, hairlinePaint)
+        // B. Horizon Hairline
+        val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = theme.accent
+            style = Paint.Style.STROKE
+            strokeWidth = (sunR * 0.04f).coerceAtLeast(1f)
+            alpha = if (theme.isLight) 90 else 120
+        }
+        val lineExt = sunR * 1.30f
+        canvas.drawLine(sunCx - lineExt, sunCy, sunCx + lineExt, sunCy, hairlinePaint)
 
-    // Rippled Water Reflection Bars
-    val rippleData = listOf(
-        // yOffset, halfWidth, barHeight
-        Triple(4.5f * scaleFactor, sunR * 0.96f, 3.8f * scaleFactor),
-        Triple(12.0f * scaleFactor, sunR * 0.84f, 3.2f * scaleFactor),
-        Triple(18.5f * scaleFactor, sunR * 0.68f, 2.6f * scaleFactor),
-        Triple(24.0f * scaleFactor, sunR * 0.50f, 2.0f * scaleFactor),
-        Triple(28.5f * scaleFactor, sunR * 0.32f, 1.4f * scaleFactor)
-    )
-
-    for ((yOff, halfW, barH) in rippleData) {
-        val barRect = RectF(
-            sunCx - halfW,
-            sunCy + yOff,
-            sunCx + halfW,
-            sunCy + yOff + barH
+        // C. 5 Water Reflection Ripple Bars (Ratio: gapRatio, widthRatio, heightRatio)
+        val ripples = listOf(
+            Triple(0.080f, 0.95f, 0.110f),
+            Triple(0.078f, 0.82f, 0.092f),
+            Triple(0.072f, 0.66f, 0.078f),
+            Triple(0.068f, 0.48f, 0.064f),
+            Triple(0.062f, 0.28f, 0.050f)
         )
-        val barCorner = barH / 2f
-        canvas.drawRoundRect(barRect, barCorner, barCorner, sunPaint)
+
+        var currentTop = sunCy
+        for ((gapRatio, widthRatio, heightRatio) in ripples) {
+            val gap = sunR * gapRatio
+            val barH = sunR * heightRatio
+            val barHalfW = sunR * widthRatio
+            val barTop = currentTop + gap
+            val barRect = RectF(sunCx - barHalfW, barTop, sunCx + barHalfW, barTop + barH)
+            val pillCorner = barH / 2f
+            canvas.drawRoundRect(barRect, pillCorner, pillCorner, sunPaint)
+            currentTop = barTop + barH
+        }
     }
 
-    // 3. Left Quote Typography
-    val padH = cardRect.width() * 0.09f
-    val maxTextW = cardRect.width() - rightSectionW - (padH * 1.2f)
+    val hasAuthor = quote.author.isNotBlank() &&
+            !quote.author.equals("Unknown", ignoreCase = true) &&
+            !quote.author.equals("Anonymous", ignoreCase = true)
 
     val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 500)
         color = theme.primaryText
-        letterSpacing = 0.01f
+        letterSpacing = 0.015f
     }
 
-    drawAutoFitText(
-        canvas = canvas,
-        text = quote.text,
-        x = cardRect.left + padH,
-        topLimit = cardRect.top + (14f * scaleFactor),
-        bottomLimit = cardRect.bottom - (14f * scaleFactor),
-        maxWidth = maxTextW,
-        paint = quotePaint,
-        initialTextSize = 16f * scaleFactor,
-        minTextSize = 11f * scaleFactor,
-        maxLines = 5,
-        lineSpacingRatio = 1.38f,
-        verticalCenter = true
-    )
+    val authorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 500)
+        color = theme.secondaryText
+        letterSpacing = 0.03f
+    }
+
+    // -------------------------------------------------------------------------
+    // LAYOUT MODE A: PORTRAIT / TALL (Stacked: Sun Top, Quote Bottom)
+    // -------------------------------------------------------------------------
+    if (isPortrait) {
+        val padH = cardW * 0.10f
+        val padV = cardH * 0.08f
+
+        // Sun radius calibrated for vertical balance
+        val sunR = minOf(cardW * 0.24f, cardH * 0.16f).coerceIn(20f * scaleFactor, 54f * scaleFactor)
+        val sunCx = cardRect.centerX()
+        val sunCy = cardRect.top + padV + sunR + (cardH * 0.04f)
+
+        drawScaleInvariantSun(sunCx, sunCy, sunR)
+
+        val textTop = sunCy + (sunR * 0.85f) + (16f * scaleFactor)
+        val textBottom = cardRect.bottom - padV
+        val availableW = cardW - (padH * 2f)
+
+        val initialTextSize = (cardW * 0.092f).coerceIn(12.5f * scaleFactor, 18f * scaleFactor)
+        val minTextSize = 9.5f * scaleFactor
+
+        drawAutoFitText(
+            canvas = canvas,
+            text = quote.text,
+            x = cardRect.centerX(),
+            topLimit = textTop,
+            bottomLimit = if (hasAuthor) textBottom - (20f * scaleFactor) else textBottom,
+            maxWidth = availableW,
+            paint = quotePaint,
+            initialTextSize = initialTextSize,
+            minTextSize = minTextSize,
+            maxLines = 7,
+            lineSpacingRatio = 1.34f,
+            align = Paint.Align.CENTER,
+            verticalCenter = true
+        )
+
+        if (hasAuthor) {
+            authorPaint.textSize = (initialTextSize * 0.70f).coerceIn(9f * scaleFactor, 12f * scaleFactor)
+            authorPaint.textAlign = Paint.Align.CENTER
+            canvas.drawText("— ${quote.author}", cardRect.centerX(), cardRect.bottom - padV, authorPaint)
+        }
+
+        // -------------------------------------------------------------------------
+        // LAYOUT MODE B: LANDSCAPE / BANNER (Side-by-Side: Quote Left, Sun Right)
+        // -------------------------------------------------------------------------
+    } else {
+        val padH = (cardW * 0.07f).coerceIn(16f * scaleFactor, 36f * scaleFactor)
+        val padV = (cardH * 0.12f).coerceIn(10f * scaleFactor, 24f * scaleFactor)
+
+        // Sun radius locked strictly to height and width limits
+        val maxSunHeight = cardH * 0.68f
+        val maxSunWidth = cardW * 0.32f
+        val sunR = minOf(maxSunHeight / 1.76f, maxSunWidth / 2.6f).coerceIn(16f * scaleFactor, 52f * scaleFactor)
+
+        val sunCx = cardRect.right - padH - (sunR * 1.30f)
+        // Offset by 0.12 * sunR so the full semicircle + ripples ensemble is vertically centered
+        val sunCy = cardRect.centerY() - (sunR * 0.12f)
+
+        drawScaleInvariantSun(sunCx, sunCy, sunR)
+
+        // Give the quote all remaining space from the left pad to the sun's left edge
+        val textLeft = cardRect.left + padH
+        val textRightBound = sunCx - (sunR * 1.35f) - (16f * scaleFactor)
+        val availableTextW = maxOf(60f * scaleFactor, textRightBound - textLeft)
+
+        val initialTextSize = (cardH * 0.15f).coerceIn(13f * scaleFactor, 20f * scaleFactor)
+        val minTextSize = 9.5f * scaleFactor
+
+        val authorReservedH = if (hasAuthor) 18f * scaleFactor else 0f
+        val textBottomLimit = cardRect.bottom - padV - authorReservedH
+
+        val finalY = drawAutoFitText(
+            canvas = canvas,
+            text = quote.text,
+            x = textLeft,
+            topLimit = cardRect.top + padV,
+            bottomLimit = textBottomLimit,
+            maxWidth = availableTextW,
+            paint = quotePaint,
+            initialTextSize = initialTextSize,
+            minTextSize = minTextSize,
+            maxLines = 5,
+            lineSpacingRatio = 1.35f,
+            align = Paint.Align.LEFT,
+            verticalCenter = true
+        )
+
+        if (hasAuthor) {
+            authorPaint.textSize = (initialTextSize * 0.70f).coerceIn(9.5f * scaleFactor, 12f * scaleFactor)
+            authorPaint.textAlign = Paint.Align.LEFT
+            val authorY = minOf(cardRect.bottom - padV, finalY + (14f * scaleFactor))
+            canvas.drawText("— ${quote.author}", textLeft, authorY, authorPaint)
+        }
+    }
 
     return bitmap
 }
