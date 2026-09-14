@@ -44,6 +44,94 @@ object QuotesStorageManager {
     private const val KEY_FAVORITES = "quotes_favorites_set"
     private const val KEY_CUSTOM_QUOTES = "quotes_custom_list"
 
+    private const val KEY_ROTATION_MODE_PREFIX = "widget_rotation_mode_" // "STATIC", "HOURLY", "DAILY"
+    private const val KEY_ROTATION_POOL_PREFIX = "widget_rotation_pool_" // "ALL", "FAVORITES", "CUSTOM", or category
+
+    // Active quote override used by the live config preview
+    @Volatile
+    var previewQuoteOverride: QuoteItem? = null
+
+    fun getWidgetRotationMode(context: Context, widgetId: Int): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString("$KEY_ROTATION_MODE_PREFIX$widgetId", "STATIC") ?: "STATIC"
+    }
+
+    fun getWidgetRotationPool(context: Context, widgetId: Int): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString("$KEY_ROTATION_POOL_PREFIX$widgetId", "ALL") ?: "ALL"
+    }
+
+    fun setWidgetRotationMode(context: Context, widgetId: Int, mode: String, pool: String = "ALL") {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("$KEY_ROTATION_MODE_PREFIX$widgetId", mode)
+            .putString("$KEY_ROTATION_POOL_PREFIX$widgetId", pool)
+            .apply()
+    }
+
+    fun getRotatingQuote(all: List<QuoteItem>, mode: String, poolCategory: String, widgetId: Int = -1): QuoteItem {
+        val eligiblePool = when (poolCategory) {
+            "FAVORITES" -> all.filter { it.isFavorite }.ifEmpty { all }
+            "CUSTOM", "MY QUOTES" -> all.filter { it.category == "CUSTOM" }.ifEmpty { all }
+            "ALL" -> all
+            else -> all.filter { it.category.equals(poolCategory, ignoreCase = true) }.ifEmpty { all }
+        }
+        if (eligiblePool.isEmpty()) return CURATED_QUOTES.first()
+
+        val timeUnit = if (mode == "HOURLY") {
+            System.currentTimeMillis() / (1000L * 60L * 60L)
+        } else {
+            System.currentTimeMillis() / (1000L * 60L * 60L * 24L)
+        }
+        val seedOffset = if (widgetId != -1) widgetId.toLong() else 0L
+        val deterministicIndex = (Math.abs(timeUnit + seedOffset) % eligiblePool.size).toInt()
+        return eligiblePool[deterministicIndex]
+    }
+
+    fun getQuoteForWidget(context: Context, widgetId: Int, defaultTypeTag: String = "EDITORIAL"): QuoteItem {
+        // Return preview override if rendering inside QuotesConfigActivity (-1)
+        if (widgetId == -1 && previewQuoteOverride != null) {
+            return previewQuoteOverride!!
+        }
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val mode = prefs.getString("$KEY_ROTATION_MODE_PREFIX$widgetId", "STATIC") ?: "STATIC"
+        val poolCategory = prefs.getString("$KEY_ROTATION_POOL_PREFIX$widgetId", "ALL") ?: "ALL"
+        val all = getAllQuotes(context)
+
+        // 1. Dynamic Automatic Rotation (Deterministic epoch calculation)
+        if (mode == "HOURLY" || mode == "DAILY") {
+            return getRotatingQuote(all, mode, poolCategory, widgetId)
+        }
+
+        // 2. Static Explicitly Pinned Quote
+        val quoteId = prefs.getString("$KEY_WIDGET_QUOTE_PREFIX$widgetId", null)
+        if (!quoteId.isNullOrBlank()) {
+            val found = all.find { it.id == quoteId }
+            if (found != null) return found
+        }
+
+        // 3. Initial Tailored Widget Placements
+        val seeded = when {
+            defaultTypeTag.contains("EDITORIAL", true) -> all.find { it.id == "stoic_1" }
+            defaultTypeTag.contains("ZEN", true) -> all.find { it.id == "mind_4" }
+            defaultTypeTag.contains("MODERN", true) || defaultTypeTag.contains("TYPEWRITER", true) -> all.find { it.id == "stoic_2" }
+            defaultTypeTag.contains("KINETIC", true) -> all.find { it.id == "stoic_3" }
+            defaultTypeTag.contains("GOLDEN", true) -> all.find { it.id == "lit_2" }
+            defaultTypeTag.contains("TWOTONE", true) || defaultTypeTag.contains("POETRY", true) -> all.find { it.id == "mind_7" }
+            defaultTypeTag.contains("INSIGHT", true) || defaultTypeTag.contains("BENTO", true) -> all.find { it.id == "prod_2" }
+            defaultTypeTag.contains("CELESTIAL", true) || defaultTypeTag.contains("PILL", true) -> all.find { it.id == "lit_8" }
+            defaultTypeTag.contains("SMILE_CARD", true) || defaultTypeTag.contains("BRUTALIST", true) -> all.find { it.id == "aff_3" }
+            defaultTypeTag.contains("BOLD", true) || defaultTypeTag.contains("TERMINAL", true) -> all.find { it.id == "sci_5" }
+            defaultTypeTag.contains("DISC", true) -> all.find { it.id == "mind_1" }
+            else -> all.firstOrNull()
+        } ?: CURATED_QUOTES.first()
+
+        setQuoteForWidget(context, widgetId, seeded.id)
+        return seeded
+    }
+
+
     // -------------------------------------------------------------------------
     // CURATED LIBRARY (65+ High-Caliber Authentic Quotes)
     // -------------------------------------------------------------------------
@@ -136,38 +224,6 @@ object QuotesStorageManager {
         return getAllQuotes(context).find { it.id == id }
     }
 
-    fun getQuoteForWidget(context: Context, widgetId: Int, defaultTypeTag: String = "EDITORIAL"): QuoteItem {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val quoteId = prefs.getString("$KEY_WIDGET_QUOTE_PREFIX$widgetId", null)
-        val all = getAllQuotes(context)
-
-        if (!quoteId.isNullOrBlank()) {
-            val found = all.find { it.id == quoteId }
-            if (found != null) return found
-        }
-
-        // Distinct tailored seeds for initial drop
-        val seeded = when {
-            defaultTypeTag.contains("EDITORIAL", true) -> all.find { it.id == "stoic_1" }
-            defaultTypeTag.contains("ZEN", true) -> all.find { it.id == "mind_4" }
-            defaultTypeTag.contains("MODERN", true) || defaultTypeTag.contains("TYPEWRITER", true) -> all.find { it.id == "stoic_2" }
-            defaultTypeTag.contains("KINETIC", true) -> all.find { it.id == "stoic_3" }
-            defaultTypeTag.contains("GOLDEN", true) -> all.find { it.id == "lit_2" }
-            defaultTypeTag.contains("TWOTONE", true) || defaultTypeTag.contains("POETRY", true) -> all.find { it.id == "mind_7" }
-            defaultTypeTag.contains("INSIGHT", true) || defaultTypeTag.contains("BENTO", true) -> all.find { it.id == "prod_2" }
-            defaultTypeTag.contains("CELESTIAL", true) || defaultTypeTag.contains("PILL", true) -> all.find { it.id == "lit_8" }
-            defaultTypeTag.contains("SMILE_CARD", true) || defaultTypeTag.contains("BRUTALIST", true) -> all.find { it.id == "aff_3" }
-            defaultTypeTag.contains("BOLD", true) || defaultTypeTag.contains("TERMINAL", true) || defaultTypeTag.contains("SMILE", true) -> all.find { it.id == "sci_5" }
-            defaultTypeTag.contains("PEBBLE", true) -> QuoteItem("peb_1", "A calmer mind builds a brighter future.", "Anonymous", "MINDFULNESS")
-            defaultTypeTag.contains("CAPSULE", true) -> QuoteItem("cap_1", "Small steps still move you forward.", "Anonymous", "MINDFULNESS")
-            defaultTypeTag.contains("RIPPLE", true) -> QuoteItem("rip_1", "Better days ahead.", "Anonymous", "AFFIRMATION")
-            defaultTypeTag.contains("DISC", true) -> QuoteItem("disc_1", "Same sky. Different day.", "Anonymous", "MINDFULNESS")
-            else -> all.firstOrNull()
-        } ?: CURATED_QUOTES.first()
-
-        setQuoteForWidget(context, widgetId, seeded.id)
-        return seeded
-    }
 
     fun setQuoteForWidget(context: Context, widgetId: Int, quoteId: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

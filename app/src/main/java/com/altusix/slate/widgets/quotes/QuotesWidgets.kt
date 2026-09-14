@@ -129,7 +129,7 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
 // =========================================================================
 
 abstract class BaseQuotesReceiver(
-    protected open val targetAspect: Float = 2.0f
+    open val targetAspect: Float = 2.0f
 ) : AppWidgetProvider() {
 
     protected open val widgetTypeTag: String = "EDITORIAL"

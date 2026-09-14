@@ -1229,17 +1229,13 @@ fun generateMindfulSmileBitmap(
         letterSpacing = 0.05f
     }
 
-    val hasAuthor = quote.author.isNotBlank() &&
-            !quote.author.equals("Unknown", ignoreCase = true) &&
-            !quote.author.equals("Anonymous", ignoreCase = true)
-
-    // Reserve bottom space for the author line so quote & author never collide
-    val authorReservedH = if (hasAuthor) 26f * scaleFactor else 0f
+    // --- Author section removed based on grid size review ---
 
     // 4. Auto-Wrap Text into Balanced Lines
     val textUpper = quote.text.trim().uppercase()
     val maxTextW = cardRect.width() * 0.76f
-    val maxContentH = (cardRect.height() * 0.74f) - authorReservedH
+    // Utilizes full vertical space now
+    val maxContentH = (cardRect.height() * 0.85f)
 
     var textSize = (minDim * 0.115f).coerceIn(13f * scaleFactor, 22f * scaleFactor)
     val minTextSize = 9.5f * scaleFactor
@@ -1277,12 +1273,12 @@ fun generateMindfulSmileBitmap(
         textSize -= 1f * scaleFactor
     }
 
-    // 5. Draw Tilted Coaster Content (-5° Slant)
+    // 5. Draw Tilted Coaster Content (-5° Slant) centered on full card
     canvas.save()
-    canvas.rotate(-5.0f, cx, cy - (authorReservedH * 0.35f))
+    canvas.rotate(-5.0f, cx, cy)
 
     val totalBlockHeight = (lines.size * lineHeight) + smileGap + smileH
-    var textY = (cy - (authorReservedH * 0.35f)) - (totalBlockHeight / 2f) + (textSize * 0.90f)
+    var textY = cy - (totalBlockHeight / 2f) + (textSize * 0.90f)
 
     // Draw Quote Lines
     for (line in lines) {
@@ -1323,19 +1319,6 @@ fun generateMindfulSmileBitmap(
     canvas.drawArc(mouthRect, 20f, 140f, false, mouthPaint)
 
     canvas.restore()
-
-    // 7. Clear & Legible Author Line
-    if (hasAuthor) {
-        val authorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = getSlateFont(context, weight = 600)
-            textSize = (minDim * 0.072f).coerceIn(10f * scaleFactor, 12.5f * scaleFactor)
-            color = theme.secondaryText
-            textAlign = Paint.Align.CENTER
-            letterSpacing = 0.04f
-        }
-        val authorY = cardRect.bottom - (16f * scaleFactor)
-        canvas.drawText("— ${quote.author}", cx, authorY, authorPaint)
-    }
 
     return bitmap
 }

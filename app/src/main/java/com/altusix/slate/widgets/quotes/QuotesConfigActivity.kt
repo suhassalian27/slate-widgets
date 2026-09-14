@@ -4,12 +4,15 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,12 +37,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.altusix.slate.core.theme.ThemePreferences
+import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.components.ConfigTabItem
 import com.altusix.slate.ui.components.CustomColorPickerDialog
 import com.altusix.slate.ui.components.RainbowCustomCircle
@@ -78,7 +85,7 @@ class QuotesConfigActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
-                var selectedTabKey by remember { mutableStateOf("LIBRARY") }
+                var selectedTabKey by remember { mutableStateOf("QUOTES") }
                 var allQuotes by remember { mutableStateOf(QuotesStorageManager.getAllQuotes(this)) }
                 var activeQuote by remember {
                     mutableStateOf(
@@ -90,6 +97,9 @@ class QuotesConfigActivity : ComponentActivity() {
                     )
                 }
 
+                // Standardized: "STATIC", "DAILY", "HOURLY"
+                var rotationMode by remember { mutableStateOf("STATIC") }
+                var selectedFilter by remember { mutableStateOf("ALL") }
                 var selectedBgHex by remember { mutableLongStateOf(0xFF000000L) }
                 var selectedAccentHex by remember { mutableLongStateOf(defaultTheme.accentHex) }
                 var opacity by remember { mutableFloatStateOf(1.0f) }
@@ -102,16 +112,26 @@ class QuotesConfigActivity : ComponentActivity() {
                     isResponsive = prefs.getBoolean("widget_${widgetId}_is_responsive", true)
                     selectedBgHex = prefs.getLong("widget_${widgetId}_bg_color", 0xFF000000L)
                     selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
+                    rotationMode = QuotesStorageManager.getWidgetRotationMode(this@QuotesConfigActivity, widgetId)
+                    selectedFilter = QuotesStorageManager.getWidgetRotationPool(this@QuotesConfigActivity, widgetId)
                 }
 
                 fun refreshQuotes() {
                     allQuotes = QuotesStorageManager.getAllQuotes(this)
                 }
 
-                val tabs = listOf(
-                    ConfigTabItem("LIBRARY", "Quotes"),
-                    ConfigTabItem("CUSTOM", "My Quotes"),
-                    ConfigTabItem("STYLE", "Widget Theme")
+                val tabs = remember {
+                    listOf(
+                        ConfigTabItem("QUOTES", "Quotes"),
+                        ConfigTabItem("STYLE", "Widget Theme")
+                    )
+                }
+
+                val currentConfig = SlateWidgetConfig(
+                    themeMode = if (calculateLuminance(selectedBgHex) > 0.5f) "LIGHT" else "DARK",
+                    backgroundColorHex = selectedBgHex,
+                    opacity = opacity,
+                    accentColorHex = selectedAccentHex
                 )
 
                 SlateConfigScaffold(
@@ -123,9 +143,9 @@ class QuotesConfigActivity : ComponentActivity() {
                     onTabSelected = { selectedTabKey = it },
                     onBackClick = { finish() },
                     onSaveClick = {
-                        // Persist active quote for this widget
                         if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                             QuotesStorageManager.setQuoteForWidget(this@QuotesConfigActivity, widgetId, activeQuote.id)
+                            QuotesStorageManager.setWidgetRotationMode(this@QuotesConfigActivity, widgetId, rotationMode, selectedFilter)
                             val isLight = calculateLuminance(selectedBgHex) > 0.5f
 
                             getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE).edit()
@@ -134,6 +154,7 @@ class QuotesConfigActivity : ComponentActivity() {
                                 .putLong("widget_${widgetId}_accent_color", selectedAccentHex)
                                 .putFloat("widget_${widgetId}_opacity", opacity)
                                 .putBoolean("widget_${widgetId}_is_responsive", isResponsive)
+                                .putString("widget_${widgetId}_mode", if (isResponsive) "RESPONSIVE" else "FIXED")
                                 .apply()
                         }
                         updateAllQuotesWidgets(this@QuotesConfigActivity)
@@ -143,51 +164,63 @@ class QuotesConfigActivity : ComponentActivity() {
                     scrollable = selectedTabKey == "STYLE",
                     previewHeight = 175.dp,
                     previewContent = {
-                        QuoteLivePreviewCard(
+                        QuoteLivePreview(
+                            widgetClassName = widgetClassName,
                             quote = activeQuote,
-                            accentColor = Color(selectedAccentHex),
-                            bgColor = Color(selectedBgHex),
-                            opacity = opacity
+                            config = currentConfig,
+                            isResponsive = isResponsive
                         )
                     }
                 ) {
                     when (selectedTabKey) {
-                        "LIBRARY" -> {
-                            QuotesLibraryTab(
+                        "QUOTES" -> {
+                            QuotesUnifiedTab(
                                 allQuotes = allQuotes,
-                                activeQuoteId = activeQuote.id,
+                                activeQuote = activeQuote,
+                                rotationMode = rotationMode,
+                                selectedFilter = selectedFilter,
                                 accentColor = Color(selectedAccentHex),
+                                onRotationModeChanged = { newMode ->
+                                    rotationMode = newMode
+                                    if (newMode != "STATIC") {
+                                        activeQuote = QuotesStorageManager.getRotatingQuote(allQuotes, newMode, selectedFilter, widgetId)
+                                    }
+                                },
+                                onFilterChanged = { newFilter ->
+                                    selectedFilter = newFilter
+                                    if (rotationMode != "STATIC") {
+                                        activeQuote = QuotesStorageManager.getRotatingQuote(allQuotes, rotationMode, newFilter, widgetId)
+                                    }
+                                },
                                 onQuoteSelected = { selected ->
                                     activeQuote = selected
+                                    if (rotationMode == "STATIC" && widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                                        QuotesStorageManager.setQuoteForWidget(this@QuotesConfigActivity, widgetId, selected.id)
+                                    }
+                                },
+                                onPinQuote = { selected ->
+                                    activeQuote = selected
+                                    rotationMode = "STATIC"
                                     if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                                         QuotesStorageManager.setQuoteForWidget(this@QuotesConfigActivity, widgetId, selected.id)
                                     }
+                                    Toast.makeText(this@QuotesConfigActivity, "Quote pinned to widget", Toast.LENGTH_SHORT).show()
                                 },
                                 onToggleFavorite = { quoteId ->
                                     QuotesStorageManager.toggleFavoriteById(this@QuotesConfigActivity, quoteId)
                                     refreshQuotes()
-                                }
-                            )
-                        }
-                        "CUSTOM" -> {
-                            QuotesCustomTab(
-                                allQuotes = allQuotes.filter { it.category == "CUSTOM" },
-                                activeQuoteId = activeQuote.id,
-                                accentColor = Color(selectedAccentHex),
-                                onAddQuote = { newQuote ->
+                                },
+                                onAddCustomQuote = { newQuote ->
                                     QuotesStorageManager.saveCustomQuote(this@QuotesConfigActivity, newQuote)
                                     refreshQuotes()
                                     activeQuote = newQuote
                                 },
-                                onDeleteQuote = { quoteId ->
+                                onDeleteCustomQuote = { quoteId ->
                                     QuotesStorageManager.deleteCustomQuote(this@QuotesConfigActivity, quoteId)
                                     refreshQuotes()
                                     if (activeQuote.id == quoteId) {
                                         activeQuote = QuotesStorageManager.CURATED_QUOTES.first()
                                     }
-                                },
-                                onQuoteSelected = { selected ->
-                                    activeQuote = selected
                                 }
                             )
                         }
@@ -208,7 +241,6 @@ class QuotesConfigActivity : ComponentActivity() {
                     }
                 }
 
-                // Custom Color Picker Dialog (for Background and Accent)
                 if (activePickerTarget != null) {
                     val initialColor = if (activePickerTarget == QuotesColorTarget.BACKGROUND) {
                         Color(selectedBgHex)
@@ -216,9 +248,9 @@ class QuotesConfigActivity : ComponentActivity() {
                         Color(selectedAccentHex)
                     }
                     val dialogTitle = if (activePickerTarget == QuotesColorTarget.BACKGROUND) {
-                        "Background Color"
+                        "Custom Background"
                     } else {
-                        "Accent Color"
+                        "Custom Accent"
                     }
 
                     CustomColorPickerDialog(
@@ -242,315 +274,396 @@ class QuotesConfigActivity : ComponentActivity() {
 }
 
 // -----------------------------------------------------------------------------
-// LIVE PREVIEW CARD
+// TRUE LIVE WIDGET PREVIEW (With Safe Aspect Ratio Fallback)
 // -----------------------------------------------------------------------------
 
 @Composable
-private fun QuoteLivePreviewCard(
+private fun QuoteLivePreview(
+    widgetClassName: String,
     quote: QuoteItem,
-    accentColor: Color,
-    bgColor: Color,
-    opacity: Float
+    config: SlateWidgetConfig,
+    isResponsive: Boolean
 ) {
-    val isLight = calculateLuminance(bgColor.toArgb().toLong()) > 0.5f
-    val textColor = if (isLight) Color(0xFF111111) else Color.White
-    val secondaryColor = if (isLight) Color(0xFF555555) else Color(0xFF8E8E93)
+    val context = LocalContext.current
+
+    val receiver = remember(widgetClassName) {
+        try {
+            val resolvedName = if (widgetClassName.isNotBlank()) widgetClassName else {
+                getQuotesWidgetsCatalog().firstOrNull()?.receiverClass?.name ?: ""
+            }
+            val clazz = Class.forName(resolvedName)
+            clazz.getDeclaredConstructor().newInstance() as? BaseQuotesReceiver
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    // Fallback: If targetAspect is 0f (Organic Pebble, Vertical Capsule, Ceramic Disc), default to 1.0f (2x2 square)
+    val effectiveAspect = remember(receiver) {
+        val rawAspect = receiver?.targetAspect ?: 0f
+        if (rawAspect > 0.05f) {
+            rawAspect
+        } else {
+            1.0f
+        }
+    }
+
+    val (defaultW, defaultH) = remember(effectiveAspect) {
+        when {
+            effectiveAspect >= 3.5f -> 320 to 72   // 4x1
+            effectiveAspect >= 1.8f -> 320 to 156  // 4x2
+            effectiveAspect <= 1.2f -> 156 to 156  // 2x2
+            else -> 160 to 72                   // 2x1
+        }
+    }
+
+    val maxDisplayW = 310f
+    val maxDisplayH = 150f
+    val (displayW, displayH) = remember(effectiveAspect) {
+        if (maxDisplayW / maxDisplayH > effectiveAspect) {
+            (maxDisplayH * effectiveAspect) to maxDisplayH
+        } else {
+            maxDisplayW to (maxDisplayW / effectiveAspect)
+        }
+    }
+
+    val bitmap = remember(widgetClassName, quote, config, isResponsive, defaultW, defaultH) {
+        try {
+            QuotesStorageManager.previewQuoteOverride = quote
+            receiver?.renderWidgetBitmap(
+                context = context,
+                appWidgetId = -1,
+                config = config,
+                isResponsive = isResponsive,
+                wDp = defaultW,
+                hDp = defaultH
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(155.dp)
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(bgColor.copy(alpha = opacity))
-            .border(1.dp, if (isLight) Color.Black.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.12f), RoundedCornerShape(22.dp))
-            .padding(18.dp)
+            .height(160.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Accent modern quote mark
-                Text(
-                    text = "“",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor,
-                    lineHeight = 24.sp
-                )
-
-                Text(
-                    text = quote.category.uppercase(),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = secondaryColor.copy(alpha = 0.7f),
-                    letterSpacing = 1.2.sp
-                )
-            }
-
-            Text(
-                text = quote.text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = textColor,
-                maxLines = 3,
-                lineHeight = 21.sp
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Widget Live Preview",
+                modifier = Modifier.size(displayW.dp, displayH.dp)
             )
-
-            Text(
-                text = if (quote.sourceBook.isNotBlank()) "— ${quote.author}, ${quote.sourceBook}" else "— ${quote.author}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                color = secondaryColor
+        } else {
+            CircularProgressIndicator(
+                color = Color(config.accentColorHex),
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp
             )
         }
     }
 }
 
 // -----------------------------------------------------------------------------
-// TAB 1: CURATED QUOTES LIBRARY
+// UNIFIED QUOTES TAB (Standardized Pinned / Daily / Hourly Rotation)
 // -----------------------------------------------------------------------------
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuotesLibraryTab(
+private fun QuotesUnifiedTab(
     allQuotes: List<QuoteItem>,
-    activeQuoteId: String,
+    activeQuote: QuoteItem,
+    rotationMode: String,
+    selectedFilter: String,
     accentColor: Color,
+    onRotationModeChanged: (String) -> Unit,
+    onFilterChanged: (String) -> Unit,
     onQuoteSelected: (QuoteItem) -> Unit,
-    onToggleFavorite: (String) -> Unit
+    onPinQuote: (QuoteItem) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    onAddCustomQuote: (QuoteItem) -> Unit,
+    onDeleteCustomQuote: (String) -> Unit
 ) {
-    val categories = listOf("ALL", "STOICISM", "MINDFULNESS", "LITERATURE", "PRODUCTIVITY", "SCIENCE", "AFFIRMATION", "FAVORITES")
-    var selectedCategory by remember { mutableStateOf("ALL") }
+    val hasFavorites = remember(allQuotes) { allQuotes.any { it.isFavorite } }
+    val standardCategories = listOf("ALL", "MY QUOTES", "STOICISM", "MINDFULNESS", "LITERATURE", "PRODUCTIVITY", "SCIENCE", "AFFIRMATION")
 
-    val filteredQuotes = remember(selectedCategory, allQuotes) {
-        when (selectedCategory) {
-            "ALL" -> allQuotes.filter { it.category != "CUSTOM" }
+    var showAddQuoteSheet by remember { mutableStateOf(false) }
+    var customText by remember { mutableStateOf("") }
+    var customAuthor by remember { mutableStateOf("") }
+
+    val filteredQuotes = remember(selectedFilter, allQuotes) {
+        when (selectedFilter) {
             "FAVORITES" -> allQuotes.filter { it.isFavorite }
-            else -> allQuotes.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+            "MY QUOTES" -> allQuotes.filter { it.category == "CUSTOM" }
+            "ALL" -> allQuotes
+            else -> allQuotes.filter { it.category.equals(selectedFilter, ignoreCase = true) }
         }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Category Filter Chips
+        // 1. Standardized Segmented Schedule Selector
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF141416))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf(
+                "STATIC" to "Pinned",
+                "DAILY" to "Daily",
+                "HOURLY" to "Hourly"
+            ).forEach { (mode, label) ->
+                val isSelected = rotationMode == mode
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                        .clickable { onRotationModeChanged(mode) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                        fontSize = 12.5.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // Status caption linking the schedule directly to the selected pool
+        val activeCategoryLabel = if (selectedFilter == "ALL") "All Library" else selectedFilter
+        val scheduleHint = when (rotationMode) {
+            "HOURLY" -> "Rotates every hour from $activeCategoryLabel"
+            "DAILY" -> "Rotates once daily from $activeCategoryLabel"
+            else -> "Pinned: displaying your selected quote continuously"
+        }
+        Text(
+            text = scheduleHint,
+            fontSize = 11.sp,
+            color = if (rotationMode == "STATIC") Color(0xFF8E8E93) else accentColor,
+            fontWeight = if (rotationMode == "STATIC") FontWeight.Normal else FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+        )
+
+        // 2. Horizontal Filter Bar (Defines both display and rotation pool)
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
+                .padding(vertical = 6.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(categories) { cat ->
-                val isSelected = selectedCategory == cat
+            if (hasFavorites) {
+                item {
+                    val isFavSelected = selectedFilter == "FAVORITES"
+                    Box(
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(if (isFavSelected) Color(0xFFFF3B30) else Color(0xFF1E1E24))
+                            .clickable { onFilterChanged("FAVORITES") }
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = "Favorites",
+                            tint = if (isFavSelected) Color.White else Color(0xFFFF5252),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            items(standardCategories) { cat ->
+                val isSelected = selectedFilter == cat
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(18.dp))
                         .background(if (isSelected) accentColor else Color(0xFF1E1E24))
-                        .clickable { selectedCategory = cat }
-                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .clickable { onFilterChanged(cat) }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = cat,
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f)
+                        color = if (isSelected) {
+                            if (calculateLuminance(accentColor.toArgb().toLong()) > 0.5f) Color.Black else Color.White
+                        } else Color.White.copy(alpha = 0.8f)
                     )
                 }
             }
         }
 
-        // Quotes List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(filteredQuotes, key = { it.id }) { quote ->
-                val isPinned = quote.id == activeQuoteId
-                QuoteListItem(
-                    quote = quote,
-                    isPinned = isPinned,
-                    accentColor = accentColor,
-                    onSelect = { onQuoteSelected(quote) },
-                    onToggleFavorite = { onToggleFavorite(quote.id) }
-                )
-            }
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// TAB 2: MY CUSTOM QUOTES (INLINE CARD - NO POPUP MODAL)
-// -----------------------------------------------------------------------------
-
-@Composable
-private fun QuotesCustomTab(
-    allQuotes: List<QuoteItem>,
-    activeQuoteId: String,
-    accentColor: Color,
-    onAddQuote: (QuoteItem) -> Unit,
-    onDeleteQuote: (String) -> Unit,
-    onQuoteSelected: (QuoteItem) -> Unit
-) {
-    var inputText by remember { mutableStateOf("") }
-    var inputAuthor by remember { mutableStateOf("") }
-    var inputCategory by remember { mutableStateOf("") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // INLINE ADD QUOTE CARD (Matches Productivity Bookmark/Clipboard editor)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF141418))
-                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text("Add Custom Quote", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
-
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                placeholder = { Text("Write your quote or life mantra...", color = Color(0xFF8E8E93), fontSize = 12.5.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 4,
-                textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = accentColor,
-                    unfocusedBorderColor = Color(0xFF24242C),
-                    focusedContainerColor = Color(0xFF0C0C0E),
-                    unfocusedContainerColor = Color(0xFF0C0C0E)
-                )
-            )
-
+        // 3. Action Card for Custom Quotes (When browsing MY QUOTES)
+        if (selectedFilter == "MY QUOTES") {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(accentColor.copy(alpha = 0.12f))
+                    .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                    .clickable { showAddQuoteSheet = true }
+                    .padding(vertical = 12.dp, horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                OutlinedTextField(
-                    value = inputAuthor,
-                    onValueChange = { inputAuthor = it },
-                    placeholder = { Text("Author (e.g. Me)", color = Color(0xFF8E8E93), fontSize = 12.5.sp) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = Color(0xFF24242C),
-                        focusedContainerColor = Color(0xFF0C0C0E),
-                        unfocusedContainerColor = Color(0xFF0C0C0E)
-                    )
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(18.dp)
                 )
-
-                Button(
-                    onClick = {
-                        if (inputText.isNotBlank()) {
-                            val newQuote = QuoteItem(
-                                id = "custom_${System.currentTimeMillis()}",
-                                text = inputText.trim(),
-                                author = if (inputAuthor.isBlank()) "Me" else inputAuthor.trim(),
-                                category = if (inputCategory.isBlank()) "CUSTOM" else inputCategory.trim().uppercase()
-                            )
-                            onAddQuote(newQuote)
-                            inputText = ""
-                            inputAuthor = ""
-                            inputCategory = ""
-                        }
-                    },
-                    modifier = Modifier.height(48.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add", tint = Color.Black)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Write New Custom Quote",
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.5.sp
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        if (allQuotes.isEmpty()) {
+        // 4. Quotes List
+        if (filteredQuotes.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 30.dp),
+                    .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No custom quotes yet.\nUse the card above to add personal wisdom.",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
+                    text = if (selectedFilter == "MY QUOTES") "No custom quotes yet.\nTap above to write one!" else "No quotes found.",
+                    color = Color(0xFF8E8E93),
+                    fontSize = 13.sp,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 40.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 40.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(allQuotes, key = { it.id }) { quote ->
-                    val isPinned = quote.id == activeQuoteId
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isPinned) accentColor.copy(alpha = 0.08f) else Color(0xFF141418))
-                            .border(1.dp, if (isPinned) accentColor else Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-                            .clickable { onQuoteSelected(quote) }
-                            .padding(14.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "CUSTOM",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = accentColor,
-                                    letterSpacing = 0.8.sp
-                                )
+                items(filteredQuotes, key = { it.id }) { quote ->
+                    val isSelected = quote.id == activeQuote.id
+                    QuoteListItem(
+                        quote = quote,
+                        isSelected = isSelected,
+                        rotationMode = rotationMode,
+                        accentColor = accentColor,
+                        onSelect = { onQuoteSelected(quote) },
+                        onPin = { onPinQuote(quote) },
+                        onToggleFavorite = { onToggleFavorite(quote.id) },
+                        onDelete = if (quote.category == "CUSTOM") { { onDeleteCustomQuote(quote.id) } } else null
+                    )
+                }
+            }
+        }
+    }
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (isPinned) {
-                                        Text("ACTIVE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = accentColor)
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                    }
-                                    IconButton(
-                                        onClick = { onDeleteQuote(quote.id) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
+    // Modal BottomSheet for Adding Quotes
+    if (showAddQuoteSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAddQuoteSheet = false },
+            containerColor = Color(0xFF16161B),
+            contentColor = Color.White,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF383842)) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "New Custom Quote",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
 
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(text = "“${quote.text}”", fontSize = 13.5.sp, color = Color.White, fontWeight = FontWeight.Medium)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "— ${quote.author}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
+                OutlinedTextField(
+                    value = customText,
+                    onValueChange = { customText = it },
+                    placeholder = { Text("Write your quote here...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    textStyle = TextStyle(color = Color.White, fontSize = 13.5.sp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentColor,
+                        unfocusedBorderColor = Color(0xFF2E2E38),
+                        focusedContainerColor = Color(0xFF0F0F12),
+                        unfocusedContainerColor = Color(0xFF0F0F12)
+                    )
+                )
+
+                OutlinedTextField(
+                    value = customAuthor,
+                    onValueChange = { customAuthor = it },
+                    placeholder = { Text("Author (e.g. Me, Anonymous)", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = 13.5.sp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentColor,
+                        unfocusedBorderColor = Color(0xFF2E2E38),
+                        focusedContainerColor = Color(0xFF0F0F12),
+                        unfocusedContainerColor = Color(0xFF0F0F12)
+                    )
+                )
+
+                Button(
+                    onClick = {
+                        if (customText.isNotBlank()) {
+                            val newQuote = QuoteItem(
+                                id = "custom_${System.currentTimeMillis()}",
+                                text = customText.trim(),
+                                author = if (customAuthor.isBlank()) "Me" else customAuthor.trim(),
+                                category = "CUSTOM"
+                            )
+                            onAddCustomQuote(newQuote)
+                            customText = ""
+                            customAuthor = ""
+                            showAddQuoteSheet = false
                         }
-                    }
+                    },
+                    enabled = customText.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = accentColor,
+                        disabledContainerColor = accentColor.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Text(
+                        text = "Save Quote",
+                        color = if (calculateLuminance(accentColor.toArgb().toLong()) > 0.5f) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
@@ -558,7 +671,133 @@ private fun QuotesCustomTab(
 }
 
 // -----------------------------------------------------------------------------
-// TAB 3: THEME & STYLE (Matches ProductivityConfigActivity exact design)
+// LIST ITEM COMPONENT
+// -----------------------------------------------------------------------------
+
+@Composable
+private fun QuoteListItem(
+    quote: QuoteItem,
+    isSelected: Boolean,
+    rotationMode: String,
+    accentColor: Color,
+    onSelect: () -> Unit,
+    onPin: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onDelete: (() -> Unit)? = null
+) {
+    val isPinnedMode = rotationMode == "STATIC"
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) accentColor.copy(alpha = 0.08f) else Color(0xFF141418))
+            .border(
+                1.dp,
+                if (isSelected) accentColor else Color.White.copy(alpha = 0.08f),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable { onSelect() }
+            .padding(14.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = quote.category,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                        letterSpacing = 0.6.sp
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isPinnedMode && isSelected) {
+                        Text(
+                            text = "PINNED",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor,
+                            letterSpacing = 0.8.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else if (!isPinnedMode) {
+                        IconButton(
+                            onClick = onPin,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PushPin,
+                                contentDescription = "Pin This Quote",
+                                tint = Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    if (onDelete != null) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.Red.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (quote.isFavorite) Color(0xFFFF5252) else Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "“${quote.text}”",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White,
+                lineHeight = 19.sp
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = if (quote.sourceBook.isNotBlank()) "— ${quote.author}, ${quote.sourceBook}" else "— ${quote.author}",
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 2: WIDGET THEME
 // -----------------------------------------------------------------------------
 
 @Composable
@@ -576,129 +815,133 @@ private fun QuotesThemeTab(
 ) {
     val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // 1. Background Presets + Custom
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionTitle(title = "Background")
-            val bgPresets = listOf(
-                0xFF161618L to "Matte",
-                0xFF000000L to "AMOLED",
-                0xFFFFFFFFL to "Light"
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(title = "Background")
+        val bgPresets = listOf(
+            0xFF161618L to "Matte",
+            0xFF000000L to "AMOLED",
+            0xFFFFFFFFL to "Light"
+        )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                bgPresets.forEach { (hex, label) ->
-                    SelectableChip(
-                        label = label,
-                        isSelected = selectedBgHex == hex,
-                        colorPreview = Color(hex),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        onBgHexSelected(hex)
-                        if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) onAccentHexSelected(0xFF000000L)
-                        else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) onAccentHexSelected(0xFFFFFFFFL)
-                    }
-                }
-
-                val isCustomBg = bgPresets.none { it.first == selectedBgHex }
-                RainbowPickerChip(
-                    isSelected = isCustomBg,
-                    activeColor = if (isCustomBg) Color(selectedBgHex) else null,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            bgPresets.forEach { (hex, label) ->
+                SelectableChip(
+                    label = label,
+                    isSelected = selectedBgHex == hex,
+                    colorPreview = Color(hex),
                     modifier = Modifier.weight(1f)
                 ) {
-                    onOpenColorPicker(QuotesColorTarget.BACKGROUND)
+                    onBgHexSelected(hex)
+                    if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) onAccentHexSelected(0xFF000000L)
+                    else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) onAccentHexSelected(0xFFFFFFFFL)
                 }
             }
+
+            val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+            RainbowPickerChip(
+                isSelected = isCustomBg,
+                activeColor = if (isCustomBg) Color(selectedBgHex) else null,
+                modifier = Modifier.weight(1f)
+            ) {
+                onOpenColorPicker(QuotesColorTarget.BACKGROUND)
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(6.dp))
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(title = "Accent Color")
+        val accentPresets = if (isLightBg) {
+            listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
+        } else {
+            listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
         }
 
-        // 2. Accent Colors
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(title = "Accent Color")
-            val accentPresets = if (isLightBg) {
-                listOf(0xFF000000L, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-            } else {
-                listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                accentPresets.forEach { hex ->
-                    ProfessionalSwatchCircle(
-                        color = Color(hex),
-                        isSelected = selectedAccentHex == hex,
-                        onClick = { onAccentHexSelected(hex) }
-                    )
-                }
-
-                val isCustomAccent = accentPresets.none { it == selectedAccentHex }
-                RainbowCustomCircle(
-                    isSelected = isCustomAccent,
-                    activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
-                    onClick = { onOpenColorPicker(QuotesColorTarget.ACCENT) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            accentPresets.forEach { hex ->
+                ProfessionalSwatchCircle(
+                    color = Color(hex),
+                    isSelected = selectedAccentHex == hex,
+                    onClick = { onAccentHexSelected(hex) }
                 )
             }
-        }
 
-        // 3. Surface Translucency
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionTitle(title = "Surface Translucency")
-                Text(
-                    text = "${(opacity * 100).toInt()}%",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            ModernOpacitySlider(value = opacity, onValueChange = onOpacityChanged)
+            val isCustomAccent = accentPresets.none { it == selectedAccentHex }
+            RainbowCustomCircle(
+                isSelected = isCustomAccent,
+                activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
+                onClick = { onOpenColorPicker(QuotesColorTarget.ACCENT) }
+            )
         }
+    }
 
-        // 4. Fixed Aspect vs Responsive (if supported)
-        if (hasModeOption) {
+    Spacer(modifier = Modifier.height(6.dp))
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SectionTitle(title = "Surface Translucency")
+            Text(
+                text = "${(opacity * 100).toInt()}%",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        ModernOpacitySlider(value = opacity, onValueChange = onOpacityChanged)
+    }
+
+    if (hasModeOption) {
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionTitle(title = "Sizing Mode")
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF141418))
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .background(Color(0xFF141416))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Column {
-                    Text("Responsive Scaling", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("Auto-fit canvas to widget dimensions", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsiveVal, label) ->
+                    val isSelected = isResponsive == responsiveVal
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                            .clickable { onResponsiveChanged(responsiveVal) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                        )
+                    }
                 }
-                Switch(
-                    checked = isResponsive,
-                    onCheckedChange = onResponsiveChanged,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.Black,
-                        checkedTrackColor = Color(selectedAccentHex)
-                    )
-                )
             }
         }
     }
 }
 
 // -----------------------------------------------------------------------------
-// HELPER COMPONENTS (IDENTICAL TO PRODUCTIVITY CONFIG)
+// HELPER COMPONENTS
 // -----------------------------------------------------------------------------
 
 @Composable
@@ -888,97 +1131,4 @@ private fun ModernOpacitySlider(
             )
         }
     )
-}
-
-// -----------------------------------------------------------------------------
-// LIST ITEM COMPONENT
-// -----------------------------------------------------------------------------
-
-@Composable
-private fun QuoteListItem(
-    quote: QuoteItem,
-    isPinned: Boolean,
-    accentColor: Color,
-    onSelect: () -> Unit,
-    onToggleFavorite: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isPinned) accentColor.copy(alpha = 0.08f) else Color(0xFF141418))
-            .border(
-                1.dp,
-                if (isPinned) accentColor else Color.White.copy(alpha = 0.08f),
-                RoundedCornerShape(16.dp)
-            )
-            .clickable { onSelect() }
-            .padding(14.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = quote.category,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = accentColor,
-                        letterSpacing = 0.6.sp
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isPinned) {
-                        Text(
-                            text = "PINNED",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor,
-                            letterSpacing = 0.8.sp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-
-                    IconButton(
-                        onClick = onToggleFavorite,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (quote.isFavorite) Color(0xFFFF5252) else Color.White.copy(alpha = 0.4f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "“${quote.text}”",
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White,
-                lineHeight = 19.sp
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = if (quote.sourceBook.isNotBlank()) "— ${quote.author}, ${quote.sourceBook}" else "— ${quote.author}",
-                fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-        }
-    }
 }
