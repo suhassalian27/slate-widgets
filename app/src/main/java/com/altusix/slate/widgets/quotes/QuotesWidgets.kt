@@ -24,7 +24,7 @@ fun getQuotesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Editorial Pull Quote", "4x2", "Quotes", QuotesEditorialReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Radiant Emblem Mantra", "2x2", "Quotes", QuotesZenMantraReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Modern Accent Quotes", "4x2", "Quotes", QuotesTypewriterReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Punchy Horizon Banner", "4x1", "Quotes", QuotesKineticReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Quote Ribbon", "4x1", "Quotes", QuotesKineticReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Golden Hour Card", "2x2", "Quotes", QuotesGoldenHourReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Two-Tone Insight", "2x2", "Quotes", QuotesPoetryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Daily Reflection", "4x2", "Quotes", QuotesBentoReceiver::class.java, hasModeOption = true),
@@ -264,7 +264,7 @@ class QuotesTypewriterReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
     }
 }
 
-// 4. Punchy Horizon Banner (4x1)
+// 4. Quote Ribbon (4x1)
 class QuotesKineticReceiver : BaseQuotesReceiver(targetAspect = 4.0f) {
     override val widgetTypeTag: String = "KINETIC"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {

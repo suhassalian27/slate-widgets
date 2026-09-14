@@ -594,8 +594,8 @@ fun generateModernQuotesSpreadBitmap(
 
 
 // =========================================================================
-// 4. PUNCHY HORIZON BANNER (4x1)
-// Clean horizontal dock strip: Left watermark + centered multi-line statement
+// 4. Quote Ribbon (4x1)
+// Mode-aware: Fixed 4:1 dock banner or responsive edge-to-edge layout
 // =========================================================================
 
 fun generatePunchyHorizonBitmap(
@@ -629,7 +629,9 @@ fun generatePunchyHorizonBitmap(
     }
     canvas.clipPath(clipPath)
 
-    val watermarkSize = cardRect.height() * 0.96f
+    // Clamped so watermark scales with height but never crowds narrow stretched cells
+    val maxWatermarkFromW = cardRect.width() * 0.32f
+    val watermarkSize = minOf(cardRect.height() * 0.96f, maxWatermarkFromW)
     val watermarkCx = cardRect.left + (watermarkSize * 0.52f)
     val watermarkCy = cardRect.centerY()
 
@@ -652,7 +654,7 @@ fun generatePunchyHorizonBitmap(
     canvas.restore()
     canvas.restore()
 
-    // 3. Auto-Scaling Horizontally & Vertically Centered Quote Text
+    // 3. Horizontally & Vertically Centered Quote Text
     val padH = 24f * scaleFactor
     val availableW = cardRect.width() - (padH * 2)
     val cx = cardRect.centerX()
@@ -668,7 +670,9 @@ fun generatePunchyHorizonBitmap(
     val bottomLimit = cardRect.bottom - (8f * scaleFactor)
     val availableH = maxOf(10f, bottomLimit - topLimit)
 
-    val initialSize = 14f * scaleFactor
+    // Expand line count and starting text size if user vertically expands in responsive mode
+    val maxLinesAllowed = if (isResponsive && hDp >= 95) 5 else 3
+    val initialSize = if (isResponsive && hDp >= 110) 16f * scaleFactor else 14f * scaleFactor
     val minSize = 9.5f * scaleFactor
     var chosenSize = initialSize
     val step = (initialSize - minSize) / 10f
@@ -686,7 +690,7 @@ fun generatePunchyHorizonBitmap(
         val descent = quotePaint.descent()
         totalHeight = if (lines.isEmpty()) 0f else (lines.size - 1) * spacing + ascent + descent
 
-        if (lines.size <= 3 && totalHeight <= availableH) {
+        if (lines.size <= maxLinesAllowed && totalHeight <= availableH) {
             break
         }
         chosenSize -= step
