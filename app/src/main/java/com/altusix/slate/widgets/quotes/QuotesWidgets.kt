@@ -27,11 +27,14 @@ fun getQuotesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Punchy Horizon Banner", "4x1", "Quotes", QuotesKineticReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Golden Hour Card", "2x2", "Quotes", QuotesGoldenHourReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Two-Tone Insight", "2x2", "Quotes", QuotesPoetryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Daily Insight", "4x2", "Quotes", QuotesBentoReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Minimal Horizon Capsule", "2x1", "Quotes", QuotesAffirmationPillReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("Mindful Smile Strip", "4x1", "Quotes", QuotesTerminalReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Daily Reflection", "4x2", "Quotes", QuotesBentoReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Celestial Horizon", "4x2", "Quotes", QuotesAffirmationPillReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Mindful Smile Card", "2x2", "Quotes", QuotesBrutalistReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Bold Condensed Statement", "4x2", "Quotes", QuotesBoldCondensedReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Ambient Bloom", "4x2", "Quotes", QuotesBoldCondensedReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Organic Pebble", "2x2", "Quotes", QuotesOrganicPebbleReceiver::class.java, hasModeOption = false),
+    SlateWidgetInfo("Vertical Capsule", "2x2", "Quotes", QuotesVerticalCapsuleReceiver::class.java, hasModeOption = false),
+    SlateWidgetInfo("Horizon Ripple", "4x2", "Quotes", QuotesHorizonRippleReceiver::class.java, hasModeOption = true),
+    SlateWidgetInfo("Ceramic Disc", "2x2", "Quotes", QuotesCeramicDiscReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -46,9 +49,12 @@ fun updateAllQuotesWidgets(context: Context) {
         QuotesPoetryReceiver(),
         QuotesBentoReceiver(),
         QuotesAffirmationPillReceiver(),
-        QuotesTerminalReceiver(),
         QuotesBrutalistReceiver(),
-        QuotesBoldCondensedReceiver()
+        QuotesBoldCondensedReceiver(),
+        QuotesOrganicPebbleReceiver(),
+        QuotesVerticalCapsuleReceiver(),
+        QuotesHorizonRippleReceiver(),
+        QuotesCeramicDiscReceiver()
     )
 
     for (receiver in receivers) {
@@ -285,7 +291,7 @@ class QuotesPoetryReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
     }
 }
 
-// 7. DAILY Insight (4x2)
+// 7. Daily Reflection (4x2)
 class QuotesBentoReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
     override val widgetTypeTag: String = "BENTO_INSIGHT"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
@@ -294,25 +300,16 @@ class QuotesBentoReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
     }
 }
 
-// 8. Minimal Horizon Capsule (2x1)
+// 8. Celestial Horizon (4x2)
 class QuotesAffirmationPillReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
-    override val widgetTypeTag: String = "PILL"
+    override val widgetTypeTag: String = "CELESTIAL"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
-        return generateMinimalCapsuleBitmap(context, quote, config, isResponsive, wDp, hDp)
+        return generateCelestialHorizonBitmap(context, quote, config, isResponsive, wDp, hDp)
     }
 }
 
-// 9. Mindful Smile Strip (4x1)
-class QuotesTerminalReceiver : BaseQuotesReceiver(targetAspect = 4.0f) {
-    override val widgetTypeTag: String = "TERMINAL_SMILE"
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
-        val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
-        return generatePunchyHorizonBitmap(context, quote, config, isResponsive, wDp, hDp)
-    }
-}
-
-// 10. Mindful Smile Card (2x2)
+// 9. Mindful Smile Card (2x2)
 class QuotesBrutalistReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
     override val widgetTypeTag: String = "BRUTALIST_SMILE_CARD"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
@@ -321,11 +318,47 @@ class QuotesBrutalistReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
     }
 }
 
-// 11. Bold Condensed Statement (4x2)
+// 10. Ambient Bloom (4x2)
 class QuotesBoldCondensedReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
     override val widgetTypeTag: String = "BOLD"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
         return generateBoldCondensedBitmap(context, quote, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 11. Organic Pebble (2x2)
+class QuotesOrganicPebbleReceiver : BaseQuotesReceiver(targetAspect = 0f) {
+    override val widgetTypeTag: String = "PEBBLE"
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
+        return generateOrganicPebbleBitmap(context, quote, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 12. Vertical Capsule (2x2)
+class QuotesVerticalCapsuleReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
+    override val widgetTypeTag: String = "CAPSULE"
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
+        return generateVerticalCapsuleBitmap(context, quote, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 13. Horizon Ripple (4x2)
+class QuotesHorizonRippleReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
+    override val widgetTypeTag: String = "RIPPLE"
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
+        return generateHorizonRippleBitmap(context, quote, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 14. Ceramic Disc (2x2)
+class QuotesCeramicDiscReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
+    override val widgetTypeTag: String = "DISC"
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)
+        return generateCeramicDiscBitmap(context, quote, config, isResponsive, wDp, hDp)
     }
 }

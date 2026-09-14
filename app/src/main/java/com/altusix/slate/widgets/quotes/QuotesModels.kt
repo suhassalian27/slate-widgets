@@ -148,16 +148,20 @@ object QuotesStorageManager {
 
         // Distinct tailored seeds for initial drop
         val seeded = when {
-            defaultTypeTag.contains("EDITORIAL", ignoreCase = true) -> all.find { it.id == "stoic_1" }
-            defaultTypeTag.contains("ZEN", ignoreCase = true) -> all.find { it.id == "mind_4" }
-            defaultTypeTag.contains("MODERN", ignoreCase = true) || defaultTypeTag.contains("TYPEWRITER", ignoreCase = true) -> all.find { it.id == "stoic_2" }
-            defaultTypeTag.contains("KINETIC", ignoreCase = true) -> all.find { it.id == "stoic_3" }
-            defaultTypeTag.contains("GOLDEN", ignoreCase = true) -> all.find { it.id == "lit_2" }
-            defaultTypeTag.contains("TWOTONE", ignoreCase = true) || defaultTypeTag.contains("POETRY", ignoreCase = true) -> all.find { it.id == "mind_7" }
-            defaultTypeTag.contains("INSIGHT", ignoreCase = true) || defaultTypeTag.contains("BENTO", ignoreCase = true) -> all.find { it.id == "prod_2" }
-            defaultTypeTag.contains("PILL", ignoreCase = true) -> all.find { it.id == "aff_1" }
-            defaultTypeTag.contains("SMILE_CARD", ignoreCase = true) || defaultTypeTag.contains("BRUTALIST", ignoreCase = true) -> all.find { it.id == "aff_3" }
-            defaultTypeTag.contains("SMILE", ignoreCase = true) || defaultTypeTag.contains("TERMINAL", ignoreCase = true) -> all.find { it.id == "sci_5" }
+            defaultTypeTag.contains("EDITORIAL", true) -> all.find { it.id == "stoic_1" }
+            defaultTypeTag.contains("ZEN", true) -> all.find { it.id == "mind_4" }
+            defaultTypeTag.contains("MODERN", true) || defaultTypeTag.contains("TYPEWRITER", true) -> all.find { it.id == "stoic_2" }
+            defaultTypeTag.contains("KINETIC", true) -> all.find { it.id == "stoic_3" }
+            defaultTypeTag.contains("GOLDEN", true) -> all.find { it.id == "lit_2" }
+            defaultTypeTag.contains("TWOTONE", true) || defaultTypeTag.contains("POETRY", true) -> all.find { it.id == "mind_7" }
+            defaultTypeTag.contains("INSIGHT", true) || defaultTypeTag.contains("BENTO", true) -> all.find { it.id == "prod_2" }
+            defaultTypeTag.contains("CELESTIAL", true) || defaultTypeTag.contains("PILL", true) -> all.find { it.id == "lit_8" }
+            defaultTypeTag.contains("SMILE_CARD", true) || defaultTypeTag.contains("BRUTALIST", true) -> all.find { it.id == "aff_3" }
+            defaultTypeTag.contains("BOLD", true) || defaultTypeTag.contains("TERMINAL", true) || defaultTypeTag.contains("SMILE", true) -> all.find { it.id == "sci_5" }
+            defaultTypeTag.contains("PEBBLE", true) -> QuoteItem("peb_1", "A calmer mind builds a brighter future.", "Anonymous", "MINDFULNESS")
+            defaultTypeTag.contains("CAPSULE", true) -> QuoteItem("cap_1", "Small steps still move you forward.", "Anonymous", "MINDFULNESS")
+            defaultTypeTag.contains("RIPPLE", true) -> QuoteItem("rip_1", "Better days ahead.", "Anonymous", "AFFIRMATION")
+            defaultTypeTag.contains("DISC", true) -> QuoteItem("disc_1", "Same sky. Different day.", "Anonymous", "MINDFULNESS")
             else -> all.firstOrNull()
         } ?: CURATED_QUOTES.first()
 

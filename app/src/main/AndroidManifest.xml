@@ -4165,11 +4165,11 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 7. Daily Insight Banner (4x2) -->
+        <!-- 7. Daily Reflection (4x2) -->
         <receiver
             android:name=".widgets.quotes.QuotesBentoReceiver"
             android:exported="true"
-            android:label="Daily Insight Banner">
+            android:label="Daily Reflection">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -4178,37 +4178,89 @@
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
 
-        <!-- 8. Minimal Horizon Capsule (2x1) -->
+        <!-- 8. Celestial Horizon (4x2) -->
         <receiver
             android:name=".widgets.quotes.QuotesAffirmationPillReceiver"
             android:exported="true"
-            android:label="Minimal Horizon Capsule">
+            android:label="Celestial Horizon">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x1" />
+                android:resource="@xml/widget_info_4x2" />
         </receiver>
 
-        <!-- 9. Mindful Smile Strip (4x1) -->
-        <receiver
-            android:name=".widgets.quotes.QuotesTerminalReceiver"
-            android:exported="true"
-            android:label="Mindful Smile Strip">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x1" />
-        </receiver>
-
-        <!-- 10. Mindful Smile Card (2x2) -->
+        <!-- 9. Mindful Smile Card (2x2) -->
         <receiver
             android:name=".widgets.quotes.QuotesBrutalistReceiver"
             android:exported="true"
             android:label="Mindful Smile Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 10. Bold Condensed Statement (4x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesBoldCondensedReceiver"
+            android:exported="true"
+            android:label="Bold Condensed Statement">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 11. Organic Pebble (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesOrganicPebbleReceiver"
+            android:exported="true"
+            android:label="Organic Pebble">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 12. Vertical Capsule (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesVerticalCapsuleReceiver"
+            android:exported="true"
+            android:label="Vertical Capsule">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 13. Horizon Ripple (4x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesHorizonRippleReceiver"
+            android:exported="true"
+            android:label="Horizon Ripple">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 14. Ceramic Disc (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesCeramicDiscReceiver"
+            android:exported="true"
+            android:label="Ceramic Disc">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
