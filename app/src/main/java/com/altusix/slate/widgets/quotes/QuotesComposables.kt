@@ -588,7 +588,6 @@ fun generateModernQuotesSpreadBitmap(
 // =========================================================================
 // 4. PUNCHY HORIZON BANNER (4x1)
 // =========================================================================
-
 fun generatePunchyHorizonBitmap(
     context: Context,
     quote: QuoteItem,
@@ -671,9 +670,11 @@ fun generatePunchyHorizonBitmap(
     return bitmap
 }
 
+
 // =========================================================================
 // 5. GOLDEN HOUR AURA (2x2)
 // =========================================================================
+
 fun generateGoldenHourCardBitmap(
     context: Context,
     quote: QuoteItem,
@@ -687,10 +688,11 @@ fun generateGoldenHourCardBitmap(
     val cardRect = RectF(0f, 0f, wDp * scaleFactor, hDp * scaleFactor)
     val cornerRadius = getStandardCornerRadius(scaleFactor)
 
+    // Base background
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.bg }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
-    // Warm radial glow aura
+    // Warm radial glow aura originating from top-right
     val auraCx = cardRect.right - (10f * scaleFactor)
     val auraCy = cardRect.top + (10f * scaleFactor)
     val auraRadius = cardRect.width() * 0.90f
@@ -717,16 +719,6 @@ fun generateGoldenHourCardBitmap(
 
     val pad = 18f * scaleFactor
 
-    // Top Category Pill
-    val tagText = "• ${quote.category.uppercase()} •"
-    val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 700)
-        textSize = 8.5f * scaleFactor
-        color = theme.accent
-        letterSpacing = 0.12f
-    }
-    canvas.drawText(tagText, pad, pad + 10f * scaleFactor, tagPaint)
-
     // Bottom author line with accent dot
     val authorY = cardRect.bottom - pad
     val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -742,13 +734,13 @@ fun generateGoldenHourCardBitmap(
     }
     canvas.drawText(quote.author, pad + 10f * scaleFactor, authorY, authorPaint)
 
-    // Auto-fit quote text
+    // Auto-fit quote text with full vertical breathing space
     val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 600)
         color = theme.primaryText
     }
 
-    val topLimit = pad + (20f * scaleFactor)
+    val topLimit = pad
     val bottomLimit = authorY - (14f * scaleFactor)
     val contentW = cardRect.width() - (pad * 2)
 
@@ -760,7 +752,7 @@ fun generateGoldenHourCardBitmap(
         bottomLimit = bottomLimit,
         maxWidth = contentW,
         paint = bodyPaint,
-        initialTextSize = 15f * scaleFactor,
+        initialTextSize = 15.5f * scaleFactor,
         minTextSize = 10.5f * scaleFactor,
         maxLines = 6,
         verticalCenter = true
