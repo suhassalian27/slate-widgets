@@ -77,6 +77,9 @@ import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import com.altusix.slate.widgets.productivity.updateAllProductivityWidgets
 import com.altusix.slate.widgets.quicktoggles.getQuickTogglesWidgetsCatalog
 import com.altusix.slate.widgets.quicktoggles.updateAllQuickTogglesWidgets
+import com.altusix.slate.widgets.quotes.QuotesConfigActivity
+import com.altusix.slate.widgets.quotes.getQuotesWidgetsCatalog
+import com.altusix.slate.widgets.quotes.updateAllQuotesWidgets
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
@@ -198,6 +201,17 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
+        val isQuotes = getQuotesWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        if (isQuotes) {
+            val forwardIntent = Intent(this, QuotesConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
                 val catalogItem = remember(widgetClassName) {
@@ -215,7 +229,8 @@ class WidgetConfigActivity : ComponentActivity() {
                             getNotesWidgetsCatalog() +
                             getPhotosWidgetsCatalog() +
                             getProductivityWidgetsCatalog() +
-                            getQuickTogglesWidgetsCatalog()
+                            getQuickTogglesWidgetsCatalog() +
+                            getQuotesWidgetsCatalog()
 
                     allWidgets.find { it.receiverClass.name == widgetClassName }
                 }
@@ -511,6 +526,7 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllPhotosWidgets(this)
         updateAllProductivityWidgets(this)
         updateAllQuickTogglesWidgets(this)
+        updateAllQuotesWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()

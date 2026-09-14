@@ -4069,5 +4069,153 @@
                 android:resource="@xml/widget_info_1x1" />
         </receiver>
 
+        <!-- ========================================================================= -->
+        <!-- QUOTES STUDIO CONFIG ACTIVITY                                              -->
+        <!-- ========================================================================= -->
+
+        <activity
+            android:name=".widgets.quotes.QuotesConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Slate"
+            android:label="Quotes Studio">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- ========================================================================= -->
+        <!-- QUOTES WIDGET RECEIVERS (10 UNIQUE STYLES)                                -->
+        <!-- ========================================================================= -->
+
+        <!-- 1. Editorial Pull Quote (4x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesEditorialReceiver"
+            android:exported="true"
+            android:label="Editorial Pull Quote">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 2. Radiant Emblem Mantra (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesZenMantraReceiver"
+            android:exported="true"
+            android:label="Radiant Emblem Mantra">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 3. Modern Accent Quotes (4x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesTypewriterReceiver"
+            android:exported="true"
+            android:label="Modern Accent Quotes">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 4. Punchy Horizon Banner (4x1) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesKineticReceiver"
+            android:exported="true"
+            android:label="Punchy Horizon Banner">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 5. Golden Hour Card (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesGoldenHourReceiver"
+            android:exported="true"
+            android:label="Golden Hour Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 6. Two-Tone Insight (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesPoetryReceiver"
+            android:exported="true"
+            android:label="Two-Tone Insight">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 7. Daily Insight Banner (4x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesBentoReceiver"
+            android:exported="true"
+            android:label="Daily Insight Banner">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 8. Minimal Horizon Capsule (2x1) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesAffirmationPillReceiver"
+            android:exported="true"
+            android:label="Minimal Horizon Capsule">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x1" />
+        </receiver>
+
+        <!-- 9. Mindful Smile Strip (4x1) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesTerminalReceiver"
+            android:exported="true"
+            android:label="Mindful Smile Strip">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 10. Mindful Smile Card (2x2) -->
+        <receiver
+            android:name=".widgets.quotes.QuotesBrutalistReceiver"
+            android:exported="true"
+            android:label="Mindful Smile Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
     </application>
 </manifest>
