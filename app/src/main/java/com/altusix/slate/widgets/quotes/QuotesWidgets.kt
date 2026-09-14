@@ -368,8 +368,8 @@ class QuotesHorizonRippleReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
     }
 }
 
-// 14. Ceramic Disc (2x2)
-class QuotesCeramicDiscReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
+// 14. Ceramic Disc (2x2) - Full Bleed Disc
+class QuotesCeramicDiscReceiver : BaseQuotesReceiver(targetAspect = 0f) {
     override val widgetTypeTag: String = "DISC"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val quote = QuotesStorageManager.getQuoteForWidget(context, appWidgetId, widgetTypeTag)

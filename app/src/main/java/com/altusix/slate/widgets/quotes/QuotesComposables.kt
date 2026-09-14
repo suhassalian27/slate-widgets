@@ -431,7 +431,15 @@ fun generateRadiantMantraBitmap(
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val theme = resolveTheme(config)
-    val cardRect = RectF(0f, 0f, wDp * scaleFactor, hDp * scaleFactor)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    }
     val cornerRadius = getStandardCornerRadius(scaleFactor)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.bg }
@@ -684,7 +692,15 @@ fun generateGoldenHourCardBitmap(
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val theme = resolveTheme(config)
-    val cardRect = RectF(0f, 0f, wDp * scaleFactor, hDp * scaleFactor)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    }
     val cornerRadius = getStandardCornerRadius(scaleFactor)
 
     // Base background
@@ -775,7 +791,15 @@ fun generateTwoToneInsightBitmap(
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val theme = resolveTheme(config)
-    val cardRect = RectF(0f, 0f, wDp * scaleFactor, hDp * scaleFactor)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val cardRect = if (isResponsive) {
+        RectF(0f, 0f, w, h)
+    } else {
+        val size = minOf(w, h)
+        RectF((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f)
+    }
     val cornerRadius = getStandardCornerRadius(scaleFactor)
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.bg }
@@ -1998,8 +2022,8 @@ fun generateHorizonRippleBitmap(
 }
 
 // =========================================================================
-// 14. CERAMIC DISC (2x2)
-// Circular coaster aesthetic with uppercase typography, bird motif & moon dot
+// 14. CERAMIC DISC (2x2) - FLAT MINIMALIST DISC
+// Proportional uppercase typography with native R.drawable.ic_bird accent
 // =========================================================================
 
 fun generateCeramicDiscBitmap(
@@ -2015,18 +2039,14 @@ fun generateCeramicDiscBitmap(
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
+    // 1. Disc Geometry (Maximized within available square cell, 2.5dp anti-aliasing margin)
     val size = minOf(w, h)
     val cx = w / 2f
     val cy = h / 2f
-    val discRadius = (size / 2f) - (4f * scaleFactor)
+    val margin = 2.5f * scaleFactor
+    val discRadius = (size / 2f) - margin
 
-    // 1. Base Disc Surface & Shadow
-    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.argb(45, 0, 0, 0)
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(cx, cy + (3f * scaleFactor), discRadius, shadowPaint)
-
+    // 2. Flat Base Disc Surface & Subtle Border (No shadow, no bottom dot)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.bg
         style = Paint.Style.FILL
@@ -2040,72 +2060,85 @@ fun generateCeramicDiscBitmap(
     }
     canvas.drawCircle(cx, cy, discRadius, borderPaint)
 
-    // 2. Uppercase Geometric Typography
-    val maxTextW = discRadius * 1.30f
+    // 3. Proportional Layout Bounds
+    val maxTextW = discRadius * 1.34f
     val textLeft = cx - (maxTextW * 0.48f)
-    val topLimit = cy - (discRadius * 0.55f)
-    val bottomLimit = cy + (discRadius * 0.20f)
+
+    val initialTextSize = discRadius * 0.150f
+    val minTextSize = discRadius * 0.082f
+    val lineSpacingRatio = 1.36f
 
     val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 600)
         color = theme.primaryText
-        letterSpacing = 0.12f
+        letterSpacing = 0.08f
     }
 
-    val finalBottom = drawAutoFitText(
-        canvas = canvas,
-        text = quote.text.uppercase(),
-        x = textLeft,
-        topLimit = topLimit,
-        bottomLimit = bottomLimit,
-        maxWidth = maxTextW,
-        paint = quotePaint,
-        initialTextSize = 14.5f * scaleFactor,
-        minTextSize = 10f * scaleFactor,
-        maxLines = 5,
-        lineSpacingRatio = 1.40f,
-        verticalCenter = false
-    )
+    val upperText = quote.text.trim().uppercase()
 
-    // 3. Horizontal Dash
+    // Native SVG aspect ratio: 78.587 / 60.091 ≈ 1.308
+    val birdTargetW = discRadius * 0.36f
+    val birdTargetH = birdTargetW * (60.091f / 78.587f)
+
+    val gapToDash = discRadius * 0.11f
+    val dashAndBirdH = maxOf(discRadius * 0.04f, birdTargetH)
+    val maxContentH = discRadius * 1.20f
+
+    // Auto-fit word wrap
+    var textSize = initialTextSize
+    var lines = breakTextIntoLines(upperText, quotePaint.apply { this.textSize = textSize }, maxTextW)
+
+    while (textSize >= minTextSize) {
+        quotePaint.textSize = textSize
+        lines = breakTextIntoLines(upperText, quotePaint, maxTextW)
+        val spacing = textSize * lineSpacingRatio
+        val textH = if (lines.isEmpty()) 0f else (lines.size - 1) * spacing + (-quotePaint.ascent() + quotePaint.descent())
+        if (textH + gapToDash + dashAndBirdH <= maxContentH || textSize <= minTextSize) {
+            break
+        }
+        textSize -= 0.8f * scaleFactor
+    }
+
+    val spacing = textSize * lineSpacingRatio
+    val ascent = -quotePaint.ascent()
+    val descent = quotePaint.descent()
+    val quoteTotalH = if (lines.isEmpty()) 0f else (lines.size - 1) * spacing + ascent + descent
+    val totalBlockH = quoteTotalH + gapToDash + dashAndBirdH
+
+    // 4. Draw Proportional Text Centered Vertically
+    var textY = cy - (totalBlockH / 2f) + ascent
+    for (line in lines) {
+        canvas.drawText(line, textLeft, textY, quotePaint)
+        textY += spacing
+    }
+
+    // 5. Proportional Signature Dash
+    val lineY = textY - spacing + descent + gapToDash
+    val dashW = discRadius * 0.22f
+    val dashStroke = (discRadius * 0.016f).coerceAtLeast(1.8f * scaleFactor)
+
     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.primaryText
         style = Paint.Style.STROKE
-        strokeWidth = 1.8f * scaleFactor
+        strokeWidth = dashStroke
         strokeCap = Paint.Cap.ROUND
     }
-    val lineY = finalBottom + (14f * scaleFactor)
-    canvas.drawLine(textLeft, lineY, textLeft + (22f * scaleFactor), lineY, linePaint)
+    canvas.drawLine(textLeft, lineY + (dashStroke * 0.5f), textLeft + dashW, lineY + (dashStroke * 0.5f), linePaint)
 
-    // 4. Soaring Bird Silhouette
-    val birdCx = textLeft + maxTextW - (18f * scaleFactor)
-    val birdCy = lineY + (2f * scaleFactor)
-    val birdSize = 22f * scaleFactor
+    // 6. Draw Vector Drawable `R.drawable.ic_bird` with theme.accent
+    val birdLeft = textLeft + maxTextW - birdTargetW
+    val birdTop = lineY - (birdTargetH * 0.38f)
 
-    val birdPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = theme.primaryText
-        style = Paint.Style.FILL
+    androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_bird)?.mutate()?.let { drawable ->
+        drawable.setTint(theme.accent)
+        drawable.setBounds(
+            birdLeft.toInt(),
+            birdTop.toInt(),
+            (birdLeft + birdTargetW).toInt(),
+            (birdTop + birdTargetH).toInt()
+        )
+        drawable.draw(canvas)
     }
-    val bs = birdSize / 24f
-    val birdPath = Path().apply {
-        moveTo(birdCx - 11f * bs, birdCy - 2f * bs)
-        cubicTo(birdCx - 6f * bs, birdCy - 9f * bs, birdCx + 3f * bs, birdCy - 11f * bs, birdCx + 10f * bs, birdCy - 7f * bs)
-        cubicTo(birdCx + 5f * bs, birdCy - 2f * bs, birdCx + 1f * bs, birdCy, birdCx + 2f * bs, birdCy + 3f * bs)
-        cubicTo(birdCx + 6f * bs, birdCy + 7f * bs, birdCx + 11f * bs, birdCy + 9f * bs, birdCx + 10f * bs, birdCy + 10f * bs)
-        cubicTo(birdCx + 5f * bs, birdCy + 8f * bs, birdCx - 1f * bs, birdCy + 6f * bs, birdCx - 5f * bs, birdCy + 8f * bs)
-        cubicTo(birdCx - 6f * bs, birdCy + 4f * bs, birdCx - 5f * bs, birdCy + 1f * bs, birdCx - 11f * bs, birdCy - 2f * bs)
-        close()
-    }
-    canvas.drawPath(birdPath, birdPaint)
-
-    // 5. Bottom Accent Dot
-    val dotR = discRadius * 0.13f
-    val dotCy = cy + discRadius - dotR - (14f * scaleFactor)
-    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = theme.accent
-        style = Paint.Style.FILL
-    }
-    canvas.drawCircle(cx, dotCy, dotR, dotPaint)
 
     return bitmap
 }
