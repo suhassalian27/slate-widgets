@@ -595,7 +595,9 @@ fun generateModernQuotesSpreadBitmap(
 
 // =========================================================================
 // 4. PUNCHY HORIZON BANNER (4x1)
+// Clean horizontal dock strip: Left watermark + centered multi-line statement
 // =========================================================================
+
 fun generatePunchyHorizonBitmap(
     context: Context,
     quote: QuoteItem,
@@ -620,14 +622,13 @@ fun generatePunchyHorizonBitmap(
     }
     canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, borderPaint)
 
-    // 2. Full-height background watermark clipped to the card squircle
+    // 2. Full-height background watermark clipped to card squircle
     canvas.save()
     val clipPath = Path().apply {
         addRoundRect(cardRect, cornerRadius, cornerRadius, Path.Direction.CW)
     }
     canvas.clipPath(clipPath)
 
-    // Full widget-height quote mark
     val watermarkSize = cardRect.height() * 0.96f
     val watermarkCx = cardRect.left + (watermarkSize * 0.52f)
     val watermarkCy = cardRect.centerY()
@@ -636,7 +637,7 @@ fun generatePunchyHorizonBitmap(
         .copy(alpha = if (theme.isLight) 0.12f else 0.18f)
         .toArgb()
 
-    // Rotate 180° around its center to transform 99 closing glyph into 66 opening glyph
+    // Rotate 180° around center to turn closing glyph (99) into opening glyph (66)
     canvas.save()
     canvas.rotate(180f, watermarkCx, watermarkCy)
     drawVectorDrawable(
@@ -651,29 +652,55 @@ fun generatePunchyHorizonBitmap(
     canvas.restore()
     canvas.restore()
 
-    // 3. Foreground Quote Text
-    val padH = 22f * scaleFactor
+    // 3. Auto-Scaling Horizontally & Vertically Centered Quote Text
+    val padH = 24f * scaleFactor
     val availableW = cardRect.width() - (padH * 2)
+    val cx = cardRect.centerX()
 
     val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = getSlateFont(context, weight = 600)
         color = theme.primaryText
         letterSpacing = -0.01f
+        textAlign = Paint.Align.CENTER
     }
 
-    drawAutoFitText(
-        canvas = canvas,
-        text = quote.text,
-        x = padH,
-        topLimit = cardRect.top + (8f * scaleFactor),
-        bottomLimit = cardRect.bottom - (8f * scaleFactor),
-        maxWidth = availableW,
-        paint = quotePaint,
-        initialTextSize = 14f * scaleFactor,
-        minTextSize = 9.5f * scaleFactor,
-        maxLines = 3,
-        verticalCenter = true
-    )
+    val topLimit = cardRect.top + (8f * scaleFactor)
+    val bottomLimit = cardRect.bottom - (8f * scaleFactor)
+    val availableH = maxOf(10f, bottomLimit - topLimit)
+
+    val initialSize = 14f * scaleFactor
+    val minSize = 9.5f * scaleFactor
+    var chosenSize = initialSize
+    val step = (initialSize - minSize) / 10f
+
+    var lines: List<String> = emptyList()
+    var spacing = chosenSize * 1.30f
+    var totalHeight = 0f
+
+    while (chosenSize >= minSize) {
+        quotePaint.textSize = chosenSize
+        spacing = chosenSize * 1.30f
+        lines = breakTextIntoLines(quote.text, quotePaint, availableW)
+
+        val ascent = -quotePaint.ascent()
+        val descent = quotePaint.descent()
+        totalHeight = if (lines.isEmpty()) 0f else (lines.size - 1) * spacing + ascent + descent
+
+        if (lines.size <= 3 && totalHeight <= availableH) {
+            break
+        }
+        chosenSize -= step
+    }
+
+    quotePaint.textSize = chosenSize
+    val ascent = -quotePaint.ascent()
+    val extraMargin = maxOf(0f, (availableH - totalHeight) / 2f)
+    var currentY = topLimit + extraMargin + ascent
+
+    for (line in lines) {
+        canvas.drawText(line, cx, currentY, quotePaint)
+        currentY += spacing
+    }
 
     return bitmap
 }
