@@ -11,6 +11,21 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import android.appwidget.AppWidgetManager
+import android.os.Bundle
 
 // =========================================================================
 // CANVAS BITMAP GENERATORS FOR SLATE "QUICK TOGGLES"
@@ -135,6 +150,7 @@ private fun drawToggleIcon(
     }
     drawVectorDrawable(context, canvas, resId, cx, cy, size, color)
 }
+
 
 // =========================================================================
 // 1. CONTROL CENTER DECK (4x2 - Full Bento Dashboard)
@@ -1657,4 +1673,98 @@ fun generateMicroToggleBitmap(
     )
 
     return bitmap
+}
+
+
+// =========================================================================
+// QUICK TOGGLES LIVE PREVIEW (True Home Screen 1:1 Scale)
+// =========================================================================
+
+@Composable
+fun QuickToggleLivePreview(
+    widgetClassName: String,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    appWidgetId: Int
+) {
+    val context = LocalContext.current
+    val manager = remember { AppWidgetManager.getInstance(context) }
+
+    // 1. Query the live launcher options assigned to this specific widget
+    val options = remember(appWidgetId) {
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            manager?.getAppWidgetOptions(appWidgetId)
+        } else null
+    }
+
+    val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val optW = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0) ?: 0
+    else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+    val optH = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+    else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
+
+    // 2. Exact home screen cell dimensions (1 cell ≈ 72dp)
+    val (defaultW, defaultH) = remember(widgetClassName) {
+        when {
+            widgetClassName.contains("Micro") -> 72 to 72
+            widgetClassName.contains("Toolbar") -> 320 to 72
+            widgetClassName.contains("SliderV") -> 72 to 156
+            widgetClassName.contains("Pill") || widgetClassName.contains("SliderH") -> 160 to 72
+            widgetClassName.contains("ControlCenter") || widgetClassName.contains("UtilityDeck") -> 320 to 156
+            else -> 160 to 160 // Quad, Connectivity, Torch Switch (2x2)
+        }
+    }
+
+    val actualWDp = if (optW > 0) optW else defaultW
+    val actualHDp = if (optH > 0) optH else defaultH
+
+    // 3. Keep 1:1 scale for pills/micros; gently downscale only if wider/taller than scaffold viewport
+    val maxDisplayW = 310f
+    val maxDisplayH = 150f
+    val scale = if (actualWDp > maxDisplayW || actualHDp > maxDisplayH) {
+        minOf(maxDisplayW / actualWDp.toFloat(), maxDisplayH / actualHDp.toFloat())
+    } else {
+        1.0f
+    }
+
+    val displayW = actualWDp * scale
+    val displayH = actualHDp * scale
+
+    val bitmap = remember(widgetClassName, config, isResponsive, actualWDp, actualHDp) {
+        try {
+            val receiverClass = Class.forName(widgetClassName)
+            val receiver = receiverClass.getDeclaredConstructor().newInstance()
+            (receiver as? BaseQuickTogglesReceiver)?.renderWidgetBitmap(
+                context = context,
+                appWidgetId = appWidgetId,
+                config = config,
+                isResponsive = isResponsive,
+                wDp = actualWDp,
+                hDp = actualHDp
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Quick Toggle Preview",
+                modifier = Modifier.size(displayW.dp, displayH.dp)
+            )
+        } else {
+            CircularProgressIndicator(
+                color = androidx.compose.ui.graphics.Color(config.accentColorHex),
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    }
 }

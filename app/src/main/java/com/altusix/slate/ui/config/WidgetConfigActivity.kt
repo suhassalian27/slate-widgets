@@ -75,11 +75,13 @@ import com.altusix.slate.widgets.productivity.BaseProductivityReceiver
 import com.altusix.slate.widgets.productivity.ProductivityConfigActivity
 import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import com.altusix.slate.widgets.productivity.updateAllProductivityWidgets
+import com.altusix.slate.widgets.quicktoggles.QuickToggleLivePreview
 import com.altusix.slate.widgets.quicktoggles.getQuickTogglesWidgetsCatalog
 import com.altusix.slate.widgets.quicktoggles.updateAllQuickTogglesWidgets
 import com.altusix.slate.widgets.quotes.QuotesConfigActivity
 import com.altusix.slate.widgets.quotes.getQuotesWidgetsCatalog
 import com.altusix.slate.widgets.quotes.updateAllQuotesWidgets
+import com.altusix.slate.widgets.quicktoggles.QuickToggleLivePreview
 
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
@@ -272,6 +274,10 @@ class WidgetConfigActivity : ComponentActivity() {
                     listOf(0xFFFFFFFFL, 0xFF00D166L, 0xFF2B80FFL, 0xFFFF3B30L, 0xFFFF9500L, 0xFFAF52DEL)
                 }
 
+                val isQuickToggles = remember(widgetClassName) {
+                    getQuickTogglesWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+                }
+
                 SlateConfigScaffold(
                     title = "Customize Widget",
                     subtitle = widgetName.ifEmpty { null },
@@ -291,62 +297,76 @@ class WidgetConfigActivity : ComponentActivity() {
                     scrollable = true,
                     previewHeight = 180.dp,
                     previewContent = {
-                        val previewBg = Color(selectedBgHex).copy(alpha = opacity)
+                        if (isQuickToggles) {
+                            QuickToggleLivePreview(
+                                widgetClassName = widgetClassName,
+                                config = SlateWidgetConfig(
+                                    themeMode = if (isLightBg) "LIGHT" else "DARK",
+                                    backgroundColorHex = selectedBgHex,
+                                    opacity = opacity,
+                                    accentColorHex = selectedAccentHex
+                                ),
+                                isResponsive = isResponsive,
+                                appWidgetId = appWidgetId
+                            )
+                        } else {
+                            val previewBg = Color(selectedBgHex).copy(alpha = opacity)
 
-                        Box(
-                            modifier = Modifier
-                                .size(148.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(previewBg)
-                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
-                                .padding(16.dp)
-                        ) {
-                            if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                            Box(
+                                modifier = Modifier
+                                    .size(148.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(previewBg)
+                                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
+                                    .padding(16.dp)
+                            ) {
+                                if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                                        Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                            Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                        }
+
+                                        val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
+                                            generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
+                                        }
+
+                                        Image(
+                                            bitmap = arcBitmap.asImageBitmap(),
+                                            contentDescription = "Arc Preview",
+                                            modifier = Modifier.size(100.dp, 50.dp)
+                                        )
+
+                                        Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
                                     }
-
-                                    val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
-                                        generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
-                                    }
-
-                                    Image(
-                                        bitmap = arcBitmap.asImageBitmap(),
-                                        contentDescription = "Arc Preview",
-                                        modifier = Modifier.size(100.dp, 50.dp)
-                                    )
-
-                                    Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                } else {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                                        Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                            Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                        }
+                                        Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                        LinearProgressIndicator(
+                                            progress = { 0.85f },
+                                            modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                                            color = Color(selectedAccentHex),
+                                            trackColor = textColor.copy(alpha = 0.15f)
+                                        )
                                     }
-                                    Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                    LinearProgressIndicator(
-                                        progress = { 0.85f },
-                                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
-                                        color = Color(selectedAccentHex),
-                                        trackColor = textColor.copy(alpha = 0.15f)
-                                    )
                                 }
                             }
                         }
