@@ -674,7 +674,6 @@ fun generatePunchyHorizonBitmap(
 // =========================================================================
 // 5. GOLDEN HOUR AURA (2x2)
 // =========================================================================
-
 fun generateGoldenHourCardBitmap(
     context: Context,
     quote: QuoteItem,
@@ -792,11 +791,13 @@ fun generateTwoToneInsightBitmap(
     val cx = cardRect.centerX()
     val pad = 18f * scaleFactor
 
+    // Bottom author line using accent color
     val authorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 500)
-        textSize = 9.5f * scaleFactor
-        color = theme.secondaryText
+        typeface = getSlateFont(context, weight = 600)
+        textSize = 10f * scaleFactor
+        color = theme.accent
         textAlign = Paint.Align.CENTER
+        letterSpacing = 0.02f
     }
     val authorY = cardRect.bottom - pad
     canvas.drawText(quote.author, cx, authorY, authorPaint)
@@ -880,10 +881,95 @@ fun generateTwoToneInsightBitmap(
     return bitmap
 }
 
+// =========================================================================
+// 7. DAILY Insight (4x2 - Minimalist Date & Italic Editorial)
+// =========================================================================
 
+fun generateDailyInsightBitmap(
+    context: Context,
+    quote: QuoteItem,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val theme = resolveTheme(config)
+    val cardRect = RectF(0f, 0f, wDp * scaleFactor, hDp * scaleFactor)
+    val cornerRadius = getStandardCornerRadius(scaleFactor)
+
+    // 1. Base card background & border
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.bg }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = theme.subtleBorder
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * scaleFactor
+    }
+    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, borderPaint)
+
+    val padH = 26f * scaleFactor
+    val padV = 20f * scaleFactor
+
+    // 2. Top Header: Date only (quote type / category removed)
+    val dateText = try {
+        val formatter = java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.getDefault())
+        formatter.format(java.util.Date()).uppercase()
+    } catch (_: Exception) {
+        "TODAY'S REFLECTION"
+    }
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 600)
+        textSize = 9.5f * scaleFactor
+        color = theme.accent
+        letterSpacing = 0.12f
+    }
+    val headerY = padV + (10f * scaleFactor)
+    canvas.drawText(dateText, padH, headerY, datePaint)
+
+    // 3. Bottom Author Line
+    val authorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 500)
+        textSize = 10.5f * scaleFactor
+        color = theme.secondaryText
+    }
+    val authorText = if (quote.sourceBook.isNotBlank()) "— ${quote.author}, ${quote.sourceBook}" else "— ${quote.author}"
+    val authorY = cardRect.bottom - padV
+    canvas.drawText(authorText, padH, authorY, authorPaint)
+
+    // 4. Clean Oblique Typography (pure quote text without quotation marks)
+    val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = getSlateFont(context, weight = 400)
+        textSkewX = -0.16f // Precision modern italic angle
+        color = theme.primaryText
+        letterSpacing = -0.01f
+    }
+
+    val topLimit = headerY + (14f * scaleFactor)
+    val bottomLimit = authorY - (14f * scaleFactor)
+    val contentW = cardRect.width() - (padH * 2)
+
+    drawAutoFitText(
+        canvas = canvas,
+        text = quote.text,
+        x = padH,
+        topLimit = topLimit,
+        bottomLimit = bottomLimit,
+        maxWidth = contentW,
+        paint = quotePaint,
+        initialTextSize = 16.5f * scaleFactor,
+        minTextSize = 11f * scaleFactor,
+        maxLines = 5,
+        verticalCenter = true
+    )
+
+    return bitmap
+}
 
 // =========================================================================
-// 7. MINDFUL SMILE CARD (2x2)
+// 8. MINDFUL SMILE CARD (2x2)
 // =========================================================================
 
 fun generateMindfulSmileBitmap(
@@ -950,85 +1036,7 @@ fun generateMindfulSmileBitmap(
     return bitmap
 }
 
-// =========================================================================
-// 8. DAILY INSIGHT BANNER (4x2)
-// =========================================================================
 
-fun generateDailyInsightBitmap(
-    context: Context,
-    quote: QuoteItem,
-    config: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int
-): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val theme = resolveTheme(config)
-    val cardRect = RectF(0f, 0f, wDp * scaleFactor, hDp * scaleFactor)
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
-
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.bg }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
-
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = theme.subtleBorder
-        style = Paint.Style.STROKE
-        strokeWidth = 1.2f * scaleFactor
-    }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, borderPaint)
-
-    val padH = 26f * scaleFactor
-    val padV = 20f * scaleFactor
-
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
-        textSize = 10f * scaleFactor
-        color = theme.secondaryText
-        letterSpacing = 0.06f
-    }
-    canvas.drawText("Today's Insight", padH, padV + 8f * scaleFactor, headerPaint)
-
-    drawSmileGlyph(
-        canvas,
-        cardRect.right - padH - 6f * scaleFactor,
-        padV + 4f * scaleFactor,
-        9f * scaleFactor,
-        theme.accent
-    )
-
-    val authorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 500)
-        textSize = 10.5f * scaleFactor
-        color = theme.secondaryText
-    }
-    val authorY = cardRect.bottom - padV
-    canvas.drawText("— ${quote.author}", padH, authorY, authorPaint)
-
-    val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = getSlateFont(context, weight = 600)
-        color = theme.primaryText
-    }
-
-    val topLimit = padV + (24f * scaleFactor)
-    val bottomLimit = authorY - (14f * scaleFactor)
-    val contentW = cardRect.width() - (padH * 2)
-
-    drawAutoFitText(
-        canvas = canvas,
-        text = quote.text,
-        x = padH,
-        topLimit = topLimit,
-        bottomLimit = bottomLimit,
-        maxWidth = contentW,
-        paint = quotePaint,
-        initialTextSize = 16.5f * scaleFactor,
-        minTextSize = 11f * scaleFactor,
-        maxLines = 6,
-        verticalCenter = true
-    )
-
-    return bitmap
-}
 
 // =========================================================================
 // 9. MINIMAL CAPSULE (2x1)

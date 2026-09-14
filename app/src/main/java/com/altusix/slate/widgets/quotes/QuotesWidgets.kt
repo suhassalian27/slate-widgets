@@ -27,7 +27,7 @@ fun getQuotesWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Punchy Horizon Banner", "4x1", "Quotes", QuotesKineticReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Golden Hour Card", "2x2", "Quotes", QuotesGoldenHourReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Two-Tone Insight", "2x2", "Quotes", QuotesPoetryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Daily Insight Banner", "4x2", "Quotes", QuotesBentoReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Daily Insight", "4x2", "Quotes", QuotesBentoReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Minimal Horizon Capsule", "2x1", "Quotes", QuotesAffirmationPillReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Mindful Smile Strip", "4x1", "Quotes", QuotesTerminalReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Mindful Smile Card", "2x2", "Quotes", QuotesBrutalistReceiver::class.java, hasModeOption = true),
@@ -285,7 +285,7 @@ class QuotesPoetryReceiver : BaseQuotesReceiver(targetAspect = 1.0f) {
     }
 }
 
-// 7. Daily Insight Banner (4x2)
+// 7. DAILY Insight (4x2)
 class QuotesBentoReceiver : BaseQuotesReceiver(targetAspect = 2.0f) {
     override val widgetTypeTag: String = "BENTO_INSIGHT"
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
