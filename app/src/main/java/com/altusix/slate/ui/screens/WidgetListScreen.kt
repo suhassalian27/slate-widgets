@@ -57,6 +57,7 @@ import com.altusix.slate.widgets.photos.getPhotosWidgetsCatalog
 import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import com.altusix.slate.widgets.quicktoggles.getQuickTogglesWidgetsCatalog
 import com.altusix.slate.widgets.quotes.getQuotesWidgetsCatalog
+import com.altusix.slate.widgets.social.getSocialWidgetsCatalog
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -94,6 +95,7 @@ fun WidgetListScreen(
     val productivityWidgets = remember { getProductivityWidgetsCatalog() }
     val quickTogglesWidgets = remember { getQuickTogglesWidgetsCatalog() }
     val quotesWidgets = remember { getQuotesWidgetsCatalog() }
+    val socialWidgets = remember { getSocialWidgetsCatalog() }
 
     val categories = remember {
         listOf(
@@ -101,7 +103,7 @@ fun WidgetListScreen(
             "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital",
             "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google",
             "Health & Fitness", "Music & Media", "Notes", "Photos & Memories",
-            "Productivity", "Quick Toggles", "Quotes"
+            "Productivity", "Quick Toggles", "Quotes", "Social"
         )
     }
 
@@ -205,10 +207,11 @@ fun WidgetListScreen(
                     21 -> productivityWidgets
                     22 -> quickTogglesWidgets
                     23 -> quotesWidgets
+                    24 -> socialWidgets
                     else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
                             calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
                             clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets +
-                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets + notesWidgets + photosWidgets + productivityWidgets + quickTogglesWidgets + quotesWidgets
+                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets + notesWidgets + photosWidgets + productivityWidgets + quickTogglesWidgets + quotesWidgets + socialWidgets
                 }
             }
 

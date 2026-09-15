@@ -43,11 +43,6 @@
 
     <!-- Quick Toggles System Permissions -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
 
 
@@ -4267,6 +4262,177 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- ================================================================= -->
+        <!-- SOCIAL WIDGETS & CONFIG ACTIVITY                                  -->
+        <!-- ================================================================= -->
+
+        <!-- Social Studio Config Activity -->
+        <activity
+            android:name=".widgets.social.SocialConfigActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:label="Social Studio">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- 1. Social Bar (4x1) -->
+        <receiver
+            android:name=".widgets.social.SocialBar5Receiver"
+            android:exported="true"
+            android:label="Social Bar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 2. Social Folder 1 (2x2) -->
+        <receiver
+            android:name=".widgets.social.SocialQuad4Receiver"
+            android:exported="true"
+            android:label="Social Folder 1">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 3. Social Folder 3 (2x2) -->
+        <receiver
+            android:name=".widgets.social.SocialMatrix9Receiver"
+            android:exported="true"
+            android:label="Social Folder 3">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 4. Social Folder 2 (4x2) -->
+        <receiver
+            android:name=".widgets.social.SocialDeck10Receiver"
+            android:exported="true"
+            android:label="Social Folder 2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 5. Social Folder 4 (4x2) -->
+        <receiver
+            android:name=".widgets.social.SocialBento10TopReceiver"
+            android:exported="true"
+            android:label="Social Folder 4">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 6. Social Folder 5 (4x2) -->
+        <receiver
+            android:name=".widgets.social.SocialBento10LeftReceiver"
+            android:exported="true"
+            android:label="Social Folder 5">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 7. Social Orbit (2x2) -->
+        <receiver
+            android:name=".widgets.social.SocialOrbit6Receiver"
+            android:exported="true"
+            android:label="Social Orbit">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. Social DMs Hub (4x1) -->
+        <receiver
+            android:name=".widgets.social.SocialMessaging4Receiver"
+            android:exported="true"
+            android:label="Social DMs Hub">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 9. Social Stream (3x1) -->
+        <receiver
+            android:name=".widgets.social.SocialStream3Receiver"
+            android:exported="true"
+            android:label="Social Stream">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_3x1" />
+        </receiver>
+
+        <!-- 10. Social Octa Deck (4x2) -->
+        <receiver
+            android:name=".widgets.social.SocialOcta8Receiver"
+            android:exported="true"
+            android:label="Social Octa Deck">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 11. Social Twin (1x2) -->
+        <receiver
+            android:name=".widgets.social.SocialTwin2Receiver"
+            android:exported="true"
+            android:label="Social Twin">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x2" />
+        </receiver>
+
+        <!-- 12. Micro Social (1x1) -->
+        <receiver
+            android:name=".widgets.social.SocialMicro1Receiver"
+            android:exported="true"
+            android:label="Micro Social">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
         </receiver>
 
     </application>

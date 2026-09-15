@@ -81,6 +81,9 @@ import com.altusix.slate.widgets.quicktoggles.updateAllQuickTogglesWidgets
 import com.altusix.slate.widgets.quotes.QuotesConfigActivity
 import com.altusix.slate.widgets.quotes.getQuotesWidgetsCatalog
 import com.altusix.slate.widgets.quotes.updateAllQuotesWidgets
+import com.altusix.slate.widgets.social.SocialConfigActivity
+import com.altusix.slate.widgets.social.getSocialWidgetsCatalog
+import com.altusix.slate.widgets.social.updateAllSocialWidgets
 import com.altusix.slate.widgets.quicktoggles.QuickToggleLivePreview
 
 enum class ColorPickerTarget {
@@ -214,6 +217,17 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
+        val isSocial = getSocialWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        if (isSocial) {
+            val forwardIntent = Intent(this, SocialConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
                 val catalogItem = remember(widgetClassName) {
@@ -232,7 +246,8 @@ class WidgetConfigActivity : ComponentActivity() {
                             getPhotosWidgetsCatalog() +
                             getProductivityWidgetsCatalog() +
                             getQuickTogglesWidgetsCatalog() +
-                            getQuotesWidgetsCatalog()
+                            getQuotesWidgetsCatalog() +
+                            getSocialWidgetsCatalog()
 
                     allWidgets.find { it.receiverClass.name == widgetClassName }
                 }
@@ -547,6 +562,7 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllProductivityWidgets(this)
         updateAllQuickTogglesWidgets(this)
         updateAllQuotesWidgets(this)
+        updateAllSocialWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
