@@ -60,7 +60,7 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
 
 abstract class BaseSocialGridReceiver(
     private val slotCount: Int,
-    private val layoutResId: Int,
+    private val defaultLayoutResId: Int,
     private val layoutTag: String
 ) : AppWidgetProvider() {
 
@@ -74,6 +74,9 @@ abstract class BaseSocialGridReceiver(
         updateWidget(context, appWidgetManager, appWidgetId)
     }
 
+    // Allows dynamic layout switching (e.g. row -> col)
+    open fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int = defaultLayoutResId
+
     fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
         val options = appWidgetManager.getAppWidgetOptions(widgetId)
         val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -86,7 +89,8 @@ abstract class BaseSocialGridReceiver(
         val config = loadSlateWidgetConfig(context, widgetId)
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
 
-        val views = RemoteViews(context.packageName, layoutResId)
+        val layoutId = resolveLayoutResId(isResponsive, wDp, hDp)
+        val views = RemoteViews(context.packageName, layoutId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
         val touchSlotIds = intArrayOf(
@@ -126,7 +130,6 @@ abstract class BaseSocialGridReceiver(
             legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
         }
 
-        // Global fallback: if no slots configured, background tap opens config
         if (socialConfig.slots.none { it.isConfigured }) {
             val rootIntent = Intent(context, SocialConfigActivity::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
@@ -148,6 +151,32 @@ abstract class BaseSocialGridReceiver(
     abstract fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap
 }
 
+// Synchronous updates to prevent dropped broadcasts
+fun updateAllSocialWidgets(context: Context) {
+    val manager = AppWidgetManager.getInstance(context) ?: return
+    val receivers: List<BaseSocialGridReceiver> = listOf(
+        SocialBar5Receiver(),
+        SocialQuad4Receiver(),
+        SocialMatrix9Receiver(),
+        SocialDeck10Receiver(),
+        SocialBento10TopReceiver(),
+        SocialBento10LeftReceiver(),
+        SocialOrbit6Receiver(),
+        SocialMessaging4Receiver(),
+        SocialStream3Receiver(),
+        SocialOcta8Receiver(),
+        SocialTwin2Receiver(),
+        SocialMicro1Receiver()
+    )
+
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
+        for (id in ids) {
+            receiver.updateWidget(context, manager, id)
+        }
+    }
+}
+
 fun getSocialWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Social Bar", sizeText = "4x1", category = "Social", receiverClass = SocialBar5Receiver::class.java, hasModeOption = true),
@@ -165,39 +194,16 @@ fun getSocialWidgetsCatalog(): List<SlateWidgetInfo> {
     )
 }
 
-fun updateAllSocialWidgets(context: Context) {
-    val manager = AppWidgetManager.getInstance(context)
-    val receivers = listOf(
-        SocialBar5Receiver::class.java,
-        SocialQuad4Receiver::class.java,
-        SocialMatrix9Receiver::class.java,
-        SocialDeck10Receiver::class.java,
-        SocialBento10TopReceiver::class.java,
-        SocialBento10LeftReceiver::class.java,
-        SocialOrbit6Receiver::class.java,
-        SocialMessaging4Receiver::class.java,
-        SocialStream3Receiver::class.java,
-        SocialOcta8Receiver::class.java,
-        SocialTwin2Receiver::class.java,
-        SocialMicro1Receiver::class.java
-    )
-    for (receiverClass in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiverClass).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
-        }
-    }
-}
-
 // 1. Social Bar (5 Apps Row - 4x1 / 5x1)
 class SocialBar5Receiver : BaseSocialGridReceiver(5, R.layout.widget_base_row_5, "BAR_5") {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        return if (isResponsive && hDp > wDp) R.layout.widget_base_col_5 else R.layout.widget_base_row_5
+    }
+
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialBar5Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
+
 
 // 2. Social Quad (4 Apps 2x2 Grid)
 class SocialQuad4Receiver : BaseSocialGridReceiver(4, R.layout.widget_appfolder_grid4_layout, "QUAD_4") {

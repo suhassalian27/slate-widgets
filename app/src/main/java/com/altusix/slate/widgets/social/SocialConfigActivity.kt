@@ -113,7 +113,16 @@ class SocialConfigActivity : ComponentActivity() {
                 LaunchedEffect(widgetId) {
                     val prefs = getSharedPreferences("slate_widget_prefs", MODE_PRIVATE)
                     opacity = prefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-                    isResponsive = prefs.getBoolean("widget_${widgetId}_is_responsive", true)
+                    selectedBgHex = prefs.getLong("widget_${widgetId}_bg_color", 0xFF161618L)
+                    selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
+
+                    val modeKey = "widget_${widgetId}_mode"
+                    val isResponsiveKey = "widget_${widgetId}_is_responsive"
+                    isResponsive = if (prefs.contains(modeKey)) {
+                        prefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+                    } else {
+                        prefs.getBoolean(isResponsiveKey, true)
+                    }
                     selectedBgHex = prefs.getLong("widget_${widgetId}_bg_color", 0xFF161618L)
                     selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
 
@@ -151,7 +160,20 @@ class SocialConfigActivity : ComponentActivity() {
                 fun saveAndFinish() {
                     SocialStorageManager.save(this@SocialConfigActivity, widgetId, socialConfig)
                     saveSlateWidgetConfig(this@SocialConfigActivity, widgetId, currentSlateConfig, isResponsive)
+
+                    // Direct refresh for current widget
+                    val appWidgetManager = AppWidgetManager.getInstance(this@SocialConfigActivity)
+                    val appWidgetInfo = appWidgetManager.getAppWidgetInfo(widgetId)
+                    val receiverClass = appWidgetInfo?.provider?.className
+                    if (!receiverClass.isNullOrBlank()) {
+                        try {
+                            val receiver = Class.forName(receiverClass).getDeclaredConstructor().newInstance() as? BaseSocialGridReceiver
+                            receiver?.updateWidget(this@SocialConfigActivity, appWidgetManager, widgetId)
+                        } catch (_: Exception) {}
+                    }
+
                     updateAllSocialWidgets(this@SocialConfigActivity)
+
                     val resultIntent = Intent().apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     }
@@ -201,7 +223,7 @@ class SocialConfigActivity : ComponentActivity() {
                         val context = LocalContext.current
                         val previewBitmap = remember(socialConfig, currentSlateConfig, isResponsive, widgetClassName) {
                             when {
-                                widgetClassName.contains("Bar5") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 240, 70, 0, cols = 5, rows = 1)
+                                widgetClassName.contains("Bar5") -> generateSocialBar5Bitmap(context, currentSlateConfig, isResponsive, 240, 70, 0)
                                 widgetClassName.contains("Quad4") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 2, rows = 2)
                                 widgetClassName.contains("Matrix9") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 3, rows = 3)
                                 widgetClassName.contains("Deck10") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 220, 110, 0, cols = 5, rows = 2)

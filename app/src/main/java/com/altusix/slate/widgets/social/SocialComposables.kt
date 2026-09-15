@@ -352,7 +352,15 @@ fun drawPresetVectorIcon(
 }
 
 /**
- * Universal slot renderer: draws icon (vector or package icon), placeholder, or app name.
+ * Resolves the drawable resource ID for a social preset.
+ */
+fun getSocialPresetDrawableResId(context: Context, presetId: String): Int {
+    val resName = if (presetId.equals("x", ignoreCase = true)) "ic_twitter_x" else "ic_${presetId.lowercase()}"
+    return context.resources.getIdentifier(resName, "drawable", context.packageName)
+}
+
+/**
+ * Universal slot renderer: draws vector icon, package icon, placeholder, or app name.
  */
 private fun drawSocialSlot(
     canvas: Canvas,
@@ -415,33 +423,40 @@ private fun drawSocialSlot(
             iconCy + (iconSize / 2f)
         )
 
-        // Resolve icon color
         val glyphColor = when (socialConfig.iconStyle) {
             "ACCENT" -> accentColor
             "ORIGINAL" -> getSocialBrandColor(slotConfig.presetId, isLight)
             else -> primaryText
         }
 
-        val cutoutColor = if (socialConfig.showTileBackground) tileBgColor else (if (isLight) Color.WHITE else Color.BLACK)
+        val presetDrawableRes = if (slotConfig.presetId.isNotBlank()) {
+            getSocialPresetDrawableResId(context, slotConfig.presetId)
+        } else 0
 
-        // Check if preset vector exists
-        val isPreset = slotConfig.presetId.isNotBlank() && SocialStorageManager.getPresetById(slotConfig.presetId) != null
-
-        if (socialConfig.iconStyle == "ORIGINAL" && !isPreset) {
-            val appIcon = getAppIconBitmap(context, slotConfig.packageName, iconSize.toInt())
-            if (appIcon != null) {
-                canvas.drawBitmap(appIcon, null, iconRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-            } else {
-                drawPresetVectorIcon(canvas, context, slotConfig.presetId, iconRect, glyphColor, cutoutColor)
+        if (presetDrawableRes != 0) {
+            val drawable = androidx.core.content.ContextCompat.getDrawable(context, presetDrawableRes)?.mutate()
+            if (drawable != null) {
+                drawable.setTint(glyphColor)
+                drawable.setBounds(
+                    iconRect.left.toInt(),
+                    iconRect.top.toInt(),
+                    iconRect.right.toInt(),
+                    iconRect.bottom.toInt()
+                )
+                drawable.draw(canvas)
             }
-        } else if (isPreset) {
-            drawPresetVectorIcon(canvas, context, slotConfig.presetId, iconRect, glyphColor, cutoutColor)
         } else {
             val appIcon = getAppIconBitmap(context, slotConfig.packageName, iconSize.toInt())
             if (appIcon != null) {
-                canvas.drawBitmap(appIcon, null, iconRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                if (socialConfig.iconStyle != "ORIGINAL") {
+                    val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                        colorFilter = android.graphics.PorterDuffColorFilter(glyphColor, android.graphics.PorterDuff.Mode.SRC_IN)
+                    }
+                    canvas.drawBitmap(appIcon, null, iconRect, iconPaint)
+                } else {
+                    canvas.drawBitmap(appIcon, null, iconRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                }
             } else {
-                // Monogram fallback
                 val monoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = glyphColor
                     textSize = iconSize * 0.55f
@@ -473,6 +488,7 @@ private fun drawSocialSlot(
     }
 }
 
+
 /**
  * Universal Grid Layout Generator for Social widgets (1x1, 1x2, 3x1, 4x1, 5x1, 2x2, 4x2, 5x2, 3x3).
  */
@@ -498,19 +514,24 @@ fun generateSocialGridBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
     val accentColor = config.accentColorHex.toInt()
 
-    // 1. Dual-Mode Geometry
+// 1. Dual-Mode Geometry
     val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
     val cardRect = if (isResponsive) {
+        // Responsive: Stretches to fill launcher grid
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        var cardH = h - (margin * 2f)
-        var cardW = cardH * targetRatio
+        // Fixed: Dock-style locked baseline (64dp standard dock height)
+        val fixedBaseH = (64f * scaleFactor).coerceAtMost(h - (margin * 2f))
+        var cardW = fixedBaseH * targetRatio
+        var cardH = fixedBaseH
+
         if (cardW > w - (margin * 2f)) {
             cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
+
         val leftX = (w - cardW) / 2f
         val topY = (h - cardH) / 2f
         RectF(leftX, topY, leftX + cardW, topY + cardH)
@@ -596,10 +617,60 @@ fun generateSocialGridBitmap(
 // 12 Concrete Bitmap Generator Implementations
 // ==========================================
 
-// 1. Social Bar (5 Apps Row - 4x1 / 5x1)
-fun generateSocialBar5Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+// 1. Social Bar (5 Apps: Fixed 5:1 Row or Responsive Smart 5x1 / 1x5 Pivot)
+fun generateSocialBar5Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
     val socialConfig = SocialStorageManager.load(context, widgetId, 5, "BAR_5")
-    return generateSocialGridBitmap(context, config, socialConfig, isResponsive, wDp, hDp, widgetId, cols = 5, rows = 1)
+
+    // In Responsive mode, pivot to 1x5 when stretched vertically.
+    // In Fixed mode, always lock to a 5x1 horizontal row.
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 5
+    val rows = if (isVertical) 5 else 1
+
+    return generateSocialGridBitmap(
+        context = context,
+        config = config,
+        socialConfig = socialConfig,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        cols = cols,
+        rows = rows
+    )
+}
+
+fun generateSocialBar5Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    socialConfig: SocialWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 5
+    val rows = if (isVertical) 5 else 1
+
+    return generateSocialGridBitmap(
+        context = context,
+        config = config,
+        socialConfig = socialConfig,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        cols = cols,
+        rows = rows
+    )
 }
 
 // 2. Social Quad (4 Apps Grid - 2x2)
