@@ -652,10 +652,34 @@ fun generateSocialMatrix9Bitmap(context: Context, config: SlateWidgetConfig, isR
     return generateSocialGridBitmap(context, config, socialConfig, isResponsive, wDp, hDp, widgetId, cols = 3, rows = 3)
 }
 
-// 4. Social Deck (10 Apps 2x5 Grid - 4x2)
-fun generateSocialDeck10Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 10, "DECK_10")
-    return generateSocialGridBitmap(context, config, socialConfig, isResponsive, wDp, hDp, widgetId, cols = 5, rows = 2)
+// 4. Social Deck (10 Apps: Fixed 5x2 or Responsive Smart 5x2 / 2x5 Pivot)
+fun generateSocialDeck10Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 10, "DECK_10")
+
+    // Responsive mode pivots to 2 columns x 5 rows if tall; Fixed mode stays locked to 5x2
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 2 else 5
+    val rows = if (isVertical) 5 else 2
+
+    return generateSocialGridBitmap(
+        context = context,
+        config = config,
+        socialConfig = resolvedConfig,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        cols = cols,
+        rows = rows
+    )
 }
 
 // 5. Social Bento Top (10 Apps - 2 Large Top + 8 Small Bottom)
@@ -834,8 +858,16 @@ fun generateSocialBento10LeftBitmap(context: Context, config: SlateWidgetConfig,
 }
 
 // 7. Social Orbit (6 Apps Circular Orbit Dial - 2x2)
-fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 6, "ORBIT_6")
+fun generateSocialOrbit6Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 6, "ORBIT_6")
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -862,8 +894,10 @@ fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isRe
     canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
     val orbitRadius = outerRadius * 0.60f
-    val tileRadius = outerRadius * 0.38f
+    // Decreased from 0.38f to 0.30f to scale down icon dimensions
+    val tileRadius = outerRadius * 0.30f
 
+    // Subtle Orbit Track
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -871,6 +905,7 @@ fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isRe
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
+    // Frosted Center Hub
     val hubRadius = outerRadius * 0.14f
     val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
@@ -879,10 +914,6 @@ fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isRe
     canvas.drawCircle(cx, cy, hubRadius, hubPaint)
 
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
-    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = innerCardBg
-        style = Paint.Style.FILL
-    }
 
     for (i in 0 until 6) {
         val angle = Math.toRadians((i * 60.0) - 90.0)
@@ -890,18 +921,16 @@ fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isRe
         val slotY = cy + (orbitRadius * Math.sin(angle)).toFloat()
 
         val tileRect = RectF(slotX - tileRadius, slotY - tileRadius, slotX + tileRadius, slotY + tileRadius)
-        val slot = socialConfig.slots.getOrElse(i) { SocialSlotConfig() }
+        val slot = resolvedConfig.slots.getOrElse(i) { SocialSlotConfig() }
 
-        if (socialConfig.showTileBackground) {
-            canvas.drawCircle(slotX, slotY, tileRadius * 0.75f, tileBgPaint)
-        }
+        // Gray circular tile background removed so icons sit cleanly on the plate
 
         drawSocialSlot(
             canvas = canvas,
             context = context,
             tileRect = tileRect,
             slotConfig = slot,
-            socialConfig = socialConfig,
+            socialConfig = resolvedConfig,
             isLight = isLight,
             scaleFactor = scaleFactor,
             primaryText = primaryText,

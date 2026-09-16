@@ -267,10 +267,26 @@ class SocialMatrix9Receiver : BaseSocialGridReceiver(9, R.layout.widget_appfolde
         generateSocialMatrix9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 4. Social Deck (10 Apps 2x5 Grid)
-class SocialDeck10Receiver : BaseSocialGridReceiver(10, R.layout.widget_megafolder_10_layout, "DECK_10", targetAspect = 2.5f) {
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-        generateSocialDeck10Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+// 4. Social Deck (10 Apps 5x2 / 2x5 Smart Grid)
+class SocialDeck10Receiver : BaseSocialGridReceiver(
+    slotCount = 10,
+    defaultLayoutResId = R.layout.widget_base_grid_5x2,
+    layoutTag = "DECK_10",
+    targetAspect = 2.5f
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_grid_2x5 else R.layout.widget_base_grid_5x2
+    }
+
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateSocialDeck10Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 5. Social Bento Top (10 Apps: 2 Big Top + 8 Small Bottom)
