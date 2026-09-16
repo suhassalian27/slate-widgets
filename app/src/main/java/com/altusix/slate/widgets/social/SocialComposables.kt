@@ -10,6 +10,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import androidx.core.content.ContextCompat
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
@@ -431,7 +432,7 @@ private fun drawSocialSlot(
         } else 0
 
         if (presetDrawableRes != 0) {
-            val drawable = androidx.core.content.ContextCompat.getDrawable(context, presetDrawableRes)?.mutate()
+            val drawable = ContextCompat.getDrawable(context, presetDrawableRes)?.mutate()
             if (drawable != null) {
                 drawable.setTint(glyphColor)
                 drawable.setBounds(
@@ -515,10 +516,8 @@ fun generateSocialGridBitmap(
     val targetRatio = cols.toFloat() / rows.toFloat()
 
     val cardRect = if (isResponsive) {
-        // Responsive: Stretches to fill the entire launcher cell
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        // Fixed: Bounded card strictly locked to the aspect ratio
         var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
         if (cardW > w - (margin * 2f)) {
@@ -556,10 +555,10 @@ fun generateSocialGridBitmap(
         style = Paint.Style.FILL
     }
 
-    // 3. Concentric Per-Corner Radius
+    // 3. Concentric Tile Corner Radius (R_inner = R_outer - pad)
     val minTileDim = minOf(tileW, tileH)
-    val squircleRadius = minTileDim * 0.28f
-    val concentricRadius = (outerRadius - pad).coerceIn(squircleRadius, minTileDim / 2f)
+    val concentricRadius = maxOf(4f * scaleFactor, outerRadius - pad).coerceAtMost(minTileDim / 2f)
+    val tileCornerRadius = minOf(concentricRadius, minTileDim * 0.36f).coerceAtLeast(4f * scaleFactor)
 
     for (i in 0 until slotCount) {
         val col = i % cols
@@ -570,14 +569,7 @@ fun generateSocialGridBitmap(
         val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
 
         val slot = socialConfig.slots.getOrElse(i) { SocialSlotConfig() }
-
-        val tl = if (col == 0 && row == 0) concentricRadius else squircleRadius
-        val tr = if (col == cols - 1 && row == 0) concentricRadius else squircleRadius
-        val br = if (col == cols - 1 && row == rows - 1) concentricRadius else squircleRadius
-        val bl = if (col == 0 && row == rows - 1) concentricRadius else squircleRadius
-
-        val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
-        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+        val tilePath = Path().apply { addRoundRect(tileRect, tileCornerRadius, tileCornerRadius, Path.Direction.CW) }
 
         canvas.save()
         canvas.clipPath(tilePath)
@@ -622,7 +614,6 @@ fun generateSocialBar5Bitmap(
 ): Bitmap {
     val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 5, "BAR_5")
 
-    // Responsive mode pivots to 1x5 vertical when tall; Fixed mode stays locked to 5x1 horizontal.
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 1 else 5
     val rows = if (isVertical) 5 else 1
@@ -664,7 +655,6 @@ fun generateSocialDeck10Bitmap(
 ): Bitmap {
     val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 10, "DECK_10")
 
-    // Responsive mode pivots to 2 columns x 5 rows if tall; Fixed mode stays locked to 5x2
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 2 else 5
     val rows = if (isVertical) 5 else 2
@@ -728,7 +718,7 @@ fun generateSocialBento10TopBitmap(context: Context, config: SlateWidgetConfig, 
 
     val topH = (cardRect.height() - (pad * 2f) - gap) / 2f
     val bigW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val concentricRadius = (outerRadius - pad).coerceIn(scaleFactor * 6f, minOf(bigW, topH) / 2f)
     val sq = scaleFactor * 8f
 
     val bigRadiiList = listOf(
@@ -815,7 +805,7 @@ fun generateSocialBento10LeftBitmap(context: Context, config: SlateWidgetConfig,
 
     val leftW = (cardRect.width() - (pad * 2f) - gap) / 2f
     val bigH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
+    val concentricRadius = (outerRadius - pad).coerceIn(scaleFactor * 6f, minOf(leftW, bigH) / 2f)
     val sq = scaleFactor * 8f
 
     val bigRadiiList = listOf(
@@ -894,10 +884,8 @@ fun generateSocialOrbit6Bitmap(
     canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
     val orbitRadius = outerRadius * 0.60f
-    // Decreased from 0.38f to 0.30f to scale down icon dimensions
     val tileRadius = outerRadius * 0.30f
 
-    // Subtle Orbit Track
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -905,7 +893,6 @@ fun generateSocialOrbit6Bitmap(
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
-    // Frosted Center Hub
     val hubRadius = outerRadius * 0.14f
     val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
@@ -922,8 +909,6 @@ fun generateSocialOrbit6Bitmap(
 
         val tileRect = RectF(slotX - tileRadius, slotY - tileRadius, slotX + tileRadius, slotY + tileRadius)
         val slot = resolvedConfig.slots.getOrElse(i) { SocialSlotConfig() }
-
-        // Gray circular tile background removed so icons sit cleanly on the plate
 
         drawSocialSlot(
             canvas = canvas,
@@ -956,7 +941,6 @@ fun generateSocialMessaging4Bitmap(
 ): Bitmap {
     val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 4, "MESSAGING_4")
 
-    // In Responsive mode, pivot to 1x4 vertical column when tall; Fixed mode stays locked to 4x1 horizontal.
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 1 else 4
     val rows = if (isVertical) 4 else 1
@@ -986,7 +970,6 @@ fun generateSocialStream3Bitmap(
 ): Bitmap {
     val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 3, "STREAM_3")
 
-    // Responsive mode pivots to 1x3 vertical when tall; Fixed mode stays locked to 3x1 horizontal
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 1 else 3
     val rows = if (isVertical) 3 else 1
@@ -1016,7 +999,6 @@ fun generateSocialOcta8Bitmap(
 ): Bitmap {
     val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 8, "OCTA_8")
 
-    // Responsive mode pivots to 2 columns x 4 rows if tall; Fixed mode stays locked to 4x2
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 2 else 4
     val rows = if (isVertical) 4 else 2
