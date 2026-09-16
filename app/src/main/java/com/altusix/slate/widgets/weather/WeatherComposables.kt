@@ -352,7 +352,17 @@ fun generateWeatherBentoGlanceBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    // Calibrated proportional scalar anchored to standard 4x2 widget bounds (300dp x 145dp)
+    val baseRefH = scaleFactor * 145f
+    val baseRefW = scaleFactor * 300f
+    val propScale = if (isResponsive) {
+        minOf(cardRect.width() / baseRefW, cardRect.height() / baseRefH)
+    } else {
+        cardRect.height() / baseRefH
+    }.coerceIn(0.55f, 1.18f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardRect.width(), cardRect.height()) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -363,33 +373,36 @@ fun generateWeatherBentoGlanceBitmap(
     val unit = WeatherPreferences.getUnit(context)
     val isNight = isNightTime(weather)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
+    val pad = s * 8f
+    val gap = s * 8f
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
         style = Paint.Style.FILL
     }
 
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val sq = scaleFactor * 10f
+    val concentricRadius = (outerRadius - pad).coerceAtLeast(s * 6f)
+    val sq = s * 10f
 
+    // -------------------------------------------------------------------------
     // LEFT MAIN CARD
+    // -------------------------------------------------------------------------
     val leftW = (cardRect.width() - (pad * 2f) - gap) * 0.52f
     val leftRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + leftW, cardRect.bottom - pad)
     val leftRadii = floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, concentricRadius, concentricRadius)
     val leftPath = Path().apply { addRoundRect(leftRect, leftRadii, Path.Direction.CW) }
     canvas.drawPath(leftPath, tilePaint)
 
-    val innerPad = scaleFactor * 12f
+    val innerPad = s * 12f
+
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 10.5f
+        textSize = s * 10f
         typeface = getSlateFont(context, weight = 700)
     }
-    canvas.drawText(weather.cityName.uppercase(), leftRect.left + innerPad, leftRect.top + innerPad + (scaleFactor * 8f), cityPaint)
+    canvas.drawText(weather.cityName.uppercase(), leftRect.left + innerPad, leftRect.top + innerPad + (s * 8f), cityPaint)
 
-    val mainIconSize = scaleFactor * 32f
+    val mainIconSize = s * 30f
     val mainIconRect = RectF(
         leftRect.right - innerPad - mainIconSize,
         leftRect.top + innerPad,
@@ -400,66 +413,79 @@ fun generateWeatherBentoGlanceBitmap(
 
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 40f
+        textSize = s * 38f
         typeface = getSlateFont(context, weight = 800)
     }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), leftRect.left + innerPad, leftRect.top + (scaleFactor * 68f), tempPaint)
+    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), leftRect.left + innerPad, leftRect.top + (s * 64f), tempPaint)
 
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 13f
+        textSize = s * 12f
         typeface = getSlateFont(context, weight = 600)
     }
-    canvas.drawText(weather.conditionText, leftRect.left + innerPad, leftRect.bottom - innerPad - (scaleFactor * 12f), condPaint)
+    canvas.drawText(weather.conditionText, leftRect.left + innerPad, leftRect.bottom - innerPad - (s * 11f), condPaint)
 
     val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 10f
+        textSize = s * 9.5f
         typeface = getSlateFont(context, weight = 600)
     }
     canvas.drawText("H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}", leftRect.left + innerPad, leftRect.bottom - innerPad, hlPaint)
 
-    // RIGHT TOP CARD: Feels Like & Humidity
+    // -------------------------------------------------------------------------
+    // RIGHT SUB-CARDS (Metrics)
+    // -------------------------------------------------------------------------
     val rightLeft = leftRect.right + gap
     val rightW = cardRect.right - pad - rightLeft
     val subH = (cardRect.height() - (pad * 2f) - gap) / 2f
 
+    val metricHalfW = rightW / 2f
+    val metricIconSize = s * 10f
+
+    // Dynamically sized label paint to ensure "FEELS LIKE" never collides with Col 2
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        typeface = getSlateFont(context, weight = 700)
+    }
+    val maxLabelW = metricHalfW - (s * 16f) - metricIconSize
+    var labelSize = s * 7.5f
+    labelPaint.textSize = labelSize
+    while (labelPaint.measureText("FEELS LIKE") > maxLabelW && labelSize > s * 5.8f) {
+        labelSize -= s * 0.3f
+        labelPaint.textSize = labelSize
+    }
+
+    val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = s * 16f
+        typeface = getSlateFont(context, weight = 700)
+    }
+
+    // RIGHT TOP CARD: Feels Like & Humidity
     val topRect = RectF(rightLeft, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + subH)
     val topRadii = floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq)
     val topPath = Path().apply { addRoundRect(topRect, topRadii, Path.Direction.CW) }
     canvas.drawPath(topPath, tilePaint)
 
-    val metricHalfW = rightW / 2f
-    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = scaleFactor * 9f
-        typeface = getSlateFont(context, weight = 700)
-    }
-    val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 17f
-        typeface = getSlateFont(context, weight = 700)
-    }
-
-    // Feels Like with Thermometer Icon
+    // Col 1: Feels Like
     val thermoRes = getDrawableResId(context, "ic_thermometer")
     if (thermoRes != 0) {
-        drawVectorDrawable(canvas, context, thermoRes, RectF(topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 8f), topRect.left + (scaleFactor * 20f), topRect.top + (scaleFactor * 18f)), secondaryText)
-        canvas.drawText("FEELS LIKE", topRect.left + (scaleFactor * 23f), topRect.top + (scaleFactor * 16f), labelPaint)
+        drawVectorDrawable(canvas, context, thermoRes, RectF(topRect.left + (s * 8f), topRect.top + (s * 7.5f), topRect.left + (s * 8f) + metricIconSize, topRect.top + (s * 7.5f) + metricIconSize), secondaryText)
+        canvas.drawText("FEELS LIKE", topRect.left + (s * 9f) + metricIconSize + (s * 2.5f), topRect.top + (s * 15.5f), labelPaint)
     } else {
-        canvas.drawText("FEELS LIKE", topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 16f), labelPaint)
+        canvas.drawText("FEELS LIKE", topRect.left + (s * 8f), topRect.top + (s * 15.5f), labelPaint)
     }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.feelsLike, unit), topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 36f), valuePaint)
+    canvas.drawText(WeatherPreferences.formatTemp(weather.feelsLike, unit), topRect.left + (s * 8f), topRect.top + (s * 35f), valuePaint)
 
-    // Humidity with Drop Icon
+    // Col 2: Humidity
     val humidRes = getDrawableResId(context, "ic_humidity")
     if (humidRes != 0) {
-        drawVectorDrawable(canvas, context, humidRes, RectF(topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 8f), topRect.left + metricHalfW + (scaleFactor * 16f), topRect.top + (scaleFactor * 18f)), secondaryText)
-        canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (scaleFactor * 19f), topRect.top + (scaleFactor * 16f), labelPaint)
+        drawVectorDrawable(canvas, context, humidRes, RectF(topRect.left + metricHalfW + (s * 4f), topRect.top + (s * 7.5f), topRect.left + metricHalfW + (s * 4f) + metricIconSize, topRect.top + (s * 7.5f) + metricIconSize), secondaryText)
+        canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (s * 5f) + metricIconSize + (s * 2.5f), topRect.top + (s * 15.5f), labelPaint)
     } else {
-        canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 16f), labelPaint)
+        canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (s * 4f), topRect.top + (s * 15.5f), labelPaint)
     }
-    canvas.drawText("${weather.humidity}%", topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 36f), valuePaint)
+    canvas.drawText("${weather.humidity}%", topRect.left + metricHalfW + (s * 4f), topRect.top + (s * 35f), valuePaint)
 
     // RIGHT BOTTOM CARD: Wind & UV Index
     val btmRect = RectF(rightLeft, topRect.bottom + gap, cardRect.right - pad, cardRect.bottom - pad)
@@ -467,25 +493,25 @@ fun generateWeatherBentoGlanceBitmap(
     val btmPath = Path().apply { addRoundRect(btmRect, btmRadii, Path.Direction.CW) }
     canvas.drawPath(btmPath, tilePaint)
 
-    // Wind with Windy Icon
+    // Col 1: Wind
     val windRes = getDrawableResId(context, "ic_weather_windy")
     if (windRes != 0) {
-        drawVectorDrawable(canvas, context, windRes, RectF(btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 8f), btmRect.left + (scaleFactor * 20f), btmRect.top + (scaleFactor * 18f)), secondaryText)
-        canvas.drawText("WIND", btmRect.left + (scaleFactor * 23f), btmRect.top + (scaleFactor * 16f), labelPaint)
+        drawVectorDrawable(canvas, context, windRes, RectF(btmRect.left + (s * 8f), btmRect.top + (s * 7.5f), btmRect.left + (s * 8f) + metricIconSize, btmRect.top + (s * 7.5f) + metricIconSize), secondaryText)
+        canvas.drawText("WIND", btmRect.left + (s * 9f) + metricIconSize + (s * 2.5f), btmRect.top + (s * 15.5f), labelPaint)
     } else {
-        canvas.drawText("WIND", btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 16f), labelPaint)
+        canvas.drawText("WIND", btmRect.left + (s * 8f), btmRect.top + (s * 15.5f), labelPaint)
     }
-    canvas.drawText("${weather.windSpeedKmH.toInt()} km/h", btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 36f), valuePaint)
+    canvas.drawText("${weather.windSpeedKmH.toInt()} km/h", btmRect.left + (s * 8f), btmRect.top + (s * 35f), valuePaint)
 
-    // UV Index with Sun/UV Icon
+    // Col 2: UV Index
     val uvRes = getDrawableResId(context, "ic_uv_index")
     if (uvRes != 0) {
-        drawVectorDrawable(canvas, context, uvRes, RectF(btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 8f), btmRect.left + metricHalfW + (scaleFactor * 16f), btmRect.top + (scaleFactor * 18f)), secondaryText)
-        canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (scaleFactor * 19f), btmRect.top + (scaleFactor * 16f), labelPaint)
+        drawVectorDrawable(canvas, context, uvRes, RectF(btmRect.left + metricHalfW + (s * 4f), btmRect.top + (s * 7.5f), btmRect.left + metricHalfW + (s * 4f) + metricIconSize, btmRect.top + (s * 7.5f) + metricIconSize), secondaryText)
+        canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (s * 5f) + metricIconSize + (s * 2.5f), btmRect.top + (s * 15.5f), labelPaint)
     } else {
-        canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 16f), labelPaint)
+        canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (s * 4f), btmRect.top + (s * 15.5f), labelPaint)
     }
-    canvas.drawText(String.format("%.1f", weather.uvIndex), btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 36f), valuePaint)
+    canvas.drawText(String.format("%.1f", weather.uvIndex), btmRect.left + metricHalfW + (s * 4f), btmRect.top + (s * 35f), valuePaint)
 
     return bitmap
 }
