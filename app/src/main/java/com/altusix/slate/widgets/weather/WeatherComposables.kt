@@ -516,7 +516,7 @@ fun generateWeatherBentoGlanceBitmap(
     return bitmap
 }
 
-// 3. Weather Daylight Arc (2x2)
+// 3. Weather Daylight Arc (2x2 / Sun Daylight Progress Arc)
 fun generateWeatherDaylightArcBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -546,7 +546,15 @@ fun generateWeatherDaylightArcBitmap(
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Unified Proportional Scalar
+    val baseRef = scaleFactor * 145f
+    val propScale = minOf(cardW / baseRef, cardH / baseRef).coerceIn(0.6f, 1.4f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -555,20 +563,54 @@ fun generateWeatherDaylightArcBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
 
     val cx = cardRect.centerX()
-    val cy = cardRect.top + (cardRect.height() * 0.50f)
-    val arcRadius = minOf(cardRect.width(), cardRect.height()) * 0.36f
-    val arcRect = RectF(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
+    val padX = (cardW * 0.08f).coerceIn(s * 10f, s * 18f)
 
-    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(30, 255, 255, 255)
+    // -------------------------------------------------------------------------
+    // 1. TOP HEADER: City Name
+    // -------------------------------------------------------------------------
+    val cityTextSize = (s * 10.5f).coerceIn(s * 8f, s * 13f)
+    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = cityTextSize
+        typeface = getSlateFont(context, weight = 700)
+        letterSpacing = 0.08f
+        textAlign = Paint.Align.CENTER
+    }
+    val cityY = cardRect.top + (cardH * 0.085f) + cityTextSize
+    canvas.drawText(weather.cityName.uppercase(), cx, cityY, cityPaint)
+
+    // -------------------------------------------------------------------------
+    // 2. DAYLIGHT ARC GEOMETRY (Dynamically Proportioned to Height)
+    // -------------------------------------------------------------------------
+    // Horizon sits at ~54% of the card height so the arc and bottom info are evenly balanced
+    val horizonY = cardRect.top + (cardH * 0.54f)
+    val maxRadiusByWidth = (cardW / 2f) - padX
+    val maxRadiusByHeight = (horizonY - cityY - (s * 10f))
+    val arcRadius = minOf(maxRadiusByWidth, maxRadiusByHeight).coerceAtLeast(s * 25f)
+    val arcRect = RectF(cx - arcRadius, horizonY - arcRadius, cx + arcRadius, horizonY + arcRadius)
+
+    // Refined Horizon Line (Dashed only between the arc feet)
+    val horizonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(32, 255, 255, 255)
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 3.5f
+        strokeWidth = s * 1f
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 3.5f, s * 3f), 0f)
+    }
+    canvas.drawLine(cx - arcRadius - (s * 4f), horizonY, cx + arcRadius + (s * 4f), horizonY, horizonPaint)
+
+    // Arc Track (180° Top Dome)
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(32, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = s * 3f
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawArc(arcRect, 180f, 180f, false, trackPaint)
 
+    // Daylight Calculation
     val cal = Calendar.getInstance()
     val currentMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
     val sunriseParts = weather.sunrise.split(":")
@@ -579,73 +621,120 @@ fun generateWeatherDaylightArcBitmap(
     val daylightRatio = ((currentMinutes - riseMinutes).toFloat() / (setMinutes - riseMinutes).toFloat()).coerceIn(0f, 1f)
     val sweepAngle = daylightRatio * 180f
 
+    // Active Arc Progress
     val activeArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 3.5f
+        strokeWidth = s * 3.2f
         strokeCap = Paint.Cap.ROUND
     }
-    canvas.drawArc(arcRect, 180f, sweepAngle, false, activeArcPaint)
+    if (sweepAngle > 0.5f) {
+        canvas.drawArc(arcRect, 180f, sweepAngle, false, activeArcPaint)
+    }
 
+    // Luminous Sun Marker (Outer Glow + Core + Highlight)
     val sunAngleRad = Math.toRadians((180.0 + sweepAngle).toDouble())
     val markerX = cx + (arcRadius * Math.cos(sunAngleRad)).toFloat()
-    val markerY = cy + (arcRadius * Math.sin(sunAngleRad)).toFloat()
+    val markerY = horizonY + (arcRadius * Math.sin(sunAngleRad)).toFloat()
 
-    val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(40, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(markerX, markerY, s * 6.5f, haloPaint)
+
+    val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(markerX, markerY, scaleFactor * 5f, markerPaint)
+    canvas.drawCircle(markerX, markerY, s * 3.8f, sunPaint)
 
-    // Sunrise / Sunset with icons
-    val timeLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = scaleFactor * 8.5f
-        typeface = getSlateFont(context, weight = 600)
+    val coreHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
     }
-    val sunriseRes = getDrawableResId(context, "ic_sunrise")
-    if (sunriseRes != 0) {
-        drawVectorDrawable(canvas, context, sunriseRes, RectF(cx - arcRadius, cy + (scaleFactor * 5f), cx - arcRadius + (scaleFactor * 12f), cy + (scaleFactor * 17f)), secondaryText)
-        canvas.drawText(weather.sunrise, cx - arcRadius + (scaleFactor * 14f), cy + (scaleFactor * 14f), timeLabelPaint)
-    } else {
-        canvas.drawText("↑ ${weather.sunrise}", cx - arcRadius, cy + (scaleFactor * 14f), timeLabelPaint)
-    }
+    canvas.drawCircle(markerX, markerY, s * 1.5f, coreHighlight)
 
-    val sunsetRes = getDrawableResId(context, "ic_sunset")
-    if (sunsetRes != 0) {
-        drawVectorDrawable(canvas, context, sunsetRes, RectF(cx + arcRadius - (scaleFactor * 34f), cy + (scaleFactor * 5f), cx + arcRadius - (scaleFactor * 22f), cy + (scaleFactor * 17f)), secondaryText)
-        val setPaint = Paint(timeLabelPaint).apply { textAlign = Paint.Align.RIGHT }
-        canvas.drawText(weather.sunset, cx + arcRadius, cy + (scaleFactor * 14f), setPaint)
-    } else {
-        val setPaint = Paint(timeLabelPaint).apply { textAlign = Paint.Align.RIGHT }
-        canvas.drawText("↓ ${weather.sunset}", cx + arcRadius, cy + (scaleFactor * 14f), setPaint)
-    }
+    // -------------------------------------------------------------------------
+    // 3. INSIDE DOME: Weather Icon & Hero Temperature (Anti-Collision Spacing)
+    // -------------------------------------------------------------------------
+    val iconSize = (arcRadius * 0.32f).coerceIn(s * 14f, s * 24f)
+    val iconCenterY = horizonY - (arcRadius * 0.65f)
+    val iconRect = RectF(cx - (iconSize / 2f), iconCenterY - (iconSize / 2f), cx + (iconSize / 2f), iconCenterY + (iconSize / 2f))
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
-    // Center Temp
+    val tempTextSize = (arcRadius * 0.50f).coerceIn(s * 22f, s * 40f)
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 34f
+        textSize = tempTextSize
         typeface = getSlateFont(context, weight = 800)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cx, cy - (scaleFactor * 4f), tempPaint)
+    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cx, horizonY - (s * 4f), tempPaint)
 
+    // -------------------------------------------------------------------------
+    // 4. AT ARC BASE: Sunrise & Sunset Timestamps
+    // -------------------------------------------------------------------------
+    val timeLabelTextSize = (s * 8.5f).coerceIn(s * 7f, s * 10.5f)
+    val timeLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = timeLabelTextSize
+        typeface = getSlateFont(context, weight = 600)
+    }
+    val metricIconSize = s * 10f
+    val sunTimeY = horizonY + (cardH * 0.085f)
+
+    // Sunrise (Left)
+    val sunriseRes = getDrawableResId(context, "ic_sunrise")
+    val leftFootX = cx - arcRadius
+    if (sunriseRes != 0) {
+        val sIconRect = RectF(leftFootX, sunTimeY - metricIconSize + (s * 1f), leftFootX + metricIconSize, sunTimeY + (s * 1f))
+        drawVectorDrawable(canvas, context, sunriseRes, sIconRect, secondaryText)
+        canvas.drawText(weather.sunrise, leftFootX + metricIconSize + (s * 3.5f), sunTimeY, timeLabelPaint)
+    } else {
+        canvas.drawText("↑ ${weather.sunrise}", leftFootX, sunTimeY, timeLabelPaint)
+    }
+
+    // Sunset (Right)
+    val sunsetRes = getDrawableResId(context, "ic_sunset")
+    val rightFootX = cx + arcRadius
+    val setPaint = Paint(timeLabelPaint).apply { textAlign = Paint.Align.RIGHT }
+    if (sunsetRes != 0) {
+        val sunsetStrWidth = setPaint.measureText(weather.sunset)
+        val sIconRect = RectF(rightFootX - sunsetStrWidth - metricIconSize - (s * 3.5f), sunTimeY - metricIconSize + (s * 1f), rightFootX - sunsetStrWidth - (s * 3.5f), sunTimeY + (s * 1f))
+        drawVectorDrawable(canvas, context, sunsetRes, sIconRect, secondaryText)
+        canvas.drawText(weather.sunset, rightFootX, sunTimeY, setPaint)
+    } else {
+        canvas.drawText("↓ ${weather.sunset}", rightFootX, sunTimeY, setPaint)
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. BOTTOM SECTION: Proportional Vertical Distribution (No Empty Void)
+    // -------------------------------------------------------------------------
+    val condTextSize = (s * 13f).coerceIn(s * 9f, s * 15f)
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 12.5f
+        textSize = condTextSize
         typeface = getSlateFont(context, weight = 600)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(weather.conditionText, cx, cardRect.bottom - (scaleFactor * 26f), condPaint)
 
-    val pillText = "${weather.cityName}  •  H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
-    val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val rangeTextSize = (s * 9.5f).coerceIn(s * 7.5f, s * 12f)
+    val rangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 9.5f
+        textSize = rangeTextSize
         typeface = getSlateFont(context, weight = 600)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(pillText, cx, cardRect.bottom - (scaleFactor * 12f), pillPaint)
+
+    // Anchor High/Low to the bottom margin
+    val rangeY = cardRect.bottom - (cardH * 0.08f)
+    val rangeStr = "H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}   L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
+    canvas.drawText(rangeStr, cx, rangeY, rangePaint)
+
+    // Center Condition Text between the sunrise/sunset timestamps and High/Low
+    val condY = (sunTimeY + rangeY - rangeTextSize) / 2f + (condTextSize * 0.35f)
+    canvas.drawText(weather.conditionText, cx, condY, condPaint)
 
     return bitmap
 }
