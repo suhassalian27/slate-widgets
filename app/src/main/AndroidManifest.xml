@@ -4272,7 +4272,7 @@
         <activity
             android:name=".widgets.social.SocialConfigActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:theme="@style/Theme.Slate"
             android:label="Social Studio">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
