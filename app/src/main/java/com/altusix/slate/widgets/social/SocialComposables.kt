@@ -156,7 +156,6 @@ fun drawPresetVectorIcon(
             canvas.drawOval(headRect, fillPaint)
             canvas.drawCircle(x(0.20f), y(0.52f), w * 0.09f, fillPaint)
             canvas.drawCircle(x(0.80f), y(0.52f), w * 0.09f, fillPaint)
-            // Antenna
             val antennaPath = Path().apply {
                 moveTo(x(0.50f), y(0.36f))
                 lineTo(x(0.58f), y(0.20f))
@@ -170,7 +169,6 @@ fun drawPresetVectorIcon(
             }
             canvas.drawPath(antennaPath, antPaint)
             canvas.drawCircle(x(0.72f), y(0.22f), w * 0.06f, fillPaint)
-            // Eyes & smile
             canvas.drawCircle(x(0.38f), y(0.54f), w * 0.055f, cutoutPaint)
             canvas.drawCircle(x(0.62f), y(0.54f), w * 0.055f, cutoutPaint)
             val smilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -345,7 +343,6 @@ fun drawPresetVectorIcon(
             canvas.drawArc(RectF(x(0.36f), y(0.48f), x(0.64f), y(0.68f)), -145f, 110f, false, wavePaint)
         }
         else -> {
-            // Default elegant social bubble
             canvas.drawCircle(iconRect.centerX(), iconRect.centerY(), w * 0.38f, strokePaint)
         }
     }
@@ -488,9 +485,8 @@ private fun drawSocialSlot(
     }
 }
 
-
 /**
- * Universal Grid Layout Generator for Social widgets (1x1, 1x2, 3x1, 4x1, 5x1, 2x2, 4x2, 5x2, 3x3).
+ * Universal Grid Layout Generator for Social widgets
  */
 fun generateSocialGridBitmap(
     context: Context,
@@ -514,24 +510,21 @@ fun generateSocialGridBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
     val accentColor = config.accentColorHex.toInt()
 
-// 1. Dual-Mode Geometry
+    // 1. Dual-Mode Container Geometry
     val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
     val cardRect = if (isResponsive) {
-        // Responsive: Stretches to fill launcher grid
+        // Responsive: Stretches to fill the entire launcher cell
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        // Fixed: Dock-style locked baseline (64dp standard dock height)
-        val fixedBaseH = (64f * scaleFactor).coerceAtMost(h - (margin * 2f))
-        var cardW = fixedBaseH * targetRatio
-        var cardH = fixedBaseH
-
+        // Fixed: Bounded card strictly locked to the aspect ratio
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
         if (cardW > w - (margin * 2f)) {
             cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
-
         val leftX = (w - cardW) / 2f
         val topY = (h - cardH) / 2f
         RectF(leftX, topY, leftX + cardW, topY + cardH)
@@ -614,7 +607,7 @@ fun generateSocialGridBitmap(
 }
 
 // ==========================================
-// 12 Concrete Bitmap Generator Implementations
+// Concrete Bitmap Generator Implementations
 // ==========================================
 
 // 1. Social Bar (5 Apps: Fixed 5:1 Row or Responsive Smart 5x1 / 1x5 Pivot)
@@ -624,12 +617,12 @@ fun generateSocialBar5Bitmap(
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
-    widgetId: Int
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
 ): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 5, "BAR_5")
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 5, "BAR_5")
 
-    // In Responsive mode, pivot to 1x5 when stretched vertically.
-    // In Fixed mode, always lock to a 5x1 horizontal row.
+    // Responsive mode pivots to 1x5 vertical when tall; Fixed mode stays locked to 5x1 horizontal.
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 1 else 5
     val rows = if (isVertical) 5 else 1
@@ -637,33 +630,7 @@ fun generateSocialBar5Bitmap(
     return generateSocialGridBitmap(
         context = context,
         config = config,
-        socialConfig = socialConfig,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        widgetId = widgetId,
-        cols = cols,
-        rows = rows
-    )
-}
-
-fun generateSocialBar5Bitmap(
-    context: Context,
-    config: SlateWidgetConfig,
-    socialConfig: SocialWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int
-): Bitmap {
-    val isVertical = isResponsive && (hDp > wDp)
-    val cols = if (isVertical) 1 else 5
-    val rows = if (isVertical) 5 else 1
-
-    return generateSocialGridBitmap(
-        context = context,
-        config = config,
-        socialConfig = socialConfig,
+        socialConfig = resolvedConfig,
         isResponsive = isResponsive,
         wDp = wDp,
         hDp = hDp,
@@ -897,7 +864,6 @@ fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isRe
     val orbitRadius = outerRadius * 0.60f
     val tileRadius = outerRadius * 0.38f
 
-    // Subtle Orbit Track
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -905,7 +871,6 @@ fun generateSocialOrbit6Bitmap(context: Context, config: SlateWidgetConfig, isRe
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
-    // Frosted Center Hub
     val hubRadius = outerRadius * 0.14f
     val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)

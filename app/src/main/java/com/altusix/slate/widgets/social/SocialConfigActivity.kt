@@ -159,18 +159,15 @@ class SocialConfigActivity : ComponentActivity() {
 
                 fun saveAndFinish() {
                     SocialStorageManager.save(this@SocialConfigActivity, widgetId, socialConfig)
-                    saveSlateWidgetConfig(this@SocialConfigActivity, widgetId, currentSlateConfig, isResponsive)
 
-                    // Direct refresh for current widget
-                    val appWidgetManager = AppWidgetManager.getInstance(this@SocialConfigActivity)
-                    val appWidgetInfo = appWidgetManager.getAppWidgetInfo(widgetId)
-                    val receiverClass = appWidgetInfo?.provider?.className
-                    if (!receiverClass.isNullOrBlank()) {
-                        try {
-                            val receiver = Class.forName(receiverClass).getDeclaredConstructor().newInstance() as? BaseSocialGridReceiver
-                            receiver?.updateWidget(this@SocialConfigActivity, appWidgetManager, widgetId)
-                        } catch (_: Exception) {}
-                    }
+                    getSharedPreferences("slate_widget_prefs", MODE_PRIVATE).edit()
+                        .putString("widget_${widgetId}_theme_mode", currentSlateConfig.themeMode)
+                        .putLong("widget_${widgetId}_bg_color", currentSlateConfig.backgroundColorHex)
+                        .putFloat("widget_${widgetId}_opacity", currentSlateConfig.opacity)
+                        .putLong("widget_${widgetId}_accent_color", currentSlateConfig.accentColorHex)
+                        .putBoolean("widget_${widgetId}_is_responsive", isResponsive)
+                        .putString("widget_${widgetId}_mode", if (isResponsive) "RESPONSIVE" else "FIXED")
+                        .commit() // MUST be commit(), not apply(), to ensure receiver reads it instantly
 
                     updateAllSocialWidgets(this@SocialConfigActivity)
 
@@ -223,7 +220,15 @@ class SocialConfigActivity : ComponentActivity() {
                         val context = LocalContext.current
                         val previewBitmap = remember(socialConfig, currentSlateConfig, isResponsive, widgetClassName) {
                             when {
-                                widgetClassName.contains("Bar5") -> generateSocialBar5Bitmap(context, currentSlateConfig, isResponsive, 240, 70, 0)
+                                widgetClassName.contains("Bar5") -> generateSocialBar5Bitmap(
+                                    context = context,
+                                    config = currentSlateConfig,
+                                    isResponsive = isResponsive,
+                                    wDp = 240,
+                                    hDp = 70,
+                                    widgetId = 0,
+                                    socialConfig = socialConfig
+                                )
                                 widgetClassName.contains("Quad4") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 2, rows = 2)
                                 widgetClassName.contains("Matrix9") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 3, rows = 3)
                                 widgetClassName.contains("Deck10") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 220, 110, 0, cols = 5, rows = 2)

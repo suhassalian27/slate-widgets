@@ -18,7 +18,6 @@ private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetC
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
     val bgKey = "widget_${widgetId}_bg_color"
 
-    // Snapshot and lock current global theme when the widget is first created
     if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
         val globalSettings = ThemePreferences(context).getThemeSettings()
         widgetPrefs.edit()
@@ -47,22 +46,37 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
     val modeKey = "widget_${widgetId}_mode"
     val isResponsiveKey = "widget_${widgetId}_is_responsive"
+
     if (widgetPrefs.contains(modeKey)) {
         return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
     }
     if (widgetPrefs.contains(isResponsiveKey)) {
         return widgetPrefs.getBoolean(isResponsiveKey, true)
     }
-    val defaultResponsive = true
+
+    val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+    val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
     widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
     return defaultResponsive
 }
 
 abstract class BaseSocialGridReceiver(
-    private val slotCount: Int,
-    private val defaultLayoutResId: Int,
-    private val layoutTag: String
+    open val slotCount: Int = 4,
+    open val defaultLayoutResId: Int = R.layout.widget_appfolder_grid4_layout,
+    open val layoutTag: String = "QUAD_4",
+    open val targetAspect: Float = 0f
 ) : AppWidgetProvider() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            val manager = AppWidgetManager.getInstance(context) ?: return
+            val ids = manager.getAppWidgetIds(ComponentName(context, this::class.java)) ?: intArrayOf()
+            for (id in ids) {
+                updateWidget(context, manager, id)
+            }
+        }
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) {
@@ -74,7 +88,6 @@ abstract class BaseSocialGridReceiver(
         updateWidget(context, appWidgetManager, appWidgetId)
     }
 
-    // Allows dynamic layout switching (e.g. row -> col)
     open fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int = defaultLayoutResId
 
     fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
@@ -84,13 +97,46 @@ abstract class BaseSocialGridReceiver(
         val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200) ?: 200 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200) ?: 200
         val wDp = if (wDpRaw <= 0) 200 else wDpRaw
         val hDp = if (hDpRaw <= 0) 200 else hDpRaw
+        val density = context.resources.displayMetrics.density
 
-        val isResponsive = parseAndLockIsResponsive(context, widgetId)
+        val isResponsive = if (widgetId == -1) true else parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
-        val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
 
-        val layoutId = resolveLayoutResId(isResponsive, wDp, hDp)
+        val padH: Int
+        val padV: Int
+        val effWDp: Int
+        val effHDp: Int
+
+        if (!isResponsive && targetAspect > 0f) {
+            val currentAspect = wDp.toFloat() / hDp.toFloat()
+            if (currentAspect > targetAspect) {
+                val contentW = hDp * targetAspect
+                padH = (((wDp - contentW) / 2f) * density).toInt()
+                padV = 0
+                effWDp = maxOf(1, contentW.toInt())
+                effHDp = hDp
+            } else {
+                val contentH = wDp / targetAspect
+                padH = 0
+                padV = (((hDp - contentH) / 2f) * density).toInt()
+                effWDp = wDp
+                effHDp = maxOf(1, contentH.toInt())
+            }
+        } else {
+            padH = 0
+            padV = 0
+            effWDp = wDp
+            effHDp = hDp
+        }
+
+        val bitmap = renderBitmapForWidget(context, config, isResponsive, effWDp, effHDp, widgetId)
+        val layoutId = resolveLayoutResId(isResponsive, effWDp, effHDp)
         val views = RemoteViews(context.packageName, layoutId)
+
+        try {
+            views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
+        } catch (_: Exception) {}
+
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
         val touchSlotIds = intArrayOf(
@@ -151,32 +197,6 @@ abstract class BaseSocialGridReceiver(
     abstract fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap
 }
 
-// Synchronous updates to prevent dropped broadcasts
-fun updateAllSocialWidgets(context: Context) {
-    val manager = AppWidgetManager.getInstance(context) ?: return
-    val receivers: List<BaseSocialGridReceiver> = listOf(
-        SocialBar5Receiver(),
-        SocialQuad4Receiver(),
-        SocialMatrix9Receiver(),
-        SocialDeck10Receiver(),
-        SocialBento10TopReceiver(),
-        SocialBento10LeftReceiver(),
-        SocialOrbit6Receiver(),
-        SocialMessaging4Receiver(),
-        SocialStream3Receiver(),
-        SocialOcta8Receiver(),
-        SocialTwin2Receiver(),
-        SocialMicro1Receiver()
-    )
-
-    for (receiver in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
-        for (id in ids) {
-            receiver.updateWidget(context, manager, id)
-        }
-    }
-}
-
 fun getSocialWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Social Bar", sizeText = "4x1", category = "Social", receiverClass = SocialBar5Receiver::class.java, hasModeOption = true),
@@ -194,79 +214,108 @@ fun getSocialWidgetsCatalog(): List<SlateWidgetInfo> {
     )
 }
 
+fun updateAllSocialWidgets(context: Context) {
+    val manager = AppWidgetManager.getInstance(context) ?: return
+    val receivers = listOf(
+        SocialBar5Receiver(),
+        SocialQuad4Receiver(),
+        SocialMatrix9Receiver(),
+        SocialDeck10Receiver(),
+        SocialBento10TopReceiver(),
+        SocialBento10LeftReceiver(),
+        SocialOrbit6Receiver(),
+        SocialMessaging4Receiver(),
+        SocialStream3Receiver(),
+        SocialOcta8Receiver(),
+        SocialTwin2Receiver(),
+        SocialMicro1Receiver()
+    )
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
+        for (id in ids) {
+            receiver.updateWidget(context, manager, id)
+        }
+    }
+}
+
 // 1. Social Bar (5 Apps Row - 4x1 / 5x1)
-class SocialBar5Receiver : BaseSocialGridReceiver(5, R.layout.widget_base_row_5, "BAR_5") {
+class SocialBar5Receiver : BaseSocialGridReceiver(
+    slotCount = 5,
+    defaultLayoutResId = R.layout.widget_base_row_5,
+    layoutTag = "BAR_5",
+    targetAspect = 5.0f
+) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
-        return if (isResponsive && hDp > wDp) R.layout.widget_base_col_5 else R.layout.widget_base_row_5
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_col_5 else R.layout.widget_base_row_5
     }
 
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialBar5Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-
 // 2. Social Quad (4 Apps 2x2 Grid)
-class SocialQuad4Receiver : BaseSocialGridReceiver(4, R.layout.widget_appfolder_grid4_layout, "QUAD_4") {
+class SocialQuad4Receiver : BaseSocialGridReceiver(4, R.layout.widget_appfolder_grid4_layout, "QUAD_4", targetAspect = 1.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialQuad4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 3. Social Matrix (9 Apps 3x3 Grid)
-class SocialMatrix9Receiver : BaseSocialGridReceiver(9, R.layout.widget_appfolder_grid9_layout, "MATRIX_9") {
+class SocialMatrix9Receiver : BaseSocialGridReceiver(9, R.layout.widget_appfolder_grid9_layout, "MATRIX_9", targetAspect = 1.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialMatrix9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 4. Social Deck (10 Apps 2x5 Grid)
-class SocialDeck10Receiver : BaseSocialGridReceiver(10, R.layout.widget_megafolder_10_layout, "DECK_10") {
+class SocialDeck10Receiver : BaseSocialGridReceiver(10, R.layout.widget_megafolder_10_layout, "DECK_10", targetAspect = 2.5f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialDeck10Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 5. Social Bento Top (10 Apps: 2 Big Top + 8 Small Bottom)
-class SocialBento10TopReceiver : BaseSocialGridReceiver(10, R.layout.widget_appfolder_bento10top_layout, "BENTO_10_TOP") {
+class SocialBento10TopReceiver : BaseSocialGridReceiver(10, R.layout.widget_appfolder_bento10top_layout, "BENTO_10_TOP", targetAspect = 2.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialBento10TopBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 6. Social Bento Left (10 Apps: 2 Big Left + 8 Small Right)
-class SocialBento10LeftReceiver : BaseSocialGridReceiver(10, R.layout.widget_appfolder_bento10left_layout, "BENTO_10_LEFT") {
+class SocialBento10LeftReceiver : BaseSocialGridReceiver(10, R.layout.widget_appfolder_bento10left_layout, "BENTO_10_LEFT", targetAspect = 2.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialBento10LeftBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 7. Social Orbit (6 Apps Circular Dial)
-class SocialOrbit6Receiver : BaseSocialGridReceiver(6, R.layout.widget_appfolder_circle6_layout, "ORBIT_6") {
+class SocialOrbit6Receiver : BaseSocialGridReceiver(6, R.layout.widget_appfolder_circle6_layout, "ORBIT_6", targetAspect = 1.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialOrbit6Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 8. Social Direct Messaging (4 Apps Messaging Row)
-class SocialMessaging4Receiver : BaseSocialGridReceiver(4, R.layout.widget_appfolder_grid4row_layout, "MESSAGING_4") {
+class SocialMessaging4Receiver : BaseSocialGridReceiver(4, R.layout.widget_appfolder_grid4row_layout, "MESSAGING_4", targetAspect = 4.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialMessaging4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 9. Social Stream (3 Apps Row)
-class SocialStream3Receiver : BaseSocialGridReceiver(3, R.layout.widget_base_row_3, "STREAM_3") {
+class SocialStream3Receiver : BaseSocialGridReceiver(3, R.layout.widget_base_row_3, "STREAM_3", targetAspect = 3.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialStream3Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 10. Social Octa Deck (8 Apps 4x2 Grid)
-class SocialOcta8Receiver : BaseSocialGridReceiver(8, R.layout.widget_base_grid_4x2, "OCTA_8") {
+class SocialOcta8Receiver : BaseSocialGridReceiver(8, R.layout.widget_base_grid_4x2, "OCTA_8", targetAspect = 2.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialOcta8Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 11. Social Twin (2 Apps Vertical Column)
-class SocialTwin2Receiver : BaseSocialGridReceiver(2, R.layout.widget_base_column_2, "TWIN_2") {
+class SocialTwin2Receiver : BaseSocialGridReceiver(2, R.layout.widget_base_column_2, "TWIN_2", targetAspect = 0.5f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialTwin2Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 12. Micro Social (1 App Single Tile)
-class SocialMicro1Receiver : BaseSocialGridReceiver(1, R.layout.widget_base_single, "MICRO_1") {
+class SocialMicro1Receiver : BaseSocialGridReceiver(1, R.layout.widget_base_single, "MICRO_1", targetAspect = 1.0f) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSocialMicro1Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
