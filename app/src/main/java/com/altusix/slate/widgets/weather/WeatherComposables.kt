@@ -100,7 +100,7 @@ fun drawWeatherIcon(
 // 10 CONCRETE WEATHER BITMAP GENERATORS
 // -------------------------------------------------------------------------
 
-// 1. Weather Horizon (4x2)
+// 1. Weather Horizon (4x2 / Editorial Forecast)
 fun generateWeatherHorizonBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -135,7 +135,15 @@ fun generateWeatherHorizonBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Proportional UI Scaling: Scales text and icons accurately in both Fixed & Responsive modes
+    val baseRefW = scaleFactor * 260f
+    val baseRefH = scaleFactor * 130f
+    val uiScale = minOf(cardW / baseRefW, cardH / baseRefH).coerceIn(0.6f, 1.45f)
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -144,88 +152,166 @@ fun generateWeatherHorizonBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
-    val pad = scaleFactor * 16f
-    val halfW = (cardRect.width() - (pad * 2f)) * 0.48f
 
-    // LEFT: Current Weather
+    val padX = (cardW * 0.05f).coerceIn(scaleFactor * 12f, scaleFactor * 20f)
+    val padY = (cardH * 0.07f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
+
+    // 2. Right-Anchored & Bounded Forecast Table
+    val rightEnd = cardRect.right - padX
+    val idealForecastW = scaleFactor * 140f * uiScale
+    val maxAllowedForecastW = (cardW - (padX * 2f)) * 0.46f
+    val forecastW = minOf(idealForecastW, maxAllowedForecastW)
+    val forecastStartX = rightEnd - forecastW
+
+    // 3. Divider Bar: Positioned comfortably to the right (giving ~52-54% space to current conditions)
+    val dividerX = forecastStartX - (scaleFactor * 14f * uiScale)
+    val showDivider = cardW >= scaleFactor * 170f
+    if (showDivider) {
+        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(28, 255, 255, 255)
+            strokeWidth = scaleFactor * 1f
+        }
+        canvas.drawLine(dividerX, cardRect.top + padY, dividerX, cardRect.bottom - padY, dividerPaint)
+    }
+
+    // -------------------------------------------------------------------------
+    // LEFT SECTION: Current Weather
+    // -------------------------------------------------------------------------
+    val maxLeftW = if (showDivider) dividerX - (cardRect.left + padX) - (scaleFactor * 10f) else cardW * 0.48f
+
+    val cityTextSize = (scaleFactor * 11f * uiScale).coerceIn(scaleFactor * 7.5f, scaleFactor * 13f)
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 11f
+        textSize = cityTextSize
         typeface = getSlateFont(context, weight = 700)
-        letterSpacing = 0.08f
+        letterSpacing = 0.06f
     }
-    canvas.drawText(weather.cityName.uppercase(), cardRect.left + pad, cardRect.top + pad + (scaleFactor * 10f), cityPaint)
+    val cityY = cardRect.top + padY + cityTextSize
+    var displayCity = weather.cityName.uppercase()
+    if (cityPaint.measureText(displayCity) > maxLeftW) {
+        while (displayCity.length > 3 && cityPaint.measureText("$displayCity…") > maxLeftW) {
+            displayCity = displayCity.dropLast(1)
+        }
+        displayCity = "$displayCity…"
+    }
+    canvas.drawText(displayCity, cardRect.left + padX, cityY, cityPaint)
 
+    val tempTextSize = (scaleFactor * 44f * uiScale).coerceIn(scaleFactor * 22f, scaleFactor * 52f)
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 46f
+        textSize = tempTextSize
         typeface = getSlateFont(context, weight = 800)
     }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cardRect.left + pad, cardRect.top + pad + (scaleFactor * 52f), tempPaint)
+    val tempStr = WeatherPreferences.formatTemp(weather.currentTemp, unit)
+    val tempY = cityY + (tempTextSize * 0.94f) + (scaleFactor * 2f * uiScale)
+    canvas.drawText(tempStr, cardRect.left + padX, tempY, tempPaint)
 
-    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 14f
-        typeface = getSlateFont(context, weight = 600)
-    }
-    canvas.drawText(weather.conditionText, cardRect.left + pad, cardRect.top + pad + (scaleFactor * 72f), condPaint)
-
-    val hiLoStr = "H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}   L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
+    // High / Low Pill (pinned to bottom)
+    val hiLoTextSize = (scaleFactor * 11f * uiScale).coerceIn(scaleFactor * 7.5f, scaleFactor * 12.5f)
     val hiLoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 11.5f
+        textSize = hiLoTextSize
         typeface = getSlateFont(context, weight = 600)
     }
-    canvas.drawText(hiLoStr, cardRect.left + pad, cardRect.top + pad + (scaleFactor * 90f), hiLoPaint)
+    val hiLoY = cardRect.bottom - padY
+    val hiLoStr = "H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
+    canvas.drawText(hiLoStr, cardRect.left + padX, hiLoY, hiLoPaint)
 
-    // DIVIDER
-    val dividerX = cardRect.left + pad + halfW + (scaleFactor * 8f)
-    val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(24, 0, 0, 0) else Color.argb(32, 255, 255, 255)
-        strokeWidth = scaleFactor * 1f
-    }
-    canvas.drawLine(dividerX, cardRect.top + pad, dividerX, cardRect.bottom - pad, dividerPaint)
-
-    // RIGHT: 5-Day Forecast
-    val rightLeft = dividerX + (scaleFactor * 12f)
-    val rightWidth = cardRect.right - pad - rightLeft
-    val dailyList = weather.dailyForecast.take(5)
-    val rowH = (cardRect.height() - (pad * 2f)) / 5f
-
-    val dayNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Condition Text (anchored above High/Low with collision check)
+    val condTextSize = (scaleFactor * 13f * uiScale).coerceIn(scaleFactor * 8.5f, scaleFactor * 15f)
+    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 11f
+        textSize = condTextSize
         typeface = getSlateFont(context, weight = 600)
     }
-    val rangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = scaleFactor * 11f
-        typeface = getSlateFont(context, weight = 600)
-        textAlign = Paint.Align.RIGHT
-    }
-
-    for (i in dailyList.indices) {
-        val item = dailyList[i]
-        val cy = cardRect.top + pad + (i * rowH) + (rowH / 2f)
-
-        canvas.drawText(item.dayLabel, rightLeft, cy + (scaleFactor * 4f), dayNamePaint)
-
-        val iconSize = scaleFactor * 16f
-        val iconX = rightLeft + (rightWidth * 0.40f)
-        val iconRect = RectF(iconX - (iconSize / 2f), cy - (iconSize / 2f), iconX + (iconSize / 2f), cy + (iconSize / 2f))
-        drawWeatherIcon(canvas, context, item.weatherCode, iconRect, accentColor, isNight = false)
-
-        if (item.rainProb >= 20) {
-            val rainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#38ACFF")
-                textSize = scaleFactor * 8.5f
-                typeface = getSlateFont(context, weight = 700)
+    val condY = hiLoY - hiLoTextSize - (scaleFactor * 4f * uiScale)
+    if (condY > tempY + (scaleFactor * 2f)) {
+        var condStr = weather.conditionText
+        if (condPaint.measureText(condStr) > maxLeftW) {
+            while (condStr.length > 3 && condPaint.measureText("$condStr…") > maxLeftW) {
+                condStr = condStr.dropLast(1)
             }
-            canvas.drawText("${item.rainProb}%", iconX + (scaleFactor * 11f), cy + (scaleFactor * 3.5f), rainPaint)
+            condStr = "$condStr…"
+        }
+        canvas.drawText(condStr, cardRect.left + padX, condY, condPaint)
+    }
+
+    // -------------------------------------------------------------------------
+    // RIGHT SECTION: 5-Day Forecast Table (Strict Right-Alignment & No Overlap)
+    // -------------------------------------------------------------------------
+    if (forecastW > scaleFactor * 50f) {
+        val daysCount = 5
+        val dailyList = weather.dailyForecast.take(daysCount)
+        val rowH = (cardRect.height() - (padY * 2f)) / daysCount.toFloat()
+
+        val dayTextSize = (scaleFactor * 11f * uiScale).coerceIn(scaleFactor * 7.5f, scaleFactor * 12.5f)
+        val rangeTextSize = (scaleFactor * 11f * uiScale).coerceIn(scaleFactor * 7.5f, scaleFactor * 12.5f)
+        val rainTextSize = (scaleFactor * 8.5f * uiScale).coerceIn(scaleFactor * 6.5f, scaleFactor * 9.5f)
+
+        val dayNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = dayTextSize
+            typeface = getSlateFont(context, weight = 600)
+        }
+        val rangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = rangeTextSize
+            typeface = getSlateFont(context, weight = 600)
+            textAlign = Paint.Align.RIGHT
+        }
+        val rainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#38ACFF")
+            textSize = rainTextSize
+            typeface = getSlateFont(context, weight = 700)
         }
 
-        val rangeText = "${WeatherPreferences.formatTempValue(item.maxTemp, unit)}°  ${WeatherPreferences.formatTempValue(item.minTemp, unit)}°"
-        canvas.drawText(rangeText, cardRect.right - pad, cy + (scaleFactor * 4f), rangePaint)
+        // Sub-column measurements for perfectly aligned temperatures
+        val minTempColW = rangePaint.measureText("19°")
+        val maxTempColW = rangePaint.measureText("29°")
+        val tempColGap = scaleFactor * 6f * uiScale
+        val tempBlockLeft = rightEnd - minTempColW - tempColGap - maxTempColW
+
+        val maxDayW = dayNamePaint.measureText("Today")
+        val dayBlockRight = forecastStartX + maxDayW
+
+        // Middle clearance calculation: guarantees elements never collide
+        val middleSpace = maxOf(0f, tempBlockLeft - dayBlockRight - (scaleFactor * 6f * uiScale))
+        val desiredIconSize = (rowH * 0.46f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        val iconSize = minOf(desiredIconSize, middleSpace)
+
+        val sampleRainW = rainPaint.measureText("75%")
+        val neededForRain = iconSize + (scaleFactor * 3f) + sampleRainW
+        val canShowRain = middleSpace >= (neededForRain + scaleFactor * 4f * uiScale)
+
+        for (i in dailyList.indices) {
+            val item = dailyList[i]
+            val cy = cardRect.top + padY + (i * rowH) + (rowH / 2f)
+
+            // 1. Day Label (Left-aligned)
+            canvas.drawText(item.dayLabel, forecastStartX, cy + (dayTextSize * 0.35f), dayNamePaint)
+
+            // 2. Weather Icon & Rain % (Centered in the middle clearance zone)
+            if (middleSpace >= iconSize) {
+                if (canShowRain && item.rainProb >= 20) {
+                    val rainStr = "${item.rainProb}%"
+                    val totalW = iconSize + (scaleFactor * 3f) + rainPaint.measureText(rainStr)
+                    val groupLeft = dayBlockRight + (middleSpace - totalW) / 2f + (scaleFactor * 3f * uiScale)
+                    val iconRect = RectF(groupLeft, cy - (iconSize / 2f), groupLeft + iconSize, cy + (iconSize / 2f))
+                    drawWeatherIcon(canvas, context, item.weatherCode, iconRect, accentColor, isNight = false)
+                    canvas.drawText(rainStr, iconRect.right + (scaleFactor * 3f), cy + (rainTextSize * 0.35f), rainPaint)
+                } else {
+                    val iconCenterX = dayBlockRight + (middleSpace / 2f) + (scaleFactor * 3f * uiScale)
+                    val iconRect = RectF(iconCenterX - (iconSize / 2f), cy - (iconSize / 2f), iconCenterX + (iconSize / 2f), cy + (iconSize / 2f))
+                    drawWeatherIcon(canvas, context, item.weatherCode, iconRect, accentColor, isNight = false)
+                }
+            }
+
+            // 3. Temperatures (Strictly right-aligned with tabular columns)
+            val maxStr = "${WeatherPreferences.formatTempValue(item.maxTemp, unit)}°"
+            val minStr = "${WeatherPreferences.formatTempValue(item.minTemp, unit)}°"
+            canvas.drawText(maxStr, rightEnd - minTempColW - tempColGap, cy + (rangeTextSize * 0.35f), rangePaint)
+            canvas.drawText(minStr, rightEnd, cy + (rangeTextSize * 0.35f), rangePaint)
+        }
     }
 
     return bitmap
