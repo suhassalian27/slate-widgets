@@ -307,22 +307,70 @@ class SocialOrbit6Receiver : BaseSocialGridReceiver(6, R.layout.widget_appfolder
         generateSocialOrbit6Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 8. Social Direct Messaging (4 Apps Messaging Row)
-class SocialMessaging4Receiver : BaseSocialGridReceiver(4, R.layout.widget_appfolder_grid4row_layout, "MESSAGING_4", targetAspect = 4.0f) {
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-        generateSocialMessaging4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+// 8. Social Direct Messaging (4 Apps Messaging Row - 4x1 / 1x4 Pivot)
+class SocialMessaging4Receiver : BaseSocialGridReceiver(
+    slotCount = 4,
+    defaultLayoutResId = R.layout.widget_base_row_4,
+    layoutTag = "MESSAGING_4",
+    targetAspect = 4.0f
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_col_4 else R.layout.widget_base_row_4
+    }
+
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateSocialMessaging4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 9. Social Stream (3 Apps Row)
-class SocialStream3Receiver : BaseSocialGridReceiver(3, R.layout.widget_base_row_3, "STREAM_3", targetAspect = 3.0f) {
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-        generateSocialStream3Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+// 9. Social Stream (3 Apps Row - 3x1 / 1x3 Pivot)
+class SocialStream3Receiver : BaseSocialGridReceiver(
+    slotCount = 3,
+    defaultLayoutResId = R.layout.widget_base_row_3,
+    layoutTag = "STREAM_3",
+    targetAspect = 3.0f
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_column_3 else R.layout.widget_base_row_3
+    }
+
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateSocialStream3Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 10. Social Octa Deck (8 Apps 4x2 Grid)
-class SocialOcta8Receiver : BaseSocialGridReceiver(8, R.layout.widget_base_grid_4x2, "OCTA_8", targetAspect = 2.0f) {
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-        generateSocialOcta8Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+// 10. Social Octa Deck (8 Apps 4x2 / 2x4 Pivot)
+class SocialOcta8Receiver : BaseSocialGridReceiver(
+    slotCount = 8,
+    defaultLayoutResId = R.layout.widget_base_grid_4x2,
+    layoutTag = "OCTA_8",
+    targetAspect = 2.0f
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_grid_2x4 else R.layout.widget_base_grid_4x2
+    }
+
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateSocialOcta8Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 11. Social Twin (2 Apps Vertical Column)

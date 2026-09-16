@@ -944,22 +944,94 @@ fun generateSocialOrbit6Bitmap(
     return bitmap
 }
 
-// 8. Social Direct Messaging (4 Messaging Apps Dock - 4x1)
-fun generateSocialMessaging4Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 4, "MESSAGING_4")
-    return generateSocialGridBitmap(context, config, socialConfig, isResponsive, wDp, hDp, widgetId, cols = 4, rows = 1)
+// 8. Social Direct Messaging (4 Apps: Fixed 4:1 Row or Responsive Smart 4x1 / 1x4 Pivot)
+fun generateSocialMessaging4Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 4, "MESSAGING_4")
+
+    // In Responsive mode, pivot to 1x4 vertical column when tall; Fixed mode stays locked to 4x1 horizontal.
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 4
+    val rows = if (isVertical) 4 else 1
+
+    return generateSocialGridBitmap(
+        context = context,
+        config = config,
+        socialConfig = resolvedConfig,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        cols = cols,
+        rows = rows
+    )
 }
 
-// 9. Social Stream (3 Apps Horizontal Dock - 3x1)
-fun generateSocialStream3Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 3, "STREAM_3")
-    return generateSocialGridBitmap(context, config, socialConfig, isResponsive, wDp, hDp, widgetId, cols = 3, rows = 1)
+// 9. Social Stream (3 Apps: Fixed 3:1 Row or Responsive Smart 3x1 / 1x3 Pivot)
+fun generateSocialStream3Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 3, "STREAM_3")
+
+    // Responsive mode pivots to 1x3 vertical when tall; Fixed mode stays locked to 3x1 horizontal
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 3
+    val rows = if (isVertical) 3 else 1
+
+    return generateSocialGridBitmap(
+        context = context,
+        config = config,
+        socialConfig = resolvedConfig,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        cols = cols,
+        rows = rows
+    )
 }
 
-// 10. Social Octa Deck (8 Apps Grid - 4x2)
-fun generateSocialOcta8Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 8, "OCTA_8")
-    return generateSocialGridBitmap(context, config, socialConfig, isResponsive, wDp, hDp, widgetId, cols = 4, rows = 2)
+// 10. Social Octa Deck (8 Apps: Fixed 4x2 or Responsive Smart 4x2 / 2x4 Pivot)
+fun generateSocialOcta8Bitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 8, "OCTA_8")
+
+    // Responsive mode pivots to 2 columns x 4 rows if tall; Fixed mode stays locked to 4x2
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 2 else 4
+    val rows = if (isVertical) 4 else 2
+
+    return generateSocialGridBitmap(
+        context = context,
+        config = config,
+        socialConfig = resolvedConfig,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        widgetId = widgetId,
+        cols = cols,
+        rows = rows
+    )
 }
 
 // 11. Social Twin Column (2 Apps Vertical Pill - 1x2)

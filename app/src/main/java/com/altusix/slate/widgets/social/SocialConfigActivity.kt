@@ -245,7 +245,15 @@ class SocialConfigActivity : ComponentActivity() {
                                 )
                                 widgetClassName.contains("Messaging4") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 220, 70, 0, cols = 4, rows = 1)
                                 widgetClassName.contains("Stream3") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 180, 70, 0, cols = 3, rows = 1)
-                                widgetClassName.contains("Octa8") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 220, 110, 0, cols = 4, rows = 2)
+                                widgetClassName.contains("Octa8") -> generateSocialOcta8Bitmap(
+                                    context = context,
+                                    config = currentSlateConfig,
+                                    isResponsive = isResponsive,
+                                    wDp = 220,
+                                    hDp = 110,
+                                    widgetId = 0,
+                                    socialConfig = socialConfig
+                                )
                                 widgetClassName.contains("Twin2") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 90, 160, 0, cols = 1, rows = 2)
                                 widgetClassName.contains("Micro1") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 100, 100, 0, cols = 1, rows = 1)
                                 else -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 2, rows = 2)
