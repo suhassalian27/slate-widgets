@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.util.Log
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
