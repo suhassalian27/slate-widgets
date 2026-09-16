@@ -156,6 +156,17 @@ class WeatherConfigActivity : ComponentActivity() {
                 fun saveAndFinish() {
                     saveSlateWidgetConfig(this@WeatherConfigActivity, widgetId, currentSlateConfig, isResponsive)
                     updateAllWeatherWidgets(this@WeatherConfigActivity)
+                    if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                        try {
+                            val manager = AppWidgetManager.getInstance(this@WeatherConfigActivity)
+                            val info = manager.getAppWidgetInfo(widgetId)
+                            if (info != null) {
+                                val receiverClass = Class.forName(info.provider.className)
+                                val receiver = receiverClass.getDeclaredConstructor().newInstance() as? BaseWeatherReceiver
+                                receiver?.updateSingleWidget(this@WeatherConfigActivity, manager, widgetId)
+                            }
+                        } catch (_: Exception) {}
+                    }
                     val resultIntent = Intent().apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     }
@@ -176,27 +187,60 @@ class WeatherConfigActivity : ComponentActivity() {
                     previewHeight = 175.dp,
                     previewContent = {
                         val context = LocalContext.current
-                        val previewBitmap = remember(weatherData, currentSlateConfig, isResponsive, widgetClassName, currentUnit) {
+                        val slot = remember(widgetClassName) {
                             when {
-                                widgetClassName.contains("Horizon") -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, 240, 110, 0)
-                                widgetClassName.contains("BentoGlance") -> generateWeatherBentoGlanceBitmap(context, currentSlateConfig, isResponsive, 240, 110, 0)
-                                widgetClassName.contains("DaylightArc") -> generateWeatherDaylightArcBitmap(context, currentSlateConfig, isResponsive, 135, 135, 0)
-                                widgetClassName.contains("PillDock") -> generateWeatherPillDockBitmap(context, currentSlateConfig, isResponsive, 240, 60, 0)
-                                widgetClassName.contains("Editorial") -> generateWeatherEditorialBitmap(context, currentSlateConfig, isResponsive, 135, 135, 0)
-                                widgetClassName.contains("HourlyRibbon") -> generateWeatherHourlyRibbonBitmap(context, currentSlateConfig, isResponsive, 240, 60, 0)
-                                widgetClassName.contains("MinimalistDual") -> generateWeatherMinimalistDualBitmap(context, currentSlateConfig, isResponsive, 135, 135, 0)
-                                widgetClassName.contains("CompactDial") -> generateWeatherCompactDialBitmap(context, currentSlateConfig, isResponsive, 135, 135, 0)
-                                widgetClassName.contains("MetroTrio") -> generateWeatherMetroTrioBitmap(context, currentSlateConfig, isResponsive, 200, 65, 0)
-                                widgetClassName.contains("Micro") -> generateWeatherMicroBitmap(context, currentSlateConfig, isResponsive, 90, 90, 0)
-                                else -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, 240, 110, 0)
+                                widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") ->
+                                    WeatherPreviewSlot(288, 120, 260.dp, 108.dp) // 4x2 slot (2.4:1 ratio vs 2.0:1 native)
+                                widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") ->
+                                    WeatherPreviewSlot(280, 60, 260.dp, 56.dp)   // 4x1 slot (4.67:1 ratio vs 4.0:1 native)
+                                widgetClassName.contains("MetroTrio") ->
+                                    WeatherPreviewSlot(240, 65, 230.dp, 62.dp)   // 3x1 slot (3.69:1 ratio vs 3.0:1 native)
+                                widgetClassName.contains("Micro") ->
+                                    WeatherPreviewSlot(100, 85, 95.dp, 80.dp)    // 1x1 slot (1.18:1 ratio vs 1.0:1 native)
+                                else ->
+                                    WeatherPreviewSlot(160, 133, 150.dp, 125.dp) // 2x2 slot (1.20:1 ratio vs 1.0:1 native)
                             }
                         }
 
-                        Image(
-                            bitmap = previewBitmap.asImageBitmap(),
-                            contentDescription = "Weather Widget Preview",
-                            modifier = Modifier.size(if (widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") || widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon")) 190.dp else 135.dp)
-                        )
+                        val previewBitmap = remember(weatherData, currentSlateConfig, isResponsive, widgetClassName, currentUnit) {
+                            when {
+                                widgetClassName.contains("Horizon") -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("BentoGlance") -> generateWeatherBentoGlanceBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("DaylightArc") -> generateWeatherDaylightArcBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("PillDock") -> generateWeatherPillDockBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("Editorial") -> generateWeatherEditorialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("HourlyRibbon") -> generateWeatherHourlyRibbonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("MinimalistDual") -> generateWeatherMinimalistDualBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("CompactDial") -> generateWeatherCompactDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("MetroTrio") -> generateWeatherMetroTrioBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("Micro") -> generateWeatherMicroBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                else -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(slot.displayW, slot.displayH)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color(0xFF101014))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (!isResponsive) Color(selectedAccentHex).copy(alpha = 0.45f) else Color(0xFF262630),
+                                        shape = RoundedCornerShape(20.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    bitmap = previewBitmap.asImageBitmap(),
+                                    contentDescription = "Weather Widget Preview",
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
                     }
                 ) {
                     if (selectedTabKey == "LOCATION") {
@@ -743,3 +787,10 @@ private fun ModernOpacitySlider(
             .height(28.dp)
     )
 }
+
+private data class WeatherPreviewSlot(
+    val slotWDp: Int,
+    val slotHDp: Int,
+    val displayW: androidx.compose.ui.unit.Dp,
+    val displayH: androidx.compose.ui.unit.Dp
+)

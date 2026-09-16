@@ -599,7 +599,7 @@ fun generateWeatherDaylightArcBitmap(
     // Sun Arc Calculations
     val cx = cardRect.centerX()
     val cy = cardRect.top + (cardRect.height() * 0.50f)
-    val arcRadius = cardRect.width() * 0.36f
+    val arcRadius = minOf(cardRect.width(), cardRect.height()) * 0.36f
 
     val arcRect = RectF(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
 

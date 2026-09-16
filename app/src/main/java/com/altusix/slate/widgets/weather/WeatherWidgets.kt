@@ -119,44 +119,24 @@ abstract class BaseWeatherReceiver(
             val isResponsive = if (id == -1) true else parseAndLockIsResponsive(context, id)
             val options = manager.getAppWidgetOptions(id)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
-            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
-            val wDp = if (wDpRaw <= 0) 160 else wDpRaw
-            val hDp = if (hDpRaw <= 0) 160 else hDpRaw
-            val density = context.resources.displayMetrics.density
 
-            val padH: Int
-            val padV: Int
-            val effWDp: Int
-            val effHDp: Int
-
-            if (!isResponsive && targetAspect > 0f) {
-                val currentAspect = wDp.toFloat() / hDp.toFloat()
-                if (currentAspect > targetAspect) {
-                    val contentW = hDp * targetAspect
-                    padH = (((wDp - contentW) / 2f) * density).toInt()
-                    padV = 0
-                    effWDp = maxOf(1, contentW.toInt())
-                    effHDp = hDp
-                } else {
-                    val contentH = wDp / targetAspect
-                    padH = 0
-                    padV = (((hDp - contentH) / 2f) * density).toInt()
-                    effWDp = wDp
-                    effHDp = maxOf(1, contentH.toInt())
-                }
-            } else {
-                padH = 0
-                padV = 0
-                effWDp = wDp
-                effHDp = hDp
+            val (fallbackW, fallbackH) = when {
+                targetAspect >= 3.5f -> 300 to 70   // 4x1 Pill Dock, Hourly Ribbon
+                targetAspect in 2.5f..3.4f -> 240 to 70  // 3x1 Metro Trio
+                targetAspect in 1.8f..2.4f -> 300 to 150 // 4x2 Horizon, Bento Glance
+                else -> 150 to 150                   // 2x2 / 1x1
             }
 
-            val bitmap = renderWidgetBitmap(context, id, config, isResponsive, effWDp, effHDp)
+            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackW) ?: fallbackW else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackW) ?: fallbackW
+            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackH) ?: fallbackH else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackH) ?: fallbackH
+            val wDp = if (wDpRaw <= 0) fallbackW else wDpRaw
+            val hDp = if (hDpRaw <= 0) fallbackH else hDpRaw
+
+            val bitmap = renderWidgetBitmap(context, id, config, isResponsive, wDp, hDp)
             val views = RemoteViews(context.packageName, R.layout.widget_base_single)
 
             try {
-                views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
+                views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
             } catch (_: Exception) {}
 
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
@@ -179,39 +159,35 @@ fun getWeatherWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Weather Horizon", sizeText = "4x2", category = "Weather", receiverClass = WeatherHorizonReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Bento Glance", sizeText = "4x2", category = "Weather", receiverClass = WeatherBentoGlanceReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Daylight Arc", sizeText = "2x2", category = "Weather", receiverClass = WeatherDaylightArcReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Daylight Arc", sizeText = "2x2", category = "Weather", receiverClass = WeatherDaylightArcReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Pill Dock", sizeText = "4x1", category = "Weather", receiverClass = WeatherPillDockReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Editorial", sizeText = "2x2", category = "Weather", receiverClass = WeatherEditorialReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Editorial", sizeText = "2x2", category = "Weather", receiverClass = WeatherEditorialReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Hourly Ribbon", sizeText = "4x1", category = "Weather", receiverClass = WeatherHourlyRibbonReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Minimalist Dual", sizeText = "2x2", category = "Weather", receiverClass = WeatherMinimalistDualReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Weather Compact Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCompactDialReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Minimalist Dual", sizeText = "2x2", category = "Weather", receiverClass = WeatherMinimalistDualReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Weather Compact Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCompactDialReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Metro Trio", sizeText = "3x1", category = "Weather", receiverClass = WeatherMetroTrioReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Micro Weather", sizeText = "1x1", category = "Weather", receiverClass = WeatherMicroReceiver::class.java, hasModeOption = true)
     )
 }
 
 fun updateAllWeatherWidgets(context: Context) {
-    val manager = AppWidgetManager.getInstance(context)
+    val manager = AppWidgetManager.getInstance(context) ?: return
     val receivers = listOf(
-        WeatherHorizonReceiver::class.java,
-        WeatherBentoGlanceReceiver::class.java,
-        WeatherDaylightArcReceiver::class.java,
-        WeatherPillDockReceiver::class.java,
-        WeatherEditorialReceiver::class.java,
-        WeatherHourlyRibbonReceiver::class.java,
-        WeatherMinimalistDualReceiver::class.java,
-        WeatherCompactDialReceiver::class.java,
-        WeatherMetroTrioReceiver::class.java,
-        WeatherMicroReceiver::class.java
+        WeatherHorizonReceiver(),
+        WeatherBentoGlanceReceiver(),
+        WeatherDaylightArcReceiver(),
+        WeatherPillDockReceiver(),
+        WeatherEditorialReceiver(),
+        WeatherHourlyRibbonReceiver(),
+        WeatherMinimalistDualReceiver(),
+        WeatherCompactDialReceiver(),
+        WeatherMetroTrioReceiver(),
+        WeatherMicroReceiver()
     )
-    for (receiverClass in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiverClass).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
+        for (id in ids) {
+            receiver.updateSingleWidget(context, manager, id)
         }
     }
 }
