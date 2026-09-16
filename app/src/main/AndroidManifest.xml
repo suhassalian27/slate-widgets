@@ -44,6 +44,10 @@
     <!-- Quick Toggles System Permissions -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
+    <!-- Weather Location Permissions -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
 
 
     <application
@@ -4427,6 +4431,150 @@
             android:name=".widgets.social.SocialMicro1Receiver"
             android:exported="true"
             android:label="Micro Social">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_1x1" />
+        </receiver>
+
+        <!-- ========================================================================= -->
+        <!-- WEATHER STUDIO CONFIG & RECEIVERS (10 UNIQUE STYLES)                      -->
+        <!-- ========================================================================= -->
+
+        <activity
+            android:name=".widgets.weather.WeatherConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Slate"
+            android:label="Weather Studio">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- 1. Weather Horizon (4x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherHorizonReceiver"
+            android:exported="true"
+            android:label="Weather Horizon">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 2. Weather Bento Glance (4x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherBentoGlanceReceiver"
+            android:exported="true"
+            android:label="Weather Bento Glance">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
+
+        <!-- 3. Weather Daylight Arc (2x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherDaylightArcReceiver"
+            android:exported="true"
+            android:label="Weather Daylight Arc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 4. Weather Pill Dock (4x1) -->
+        <receiver
+            android:name=".widgets.weather.WeatherPillDockReceiver"
+            android:exported="true"
+            android:label="Weather Pill Dock">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 5. Weather Editorial (2x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherEditorialReceiver"
+            android:exported="true"
+            android:label="Weather Editorial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 6. Weather Hourly Ribbon (4x1) -->
+        <receiver
+            android:name=".widgets.weather.WeatherHourlyRibbonReceiver"
+            android:exported="true"
+            android:label="Weather Hourly Ribbon">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
+
+        <!-- 7. Weather Minimalist Dual (2x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherMinimalistDualReceiver"
+            android:exported="true"
+            android:label="Weather Minimalist Dual">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 8. Weather Compact Dial (2x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherCompactDialReceiver"
+            android:exported="true"
+            android:label="Weather Compact Dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2x2" />
+        </receiver>
+
+        <!-- 9. Weather Metro Trio (3x1) -->
+        <receiver
+            android:name=".widgets.weather.WeatherMetroTrioReceiver"
+            android:exported="true"
+            android:label="Weather Metro Trio">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_3x1" />
+        </receiver>
+
+        <!-- 10. Micro Weather (1x1) -->
+        <receiver
+            android:name=".widgets.weather.WeatherMicroReceiver"
+            android:exported="true"
+            android:label="Micro Weather">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

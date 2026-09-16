@@ -58,6 +58,7 @@ import com.altusix.slate.widgets.productivity.getProductivityWidgetsCatalog
 import com.altusix.slate.widgets.quicktoggles.getQuickTogglesWidgetsCatalog
 import com.altusix.slate.widgets.quotes.getQuotesWidgetsCatalog
 import com.altusix.slate.widgets.social.getSocialWidgetsCatalog
+import com.altusix.slate.widgets.weather.getWeatherWidgetsCatalog
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -96,6 +97,7 @@ fun WidgetListScreen(
     val quickTogglesWidgets = remember { getQuickTogglesWidgetsCatalog() }
     val quotesWidgets = remember { getQuotesWidgetsCatalog() }
     val socialWidgets = remember { getSocialWidgetsCatalog() }
+    val weatherWidgets = remember { getWeatherWidgetsCatalog() }
 
     val categories = remember {
         listOf(
@@ -103,7 +105,7 @@ fun WidgetListScreen(
             "Calculator", "Calendar", "Camera", "Clock - Analog", "Clock - Digital",
             "Clock - Hybrid", "Compass", "Contacts", "Device", "Games", "Google",
             "Health & Fitness", "Music & Media", "Notes", "Photos & Memories",
-            "Productivity", "Quick Toggles", "Quotes", "Social"
+            "Productivity", "Quick Toggles", "Quotes", "Social", "Weather"
         )
     }
 
@@ -208,10 +210,11 @@ fun WidgetListScreen(
                     22 -> quickTogglesWidgets
                     23 -> quotesWidgets
                     24 -> socialWidgets
+                    25 -> weatherWidgets
                     else -> aiWidgets + appFolderWidgets + appLauncherWidgets + batteryWidgets + bluetoothWidgets +
                             calculatorWidgets + calendarWidgets + cameraWidgets + clockWidgets +
                             clockDigitalWidgets + clockHybridWidgets + compassWidgets + contactsWidgets +
-                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets + notesWidgets + photosWidgets + productivityWidgets + quickTogglesWidgets + quotesWidgets + socialWidgets
+                            deviceInfoWidgets + gamesWidgets + googleWidgets + healthWidgets + mediaWidgets + notesWidgets + photosWidgets + productivityWidgets + quickTogglesWidgets + quotesWidgets + socialWidgets + weatherWidgets
                 }
             }
 

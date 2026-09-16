@@ -84,6 +84,9 @@ import com.altusix.slate.widgets.quotes.updateAllQuotesWidgets
 import com.altusix.slate.widgets.social.SocialConfigActivity
 import com.altusix.slate.widgets.social.getSocialWidgetsCatalog
 import com.altusix.slate.widgets.social.updateAllSocialWidgets
+import com.altusix.slate.widgets.weather.WeatherConfigActivity
+import com.altusix.slate.widgets.weather.getWeatherWidgetsCatalog
+import com.altusix.slate.widgets.weather.updateAllWeatherWidgets
 import com.altusix.slate.widgets.quicktoggles.QuickToggleLivePreview
 
 enum class ColorPickerTarget {
@@ -228,6 +231,17 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
+        val isWeather = getWeatherWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        if (isWeather) {
+            val forwardIntent = Intent(this, WeatherConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
                 val catalogItem = remember(widgetClassName) {
@@ -247,7 +261,8 @@ class WidgetConfigActivity : ComponentActivity() {
                             getProductivityWidgetsCatalog() +
                             getQuickTogglesWidgetsCatalog() +
                             getQuotesWidgetsCatalog() +
-                            getSocialWidgetsCatalog()
+                            getSocialWidgetsCatalog() +
+                            getWeatherWidgetsCatalog()
 
                     allWidgets.find { it.receiverClass.name == widgetClassName }
                 }
@@ -563,6 +578,7 @@ class WidgetConfigActivity : ComponentActivity() {
         updateAllQuickTogglesWidgets(this)
         updateAllQuotesWidgets(this)
         updateAllSocialWidgets(this)
+        updateAllWeatherWidgets(this)
 
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         finish()
