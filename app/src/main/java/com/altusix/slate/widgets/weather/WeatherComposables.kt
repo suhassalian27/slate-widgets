@@ -6,8 +6,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Rect
 import android.graphics.RectF
+import androidx.core.content.ContextCompat
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
@@ -15,247 +15,84 @@ import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
 import java.util.Calendar
 
-/**
- * Universal vector weather icon renderer.
- * Draws razor-sharp glyphs at any resolution without bitmap compression artifacts.
- */
+// -------------------------------------------------------------------------
+// VECTOR DRAWABLE HELPERS
+// -------------------------------------------------------------------------
+
+fun getDrawableResId(context: Context, resName: String): Int {
+    return context.resources.getIdentifier(resName, "drawable", context.packageName)
+}
+
+fun isNightTime(weather: WeatherData): Boolean {
+    return try {
+        val cal = Calendar.getInstance()
+        val currentMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        val sunriseParts = weather.sunrise.split(":")
+        val sunsetParts = weather.sunset.split(":")
+        val riseMinutes = (sunriseParts.getOrNull(0)?.toIntOrNull() ?: 6) * 60 + (sunriseParts.getOrNull(1)?.toIntOrNull() ?: 0)
+        val setMinutes = (sunsetParts.getOrNull(0)?.toIntOrNull() ?: 19) * 60 + (sunsetParts.getOrNull(1)?.toIntOrNull() ?: 30)
+        currentMinutes < riseMinutes || currentMinutes >= setMinutes
+    } catch (_: Exception) {
+        false
+    }
+}
+
+fun getWeatherIconResId(context: Context, weatherCode: Int, isNight: Boolean = false): Int {
+    val resName = when (weatherCode) {
+        0 -> if (isNight) "ic_weather_clear_night" else "ic_weather_clear_day"
+        1, 2 -> if (isNight) "ic_weather_partly_cloudy_night" else "ic_weather_partly_cloudy_day"
+        3 -> "ic_weather_cloudy"
+        45, 48 -> "ic_weather_fog"
+        51, 53, 55, 56, 57 -> "ic_weather_drizzle"
+        61, 63, 65, 80, 81, 82 -> "ic_weather_rain"
+        66, 67 -> "ic_weather_sleet"
+        71, 73, 75, 77, 85, 86 -> "ic_weather_snow"
+        95, 96, 99 -> "ic_weather_thunderstorm"
+        else -> "ic_weather_windy"
+    }
+
+    var id = getDrawableResId(context, resName)
+    if (id == 0 && isNight && resName.endsWith("_night")) {
+        id = getDrawableResId(context, resName.replace("_night", "_day"))
+    }
+    if (id == 0) {
+        id = getDrawableResId(context, "ic_weather_cloudy")
+    }
+    return id
+}
+
+fun drawVectorDrawable(
+    canvas: Canvas,
+    context: Context,
+    drawableResId: Int,
+    bounds: RectF,
+    tintColor: Int
+) {
+    if (drawableResId == 0) return
+    try {
+        val drawable = ContextCompat.getDrawable(context, drawableResId)?.mutate() ?: return
+        drawable.setTint(tintColor)
+        drawable.setBounds(
+            bounds.left.toInt(),
+            bounds.top.toInt(),
+            bounds.right.toInt(),
+            bounds.bottom.toInt()
+        )
+        drawable.draw(canvas)
+    } catch (_: Exception) {}
+}
+
 fun drawWeatherIcon(
     canvas: Canvas,
+    context: Context,
     weatherCode: Int,
     iconRect: RectF,
     color: Int,
     isNight: Boolean = false
 ) {
-    val l = iconRect.left
-    val t = iconRect.top
-    val w = iconRect.width()
-    val h = iconRect.height()
-
-    fun x(pct: Float): Float = l + w * pct
-    fun y(pct: Float): Float = t + h * pct
-
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.FILL
-    }
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = w * 0.08f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    // Helper: draw smooth cloud shape
-    fun drawCloud(cloudRect: RectF, paint: Paint) {
-        val cl = cloudRect.left
-        val ct = cloudRect.top
-        val cw = cloudRect.width()
-        val ch = cloudRect.height()
-        fun cx(p: Float) = cl + cw * p
-        fun cy(p: Float) = ct + ch * p
-
-        val p = Path().apply {
-            moveTo(cx(0.20f), cy(0.76f))
-            lineTo(cx(0.80f), cy(0.76f))
-            quadTo(cx(0.92f), cy(0.76f), cx(0.92f), cy(0.62f))
-            quadTo(cx(0.92f), cy(0.48f), cx(0.80f), cy(0.48f))
-            cubicTo(cx(0.80f), cy(0.28f), cx(0.58f), cy(0.26f), cx(0.52f), cy(0.40f))
-            cubicTo(cx(0.46f), cy(0.32f), cx(0.32f), cy(0.34f), cx(0.30f), cy(0.48f))
-            quadTo(cx(0.16f), cy(0.48f), cx(0.16f), cy(0.62f))
-            quadTo(cx(0.16f), cy(0.76f), cx(0.20f), cy(0.76f))
-            close()
-        }
-        canvas.drawPath(p, paint)
-    }
-
-    when (weatherCode) {
-        // Clear Sky
-        0 -> {
-            if (!isNight) {
-                // Sun
-                val sunRadius = w * 0.22f
-                val cx = iconRect.centerX()
-                val cy = iconRect.centerY()
-                canvas.drawCircle(cx, cy, sunRadius, fillPaint)
-
-                // 8 Sun Rays
-                val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    this.color = color
-                    style = Paint.Style.STROKE
-                    strokeWidth = w * 0.075f
-                    strokeCap = Paint.Cap.ROUND
-                }
-                val r1 = sunRadius + (w * 0.08f)
-                val r2 = sunRadius + (w * 0.18f)
-                for (i in 0 until 8) {
-                    val angle = Math.toRadians(i * 45.0)
-                    val x1 = cx + (r1 * Math.cos(angle)).toFloat()
-                    val y1 = cy + (r1 * Math.sin(angle)).toFloat()
-                    val x2 = cx + (r2 * Math.cos(angle)).toFloat()
-                    val y2 = cy + (r2 * Math.sin(angle)).toFloat()
-                    canvas.drawLine(x1, y1, x2, y2, rayPaint)
-                }
-            } else {
-                // Crescent Moon
-                val moonPath = Path().apply {
-                    val mr = RectF(x(0.24f), y(0.18f), x(0.80f), y(0.82f))
-                    arcTo(mr, -90f, 260f, false)
-                    quadTo(x(0.48f), y(0.50f), x(0.52f), y(0.18f))
-                    close()
-                }
-                canvas.drawPath(moonPath, fillPaint)
-            }
-        }
-
-        // Mainly Clear / Partly Cloudy
-        1, 2 -> {
-            if (!isNight) {
-                // Sun peeking behind cloud at top right
-                val sunRadius = w * 0.16f
-                canvas.drawCircle(x(0.66f), y(0.34f), sunRadius, fillPaint)
-                val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    this.color = color
-                    style = Paint.Style.STROKE
-                    strokeWidth = w * 0.06f
-                    strokeCap = Paint.Cap.ROUND
-                }
-                for (deg in listOf(0, 45, 90, 315)) {
-                    val rad = Math.toRadians(deg.toDouble())
-                    val x1 = x(0.66f) + (sunRadius * 1.2f * Math.cos(rad)).toFloat()
-                    val y1 = y(0.34f) + (sunRadius * 1.2f * Math.sin(rad)).toFloat()
-                    val x2 = x(0.66f) + (sunRadius * 1.6f * Math.cos(rad)).toFloat()
-                    val y2 = y(0.34f) + (sunRadius * 1.6f * Math.sin(rad)).toFloat()
-                    canvas.drawLine(x1, y1, x2, y2, rayPaint)
-                }
-            } else {
-                // Moon peeking behind cloud
-                canvas.drawCircle(x(0.66f), y(0.34f), w * 0.14f, fillPaint)
-            }
-            // Foreground cloud
-            drawCloud(RectF(x(0.08f), y(0.28f), x(0.92f), y(0.86f)), fillPaint)
-        }
-
-        // Overcast / Cloudy
-        3 -> {
-            // Background cloud
-            val bgCloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = Color.argb(140, Color.red(color), Color.green(color), Color.blue(color))
-                style = Paint.Style.FILL
-            }
-            drawCloud(RectF(x(0.24f), y(0.16f), x(0.94f), y(0.68f)), bgCloudPaint)
-            // Foreground cloud
-            drawCloud(RectF(x(0.08f), y(0.32f), x(0.84f), y(0.86f)), fillPaint)
-        }
-
-        // Fog / Mist
-        45, 48 -> {
-            drawCloud(RectF(x(0.14f), y(0.16f), x(0.86f), y(0.64f)), fillPaint)
-            // Horizontal mist lines
-            val mistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.STROKE
-                strokeWidth = w * 0.065f
-                strokeCap = Paint.Cap.ROUND
-            }
-            canvas.drawLine(x(0.22f), y(0.72f), x(0.78f), y(0.72f), mistPaint)
-            canvas.drawLine(x(0.16f), y(0.82f), x(0.84f), y(0.82f), mistPaint)
-            canvas.drawLine(x(0.28f), y(0.92f), x(0.72f), y(0.92f), mistPaint)
-        }
-
-        // Drizzle / Light Rain
-        51, 53, 55, 56, 57, 61 -> {
-            drawCloud(RectF(x(0.10f), y(0.14f), x(0.90f), y(0.64f)), fillPaint)
-            val dropPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.STROKE
-                strokeWidth = w * 0.07f
-                strokeCap = Paint.Cap.ROUND
-            }
-            // 3 slanted drops
-            val dropY1 = y(0.72f)
-            val dropY2 = y(0.88f)
-            val dx = w * 0.04f
-            canvas.drawLine(x(0.32f), dropY1, x(0.32f) - dx, dropY2, dropPaint)
-            canvas.drawLine(x(0.50f), dropY1, x(0.50f) - dx, dropY2, dropPaint)
-            canvas.drawLine(x(0.68f), dropY1, x(0.68f) - dx, dropY2, dropPaint)
-        }
-
-        // Moderate / Heavy Rain / Showers
-        63, 65, 66, 67, 80, 81, 82 -> {
-            drawCloud(RectF(x(0.10f), y(0.12f), x(0.90f), y(0.60f)), fillPaint)
-            val dropPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.STROKE
-                strokeWidth = w * 0.065f
-                strokeCap = Paint.Cap.ROUND
-            }
-            val dx = w * 0.05f
-            // 4 longer rain streaks
-            canvas.drawLine(x(0.26f), y(0.68f), x(0.26f) - dx, y(0.92f), dropPaint)
-            canvas.drawLine(x(0.42f), y(0.66f), x(0.42f) - dx, y(0.90f), dropPaint)
-            canvas.drawLine(x(0.58f), y(0.68f), x(0.58f) - dx, y(0.92f), dropPaint)
-            canvas.drawLine(x(0.74f), y(0.66f), x(0.74f) - dx, y(0.90f), dropPaint)
-        }
-
-        // Snow / Snow Showers
-        71, 73, 75, 77, 85, 86 -> {
-            drawCloud(RectF(x(0.10f), y(0.14f), x(0.90f), y(0.64f)), fillPaint)
-            val snowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.FILL
-            }
-            canvas.drawCircle(x(0.30f), y(0.76f), w * 0.055f, snowPaint)
-            canvas.drawCircle(x(0.50f), y(0.84f), w * 0.055f, snowPaint)
-            canvas.drawCircle(x(0.70f), y(0.76f), w * 0.055f, snowPaint)
-            canvas.drawCircle(x(0.40f), y(0.92f), w * 0.045f, snowPaint)
-            canvas.drawCircle(x(0.60f), y(0.92f), w * 0.045f, snowPaint)
-        }
-
-        // Thunderstorm
-        95, 96, 99 -> {
-            drawCloud(RectF(x(0.10f), y(0.12f), x(0.90f), y(0.60f)), fillPaint)
-            // Sharp lightning bolt
-            val boltPath = Path().apply {
-                moveTo(x(0.54f), y(0.58f))
-                lineTo(x(0.42f), y(0.74f))
-                lineTo(x(0.50f), y(0.74f))
-                lineTo(x(0.38f), y(0.94f))
-                lineTo(x(0.62f), y(0.70f))
-                lineTo(x(0.52f), y(0.70f))
-                close()
-            }
-            canvas.drawPath(boltPath, fillPaint)
-        }
-
-        // Default Wind / Breezy
-        else -> {
-            val windPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.STROKE
-                strokeWidth = w * 0.075f
-                strokeCap = Paint.Cap.ROUND
-            }
-            val w1 = Path().apply {
-                moveTo(x(0.16f), y(0.34f))
-                lineTo(x(0.66f), y(0.34f))
-                quadTo(x(0.82f), y(0.34f), x(0.82f), y(0.24f))
-                quadTo(x(0.82f), y(0.14f), x(0.72f), y(0.14f))
-            }
-            val w2 = Path().apply {
-                moveTo(x(0.12f), y(0.54f))
-                lineTo(x(0.76f), y(0.54f))
-                quadTo(x(0.88f), y(0.54f), x(0.88f), y(0.64f))
-                quadTo(x(0.88f), y(0.74f), x(0.78f), y(0.74f))
-            }
-            val w3 = Path().apply {
-                moveTo(x(0.22f), y(0.74f))
-                lineTo(x(0.58f), y(0.74f))
-            }
-            canvas.drawPath(w1, windPaint)
-            canvas.drawPath(w2, windPaint)
-            canvas.drawPath(w3, windPaint)
-        }
+    val resId = getWeatherIconResId(context, weatherCode, isNight)
+    if (resId != 0) {
+        drawVectorDrawable(canvas, context, resId, iconRect, color)
     }
 }
 
@@ -263,7 +100,7 @@ fun drawWeatherIcon(
 // 10 CONCRETE WEATHER BITMAP GENERATORS
 // -------------------------------------------------------------------------
 
-// 1. Weather Horizon (4x2 / Editorial Forecast)
+// 1. Weather Horizon (4x2)
 fun generateWeatherHorizonBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -308,10 +145,9 @@ fun generateWeatherHorizonBitmap(
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
     val pad = scaleFactor * 16f
-
     val halfW = (cardRect.width() - (pad * 2f)) * 0.48f
 
-    // LEFT SECTION: Current Conditions
+    // LEFT: Current Weather
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 11f
@@ -320,16 +156,13 @@ fun generateWeatherHorizonBitmap(
     }
     canvas.drawText(weather.cityName.uppercase(), cardRect.left + pad, cardRect.top + pad + (scaleFactor * 10f), cityPaint)
 
-    // Current Temp
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 46f
         typeface = getSlateFont(context, weight = 800)
     }
-    val tempStr = WeatherPreferences.formatTemp(weather.currentTemp, unit)
-    canvas.drawText(tempStr, cardRect.left + pad, cardRect.top + pad + (scaleFactor * 52f), tempPaint)
+    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cardRect.left + pad, cardRect.top + pad + (scaleFactor * 52f), tempPaint)
 
-    // Condition Text
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 14f
@@ -337,7 +170,6 @@ fun generateWeatherHorizonBitmap(
     }
     canvas.drawText(weather.conditionText, cardRect.left + pad, cardRect.top + pad + (scaleFactor * 72f), condPaint)
 
-    // High / Low Pill
     val hiLoStr = "H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}   L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
     val hiLoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
@@ -346,7 +178,7 @@ fun generateWeatherHorizonBitmap(
     }
     canvas.drawText(hiLoStr, cardRect.left + pad, cardRect.top + pad + (scaleFactor * 90f), hiLoPaint)
 
-    // CENTER DIVIDER
+    // DIVIDER
     val dividerX = cardRect.left + pad + halfW + (scaleFactor * 8f)
     val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(24, 0, 0, 0) else Color.argb(32, 255, 255, 255)
@@ -354,7 +186,7 @@ fun generateWeatherHorizonBitmap(
     }
     canvas.drawLine(dividerX, cardRect.top + pad, dividerX, cardRect.bottom - pad, dividerPaint)
 
-    // RIGHT SECTION: 5-Day Forecast List
+    // RIGHT: 5-Day Forecast
     val rightLeft = dividerX + (scaleFactor * 12f)
     val rightWidth = cardRect.right - pad - rightLeft
     val dailyList = weather.dailyForecast.take(5)
@@ -376,26 +208,22 @@ fun generateWeatherHorizonBitmap(
         val item = dailyList[i]
         val cy = cardRect.top + pad + (i * rowH) + (rowH / 2f)
 
-        // Day name
         canvas.drawText(item.dayLabel, rightLeft, cy + (scaleFactor * 4f), dayNamePaint)
 
-        // Weather icon
-        val iconSize = scaleFactor * 14f
+        val iconSize = scaleFactor * 16f
         val iconX = rightLeft + (rightWidth * 0.40f)
         val iconRect = RectF(iconX - (iconSize / 2f), cy - (iconSize / 2f), iconX + (iconSize / 2f), cy + (iconSize / 2f))
-        drawWeatherIcon(canvas, item.weatherCode, iconRect, accentColor)
+        drawWeatherIcon(canvas, context, item.weatherCode, iconRect, accentColor, isNight = false)
 
-        // Rain % indicator if significant
         if (item.rainProb >= 20) {
             val rainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.parseColor("#38ACFF")
                 textSize = scaleFactor * 8.5f
                 typeface = getSlateFont(context, weight = 700)
             }
-            canvas.drawText("${item.rainProb}%", iconX + (scaleFactor * 10f), cy + (scaleFactor * 3.5f), rainPaint)
+            canvas.drawText("${item.rainProb}%", iconX + (scaleFactor * 11f), cy + (scaleFactor * 3.5f), rainPaint)
         }
 
-        // Temp range
         val rangeText = "${WeatherPreferences.formatTempValue(item.maxTemp, unit)}°  ${WeatherPreferences.formatTempValue(item.minTemp, unit)}°"
         canvas.drawText(rangeText, cardRect.right - pad, cy + (scaleFactor * 4f), rangePaint)
     }
@@ -403,7 +231,7 @@ fun generateWeatherHorizonBitmap(
     return bitmap
 }
 
-// 2. Weather Bento Glance (4x2 / Bento Grid Structure)
+// 2. Weather Bento Glance (4x2)
 fun generateWeatherBentoGlanceBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -447,6 +275,7 @@ fun generateWeatherBentoGlanceBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
 
     val pad = scaleFactor * 8f
     val gap = scaleFactor * 8f
@@ -459,7 +288,7 @@ fun generateWeatherBentoGlanceBitmap(
     val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
     val sq = scaleFactor * 10f
 
-    // LEFT BIG CARD: Current Weather & Icon
+    // LEFT MAIN CARD
     val leftW = (cardRect.width() - (pad * 2f) - gap) * 0.52f
     val leftRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + leftW, cardRect.bottom - pad)
     val leftRadii = floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, concentricRadius, concentricRadius)
@@ -467,7 +296,6 @@ fun generateWeatherBentoGlanceBitmap(
     canvas.drawPath(leftPath, tilePaint)
 
     val innerPad = scaleFactor * 12f
-    // City name
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 10.5f
@@ -475,7 +303,6 @@ fun generateWeatherBentoGlanceBitmap(
     }
     canvas.drawText(weather.cityName.uppercase(), leftRect.left + innerPad, leftRect.top + innerPad + (scaleFactor * 8f), cityPaint)
 
-    // Weather Icon
     val mainIconSize = scaleFactor * 32f
     val mainIconRect = RectF(
         leftRect.right - innerPad - mainIconSize,
@@ -483,9 +310,8 @@ fun generateWeatherBentoGlanceBitmap(
         leftRect.right - innerPad,
         leftRect.top + innerPad + mainIconSize
     )
-    drawWeatherIcon(canvas, weather.weatherCode, mainIconRect, accentColor)
+    drawWeatherIcon(canvas, context, weather.weatherCode, mainIconRect, accentColor, isNight)
 
-    // Huge Temp
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 40f
@@ -493,7 +319,6 @@ fun generateWeatherBentoGlanceBitmap(
     }
     canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), leftRect.left + innerPad, leftRect.top + (scaleFactor * 68f), tempPaint)
 
-    // Condition
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 13f
@@ -501,7 +326,6 @@ fun generateWeatherBentoGlanceBitmap(
     }
     canvas.drawText(weather.conditionText, leftRect.left + innerPad, leftRect.bottom - innerPad - (scaleFactor * 12f), condPaint)
 
-    // High / Low
     val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 10f
@@ -531,12 +355,24 @@ fun generateWeatherBentoGlanceBitmap(
         typeface = getSlateFont(context, weight = 700)
     }
 
-    // Feels Like
-    canvas.drawText("FEELS LIKE", topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 16f), labelPaint)
+    // Feels Like with Thermometer Icon
+    val thermoRes = getDrawableResId(context, "ic_thermometer")
+    if (thermoRes != 0) {
+        drawVectorDrawable(canvas, context, thermoRes, RectF(topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 8f), topRect.left + (scaleFactor * 20f), topRect.top + (scaleFactor * 18f)), secondaryText)
+        canvas.drawText("FEELS LIKE", topRect.left + (scaleFactor * 23f), topRect.top + (scaleFactor * 16f), labelPaint)
+    } else {
+        canvas.drawText("FEELS LIKE", topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 16f), labelPaint)
+    }
     canvas.drawText(WeatherPreferences.formatTemp(weather.feelsLike, unit), topRect.left + (scaleFactor * 10f), topRect.top + (scaleFactor * 36f), valuePaint)
 
-    // Humidity
-    canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 16f), labelPaint)
+    // Humidity with Drop Icon
+    val humidRes = getDrawableResId(context, "ic_humidity")
+    if (humidRes != 0) {
+        drawVectorDrawable(canvas, context, humidRes, RectF(topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 8f), topRect.left + metricHalfW + (scaleFactor * 16f), topRect.top + (scaleFactor * 18f)), secondaryText)
+        canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (scaleFactor * 19f), topRect.top + (scaleFactor * 16f), labelPaint)
+    } else {
+        canvas.drawText("HUMIDITY", topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 16f), labelPaint)
+    }
     canvas.drawText("${weather.humidity}%", topRect.left + metricHalfW + (scaleFactor * 6f), topRect.top + (scaleFactor * 36f), valuePaint)
 
     // RIGHT BOTTOM CARD: Wind & UV Index
@@ -545,18 +381,30 @@ fun generateWeatherBentoGlanceBitmap(
     val btmPath = Path().apply { addRoundRect(btmRect, btmRadii, Path.Direction.CW) }
     canvas.drawPath(btmPath, tilePaint)
 
-    // Wind
-    canvas.drawText("WIND", btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 16f), labelPaint)
+    // Wind with Windy Icon
+    val windRes = getDrawableResId(context, "ic_weather_windy")
+    if (windRes != 0) {
+        drawVectorDrawable(canvas, context, windRes, RectF(btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 8f), btmRect.left + (scaleFactor * 20f), btmRect.top + (scaleFactor * 18f)), secondaryText)
+        canvas.drawText("WIND", btmRect.left + (scaleFactor * 23f), btmRect.top + (scaleFactor * 16f), labelPaint)
+    } else {
+        canvas.drawText("WIND", btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 16f), labelPaint)
+    }
     canvas.drawText("${weather.windSpeedKmH.toInt()} km/h", btmRect.left + (scaleFactor * 10f), btmRect.top + (scaleFactor * 36f), valuePaint)
 
-    // UV Index
-    canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 16f), labelPaint)
+    // UV Index with Sun/UV Icon
+    val uvRes = getDrawableResId(context, "ic_uv_index")
+    if (uvRes != 0) {
+        drawVectorDrawable(canvas, context, uvRes, RectF(btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 8f), btmRect.left + metricHalfW + (scaleFactor * 16f), btmRect.top + (scaleFactor * 18f)), secondaryText)
+        canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (scaleFactor * 19f), btmRect.top + (scaleFactor * 16f), labelPaint)
+    } else {
+        canvas.drawText("UV INDEX", btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 16f), labelPaint)
+    }
     canvas.drawText(String.format("%.1f", weather.uvIndex), btmRect.left + metricHalfW + (scaleFactor * 6f), btmRect.top + (scaleFactor * 36f), valuePaint)
 
     return bitmap
 }
 
-// 3. Weather Daylight Arc (2x2 / Sun Daylight Progress Arc)
+// 3. Weather Daylight Arc (2x2)
 fun generateWeatherDaylightArcBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -596,14 +444,11 @@ fun generateWeatherDaylightArcBitmap(
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
 
-    // Sun Arc Calculations
     val cx = cardRect.centerX()
     val cy = cardRect.top + (cardRect.height() * 0.50f)
     val arcRadius = minOf(cardRect.width(), cardRect.height()) * 0.36f
-
     val arcRect = RectF(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
 
-    // Arc Track (180 to 0 degrees, top half)
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(30, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -612,7 +457,6 @@ fun generateWeatherDaylightArcBitmap(
     }
     canvas.drawArc(arcRect, 180f, 180f, false, trackPaint)
 
-    // Current time daylight progress ratio (0.0 to 1.0)
     val cal = Calendar.getInstance()
     val currentMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
     val sunriseParts = weather.sunrise.split(":")
@@ -631,7 +475,6 @@ fun generateWeatherDaylightArcBitmap(
     }
     canvas.drawArc(arcRect, 180f, sweepAngle, false, activeArcPaint)
 
-    // Glowing Sun Marker
     val sunAngleRad = Math.toRadians((180.0 + sweepAngle).toDouble())
     val markerX = cx + (arcRadius * Math.cos(sunAngleRad)).toFloat()
     val markerY = cy + (arcRadius * Math.sin(sunAngleRad)).toFloat()
@@ -642,17 +485,31 @@ fun generateWeatherDaylightArcBitmap(
     }
     canvas.drawCircle(markerX, markerY, scaleFactor * 5f, markerPaint)
 
-    // Sunrise & Sunset Labels at base of arc
+    // Sunrise / Sunset with icons
     val timeLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 8.5f
         typeface = getSlateFont(context, weight = 600)
     }
-    canvas.drawText("↑ ${weather.sunrise}", cx - arcRadius, cy + (scaleFactor * 14f), timeLabelPaint)
-    val setPaint = Paint(timeLabelPaint).apply { textAlign = Paint.Align.RIGHT }
-    canvas.drawText("↓ ${weather.sunset}", cx + arcRadius, cy + (scaleFactor * 14f), setPaint)
+    val sunriseRes = getDrawableResId(context, "ic_sunrise")
+    if (sunriseRes != 0) {
+        drawVectorDrawable(canvas, context, sunriseRes, RectF(cx - arcRadius, cy + (scaleFactor * 5f), cx - arcRadius + (scaleFactor * 12f), cy + (scaleFactor * 17f)), secondaryText)
+        canvas.drawText(weather.sunrise, cx - arcRadius + (scaleFactor * 14f), cy + (scaleFactor * 14f), timeLabelPaint)
+    } else {
+        canvas.drawText("↑ ${weather.sunrise}", cx - arcRadius, cy + (scaleFactor * 14f), timeLabelPaint)
+    }
 
-    // Center Weather Info
+    val sunsetRes = getDrawableResId(context, "ic_sunset")
+    if (sunsetRes != 0) {
+        drawVectorDrawable(canvas, context, sunsetRes, RectF(cx + arcRadius - (scaleFactor * 34f), cy + (scaleFactor * 5f), cx + arcRadius - (scaleFactor * 22f), cy + (scaleFactor * 17f)), secondaryText)
+        val setPaint = Paint(timeLabelPaint).apply { textAlign = Paint.Align.RIGHT }
+        canvas.drawText(weather.sunset, cx + arcRadius, cy + (scaleFactor * 14f), setPaint)
+    } else {
+        val setPaint = Paint(timeLabelPaint).apply { textAlign = Paint.Align.RIGHT }
+        canvas.drawText("↓ ${weather.sunset}", cx + arcRadius, cy + (scaleFactor * 14f), setPaint)
+    }
+
+    // Center Temp
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 34f
@@ -661,7 +518,6 @@ fun generateWeatherDaylightArcBitmap(
     }
     canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cx, cy - (scaleFactor * 4f), tempPaint)
 
-    // Condition
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 12.5f
@@ -670,7 +526,6 @@ fun generateWeatherDaylightArcBitmap(
     }
     canvas.drawText(weather.conditionText, cx, cardRect.bottom - (scaleFactor * 26f), condPaint)
 
-    // City & High/Low Pill
     val pillText = "${weather.cityName}  •  H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
     val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
@@ -683,7 +538,7 @@ fun generateWeatherDaylightArcBitmap(
     return bitmap
 }
 
-// 4. Weather Pill Dock (4x1 / Wide Bar)
+// 4. Weather Pill Dock (4x1)
 fun generateWeatherPillDockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -727,9 +582,9 @@ fun generateWeatherPillDockBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
     val pad = scaleFactor * 14f
 
-    // Left Location & Condition
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 13f
@@ -746,9 +601,9 @@ fun generateWeatherPillDockBitmap(
 
     // Center Temp & Icon
     val centerLeft = cardRect.left + (cardRect.width() * 0.44f)
-    val iconSize = scaleFactor * 22f
+    val iconSize = scaleFactor * 24f
     val iconRect = RectF(centerLeft, cardRect.centerY() - (iconSize / 2f), centerLeft + iconSize, cardRect.centerY() + (iconSize / 2f))
-    drawWeatherIcon(canvas, weather.weatherCode, iconRect, accentColor)
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -757,7 +612,7 @@ fun generateWeatherPillDockBitmap(
     }
     canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), centerLeft + iconSize + (scaleFactor * 8f), cardRect.centerY() + (scaleFactor * 8f), tempPaint)
 
-    // Right 3 Hourly Forecast Pills
+    // Right Hourly Pills
     val hourlyItems = weather.hourlyForecast.drop(1).take(3)
     val pillStartX = cardRect.right - pad - (scaleFactor * 115f)
     val pillW = scaleFactor * 36f
@@ -795,7 +650,7 @@ fun generateWeatherPillDockBitmap(
     return bitmap
 }
 
-// 5. Weather Editorial Capsule (2x2 / Typographic Poster)
+// 5. Weather Editorial Capsule (2x2)
 fun generateWeatherEditorialBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -834,9 +689,9 @@ fun generateWeatherEditorialBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
     val pad = scaleFactor * 16f
 
-    // Header Condition Tag
     val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 10f
@@ -845,7 +700,6 @@ fun generateWeatherEditorialBitmap(
     }
     canvas.drawText(weather.conditionText.uppercase(), cardRect.left + pad, cardRect.top + pad + (scaleFactor * 10f), headerPaint)
 
-    // Giant Temp
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 52f
@@ -853,12 +707,11 @@ fun generateWeatherEditorialBitmap(
     }
     canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cardRect.left + pad, cardRect.top + (scaleFactor * 78f), tempPaint)
 
-    // Weather Icon at top right
+    // Top Right Icon
     val iconSize = scaleFactor * 32f
     val iconRect = RectF(cardRect.right - pad - iconSize, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + iconSize)
-    drawWeatherIcon(canvas, weather.weatherCode, iconRect, accentColor)
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
-    // Bottom City Badge & Range
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 13f
@@ -876,7 +729,7 @@ fun generateWeatherEditorialBitmap(
     return bitmap
 }
 
-// 6. Weather Hourly Ribbon (4x1 / 24h Hourly Projections)
+// 6. Weather Hourly Ribbon (4x1)
 fun generateWeatherHourlyRibbonBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -922,7 +775,6 @@ fun generateWeatherHourlyRibbonBitmap(
     val unit = WeatherPreferences.getUnit(context)
     val pad = scaleFactor * 12f
 
-    // Left Current Block
     val leftW = scaleFactor * 75f
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -938,7 +790,6 @@ fun generateWeatherHourlyRibbonBitmap(
     }
     canvas.drawText(weather.cityName, cardRect.left + pad, cardRect.centerY() + (scaleFactor * 11f), cityPaint)
 
-    // Divider
     val divX = cardRect.left + pad + leftW
     val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(30, 255, 255, 255)
@@ -946,7 +797,6 @@ fun generateWeatherHourlyRibbonBitmap(
     }
     canvas.drawLine(divX, cardRect.top + pad, divX, cardRect.bottom - pad, divPaint)
 
-    // Right 5 Hourly Nodes
     val hourly = weather.hourlyForecast.take(5)
     val ribbonLeft = divX + (scaleFactor * 12f)
     val ribbonW = cardRect.right - pad - ribbonLeft
@@ -968,18 +818,18 @@ fun generateWeatherHourlyRibbonBitmap(
     for (i in hourly.indices) {
         val item = hourly[i]
         val nx = ribbonLeft + i * nodeStep
-        val iconSize = scaleFactor * 13f
+        val iconSize = scaleFactor * 15f
         val iRect = RectF(nx - (iconSize / 2f), cardRect.centerY() - (iconSize / 2f) - (scaleFactor * 2f), nx + (iconSize / 2f), cardRect.centerY() + (iconSize / 2f) - (scaleFactor * 2f))
 
         canvas.drawText(item.timeLabel, nx, cardRect.top + pad + (scaleFactor * 6f), timePaint)
-        drawWeatherIcon(canvas, item.weatherCode, iRect, accentColor)
+        drawWeatherIcon(canvas, context, item.weatherCode, iRect, accentColor, isNight = false)
         canvas.drawText(WeatherPreferences.formatTemp(item.temp, unit), nx, cardRect.bottom - pad, hTempPaint)
     }
 
     return bitmap
 }
 
-// 7. Weather Minimalist Dual (2x2 / Split Quadrant)
+// 7. Weather Minimalist Dual (2x2)
 fun generateWeatherMinimalistDualBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1018,16 +868,16 @@ fun generateWeatherMinimalistDualBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
     val pad = scaleFactor * 14f
-
     val cx = cardRect.centerX()
 
-    // Left Half: Large Weather Vector Icon
+    // Left Half: Weather Vector Icon
     val iconSize = scaleFactor * 48f
     val iconLeft = cardRect.left + (cardRect.width() * 0.25f) - (iconSize / 2f)
     val iconTop = cardRect.centerY() - (iconSize / 2f)
     val iconRect = RectF(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
-    drawWeatherIcon(canvas, weather.weatherCode, iconRect, accentColor)
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
     // Center Divider
     val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1069,7 +919,7 @@ fun generateWeatherMinimalistDualBitmap(
     return bitmap
 }
 
-// 8. Weather Compact Dial (2x2 / 4-Corner Conditions Station)
+// 8. Weather Compact Dial (2x2)
 fun generateWeatherCompactDialBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1108,9 +958,9 @@ fun generateWeatherCompactDialBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
     val pad = scaleFactor * 12f
 
-    // 4 Corner Badges
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 8.5f
@@ -1122,31 +972,50 @@ fun generateWeatherCompactDialBitmap(
         typeface = getSlateFont(context, weight = 700)
     }
 
-    // Top-Left: WIND
-    canvas.drawText("WIND", cardRect.left + pad, cardRect.top + pad + (scaleFactor * 8f), labelPaint)
+    // Top-Left: WIND with icon
+    val windRes = getDrawableResId(context, "ic_weather_windy")
+    if (windRes != 0) {
+        drawVectorDrawable(canvas, context, windRes, RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + (scaleFactor * 12f), cardRect.top + pad + (scaleFactor * 12f)), secondaryText)
+        canvas.drawText("WIND", cardRect.left + pad + (scaleFactor * 15f), cardRect.top + pad + (scaleFactor * 9f), labelPaint)
+    } else {
+        canvas.drawText("WIND", cardRect.left + pad, cardRect.top + pad + (scaleFactor * 8f), labelPaint)
+    }
     canvas.drawText("${weather.windSpeedKmH.toInt()} km/h", cardRect.left + pad, cardRect.top + pad + (scaleFactor * 22f), valPaint)
 
-    // Top-Right: HUMIDITY
+    // Top-Right: HUMIDITY with icon
+    val humidRes = getDrawableResId(context, "ic_humidity")
     val rLabel = Paint(labelPaint).apply { textAlign = Paint.Align.RIGHT }
     val rVal = Paint(valPaint).apply { textAlign = Paint.Align.RIGHT }
+    if (humidRes != 0) {
+        drawVectorDrawable(canvas, context, humidRes, RectF(cardRect.right - pad - (scaleFactor * 52f), cardRect.top + pad, cardRect.right - pad - (scaleFactor * 42f), cardRect.top + pad + (scaleFactor * 12f)), secondaryText)
+    }
     canvas.drawText("HUMIDITY", cardRect.right - pad, cardRect.top + pad + (scaleFactor * 8f), rLabel)
     canvas.drawText("${weather.humidity}%", cardRect.right - pad, cardRect.top + pad + (scaleFactor * 22f), rVal)
 
-    // Bottom-Left: RAIN CHANCE
-    canvas.drawText("RAIN", cardRect.left + pad, cardRect.bottom - pad - (scaleFactor * 14f), labelPaint)
+    // Bottom-Left: RAIN CHANCE with icon
+    val rainRes = getDrawableResId(context, "ic_rain_chance")
+    if (rainRes != 0) {
+        drawVectorDrawable(canvas, context, rainRes, RectF(cardRect.left + pad, cardRect.bottom - pad - (scaleFactor * 24f), cardRect.left + pad + (scaleFactor * 12f), cardRect.bottom - pad - (scaleFactor * 12f)), secondaryText)
+        canvas.drawText("RAIN", cardRect.left + pad + (scaleFactor * 15f), cardRect.bottom - pad - (scaleFactor * 14f), labelPaint)
+    } else {
+        canvas.drawText("RAIN", cardRect.left + pad, cardRect.bottom - pad - (scaleFactor * 14f), labelPaint)
+    }
     canvas.drawText("${weather.rainChance}%", cardRect.left + pad, cardRect.bottom - pad, valPaint)
 
-    // Bottom-Right: UV INDEX
+    // Bottom-Right: UV INDEX with icon
+    val uvRes = getDrawableResId(context, "ic_uv_index")
+    if (uvRes != 0) {
+        drawVectorDrawable(canvas, context, uvRes, RectF(cardRect.right - pad - (scaleFactor * 48f), cardRect.bottom - pad - (scaleFactor * 24f), cardRect.right - pad - (scaleFactor * 38f), cardRect.bottom - pad - (scaleFactor * 12f)), secondaryText)
+    }
     canvas.drawText("UV INDEX", cardRect.right - pad, cardRect.bottom - pad - (scaleFactor * 14f), rLabel)
     canvas.drawText(String.format("%.1f", weather.uvIndex), cardRect.right - pad, cardRect.bottom - pad, rVal)
 
-    // Center Core: Temp & Icon
+    // Center: Icon & Temp
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
-
-    val centerIconSize = scaleFactor * 24f
-    val iconRect = RectF(cx - (centerIconSize / 2f), cy - (scaleFactor * 26f), cx + (centerIconSize / 2f), cy - (scaleFactor * 2f))
-    drawWeatherIcon(canvas, weather.weatherCode, iconRect, accentColor)
+    val centerIconSize = scaleFactor * 26f
+    val iconRect = RectF(cx - (centerIconSize / 2f), cy - (scaleFactor * 27f), cx + (centerIconSize / 2f), cy - (scaleFactor * 1f))
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
@@ -1167,7 +1036,7 @@ fun generateWeatherCompactDialBitmap(
     return bitmap
 }
 
-// 9. Weather Metro Trio (3x1 / 3-Day Projection Bar)
+// 9. Weather Metro Trio (3x1)
 fun generateWeatherMetroTrioBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1242,9 +1111,9 @@ fun generateWeatherMetroTrioBitmap(
 
         canvas.drawText(labels[i], px, cardRect.top + (scaleFactor * 18f), titlePaint)
 
-        val iconSize = scaleFactor * 18f
+        val iconSize = scaleFactor * 20f
         val iRect = RectF(px - (iconSize / 2f), cardRect.centerY() - (iconSize / 2f), px + (iconSize / 2f), cardRect.centerY() + (iconSize / 2f))
-        drawWeatherIcon(canvas, d.weatherCode, iRect, accentColor)
+        drawWeatherIcon(canvas, context, d.weatherCode, iRect, accentColor, isNight = false)
 
         canvas.drawText("${WeatherPreferences.formatTempValue(d.maxTemp, unit)}°", px, cardRect.bottom - (scaleFactor * 10f), tempPaint)
     }
@@ -1252,7 +1121,7 @@ fun generateWeatherMetroTrioBitmap(
     return bitmap
 }
 
-// 10. Micro Weather (1x1 / Minimalist Single App Tile)
+// 10. Micro Weather (1x1)
 fun generateWeatherMicroBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1291,14 +1160,13 @@ fun generateWeatherMicroBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
     val pad = scaleFactor * 10f
 
-    // Weather Icon at top-right
-    val iconSize = scaleFactor * 22f
+    val iconSize = scaleFactor * 24f
     val iconRect = RectF(cardRect.right - pad - iconSize, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + iconSize)
-    drawWeatherIcon(canvas, weather.weatherCode, iconRect, accentColor)
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
-    // Current Temp
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = scaleFactor * 28f
@@ -1306,7 +1174,6 @@ fun generateWeatherMicroBitmap(
     }
     canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cardRect.left + pad, cardRect.centerY() + (scaleFactor * 8f), tempPaint)
 
-    // City at bottom
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
         textSize = scaleFactor * 8.5f

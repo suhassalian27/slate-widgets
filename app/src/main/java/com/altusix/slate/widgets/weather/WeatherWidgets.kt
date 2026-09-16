@@ -63,8 +63,21 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
         return widgetPrefs.getBoolean(isResponsiveKey, true)
     }
 
-    val defaultResponsive = true
-    widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
+    if (widgetPrefs.contains("widget_-1_mode")) {
+        val studioResponsive = widgetPrefs.getString("widget_-1_mode", "RESPONSIVE") == "RESPONSIVE"
+        widgetPrefs.edit()
+            .putBoolean(isResponsiveKey, studioResponsive)
+            .putString(modeKey, if (studioResponsive) "RESPONSIVE" else "FIXED")
+            .apply()
+        return studioResponsive
+    }
+
+    val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+    val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
+    widgetPrefs.edit()
+        .putBoolean(isResponsiveKey, defaultResponsive)
+        .putString(modeKey, if (defaultResponsive) "RESPONSIVE" else "FIXED")
+        .apply()
     return defaultResponsive
 }
 
@@ -121,22 +134,50 @@ abstract class BaseWeatherReceiver(
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
             val (fallbackW, fallbackH) = when {
-                targetAspect >= 3.5f -> 300 to 70   // 4x1 Pill Dock, Hourly Ribbon
-                targetAspect in 2.5f..3.4f -> 240 to 70  // 3x1 Metro Trio
-                targetAspect in 1.8f..2.4f -> 300 to 150 // 4x2 Horizon, Bento Glance
-                else -> 150 to 150                   // 2x2 / 1x1
+                targetAspect >= 3.5f -> 300 to 75
+                targetAspect in 2.5f..3.4f -> 240 to 80
+                targetAspect in 1.8f..2.4f -> 300 to 150
+                else -> 150 to 150
             }
 
             val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackW) ?: fallbackW else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackW) ?: fallbackW
             val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackH) ?: fallbackH else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackH) ?: fallbackH
             val wDp = if (wDpRaw <= 0) fallbackW else wDpRaw
             val hDp = if (hDpRaw <= 0) fallbackH else hDpRaw
+            val density = context.resources.displayMetrics.density
 
-            val bitmap = renderWidgetBitmap(context, id, config, isResponsive, wDp, hDp)
+            val padH: Int
+            val padV: Int
+            val effWDp: Int
+            val effHDp: Int
+
+            if (!isResponsive && targetAspect > 0f) {
+                val currentAspect = wDp.toFloat() / hDp.toFloat()
+                if (currentAspect > targetAspect) {
+                    val contentW = hDp * targetAspect
+                    padH = (((wDp - contentW) / 2f) * density).toInt()
+                    padV = 0
+                    effWDp = maxOf(1, contentW.toInt())
+                    effHDp = hDp
+                } else {
+                    val contentH = wDp / targetAspect
+                    padH = 0
+                    padV = (((hDp - contentH) / 2f) * density).toInt()
+                    effWDp = wDp
+                    effHDp = maxOf(1, contentH.toInt())
+                }
+            } else {
+                padH = 0
+                padV = 0
+                effWDp = wDp
+                effHDp = hDp
+            }
+
+            val bitmap = renderWidgetBitmap(context, id, config, isResponsive, effWDp, effHDp)
             val views = RemoteViews(context.packageName, R.layout.widget_base_single)
 
             try {
-                views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+                views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
             } catch (_: Exception) {}
 
             views.setImageViewBitmap(R.id.widget_image_view, bitmap)
@@ -159,12 +200,12 @@ fun getWeatherWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo(name = "Weather Horizon", sizeText = "4x2", category = "Weather", receiverClass = WeatherHorizonReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Bento Glance", sizeText = "4x2", category = "Weather", receiverClass = WeatherBentoGlanceReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Daylight Arc", sizeText = "2x2", category = "Weather", receiverClass = WeatherDaylightArcReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Weather Daylight Arc", sizeText = "2x2", category = "Weather", receiverClass = WeatherDaylightArcReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Pill Dock", sizeText = "4x1", category = "Weather", receiverClass = WeatherPillDockReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Editorial", sizeText = "2x2", category = "Weather", receiverClass = WeatherEditorialReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Weather Editorial", sizeText = "2x2", category = "Weather", receiverClass = WeatherEditorialReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Hourly Ribbon", sizeText = "4x1", category = "Weather", receiverClass = WeatherHourlyRibbonReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Minimalist Dual", sizeText = "2x2", category = "Weather", receiverClass = WeatherMinimalistDualReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Weather Compact Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCompactDialReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Weather Minimalist Dual", sizeText = "2x2", category = "Weather", receiverClass = WeatherMinimalistDualReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Compact Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCompactDialReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Metro Trio", sizeText = "3x1", category = "Weather", receiverClass = WeatherMetroTrioReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Micro Weather", sizeText = "1x1", category = "Weather", receiverClass = WeatherMicroReceiver::class.java, hasModeOption = true)
     )
@@ -192,61 +233,52 @@ fun updateAllWeatherWidgets(context: Context) {
     }
 }
 
-// 1. Weather Horizon (4x2)
+// Concrete Receivers
 class WeatherHorizonReceiver : BaseWeatherReceiver(targetAspect = 2.0f, widgetTypeTag = "HORIZON") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherHorizonBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 2. Weather Bento Glance (4x2)
 class WeatherBentoGlanceReceiver : BaseWeatherReceiver(targetAspect = 2.0f, widgetTypeTag = "BENTO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherBentoGlanceBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 3. Weather Daylight Arc (2x2)
 class WeatherDaylightArcReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "ARC") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherDaylightArcBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 4. Weather Pill Dock (4x1)
 class WeatherPillDockReceiver : BaseWeatherReceiver(targetAspect = 4.0f, widgetTypeTag = "DOCK") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherPillDockBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 5. Weather Editorial (2x2)
 class WeatherEditorialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "EDITORIAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherEditorialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 6. Weather Hourly Ribbon (4x1)
 class WeatherHourlyRibbonReceiver : BaseWeatherReceiver(targetAspect = 4.0f, widgetTypeTag = "RIBBON") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherHourlyRibbonBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 7. Weather Minimalist Dual (2x2)
 class WeatherMinimalistDualReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "DUAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMinimalistDualBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 8. Weather Compact Dial (2x2)
 class WeatherCompactDialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "DIAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherCompactDialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 9. Weather Metro Trio (3x1)
 class WeatherMetroTrioReceiver : BaseWeatherReceiver(targetAspect = 3.0f, widgetTypeTag = "TRIO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMetroTrioBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 10. Micro Weather (1x1)
 class WeatherMicroReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "MICRO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMicroBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
