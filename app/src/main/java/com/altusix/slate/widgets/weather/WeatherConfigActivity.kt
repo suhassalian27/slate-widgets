@@ -209,7 +209,6 @@ class WeatherConfigActivity : ComponentActivity() {
                                 widgetClassName.contains("DaylightArc") -> generateWeatherDaylightArcBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("PillDock") -> generateWeatherPillDockBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("Editorial") -> generateWeatherEditorialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("HourlyRibbon") -> generateWeatherHourlyRibbonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("MinimalistDual") -> generateWeatherMinimalistDualBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("CompactDial") -> generateWeatherCompactDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("MetroTrio") -> generateWeatherMetroTrioBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)

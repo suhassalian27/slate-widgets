@@ -1490,7 +1490,7 @@ fun generateWeatherCompactDialBitmap(
     return bitmap
 }
 
-// 8. Weather Metro Trio (3x1)
+// 8. Weather Metro Trio (3x1 / 3-Day Forecast Columns)
 fun generateWeatherMetroTrioBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1525,7 +1525,17 @@ fun generateWeatherMetroTrioBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val panelW = cardW / 3f
+
+    // 1. Dual-Axis Proportional Scalar calibrated to standard 3x1 dimensions (~225dp x 75dp)
+    val baseRefW = scaleFactor * 225f
+    val baseRefH = scaleFactor * 75f
+    val propScale = minOf(cardW / baseRefW, cardH / baseRefH).coerceIn(0.60f, 1.40f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -1534,42 +1544,83 @@ fun generateWeatherMetroTrioBitmap(
 
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
-    val panelW = cardRect.width() / 3f
-
-    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
-        strokeWidth = scaleFactor * 1f
-    }
-    canvas.drawLine(cardRect.left + panelW, cardRect.top + (scaleFactor * 10f), cardRect.left + panelW, cardRect.bottom - (scaleFactor * 10f), divPaint)
-    canvas.drawLine(cardRect.left + (panelW * 2f), cardRect.top + (scaleFactor * 10f), cardRect.left + (panelW * 2f), cardRect.bottom - (scaleFactor * 10f), divPaint)
-
     val days = weather.dailyForecast.take(3)
     val labels = listOf("TODAY", "TOMORROW", days.getOrNull(2)?.dayLabel?.uppercase() ?: "DAY")
 
+    // -------------------------------------------------------------------------
+    // BALANCED PROPORTIONS (Tamed Sizes)
+    // -------------------------------------------------------------------------
+    val titleTextSize = (cardH * 0.1f).coerceIn(s * 7.5f, s * 11f)
     val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 9f
-        typeface = getSlateFont(context, weight = 700)
-        textAlign = Paint.Align.CENTER
-    }
-    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 16f
-        typeface = getSlateFont(context, weight = 800)
+        textSize = titleTextSize
+        typeface = getSlateFont(context, weight = 500)
+        letterSpacing = 0.08f
         textAlign = Paint.Align.CENTER
     }
 
+    val tempTextSize = (cardH * 0.18f).coerceIn(s * 13f, s * 21f)
+    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = tempTextSize
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Refined icon size that doesn't overwhelm the cell
+    val iconSize = (cardH * 0.34f).coerceIn(s * 18f, s * 26f).coerceAtMost(panelW * 0.45f)
+
+    // Calculated vertical gaps
+    val gap = (cardH * 0.06f).coerceIn(s * 3f, s * 6f)
+
+    // -------------------------------------------------------------------------
+    // IDENTICAL TOP & BOTTOM PADDING
+    // -------------------------------------------------------------------------
+    val tempVisualH = tempTextSize * 0.85f
+    val totalColumnH = titleTextSize + gap + iconSize + gap + tempVisualH
+
+    // Center the whole cluster vertically so topPadding == bottomPadding
+    val startY = cardRect.top + ((cardH - totalColumnH) / 2f)
+
+    val titleY = startY + titleTextSize
+    val iconTop = titleY + gap
+    val tempY = iconTop + iconSize + gap + tempVisualH
+
+    // -------------------------------------------------------------------------
+    // SYMMETRICAL CENTER DIVIDERS
+    // -------------------------------------------------------------------------
+    val divH = (totalColumnH + (s * 8f)).coerceAtMost(cardH * 0.76f)
+    val divTop = cardRect.centerY() - (divH / 2f)
+    val divBottom = cardRect.centerY() + (divH / 2f)
+
+    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        strokeWidth = s * 1f
+    }
+    canvas.drawLine(cardRect.left + panelW, divTop, cardRect.left + panelW, divBottom, divPaint)
+    canvas.drawLine(cardRect.left + (panelW * 2f), divTop, cardRect.left + (panelW * 2f), divBottom, divPaint)
+
+    // -------------------------------------------------------------------------
+    // COLUMN CONTENT RENDERING
+    // -------------------------------------------------------------------------
     for (i in 0 until 3) {
         val px = cardRect.left + (i * panelW) + (panelW / 2f)
         val d = days.getOrNull(i) ?: DailyForecastItem("Day", 20f, 14f, 1, 0)
 
-        canvas.drawText(labels[i], px, cardRect.top + (scaleFactor * 18f), titlePaint)
+        // Day label
+        canvas.drawText(labels[i], px, titleY, titlePaint)
 
-        val iconSize = scaleFactor * 20f
-        val iRect = RectF(px - (iconSize / 2f), cardRect.centerY() - (iconSize / 2f), px + (iconSize / 2f), cardRect.centerY() + (iconSize / 2f))
+        // Weather icon
+        val iRect = RectF(
+            px - (iconSize / 2f),
+            iconTop,
+            px + (iconSize / 2f),
+            iconTop + iconSize
+        )
         drawWeatherIcon(canvas, context, d.weatherCode, iRect, accentColor, isNight = false)
 
-        canvas.drawText("${WeatherPreferences.formatTempValue(d.maxTemp, unit)}°", px, cardRect.bottom - (scaleFactor * 10f), tempPaint)
+        // Temperature
+        canvas.drawText("${WeatherPreferences.formatTempValue(d.maxTemp, unit)}°", px, tempY, tempPaint)
     }
 
     return bitmap
