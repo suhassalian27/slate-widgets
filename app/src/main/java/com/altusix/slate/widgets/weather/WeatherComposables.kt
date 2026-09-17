@@ -1268,7 +1268,7 @@ fun generateWeatherMinimalistDualBitmap(
     return bitmap
 }
 
-// 8. Weather Compact Dial (2x2)
+// 8. Weather Compact Dial (2x2 / 4-Corner Conditions Station)
 fun generateWeatherCompactDialBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1298,7 +1298,15 @@ fun generateWeatherCompactDialBitmap(
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Tightest-Axis Proportional Scalar: Prevents elements from staying oversized on compact sizes
+    val baseRef = scaleFactor * 145f
+    val propScale = minOf(cardW / baseRef, cardH / baseRef).coerceIn(0.55f, 1.35f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -1308,79 +1316,168 @@ fun generateWeatherCompactDialBitmap(
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
     val isNight = isNightTime(weather)
-    val pad = scaleFactor * 12f
+
+    val padX = (cardW * 0.08f).coerceIn(s * 10f, s * 18f)
+    val padY = (cardH * 0.08f).coerceIn(s * 10f, s * 18f)
+
+    // Corner metrics typography
+    val labelTextSize = (s * 7.2f).coerceIn(s * 5.8f, s * 10f)
+    val valTextSize = (s * 13.5f).coerceIn(s * 10f, s * 18f)
+    val metricIconSize = (s * 9.5f).coerceIn(s * 7.5f, s * 13f)
 
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 8.5f
+        textSize = labelTextSize
         typeface = getSlateFont(context, weight = 700)
+        letterSpacing = 0.05f
     }
     val valPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 11.5f
+        textSize = valTextSize
         typeface = getSlateFont(context, weight = 700)
     }
 
-    // Top-Left: WIND with icon
-    val windRes = getDrawableResId(context, "ic_weather_windy")
-    if (windRes != 0) {
-        drawVectorDrawable(canvas, context, windRes, RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + (scaleFactor * 12f), cardRect.top + pad + (scaleFactor * 12f)), secondaryText)
-        canvas.drawText("WIND", cardRect.left + pad + (scaleFactor * 15f), cardRect.top + pad + (scaleFactor * 9f), labelPaint)
-    } else {
-        canvas.drawText("WIND", cardRect.left + pad, cardRect.top + pad + (scaleFactor * 8f), labelPaint)
-    }
-    canvas.drawText("${weather.windSpeedKmH.toInt()} km/h", cardRect.left + pad, cardRect.top + pad + (scaleFactor * 22f), valPaint)
-
-    // Top-Right: HUMIDITY with icon
-    val humidRes = getDrawableResId(context, "ic_humidity")
     val rLabel = Paint(labelPaint).apply { textAlign = Paint.Align.RIGHT }
     val rVal = Paint(valPaint).apply { textAlign = Paint.Align.RIGHT }
-    if (humidRes != 0) {
-        drawVectorDrawable(canvas, context, humidRes, RectF(cardRect.right - pad - (scaleFactor * 52f), cardRect.top + pad, cardRect.right - pad - (scaleFactor * 42f), cardRect.top + pad + (scaleFactor * 12f)), secondaryText)
-    }
-    canvas.drawText("HUMIDITY", cardRect.right - pad, cardRect.top + pad + (scaleFactor * 8f), rLabel)
-    canvas.drawText("${weather.humidity}%", cardRect.right - pad, cardRect.top + pad + (scaleFactor * 22f), rVal)
 
-    // Bottom-Left: RAIN CHANCE with icon
+    // -------------------------------------------------------------------------
+    // TOP CORNERS: WIND (Left) & HUMIDITY (Right)
+    // -------------------------------------------------------------------------
+    val topLabelY = cardRect.top + padY + labelTextSize
+    val topValY = topLabelY + (s * 3.5f) + (valTextSize * 0.88f)
+
+    // Top-Left: WIND
+    val windRes = getDrawableResId(context, "ic_weather_windy")
+    if (windRes != 0) {
+        val iconRect = RectF(
+            cardRect.left + padX,
+            topLabelY - metricIconSize + (s * 1.2f),
+            cardRect.left + padX + metricIconSize,
+            topLabelY + (s * 1.2f)
+        )
+        drawVectorDrawable(canvas, context, windRes, iconRect, secondaryText)
+        canvas.drawText("WIND", cardRect.left + padX + metricIconSize + (s * 3.5f), topLabelY, labelPaint)
+    } else {
+        canvas.drawText("WIND", cardRect.left + padX, topLabelY, labelPaint)
+    }
+    canvas.drawText("${weather.windSpeedKmH.toInt()} km/h", cardRect.left + padX, topValY, valPaint)
+
+    // Top-Right: HUMIDITY
+    val humidRes = getDrawableResId(context, "ic_humidity")
+    val humidLabel = "HUMIDITY"
+    val humidLabelW = rLabel.measureText(humidLabel)
+    if (humidRes != 0) {
+        val totalTopRightW = metricIconSize + (s * 3.5f) + humidLabelW
+        val iconLeft = cardRect.right - padX - totalTopRightW
+        val iconRect = RectF(
+            iconLeft,
+            topLabelY - metricIconSize + (s * 1.2f),
+            iconLeft + metricIconSize,
+            topLabelY + (s * 1.2f)
+        )
+        drawVectorDrawable(canvas, context, humidRes, iconRect, secondaryText)
+    }
+    canvas.drawText(humidLabel, cardRect.right - padX, topLabelY, rLabel)
+    canvas.drawText("${weather.humidity}%", cardRect.right - padX, topValY, rVal)
+
+    // -------------------------------------------------------------------------
+    // BOTTOM CORNERS: RAIN (Left) & UV INDEX (Right)
+    // -------------------------------------------------------------------------
+    val btmValY = cardRect.bottom - padY
+    val btmLabelY = btmValY - (valTextSize * 0.88f) - (s * 3.5f)
+
+    // Bottom-Left: RAIN
     val rainRes = getDrawableResId(context, "ic_rain_chance")
     if (rainRes != 0) {
-        drawVectorDrawable(canvas, context, rainRes, RectF(cardRect.left + pad, cardRect.bottom - pad - (scaleFactor * 24f), cardRect.left + pad + (scaleFactor * 12f), cardRect.bottom - pad - (scaleFactor * 12f)), secondaryText)
-        canvas.drawText("RAIN", cardRect.left + pad + (scaleFactor * 15f), cardRect.bottom - pad - (scaleFactor * 14f), labelPaint)
+        val iconRect = RectF(
+            cardRect.left + padX,
+            btmLabelY - metricIconSize + (s * 1.2f),
+            cardRect.left + padX + metricIconSize,
+            btmLabelY + (s * 1.2f)
+        )
+        drawVectorDrawable(canvas, context, rainRes, iconRect, secondaryText)
+        canvas.drawText("RAIN", cardRect.left + padX + metricIconSize + (s * 3.5f), btmLabelY, labelPaint)
     } else {
-        canvas.drawText("RAIN", cardRect.left + pad, cardRect.bottom - pad - (scaleFactor * 14f), labelPaint)
+        canvas.drawText("RAIN", cardRect.left + padX, btmLabelY, labelPaint)
     }
-    canvas.drawText("${weather.rainChance}%", cardRect.left + pad, cardRect.bottom - pad, valPaint)
+    canvas.drawText("${weather.rainChance}%", cardRect.left + padX, btmValY, valPaint)
 
-    // Bottom-Right: UV INDEX with icon
+    // Bottom-Right: UV INDEX
     val uvRes = getDrawableResId(context, "ic_uv_index")
+    val uvLabel = "UV INDEX"
+    val uvLabelW = rLabel.measureText(uvLabel)
     if (uvRes != 0) {
-        drawVectorDrawable(canvas, context, uvRes, RectF(cardRect.right - pad - (scaleFactor * 48f), cardRect.bottom - pad - (scaleFactor * 24f), cardRect.right - pad - (scaleFactor * 38f), cardRect.bottom - pad - (scaleFactor * 12f)), secondaryText)
+        val totalBtmRightW = metricIconSize + (s * 3.5f) + uvLabelW
+        val iconLeft = cardRect.right - padX - totalBtmRightW
+        val iconRect = RectF(
+            iconLeft,
+            btmLabelY - metricIconSize + (s * 1.2f),
+            iconLeft + metricIconSize,
+            btmLabelY + (s * 1.2f)
+        )
+        drawVectorDrawable(canvas, context, uvRes, iconRect, secondaryText)
     }
-    canvas.drawText("UV INDEX", cardRect.right - pad, cardRect.bottom - pad - (scaleFactor * 14f), rLabel)
-    canvas.drawText(String.format("%.1f", weather.uvIndex), cardRect.right - pad, cardRect.bottom - pad, rVal)
+    canvas.drawText(uvLabel, cardRect.right - padX, btmLabelY, rLabel)
+    canvas.drawText(String.format(java.util.Locale.US, "%.1f", weather.uvIndex), cardRect.right - padX, btmValY, rVal)
 
-    // Center: Icon & Temp
+    // -------------------------------------------------------------------------
+    // CENTER HERO CORE: Bounded & Guaranteed Non-Colliding
+    // -------------------------------------------------------------------------
     val cx = cardRect.centerX()
-    val cy = cardRect.centerY()
-    val centerIconSize = scaleFactor * 26f
-    val iconRect = RectF(cx - (centerIconSize / 2f), cy - (scaleFactor * 27f), cx + (centerIconSize / 2f), cy - (scaleFactor * 1f))
-    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+
+    // Measure exact clear vertical space between top and bottom corner metrics
+    val topBoundaryY = topValY + (s * 4f)
+    val bottomBoundaryY = btmLabelY - labelTextSize - (s * 4f)
+    val availableCenterH = maxOf(0f, bottomBoundaryY - topBoundaryY)
+
+    // Base proportional sizes
+    var centerIconSize = (s * 24f).coerceIn(s * 16f, s * 34f)
+    var tempTextSize = (s * 32f).coerceIn(s * 20f, s * 44f)
+    var cityTextSize = (s * 9.5f).coerceIn(s * 7f, s * 12.5f)
+    var gapIconToTemp = s * 2.5f
+    var gapTempToCity = s * 2f
+
+    var totalCoreH = centerIconSize + gapIconToTemp + (tempTextSize * 0.86f) + gapTempToCity + cityTextSize
+
+    // Auto-compress hero stack if available height is tight
+    if (totalCoreH > availableCenterH && availableCenterH > 0f) {
+        val ratio = (availableCenterH / totalCoreH).coerceIn(0.60f, 1f)
+        centerIconSize *= ratio
+        tempTextSize *= ratio
+        cityTextSize *= ratio
+        gapIconToTemp *= ratio
+        gapTempToCity *= ratio
+        totalCoreH = centerIconSize + gapIconToTemp + (tempTextSize * 0.86f) + gapTempToCity + cityTextSize
+    }
 
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 32f
+        textSize = tempTextSize
         typeface = getSlateFont(context, weight = 800)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cx, cy + (scaleFactor * 18f), tempPaint)
-
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 9f
+        textSize = cityTextSize
         typeface = getSlateFont(context, weight = 600)
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText(weather.cityName, cx, cy + (scaleFactor * 30f), cityPaint)
+
+    val startY = cardRect.centerY() - (totalCoreH / 2f)
+
+    val iconRect = RectF(
+        cx - (centerIconSize / 2f),
+        startY,
+        cx + (centerIconSize / 2f),
+        startY + centerIconSize
+    )
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+
+    val tempY = startY + centerIconSize + gapIconToTemp + (tempTextSize * 0.86f)
+    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cx, tempY, tempPaint)
+
+    val cityY = tempY + gapTempToCity + cityTextSize
+    canvas.drawText(weather.cityName, cx, cityY, cityPaint)
 
     return bitmap
 }
