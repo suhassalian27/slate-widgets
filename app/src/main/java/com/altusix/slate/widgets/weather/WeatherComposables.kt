@@ -1098,7 +1098,7 @@ fun generateWeatherHourlyRibbonBitmap(
     return bitmap
 }
 
-// 7. Weather Minimalist Dual (2x2)
+// 7. Weather Minimalist Dual (2x2 / Split Quadrant)
 fun generateWeatherMinimalistDualBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1128,7 +1128,14 @@ fun generateWeatherMinimalistDualBitmap(
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Dual-Axis Proportional Scalar: Responds fluidly across small, square, and tall cell sizes
+    val propScale = ((cardW + cardH) / (scaleFactor * 280f)).coerceIn(0.65f, 1.65f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -1138,52 +1145,125 @@ fun generateWeatherMinimalistDualBitmap(
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
     val isNight = isNightTime(weather)
-    val pad = scaleFactor * 14f
-    val cx = cardRect.centerX()
 
-    // Left Half: Weather Vector Icon
-    val iconSize = scaleFactor * 48f
-    val iconLeft = cardRect.left + (cardRect.width() * 0.25f) - (iconSize / 2f)
+    val padX = (cardW * 0.085f).coerceIn(s * 10f, s * 20f)
+    val padY = (cardH * 0.09f).coerceIn(s * 10f, s * 20f)
+
+    // 2. Proportional Division: Left 44% (Icon) / Right 56% (Text) for optimal clearance
+    val dividerX = cardRect.left + (cardW * 0.44f)
+
+    // Center Divider Line
+    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
+        strokeWidth = s * 1f
+    }
+    canvas.drawLine(dividerX, cardRect.top + padY, dividerX, cardRect.bottom - padY, divPaint)
+
+    // -------------------------------------------------------------------------
+    // LEFT PANE: Weather Vector Icon (Centered Vertically & Horizontally)
+    // -------------------------------------------------------------------------
+    val leftPaneW = dividerX - cardRect.left
+    val iconSize = minOf(leftPaneW * 0.65f, cardH * 0.40f, s * 44f).coerceAtLeast(s * 18f)
+    val iconLeft = cardRect.left + (leftPaneW - iconSize) / 2f
     val iconTop = cardRect.centerY() - (iconSize / 2f)
     val iconRect = RectF(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
     drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
 
-    // Center Divider
-    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
-        strokeWidth = scaleFactor * 1f
-    }
-    canvas.drawLine(cx, cardRect.top + pad, cx, cardRect.bottom - pad, divPaint)
+    // -------------------------------------------------------------------------
+    // RIGHT PANE: Top Block (Temp & Condition) + Bottom Block (City & High/Low)
+    // -------------------------------------------------------------------------
+    val rightX = dividerX + (s * 11f)
+    val maxTextW = cardRect.right - padX - rightX
 
-    // Right Half: Stacked Info
-    val rightX = cx + (scaleFactor * 12f)
+    // Sizing & Paints
+    val tempTextSize = (s * 34f).coerceIn(s * 20f, s * 44f)
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 36f
+        textSize = tempTextSize
         typeface = getSlateFont(context, weight = 800)
     }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), rightX, cardRect.top + (scaleFactor * 52f), tempPaint)
 
+    var condTextSize = (s * 11.5f).coerceIn(s * 8f, s * 14.5f)
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 12f
+        textSize = condTextSize
         typeface = getSlateFont(context, weight = 600)
     }
-    canvas.drawText(weather.conditionText, rightX, cardRect.top + (scaleFactor * 72f), condPaint)
+    var displayCondition = weather.conditionText
+    while (condPaint.measureText(displayCondition) > maxTextW && condTextSize > s * 6.5f) {
+        condTextSize -= s * 0.35f
+        condPaint.textSize = condTextSize
+    }
+    if (condPaint.measureText(displayCondition) > maxTextW) {
+        while (displayCondition.length > 3 && condPaint.measureText("$displayCondition…") > maxTextW) {
+            displayCondition = displayCondition.dropLast(1)
+        }
+        displayCondition = "$displayCondition…"
+    }
 
+    var cityTextSize = (s * 9.5f).coerceIn(s * 7f, s * 12.5f)
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 10f
+        textSize = cityTextSize
         typeface = getSlateFont(context, weight = 700)
+        letterSpacing = 0.06f
     }
-    canvas.drawText(weather.cityName.uppercase(), rightX, cardRect.top + (scaleFactor * 90f), cityPaint)
+    var displayCity = weather.cityName.uppercase()
+    while (cityPaint.measureText(displayCity) > maxTextW && cityTextSize > s * 6f) {
+        cityTextSize -= s * 0.3f
+        cityPaint.textSize = cityTextSize
+    }
+    if (cityPaint.measureText(displayCity) > maxTextW) {
+        while (displayCity.length > 3 && cityPaint.measureText("$displayCity…") > maxTextW) {
+            displayCity = displayCity.dropLast(1)
+        }
+        displayCity = "$displayCity…"
+    }
 
+    var hlTextSize = (s * 9f).coerceIn(s * 6.8f, s * 12f)
     val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 9.5f
+        textSize = hlTextSize
         typeface = getSlateFont(context, weight = 600)
     }
-    canvas.drawText("H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}", rightX, cardRect.bottom - pad, hlPaint)
+    var hlStr = "H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
+    while (hlPaint.measureText(hlStr) > maxTextW && hlTextSize > s * 5.8f) {
+        hlTextSize -= s * 0.25f
+        hlPaint.textSize = hlTextSize
+    }
+
+    // Top and Bottom Group Positioning with Overlap Prevention
+    val topBlockH = (tempTextSize * 0.88f) + (s * 4f) + condTextSize
+    val btmBlockH = cityTextSize + (s * 3.5f) + hlTextSize
+    val availableH = cardH - (padY * 2f)
+
+    if (topBlockH + btmBlockH + (s * 8f) <= availableH) {
+        // Tall / Standard cell: Anchor top block to top, bottom block to bottom
+        val tempY = cardRect.top + padY + (tempTextSize * 0.88f)
+        val condY = tempY + (s * 4f) + condTextSize
+        val hlY = cardRect.bottom - padY
+        val cityY = hlY - hlTextSize - (s * 3.5f)
+
+        canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), rightX, tempY, tempPaint)
+        canvas.drawText(displayCondition, rightX, condY, condPaint)
+        canvas.drawText(displayCity, rightX, cityY, cityPaint)
+        canvas.drawText(hlStr, rightX, hlY, hlPaint)
+    } else {
+        // Tight / Compact cell: Vertically center the entire stack as a cohesive unit
+        val compactGap = s * 3.5f
+        val totalStackH = (tempTextSize * 0.88f) + compactGap + condTextSize + compactGap + cityTextSize + compactGap + hlTextSize
+        val startY = cardRect.centerY() - (totalStackH / 2f) + (tempTextSize * 0.88f)
+
+        val tempY = startY
+        val condY = tempY + compactGap + condTextSize
+        val cityY = condY + compactGap + cityTextSize
+        val hlY = cityY + compactGap + hlTextSize
+
+        canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), rightX, tempY, tempPaint)
+        canvas.drawText(displayCondition, rightX, condY, condPaint)
+        canvas.drawText(displayCity, rightX, cityY, cityPaint)
+        canvas.drawText(hlStr, rightX, hlY, hlPaint)
+    }
 
     return bitmap
 }
