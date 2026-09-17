@@ -1567,7 +1567,7 @@ fun generateWeatherMetroTrioBitmap(
     return bitmap
 }
 
-// 10. Micro Weather (1x1)
+// 10. Micro Weather (1x1 / Minimalist Single App Tile)
 fun generateWeatherMicroBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1597,7 +1597,15 @@ fun generateWeatherMicroBitmap(
         RectF(leftX, topY, leftX + size, topY + size)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Dual-Axis Proportional Scalar anchored to a 1x1 base cell (~75dp x 75dp)
+    val baseRef = scaleFactor * 75f
+    val propScale = minOf(cardW / baseRef, cardH / baseRef).coerceIn(0.60f, 2.2f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -1607,25 +1615,73 @@ fun generateWeatherMicroBitmap(
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
     val isNight = isNightTime(weather)
-    val pad = scaleFactor * 10f
 
-    val iconSize = scaleFactor * 24f
-    val iconRect = RectF(cardRect.right - pad - iconSize, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + iconSize)
-    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+    val padX = (cardW * 0.11f).coerceIn(s * 8f, s * 16f)
+    val padY = (cardH * 0.11f).coerceIn(s * 8f, s * 16f)
 
-    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 28f
-        typeface = getSlateFont(context, weight = 800)
-    }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cardRect.left + pad, cardRect.centerY() + (scaleFactor * 8f), tempPaint)
-
+    // -------------------------------------------------------------------------
+    // 1. BOTTOM: City Name (Pinned to bottom-left with auto-shrink)
+    // -------------------------------------------------------------------------
+    var cityTextSize = (s * 8.5f).coerceIn(s * 6f, s * 13f)
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 8.5f
+        textSize = cityTextSize
         typeface = getSlateFont(context, weight = 700)
     }
-    canvas.drawText(weather.cityName, cardRect.left + pad, cardRect.bottom - pad, cityPaint)
+    val maxCityW = cardW - (padX * 2f)
+    var displayCity = weather.cityName
+    while (cityPaint.measureText(displayCity) > maxCityW && cityTextSize > s * 5.5f) {
+        cityTextSize -= s * 0.3f
+        cityPaint.textSize = cityTextSize
+    }
+    if (cityPaint.measureText(displayCity) > maxCityW) {
+        while (displayCity.length > 3 && cityPaint.measureText("$displayCity…") > maxCityW) {
+            displayCity = displayCity.dropLast(1)
+        }
+        displayCity = "$displayCity…"
+    }
+    val cityY = cardRect.bottom - padY
+    canvas.drawText(displayCity, cardRect.left + padX, cityY, cityPaint)
+
+    // -------------------------------------------------------------------------
+    // 2. TOP-RIGHT: Weather Vector Icon
+    // -------------------------------------------------------------------------
+    val maxIconSize = minOf(cardW * 0.34f, cardH * 0.34f)
+    val iconSize = (s * 20f).coerceIn(s * 14f, maxIconSize)
+    val iconRect = RectF(
+        cardRect.right - padX - iconSize,
+        cardRect.top + padY,
+        cardRect.right - padX,
+        cardRect.top + padY + iconSize
+    )
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+
+    // -------------------------------------------------------------------------
+    // 3. HERO TEMPERATURE: Non-Colliding Dynamic Positioning
+    // -------------------------------------------------------------------------
+    val tempStr = WeatherPreferences.formatTemp(weather.currentTemp, unit)
+    val maxTempW = iconRect.left - (cardRect.left + padX) - (s * 2.5f)
+
+    var tempTextSize = (s * 26f).coerceIn(s * 16f, s * 46f)
+    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = tempTextSize
+        typeface = getSlateFont(context, weight = 800)
+    }
+
+    // Auto-scale temperature font down if it risks touching the icon
+    while (tempPaint.measureText(tempStr) > maxTempW && tempTextSize > s * 14f) {
+        tempTextSize -= s * 0.5f
+        tempPaint.textSize = tempTextSize
+    }
+
+    // Vertically center the temperature in the open space between card top and city name
+    val topBound = cardRect.top + padY
+    val bottomBound = cityY - cityTextSize - (s * 3.5f)
+    val availableH = maxOf(0f, bottomBound - topBound)
+    val tempY = topBound + (availableH / 2f) + (tempTextSize * 0.38f)
+
+    canvas.drawText(tempStr, cardRect.left + padX, tempY, tempPaint)
 
     return bitmap
 }
