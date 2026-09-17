@@ -742,7 +742,7 @@ fun generateWeatherDaylightArcBitmap(
     return bitmap
 }
 
-// 4. Weather Pill Dock (4x1)
+// 4. Weather Pill Dock (4x1 / Wide Bar)
 fun generateWeatherPillDockBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -777,7 +777,16 @@ fun generateWeatherPillDockBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Proportional Scalar calibrated to standard 4x1 dimensions (~300dp x 75dp)
+    val baseRefW = scaleFactor * 300f
+    val baseRefH = scaleFactor * 75f
+    val propScale = minOf(cardW / baseRefW, cardH / baseRefH).coerceIn(0.60f, 1.45f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
@@ -787,69 +796,168 @@ fun generateWeatherPillDockBitmap(
     val weather = WeatherPreferences.getCachedWeatherData(context)
     val unit = WeatherPreferences.getUnit(context)
     val isNight = isNightTime(weather)
-    val pad = scaleFactor * 14f
 
-    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 13f
-        typeface = getSlateFont(context, weight = 700)
+    // Unified padding: Top, bottom, and right match identically
+    val pad = (cardH * 0.095f).coerceIn(s * 6f, s * 8.5f)
+
+    // Calculate exact corner inset at the bottom line to prevent border-radius clipping
+    val cornerInset = if (pad < outerRadius && outerRadius > 0f) {
+        val dy = outerRadius - pad
+        (outerRadius - Math.sqrt((outerRadius * outerRadius - dy * dy).coerceAtLeast(0f).toDouble()).toFloat())
+    } else {
+        0f
     }
-    canvas.drawText(weather.cityName, cardRect.left + pad, cardRect.centerY() - (scaleFactor * 3f), cityPaint)
+    val leftStartX = cardRect.left + pad + cornerInset + (s * 3.5f)
 
-    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = scaleFactor * 10f
-        typeface = getSlateFont(context, weight = 600)
-    }
-    canvas.drawText("${weather.conditionText} • H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)} L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}", cardRect.left + pad, cardRect.centerY() + (scaleFactor * 11f), condPaint)
-
-    // Center Temp & Icon
-    val centerLeft = cardRect.left + (cardRect.width() * 0.44f)
-    val iconSize = scaleFactor * 24f
-    val iconRect = RectF(centerLeft, cardRect.centerY() - (iconSize / 2f), centerLeft + iconSize, cardRect.centerY() + (iconSize / 2f))
-    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
-
-    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 24f
-        typeface = getSlateFont(context, weight = 800)
-    }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), centerLeft + iconSize + (scaleFactor * 8f), cardRect.centerY() + (scaleFactor * 8f), tempPaint)
-
-    // Right Hourly Pills
+    // -------------------------------------------------------------------------
+    // RIGHT SECTION: Hourly Forecast Pills (Concentric Outer Radius)
+    // -------------------------------------------------------------------------
     val hourlyItems = weather.hourlyForecast.drop(1).take(3)
-    val pillStartX = cardRect.right - pad - (scaleFactor * 115f)
-    val pillW = scaleFactor * 36f
-    val pillGap = scaleFactor * 4f
+    val pillGap = s * 4f
+    val pillW = (s * 34f).coerceIn(s * 24f, s * 42f)
+    val totalPillsW = (hourlyItems.size * pillW) + ((hourlyItems.size - 1) * pillGap)
 
+    val pillsEndX = cardRect.right - pad
+    val pillsStartX = pillsEndX - totalPillsW
+
+    val pillTop = cardRect.top + pad
+    val pillBottom = cardRect.bottom - pad
+    val pillH = pillBottom - pillTop
+
+    val hourLabelTextSize = (pillH * 0.18f).coerceIn(s * 6.5f, s * 10f)
     val hourLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
-        textSize = scaleFactor * 8.5f
+        textSize = hourLabelTextSize
         typeface = getSlateFont(context, weight = 600)
         textAlign = Paint.Align.CENTER
     }
+
+    val hourTempTextSize = (pillH * 0.22f).coerceIn(s * 8f, s * 12.5f)
     val hourTempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = scaleFactor * 10f
+        textSize = hourTempTextSize
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
+
+    val pillIconSize = (pillH * 0.28f).coerceIn(s * 12f, s * 18f)
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val pillTilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
+
+    val concentricRadius = (outerRadius - pad).coerceAtLeast(s * 6f).coerceAtMost(pillH / 2f)
+    val innerRadius = (s * 7.5f).coerceIn(s * 5.5f, s * 9.5f)
 
     for (i in hourlyItems.indices) {
         val item = hourlyItems[i]
-        val px = pillStartX + i * (pillW + pillGap)
-        val pRect = RectF(px, cardRect.top + (scaleFactor * 8f), px + pillW, cardRect.bottom - (scaleFactor * 8f))
+        val px = pillsStartX + i * (pillW + pillGap)
+        val pRect = RectF(px, pillTop, px + pillW, pillBottom)
 
-        val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
-        val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = innerCardBg
-            style = Paint.Style.FILL
+        if (i == hourlyItems.lastIndex) {
+            // Concentric corner curvature matching widget's outer boundary
+            val radii = floatArrayOf(
+                innerRadius, innerRadius,
+                concentricRadius, concentricRadius,
+                concentricRadius, concentricRadius,
+                innerRadius, innerRadius
+            )
+            val path = Path().apply { addRoundRect(pRect, radii, Path.Direction.CW) }
+            canvas.drawPath(path, pillTilePaint)
+        } else {
+            canvas.drawRoundRect(pRect, innerRadius, innerRadius, pillTilePaint)
         }
-        canvas.drawRoundRect(pRect, scaleFactor * 8f, scaleFactor * 8f, tilePaint)
 
-        canvas.drawText(item.timeLabel, pRect.centerX(), pRect.top + (scaleFactor * 11f), hourLabelPaint)
-        canvas.drawText(WeatherPreferences.formatTemp(item.temp, unit), pRect.centerX(), pRect.bottom - (scaleFactor * 6f), hourTempPaint)
+        canvas.drawText(item.timeLabel, pRect.centerX(), pRect.top + (pillH * 0.23f), hourLabelPaint)
+
+        val pillIconRect = RectF(
+            pRect.centerX() - (pillIconSize / 2f),
+            pRect.centerY() - (pillIconSize / 2f),
+            pRect.centerX() + (pillIconSize / 2f),
+            pRect.centerY() + (pillIconSize / 2f)
+        )
+        drawWeatherIcon(canvas, context, item.weatherCode, pillIconRect, accentColor, isNight = false)
+
+        canvas.drawText(WeatherPreferences.formatTemp(item.temp, unit), pRect.centerX(), pRect.bottom - (pillH * 0.12f), hourTempPaint)
     }
+
+    // -------------------------------------------------------------------------
+    // LEFT TOP SECTION: Weather Vector Icon + Hero Degree (Pinned to Top)
+    // -------------------------------------------------------------------------
+    val maxLeftW = pillsStartX - leftStartX - (s * 10f)
+
+    val iconSize = (cardH * 0.35f).coerceIn(s * 18f, s * 30f)
+    val tempTextSize = (cardH * 0.40f).coerceIn(s * 20f, s * 36f)
+    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = tempTextSize
+        typeface = getSlateFont(context, weight = 800)
+    }
+    val tempStr = WeatherPreferences.formatTemp(weather.currentTemp, unit)
+
+    val topRowH = maxOf(iconSize, tempTextSize * 0.86f)
+    val iconRect = RectF(
+        leftStartX,
+        cardRect.top + pad + ((topRowH - iconSize) / 2f),
+        leftStartX + iconSize,
+        cardRect.top + pad + ((topRowH + iconSize) / 2f)
+    )
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+
+    val tempX = iconRect.right + (s * 6f)
+    val tempY = cardRect.top + pad + (topRowH / 2f) + (tempTextSize * 0.35f)
+    canvas.drawText(tempStr, tempX, tempY, tempPaint)
+
+    // -------------------------------------------------------------------------
+    // LEFT BOTTOM SECTION: City (Upper) & Condition + Range (Lower) (Pinned to Bottom)
+    // -------------------------------------------------------------------------
+    var condTextSize = (s * 9.2f).coerceIn(s * 7.2f, s * 11.5f)
+    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = condTextSize
+        typeface = getSlateFont(context, weight = 600)
+    }
+
+    var cityTextSize = (s * 11.5f).coerceIn(s * 8.5f, s * 14f)
+    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = cityTextSize
+        typeface = getSlateFont(context, weight = 700)
+    }
+
+    val condStr = "${weather.conditionText}  •  H: ${WeatherPreferences.formatTemp(weather.tempMax, unit)}  L: ${WeatherPreferences.formatTemp(weather.tempMin, unit)}"
+    val condY = cardRect.bottom - pad
+    val textGap = (cardH * 0.045f).coerceIn(s * 2.5f, s * 4f)
+    val cityY = condY - condTextSize - textGap
+
+    // Auto-scale City text size to prevent truncation when space exists
+    var displayCity = weather.cityName
+    while (cityPaint.measureText(displayCity) > maxLeftW && cityTextSize > s * 7.5f) {
+        cityTextSize -= s * 0.3f
+        cityPaint.textSize = cityTextSize
+    }
+    if (cityPaint.measureText(displayCity) > maxLeftW) {
+        while (displayCity.length > 3 && cityPaint.measureText("$displayCity…") > maxLeftW) {
+            displayCity = displayCity.dropLast(1)
+        }
+        displayCity = "$displayCity…"
+    }
+    canvas.drawText(displayCity, leftStartX, cityY, cityPaint)
+
+    // Auto-scale Condition + Range string smoothly down to fit width
+    var displayCond = condStr
+    while (condPaint.measureText(displayCond) > maxLeftW && condTextSize > s * 6.5f) {
+        condTextSize -= s * 0.3f
+        condPaint.textSize = condTextSize
+    }
+    if (condPaint.measureText(displayCond) > maxLeftW) {
+        while (displayCond.length > 3 && condPaint.measureText("$displayCond…") > maxLeftW) {
+            displayCond = displayCond.dropLast(1)
+        }
+        displayCond = "$displayCond…"
+    }
+    canvas.drawText(displayCond, leftStartX, condY, condPaint)
 
     return bitmap
 }
