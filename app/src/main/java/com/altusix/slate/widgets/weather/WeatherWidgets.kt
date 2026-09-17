@@ -234,51 +234,62 @@ fun updateAllWeatherWidgets(context: Context) {
 }
 
 // Concrete Receivers
+
+// 1. Weather Horizon (4x2 / Editorial Forecast
 class WeatherHorizonReceiver : BaseWeatherReceiver(targetAspect = 2.0f, widgetTypeTag = "HORIZON") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherHorizonBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 2. Weather Bento Glance (4x2)
 class WeatherBentoGlanceReceiver : BaseWeatherReceiver(targetAspect = 2.0f, widgetTypeTag = "BENTO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherBentoGlanceBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 3. Weather Daylight Arc (2x2 / Sun Daylight Progress Arc)
 class WeatherDaylightArcReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "ARC") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherDaylightArcBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 4. Weather Pill Dock (4x1)
 class WeatherPillDockReceiver : BaseWeatherReceiver(targetAspect = 4.0f, widgetTypeTag = "DOCK") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherPillDockBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 5. Weather Editorial Capsule (2x2)
 class WeatherEditorialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "EDITORIAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherEditorialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 6. Weather Hourly Ribbon (4x1)
 class WeatherHourlyRibbonReceiver : BaseWeatherReceiver(targetAspect = 4.0f, widgetTypeTag = "RIBBON") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherHourlyRibbonBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 7. Weather Minimalist Dual (2x2)
 class WeatherMinimalistDualReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "DUAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMinimalistDualBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 8. Weather Compact Dial (2x2)
 class WeatherCompactDialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "DIAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherCompactDialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 9. Weather Metro Trio (3x1)
 class WeatherMetroTrioReceiver : BaseWeatherReceiver(targetAspect = 3.0f, widgetTypeTag = "TRIO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMetroTrioBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
+// 10. Micro Weather (1x1)
 class WeatherMicroReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "MICRO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMicroBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
