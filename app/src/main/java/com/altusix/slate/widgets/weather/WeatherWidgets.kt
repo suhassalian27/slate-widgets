@@ -203,7 +203,6 @@ fun getWeatherWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Weather Daylight Arc", sizeText = "2x2", category = "Weather", receiverClass = WeatherDaylightArcReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Pill Dock", sizeText = "4x1", category = "Weather", receiverClass = WeatherPillDockReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Editorial", sizeText = "2x2", category = "Weather", receiverClass = WeatherEditorialReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Weather Hourly Ribbon", sizeText = "4x1", category = "Weather", receiverClass = WeatherHourlyRibbonReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Minimalist Dual", sizeText = "2x2", category = "Weather", receiverClass = WeatherMinimalistDualReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Compact Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCompactDialReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Metro Trio", sizeText = "3x1", category = "Weather", receiverClass = WeatherMetroTrioReceiver::class.java, hasModeOption = true),
@@ -219,7 +218,6 @@ fun updateAllWeatherWidgets(context: Context) {
         WeatherDaylightArcReceiver(),
         WeatherPillDockReceiver(),
         WeatherEditorialReceiver(),
-        WeatherHourlyRibbonReceiver(),
         WeatherMinimalistDualReceiver(),
         WeatherCompactDialReceiver(),
         WeatherMetroTrioReceiver(),
@@ -265,31 +263,25 @@ class WeatherEditorialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widget
         generateWeatherEditorialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 6. Weather Hourly Ribbon (4x1)
-class WeatherHourlyRibbonReceiver : BaseWeatherReceiver(targetAspect = 4.0f, widgetTypeTag = "RIBBON") {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
-        generateWeatherHourlyRibbonBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
-}
-
-// 7. Weather Minimalist Dual (2x2)
+// 6. Weather Minimalist Dual (2x2)
 class WeatherMinimalistDualReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "DUAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMinimalistDualBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 8. Weather Compact Dial (2x2)
+// 7. Weather Compact Dial (2x2)
 class WeatherCompactDialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "DIAL") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherCompactDialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 9. Weather Metro Trio (3x1)
+// 8. Weather Metro Trio (3x1)
 class WeatherMetroTrioReceiver : BaseWeatherReceiver(targetAspect = 3.0f, widgetTypeTag = "TRIO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMetroTrioBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
-// 10. Micro Weather (1x1)
+// 9. Micro Weather (1x1)
 class WeatherMicroReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "MICRO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMicroBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)

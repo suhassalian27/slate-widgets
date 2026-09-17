@@ -4518,20 +4518,7 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 6. Weather Hourly Ribbon (4x1) -->
-        <receiver
-            android:name=".widgets.weather.WeatherHourlyRibbonReceiver"
-            android:exported="true"
-            android:label="Weather Hourly Ribbon">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_4x1" />
-        </receiver>
-
-        <!-- 7. Weather Minimalist Dual (2x2) -->
+        <!-- 6. Weather Minimalist Dual (2x2) -->
         <receiver
             android:name=".widgets.weather.WeatherMinimalistDualReceiver"
             android:exported="true"
@@ -4544,7 +4531,7 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 8. Weather Compact Dial (2x2) -->
+        <!-- 7. Weather Compact Dial (2x2) -->
         <receiver
             android:name=".widgets.weather.WeatherCompactDialReceiver"
             android:exported="true"
@@ -4557,7 +4544,7 @@
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
 
-        <!-- 9. Weather Metro Trio (3x1) -->
+        <!-- 8. Weather Metro Trio (3x1) -->
         <receiver
             android:name=".widgets.weather.WeatherMetroTrioReceiver"
             android:exported="true"
@@ -4570,7 +4557,7 @@
                 android:resource="@xml/widget_info_3x1" />
         </receiver>
 
-        <!-- 10. Micro Weather (1x1) -->
+        <!-- 9. Micro Weather (1x1) -->
         <receiver
             android:name=".widgets.weather.WeatherMicroReceiver"
             android:exported="true"

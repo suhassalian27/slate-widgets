@@ -1106,107 +1106,7 @@ fun generateWeatherEditorialBitmap(
     return bitmap
 }
 
-// 6. Weather Hourly Ribbon (4x1)
-fun generateWeatherHourlyRibbonBitmap(
-    context: Context,
-    config: SlateWidgetConfig,
-    isResponsive: Boolean,
-    wDp: Int,
-    hDp: Int,
-    widgetId: Int
-): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
-    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
-    val accentColor = config.accentColorHex.toInt()
-
-    val margin = scaleFactor * 1.5f
-    val targetRatio = 4.0f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        var cardH = h - (margin * 2f)
-        var cardW = cardH * targetRatio
-        if (cardW > w - (margin * 2f)) {
-            cardW = w - (margin * 2f)
-            cardH = cardW / targetRatio
-        }
-        val leftX = (w - cardW) / 2f
-        val topY = (h - cardH) / 2f
-        RectF(leftX, topY, leftX + cardW, topY + cardH)
-    }
-
-    val outerRadius = getStandardCornerRadius(scaleFactor)
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
-
-    val weather = WeatherPreferences.getCachedWeatherData(context)
-    val unit = WeatherPreferences.getUnit(context)
-    val pad = scaleFactor * 12f
-
-    val leftW = scaleFactor * 75f
-    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 26f
-        typeface = getSlateFont(context, weight = 800)
-    }
-    canvas.drawText(WeatherPreferences.formatTemp(weather.currentTemp, unit), cardRect.left + pad, cardRect.centerY() - (scaleFactor * 2f), tempPaint)
-
-    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = scaleFactor * 9.5f
-        typeface = getSlateFont(context, weight = 700)
-    }
-    canvas.drawText(weather.cityName, cardRect.left + pad, cardRect.centerY() + (scaleFactor * 11f), cityPaint)
-
-    val divX = cardRect.left + pad + leftW
-    val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(20, 0, 0, 0) else Color.argb(30, 255, 255, 255)
-        strokeWidth = scaleFactor * 1f
-    }
-    canvas.drawLine(divX, cardRect.top + pad, divX, cardRect.bottom - pad, divPaint)
-
-    val hourly = weather.hourlyForecast.take(5)
-    val ribbonLeft = divX + (scaleFactor * 12f)
-    val ribbonW = cardRect.right - pad - ribbonLeft
-    val nodeStep = ribbonW / maxOf(1, hourly.size - 1)
-
-    val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = scaleFactor * 8.5f
-        typeface = getSlateFont(context, weight = 600)
-        textAlign = Paint.Align.CENTER
-    }
-    val hTempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = scaleFactor * 10.5f
-        typeface = getSlateFont(context, weight = 700)
-        textAlign = Paint.Align.CENTER
-    }
-
-    for (i in hourly.indices) {
-        val item = hourly[i]
-        val nx = ribbonLeft + i * nodeStep
-        val iconSize = scaleFactor * 15f
-        val iRect = RectF(nx - (iconSize / 2f), cardRect.centerY() - (iconSize / 2f) - (scaleFactor * 2f), nx + (iconSize / 2f), cardRect.centerY() + (iconSize / 2f) - (scaleFactor * 2f))
-
-        canvas.drawText(item.timeLabel, nx, cardRect.top + pad + (scaleFactor * 6f), timePaint)
-        drawWeatherIcon(canvas, context, item.weatherCode, iRect, accentColor, isNight = false)
-        canvas.drawText(WeatherPreferences.formatTemp(item.temp, unit), nx, cardRect.bottom - pad, hTempPaint)
-    }
-
-    return bitmap
-}
-
-// 7. Weather Minimalist Dual (2x2 / Split Quadrant)
+// 6. Weather Minimalist Dual (2x2 / Split Quadrant)
 fun generateWeatherMinimalistDualBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1376,7 +1276,7 @@ fun generateWeatherMinimalistDualBitmap(
     return bitmap
 }
 
-// 8. Weather Compact Dial (2x2 / 4-Corner Conditions Station)
+// 7. Weather Compact Dial (2x2 / 4-Corner Conditions Station)
 fun generateWeatherCompactDialBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1590,7 +1490,7 @@ fun generateWeatherCompactDialBitmap(
     return bitmap
 }
 
-// 9. Weather Metro Trio (3x1)
+// 8. Weather Metro Trio (3x1)
 fun generateWeatherMetroTrioBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1675,7 +1575,7 @@ fun generateWeatherMetroTrioBitmap(
     return bitmap
 }
 
-// 10. Micro Weather (1x1 / Minimalist Single App Tile)
+// 9. Micro Weather (1x1 / Minimalist Single App Tile)
 fun generateWeatherMicroBitmap(
     context: Context,
     config: SlateWidgetConfig,
