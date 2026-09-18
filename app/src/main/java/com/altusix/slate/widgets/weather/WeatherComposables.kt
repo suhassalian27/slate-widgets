@@ -1781,7 +1781,9 @@ fun generateWeatherMicroBitmap(
     return bitmap
 }
 
+// =========================================================================
 // 10. Weather Celestial Lunar (2x2 / Minimalist Lunar Poster)
+// =========================================================================
 fun generateWeatherCelestialBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1798,6 +1800,7 @@ fun generateWeatherCelestialBitmap(
     val bgColor = getSafeBgColor(config)
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val accentColor = config.accentColorHex.toInt()
 
     val margin = scaleFactor * 1.5f
     val targetRatio = 1.0f
@@ -1829,7 +1832,7 @@ fun generateWeatherCelestialBitmap(
     val unit = WeatherPreferences.getUnit(context)
 
     // -------------------------------------------------------------------------
-    // 2. CELESTIAL SPHERE: Realistic 3D Phase Lighting
+    // 2. CELESTIAL SPHERE: Strict Circular Clipping & Asset Compensation
     // -------------------------------------------------------------------------
     val sphereRadius = cardH * 0.58f
     val sphereCx = cardRect.right + (cardW * 0.04f)
@@ -1841,22 +1844,37 @@ fun generateWeatherCelestialBitmap(
         sphereCy + sphereRadius
     )
 
-    // Clip strictly to card boundary
+    // Dual clip: strictly bound by both the card outer corners and the lunar sphere
     val cardPath = Path().apply {
         addRoundRect(cardRect, outerRadius, outerRadius, Path.Direction.CW)
     }
+    val moonClip = Path().apply {
+        addCircle(sphereCx, sphereCy, sphereRadius, Path.Direction.CW)
+    }
+
     canvas.save()
     canvas.clipPath(cardPath)
+    canvas.clipPath(moonClip)
 
     val moonRes = getDrawableResId(context, "img_lunar_sphere")
     if (moonRes != 0) {
         val moonDrawable = androidx.core.content.ContextCompat.getDrawable(context, moonRes)
         moonDrawable?.let {
+            // Compensate for the 15.1% transparent margin baked into the SVG/WebP asset
+            val assetScale = 1.0f / 0.8491f // ~1.178x zoom
+            val assetRadius = sphereRadius * assetScale
+            val assetRect = RectF(
+                sphereCx - assetRadius,
+                sphereCy - assetRadius,
+                sphereCx + assetRadius,
+                sphereCy + assetRadius
+            )
+
             it.setBounds(
-                sphereRect.left.toInt(),
-                sphereRect.top.toInt(),
-                sphereRect.right.toInt(),
-                sphereRect.bottom.toInt()
+                assetRect.left.toInt(),
+                assetRect.top.toInt(),
+                assetRect.right.toInt(),
+                assetRect.bottom.toInt()
             )
             it.draw(canvas)
         }
@@ -1874,7 +1892,7 @@ fun generateWeatherCelestialBitmap(
     canvas.restore()
 
     // -------------------------------------------------------------------------
-    // 3. LEFT SECTION: Typography & Temperature
+    // 3. LEFT SECTION: Typography & Accent Tinted Degree Symbol
     // -------------------------------------------------------------------------
     val padX = (cardW * 0.11f).coerceIn(s * 12f, s * 22f)
     val padY = (cardH * 0.11f).coerceIn(s * 12f, s * 22f)
@@ -1885,7 +1903,7 @@ fun generateWeatherCelestialBitmap(
     val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = cityTextSize
-        typeface = getSlateFont(context, weight = 500)
+        typeface = getSlateFont(context, weight = 600)
     }
     var displayCity = weather.cityName
     while (cityPaint.measureText(displayCity) > maxTextW && cityTextSize > s * 8f) {
@@ -1895,7 +1913,7 @@ fun generateWeatherCelestialBitmap(
     val cityY = cardRect.top + padY + cityTextSize
     canvas.drawText(displayCity, cardRect.left + padX, cityY, cityPaint)
 
-    // Top: Weather Condition
+    // Top: Weather Condition (Neutral secondary tone)
     var condTextSize = (s * 12f).coerceIn(s * 8.5f, s * 16f)
     val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryText
@@ -1910,20 +1928,26 @@ fun generateWeatherCelestialBitmap(
     val condY = cityY + condTextSize + (s * 3.5f)
     canvas.drawText(displayCond, cardRect.left + padX, condY, condPaint)
 
-    // Bottom: Clean Sleek Degree
+    // Bottom: Clean Numeral with Editorial Accent Degree Symbol
     val tempTextSize = (cardH * 0.25f).coerceIn(s * 28f, s * 48f)
     val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
         textSize = tempTextSize
         typeface = getSlateFont(context, weight = 300)
     }
+    val degreePaint = Paint(tempPaint).apply {
+        color = if (accentColor != 0 && accentColor != Color.WHITE) accentColor else primaryText
+    }
+
     val tempY = cardRect.bottom - padY
-    val tempStr = "${WeatherPreferences.formatTempValue(weather.currentTemp, unit)}°"
-    canvas.drawText(tempStr, cardRect.left + padX, tempY, tempPaint)
+    val tempValStr = WeatherPreferences.formatTempValue(weather.currentTemp, unit).toString()
+    val tempValW = tempPaint.measureText(tempValStr)
+
+    canvas.drawText(tempValStr, cardRect.left + padX, tempY, tempPaint)
+    canvas.drawText("°", cardRect.left + padX + tempValW, tempY, degreePaint)
 
     return bitmap
 }
-
 
 // 11. Weather Lunar Solo (Standalone Transparent Sphere)
 fun generateWeatherLunarSoloBitmap(
@@ -2239,7 +2263,10 @@ fun generateWeatherOrbitDialBitmap(
     return bitmap
 }
 
+
+// =========================================================================
 // 13. Weather Solar Track (4x1 Pill / Smart Responsive Celestial Horizon)
+// =========================================================================
 fun generateWeatherSolarTrackBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -2332,7 +2359,7 @@ fun generateWeatherSolarTrackBitmap(
     val celestialProgress = if (isSunActive) {
         ((minuteOfDay - sunriseMin).toFloat() / (sunsetMin - sunriseMin)).coerceIn(0.06f, 0.94f)
     } else {
-        val nightDuration = (24 * 60 - sunsetMin) + sunriseMin // 690 mins
+        val nightDuration = (24 * 60 - sunsetMin) + sunriseMin
         val elapsedNight = if (minuteOfDay >= sunsetMin) {
             minuteOfDay - sunsetMin
         } else {
@@ -2341,7 +2368,7 @@ fun generateWeatherSolarTrackBitmap(
         (elapsedNight.toFloat() / nightDuration).coerceIn(0.06f, 0.94f)
     }
 
-    val tempStr = "${WeatherPreferences.formatTempValue(weather.currentTemp, unit)}°"
+    val tempValStr = WeatherPreferences.formatTempValue(weather.currentTemp, unit).toString()
     var displayCond = weather.conditionText
     var displayCity = weather.cityName
     val dateStr = java.text.SimpleDateFormat("EEE, d MMM", java.util.Locale.getDefault()).format(java.util.Date())
@@ -2364,6 +2391,9 @@ fun generateWeatherSolarTrackBitmap(
             textSize = tempTextSize
             typeface = getSlateFont(context, weight = 300)
         }
+        val degreePaint = Paint(tempPaint).apply {
+            color = if (accentColor != 0 && accentColor != Color.WHITE) accentColor else primaryText
+        }
 
         var condTextSize = (s * 8f).coerceIn(s * 7.5f, s * 13f)
         val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2384,11 +2414,16 @@ fun generateWeatherSolarTrackBitmap(
         val leftStartY = cy - (leftTotalH / 2f)
 
         val tempY = leftStartY + tempVisualH
-        canvas.drawText(tempStr, sidePadding, tempY, tempPaint)
+        val tempValW = tempPaint.measureText(tempValStr)
+        val degreeW = degreePaint.measureText("°")
+
+        canvas.drawText(tempValStr, sidePadding, tempY, tempPaint)
+        canvas.drawText("°", sidePadding + tempValW, tempY, degreePaint)
+
         val condY = tempY + gapLeft + condTextSize
         canvas.drawText(displayCond, sidePadding, condY, condPaint)
 
-        val leftBlockEnd = sidePadding + maxOf(tempPaint.measureText(tempStr), condPaint.measureText(displayCond))
+        val leftBlockEnd = sidePadding + maxOf(tempValW + degreeW, condPaint.measureText(displayCond))
 
         // Right Typography
         var cityTextSize = (s * 10.5f).coerceIn(s * 7.5f, s * 13.5f)
@@ -2479,7 +2514,7 @@ fun generateWeatherSolarTrackBitmap(
             celestialProgress, orbRadius, isSunActive, s
         )
 
-        // 3. Bottom Row: Hero Temperature & Condition
+        // 3. Bottom Row: Hero Temperature with Accent Degree & Condition
         val tempTextSize = (cardH * 0.26f).coerceIn(s * 28f, s * 50f)
         val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryText
@@ -2487,6 +2522,10 @@ fun generateWeatherSolarTrackBitmap(
             typeface = getSlateFont(context, weight = 300)
             textAlign = Paint.Align.LEFT
         }
+        val degreePaint = Paint(tempPaint).apply {
+            color = if (accentColor != 0 && accentColor != Color.WHITE) accentColor else primaryText
+        }
+
         val condTextSize = (s * 11.5f).coerceIn(s * 8.5f, s * 15f)
         val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = secondaryText
@@ -2496,9 +2535,12 @@ fun generateWeatherSolarTrackBitmap(
         }
 
         val bottomY = cardRect.bottom - (cardH * 0.14f).coerceIn(s * 14f, s * 28f)
-        val tempW = tempPaint.measureText(tempStr)
-        canvas.drawText(tempStr, padX, bottomY, tempPaint)
-        canvas.drawText(displayCond, padX + tempW + (s * 8f), bottomY - (tempTextSize * 0.12f), condPaint)
+        val tempValW = tempPaint.measureText(tempValStr)
+        val degreeW = degreePaint.measureText("°")
+
+        canvas.drawText(tempValStr, padX, bottomY, tempPaint)
+        canvas.drawText("°", padX + tempValW, bottomY, degreePaint)
+        canvas.drawText(displayCond, padX + tempValW + degreeW + (s * 8f), bottomY - (tempTextSize * 0.12f), condPaint)
     }
 
     return bitmap
@@ -2531,9 +2573,7 @@ private fun drawCelestialHorizon(
     val orbRect = RectF(orbX - orbRadius, cy - orbRadius, orbX + orbRadius, cy + orbRadius)
 
     if (isSunActive) {
-        // ---------------------------------------------------------------------
-        // DAYTIME: Luminous Golden Sun & Amber Horizon Trail
-        // ---------------------------------------------------------------------
+        // Daytime: Sun
         val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             strokeWidth = s * 1.8f
             shader = android.graphics.LinearGradient(
@@ -2549,7 +2589,6 @@ private fun drawCelestialHorizon(
         }
         canvas.drawLine(trackStart, cy, orbX, cy, trailPaint)
 
-        // Solar Atmospheric Bloom
         val glowRadius = orbRadius * 2.8f
         val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = android.graphics.RadialGradient(
@@ -2561,7 +2600,6 @@ private fun drawCelestialHorizon(
         }
         canvas.drawCircle(orbX, cy, glowRadius, glowPaint)
 
-        // Core Solar Disk
         val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = android.graphics.LinearGradient(
                 orbX, cy - orbRadius, orbX, cy + orbRadius,
@@ -2573,9 +2611,7 @@ private fun drawCelestialHorizon(
         }
         canvas.drawCircle(orbX, cy, orbRadius, sunPaint)
     } else {
-        // ---------------------------------------------------------------------
-        // NIGHTTIME: Realistic Moon Disk & Silvery Starlight Trail
-        // ---------------------------------------------------------------------
+        // Nighttime: Moon
         val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             strokeWidth = s * 1.8f
             shader = android.graphics.LinearGradient(
@@ -2591,7 +2627,6 @@ private fun drawCelestialHorizon(
         }
         canvas.drawLine(trackStart, cy, orbX, cy, trailPaint)
 
-        // Moonlight Atmospheric Bloom
         val glowRadius = orbRadius * 2.6f
         val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = android.graphics.RadialGradient(
@@ -2603,7 +2638,6 @@ private fun drawCelestialHorizon(
         }
         canvas.drawCircle(orbX, cy, glowRadius, glowPaint)
 
-        // Render Realistic Moon Disk
         val moonRes = getDrawableResId(context, "img_lunar_sphere")
         if (moonRes != 0) {
             val moonClip = Path().apply { addCircle(orbX, cy, orbRadius, Path.Direction.CW) }
@@ -2625,7 +2659,6 @@ private fun drawCelestialHorizon(
             drawSoftLunarLighting(canvas, orbRect, orbX, cy, orbRadius, s)
             canvas.restore()
         } else {
-            // Silvery celestial fallback disc
             val moonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = android.graphics.LinearGradient(
                     orbX, cy - orbRadius, orbX, cy + orbRadius,
@@ -2639,6 +2672,8 @@ private fun drawCelestialHorizon(
         }
     }
 }
+
+
 
 // 14. Weather Fluid Pebble (4x2 / Organic Dual-Lobe Horizon)
 fun generateWeatherFluidPebbleBitmap(
