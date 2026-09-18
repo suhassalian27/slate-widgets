@@ -4596,6 +4596,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_2x2" />
         </receiver>
+        <!-- 13. Weather Solar Track Receiver (4x1 / Pill Daylight Horizon) -->
+        <receiver
+            android:name=".widgets.weather.WeatherSolarTrackReceiver"
+            android:exported="true"
+            android:label="Weather Solar Track">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x1" />
+        </receiver>
 
     </application>
 </manifest>

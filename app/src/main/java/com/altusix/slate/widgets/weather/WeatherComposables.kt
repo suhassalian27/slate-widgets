@@ -2238,3 +2238,404 @@ fun generateWeatherOrbitDialBitmap(
 
     return bitmap
 }
+
+// 13. Weather Solar Track (4x1 Pill / Smart Responsive Celestial Horizon)
+fun generateWeatherSolarTrackBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val accentColor = config.accentColorHex.toInt()
+
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 3.6f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspect = cardW / cardH
+
+    // -------------------------------------------------------------------------
+    // 1. SMART RESPONSIVE SHAPE (Capsule in wide mode, elegant squircle in tall)
+    // -------------------------------------------------------------------------
+    val isWide = aspect >= 2.0f
+    val outerRadius = if (isWide) {
+        cardH / 2f
+    } else {
+        getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 3.5f)
+    }
+
+    val s = if (isWide) {
+        val baseRefW = scaleFactor * 280f
+        val baseRefH = scaleFactor * 70f
+        scaleFactor * minOf(cardW / baseRefW, cardH / baseRefH).coerceIn(0.65f, 1.55f)
+    } else {
+        val baseRef = scaleFactor * 140f
+        scaleFactor * (minOf(cardW, cardH) / baseRef).coerceIn(0.65f, 1.55f)
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(
+            (config.opacity.coerceIn(0f, 1f) * 255).toInt(),
+            Color.red(bgColor),
+            Color.green(bgColor),
+            Color.blue(bgColor)
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = s * 1f
+        color = if (isLight) Color.argb(15, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+    }
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, borderPaint)
+
+    val weather = WeatherPreferences.getCachedWeatherData(context)
+    val unit = WeatherPreferences.getUnit(context)
+
+    // -------------------------------------------------------------------------
+    // 2. SUN & MOON REAL CYCLE CALCULATION (Dawn -> Dusk -> Dawn)
+    // -------------------------------------------------------------------------
+    val cal = java.util.Calendar.getInstance()
+    val minuteOfDay = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+    val sunriseMin = 6 * 60       // 06:00 AM (Sun rises on the left)
+    val sunsetMin = 18 * 60 + 30  // 06:30 PM (Sun sets on right, Moon rises on left)
+
+    val isSunActive = minuteOfDay in sunriseMin until sunsetMin
+
+    // Smooth normalized progress along the track [0.05f to 0.95f]
+    val celestialProgress = if (isSunActive) {
+        ((minuteOfDay - sunriseMin).toFloat() / (sunsetMin - sunriseMin)).coerceIn(0.06f, 0.94f)
+    } else {
+        val nightDuration = (24 * 60 - sunsetMin) + sunriseMin // 690 mins
+        val elapsedNight = if (minuteOfDay >= sunsetMin) {
+            minuteOfDay - sunsetMin
+        } else {
+            (24 * 60 - sunsetMin) + minuteOfDay
+        }
+        (elapsedNight.toFloat() / nightDuration).coerceIn(0.06f, 0.94f)
+    }
+
+    val tempStr = "${WeatherPreferences.formatTempValue(weather.currentTemp, unit)}°"
+    var displayCond = weather.conditionText
+    var displayCity = weather.cityName
+    val dateStr = java.text.SimpleDateFormat("EEE, d MMM", java.util.Locale.getDefault()).format(java.util.Date())
+
+    // -------------------------------------------------------------------------
+    // 3. ADAPTIVE RESPONSIVE LAYOUT ENGINE
+    // -------------------------------------------------------------------------
+    if (isWide) {
+        // ---------------------------------------------------------------------
+        // WIDE MODE: Maximized Center Track flanked by Compact Typography
+        // ---------------------------------------------------------------------
+        val cy = cardRect.centerY()
+        val sidePadding = cardRect.left + (outerRadius * 0.42f).coerceIn(s * 14f, s * 24f)
+        val rightPadding = cardRect.right - (outerRadius * 0.42f).coerceIn(s * 14f, s * 24f)
+
+        // Left Typography
+        val tempTextSize = (cardH * 0.36f).coerceIn(s * 22f, s * 38f)
+        val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = tempTextSize
+            typeface = getSlateFont(context, weight = 300)
+        }
+
+        var condTextSize = (s * 8f).coerceIn(s * 7.5f, s * 13f)
+        val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = condTextSize
+            typeface = getSlateFont(context, weight = 400)
+        }
+
+        val maxLeftW = cardW * 0.22f
+        while (condPaint.measureText(displayCond) > maxLeftW && condTextSize > s * 7f) {
+            condTextSize -= s * 0.3f
+            condPaint.textSize = condTextSize
+        }
+
+        val tempVisualH = tempTextSize * 0.74f
+        val gapLeft = s * 2.5f
+        val leftTotalH = tempVisualH + gapLeft + condTextSize
+        val leftStartY = cy - (leftTotalH / 2f)
+
+        val tempY = leftStartY + tempVisualH
+        canvas.drawText(tempStr, sidePadding, tempY, tempPaint)
+        val condY = tempY + gapLeft + condTextSize
+        canvas.drawText(displayCond, sidePadding, condY, condPaint)
+
+        val leftBlockEnd = sidePadding + maxOf(tempPaint.measureText(tempStr), condPaint.measureText(displayCond))
+
+        // Right Typography
+        var cityTextSize = (s * 10.5f).coerceIn(s * 7.5f, s * 13.5f)
+        val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = cityTextSize
+            typeface = getSlateFont(context, weight = 500)
+        }
+
+        val dateTextSize = (s * 8.5f).coerceIn(s * 6.5f, s * 11f)
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = dateTextSize
+            typeface = getSlateFont(context, weight = 400)
+        }
+
+        val maxRightW = cardW * 0.22f
+        while (cityPaint.measureText(displayCity) > maxRightW && cityTextSize > s * 7f) {
+            cityTextSize -= s * 0.3f
+            cityPaint.textSize = cityTextSize
+        }
+
+        val rightBlockW = maxOf(cityPaint.measureText(displayCity), datePaint.measureText(dateStr))
+        val rightBlockX = rightPadding - rightBlockW
+
+        val gapRight = s * 2.5f
+        val rightTotalH = cityTextSize + gapRight + (dateTextSize * 0.85f)
+        val rightStartY = cy - (rightTotalH / 2f)
+
+        val cityY = rightStartY + cityTextSize
+        canvas.drawText(displayCity, rightBlockX, cityY, cityPaint)
+        val dateY = cityY + gapRight + (dateTextSize * 0.85f)
+        canvas.drawText(dateStr, rightBlockX, dateY, datePaint)
+
+        // Divider Line
+        val dividerX = rightBlockX - (s * 10f)
+        val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+            strokeWidth = s * 1f
+        }
+        val divHalfH = cardH * 0.20f
+        canvas.drawLine(dividerX, cy - divHalfH, dividerX, cy + divHalfH, divPaint)
+
+        // Expanded Center Horizon Track
+        val trackStart = leftBlockEnd + (s * 12f)
+        val trackEnd = dividerX - (s * 12f)
+        val orbRadius = (cardH * 0.17f).coerceIn(s * 9f, s * 15f)
+
+        drawCelestialHorizon(
+            canvas, context, trackStart, trackEnd, cy,
+            celestialProgress, orbRadius, isSunActive, s
+        )
+    } else {
+        // ---------------------------------------------------------------------
+        // TALL / SQUARISH MODE: Balanced 3-Row Vertical Architecture
+        // ---------------------------------------------------------------------
+        val padX = cardRect.left + (cardW * 0.10f).coerceIn(s * 14f, s * 26f)
+        val padRight = cardRect.right - (cardW * 0.10f).coerceIn(s * 14f, s * 26f)
+
+        // 1. Top Row: City & Date
+        val cityTextSize = (s * 12f).coerceIn(s * 9f, s * 16f)
+        val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = cityTextSize
+            typeface = getSlateFont(context, weight = 600)
+            textAlign = Paint.Align.LEFT
+        }
+        val dateTextSize = (s * 9.5f).coerceIn(s * 7.5f, s * 13f)
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = dateTextSize
+            typeface = getSlateFont(context, weight = 400)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val topY = cardRect.top + (cardH * 0.16f).coerceIn(s * 16f, s * 34f)
+        canvas.drawText(displayCity, padX, topY, cityPaint)
+        canvas.drawText(dateStr, padRight, topY, datePaint)
+
+        // 2. Middle Row: Wide Horizon Track spanning full card width
+        val trackY = cardRect.centerY()
+        val trackStart = padX
+        val trackEnd = padRight
+        val orbRadius = (minOf(cardW, cardH) * 0.085f).coerceIn(s * 10f, s * 18f)
+
+        drawCelestialHorizon(
+            canvas, context, trackStart, trackEnd, trackY,
+            celestialProgress, orbRadius, isSunActive, s
+        )
+
+        // 3. Bottom Row: Hero Temperature & Condition
+        val tempTextSize = (cardH * 0.26f).coerceIn(s * 28f, s * 50f)
+        val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = tempTextSize
+            typeface = getSlateFont(context, weight = 300)
+            textAlign = Paint.Align.LEFT
+        }
+        val condTextSize = (s * 11.5f).coerceIn(s * 8.5f, s * 15f)
+        val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = condTextSize
+            typeface = getSlateFont(context, weight = 400)
+            textAlign = Paint.Align.LEFT
+        }
+
+        val bottomY = cardRect.bottom - (cardH * 0.14f).coerceIn(s * 14f, s * 28f)
+        val tempW = tempPaint.measureText(tempStr)
+        canvas.drawText(tempStr, padX, bottomY, tempPaint)
+        canvas.drawText(displayCond, padX + tempW + (s * 8f), bottomY - (tempTextSize * 0.12f), condPaint)
+    }
+
+    return bitmap
+}
+
+/**
+ * Draws the celestial horizon track with luminous Sun (day) or cratered Moon (night).
+ */
+private fun drawCelestialHorizon(
+    canvas: Canvas,
+    context: Context,
+    trackStart: Float,
+    trackEnd: Float,
+    cy: Float,
+    progress: Float,
+    orbRadius: Float,
+    isSunActive: Boolean,
+    s: Float
+) {
+    val trackW = (trackEnd - trackStart).coerceAtLeast(s * 30f)
+    val orbX = trackStart + (trackW * progress)
+
+    // Inactive Horizon Line
+    val trackLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(26, 255, 255, 255)
+        strokeWidth = s * 1.5f
+    }
+    canvas.drawLine(trackStart, cy, trackEnd, cy, trackLinePaint)
+
+    val orbRect = RectF(orbX - orbRadius, cy - orbRadius, orbX + orbRadius, cy + orbRadius)
+
+    if (isSunActive) {
+        // ---------------------------------------------------------------------
+        // DAYTIME: Luminous Golden Sun & Amber Horizon Trail
+        // ---------------------------------------------------------------------
+        val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            strokeWidth = s * 1.8f
+            shader = android.graphics.LinearGradient(
+                trackStart, cy, orbX, cy,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.argb(90, 255, 170, 40),
+                    Color.argb(240, 255, 190, 60)
+                ),
+                floatArrayOf(0.0f, 0.60f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawLine(trackStart, cy, orbX, cy, trailPaint)
+
+        // Solar Atmospheric Bloom
+        val glowRadius = orbRadius * 2.8f
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.RadialGradient(
+                orbX, cy, glowRadius,
+                intArrayOf(Color.argb(120, 255, 160, 40), Color.argb(45, 255, 120, 20), Color.TRANSPARENT),
+                floatArrayOf(0.0f, 0.45f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawCircle(orbX, cy, glowRadius, glowPaint)
+
+        // Core Solar Disk
+        val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.LinearGradient(
+                orbX, cy - orbRadius, orbX, cy + orbRadius,
+                intArrayOf(Color.parseColor("#FFD066"), Color.parseColor("#FF8C1A")),
+                floatArrayOf(0.0f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(orbX, cy, orbRadius, sunPaint)
+    } else {
+        // ---------------------------------------------------------------------
+        // NIGHTTIME: Realistic Moon Disk & Silvery Starlight Trail
+        // ---------------------------------------------------------------------
+        val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            strokeWidth = s * 1.8f
+            shader = android.graphics.LinearGradient(
+                trackStart, cy, orbX, cy,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.argb(70, 140, 170, 240),
+                    Color.argb(220, 200, 220, 255)
+                ),
+                floatArrayOf(0.0f, 0.60f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawLine(trackStart, cy, orbX, cy, trailPaint)
+
+        // Moonlight Atmospheric Bloom
+        val glowRadius = orbRadius * 2.6f
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.RadialGradient(
+                orbX, cy, glowRadius,
+                intArrayOf(Color.argb(100, 190, 215, 255), Color.argb(35, 130, 160, 240), Color.TRANSPARENT),
+                floatArrayOf(0.0f, 0.50f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawCircle(orbX, cy, glowRadius, glowPaint)
+
+        // Render Realistic Moon Disk
+        val moonRes = getDrawableResId(context, "img_lunar_sphere")
+        if (moonRes != 0) {
+            val moonClip = Path().apply { addCircle(orbX, cy, orbRadius, Path.Direction.CW) }
+            canvas.save()
+            canvas.clipPath(moonClip)
+
+            val moonDrawable = androidx.core.content.ContextCompat.getDrawable(context, moonRes)
+            moonDrawable?.let {
+                val assetScale = 1.0f / 0.8491f
+                val assetR = orbRadius * assetScale
+                it.setBounds(
+                    (orbX - assetR).toInt(),
+                    (cy - assetR).toInt(),
+                    (orbX + assetR).toInt(),
+                    (cy + assetR).toInt()
+                )
+                it.draw(canvas)
+            }
+            drawSoftLunarLighting(canvas, orbRect, orbX, cy, orbRadius, s)
+            canvas.restore()
+        } else {
+            // Silvery celestial fallback disc
+            val moonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = android.graphics.LinearGradient(
+                    orbX, cy - orbRadius, orbX, cy + orbRadius,
+                    intArrayOf(Color.parseColor("#F5F7FF"), Color.parseColor("#B0BCD6")),
+                    floatArrayOf(0.0f, 1.0f),
+                    android.graphics.Shader.TileMode.CLAMP
+                )
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(orbX, cy, orbRadius, moonPaint)
+        }
+    }
+}

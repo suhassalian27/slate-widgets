@@ -209,7 +209,8 @@ fun getWeatherWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Micro Weather", sizeText = "1x1", category = "Weather", receiverClass = WeatherMicroReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo(name = "Weather Celestial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCelestialReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Lunar Solo", sizeText = "2x2", category = "Weather", receiverClass = WeatherLunarSoloReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Weather Orbit Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherOrbitDialReceiver::class.java, hasModeOption = false)
+        SlateWidgetInfo(name = "Weather Orbit Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherOrbitDialReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Solar Track", sizeText = "4x1", category = "Weather", receiverClass = WeatherSolarTrackReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -227,7 +228,8 @@ fun updateAllWeatherWidgets(context: Context) {
         WeatherMicroReceiver(),
         WeatherCelestialReceiver(),
         WeatherLunarSoloReceiver(),
-        WeatherOrbitDialReceiver()
+        WeatherOrbitDialReceiver(),
+        WeatherSolarTrackReceiver()
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
@@ -328,4 +330,16 @@ class WeatherOrbitDialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widget
         wDp: Int,
         hDp: Int
     ): Bitmap = generateWeatherOrbitDialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
+}
+
+// 13. Weather Solar Track Receiver (4x1 / Pill Daylight Horizon)
+class WeatherSolarTrackReceiver : BaseWeatherReceiver(targetAspect = 3.6f, widgetTypeTag = "SOLAR_TRACK") {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateWeatherSolarTrackBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }

@@ -191,8 +191,8 @@ class WeatherConfigActivity : ComponentActivity() {
                             when {
                                 widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") ->
                                     WeatherPreviewSlot(288, 120, 260.dp, 108.dp)
-                                widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") ->
-                                    WeatherPreviewSlot(280, 60, 260.dp, 56.dp)
+                                widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") || widgetClassName.contains("SolarTrack") ->
+                                    WeatherPreviewSlot(280, 60, 260.dp, 56.dp)   // 4x1 Pill Slot
                                 widgetClassName.contains("MetroTrio") ->
                                     WeatherPreviewSlot(240, 65, 230.dp, 62.dp)
                                 widgetClassName.contains("Micro") ->
@@ -218,6 +218,7 @@ class WeatherConfigActivity : ComponentActivity() {
                                 widgetClassName.contains("Celestial") -> generateWeatherCelestialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("LunarSolo") -> generateWeatherLunarSoloBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("OrbitDial") -> generateWeatherOrbitDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("SolarTrack") -> generateWeatherSolarTrackBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 else -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                             }
                         }
