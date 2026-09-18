@@ -206,7 +206,10 @@ fun getWeatherWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Weather Minimalist Dual", sizeText = "2x2", category = "Weather", receiverClass = WeatherMinimalistDualReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Compact Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCompactDialReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Metro Trio", sizeText = "3x1", category = "Weather", receiverClass = WeatherMetroTrioReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo(name = "Micro Weather", sizeText = "1x1", category = "Weather", receiverClass = WeatherMicroReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Micro Weather", sizeText = "1x1", category = "Weather", receiverClass = WeatherMicroReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Weather Celestial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCelestialReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Lunar Solo", sizeText = "2x2", category = "Weather", receiverClass = WeatherLunarSoloReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo(name = "Weather Orbit Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherOrbitDialReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -221,7 +224,10 @@ fun updateAllWeatherWidgets(context: Context) {
         WeatherMinimalistDualReceiver(),
         WeatherCompactDialReceiver(),
         WeatherMetroTrioReceiver(),
-        WeatherMicroReceiver()
+        WeatherMicroReceiver(),
+        WeatherCelestialReceiver(),
+        WeatherLunarSoloReceiver(),
+        WeatherOrbitDialReceiver()
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
@@ -230,6 +236,7 @@ fun updateAllWeatherWidgets(context: Context) {
         }
     }
 }
+
 
 // Concrete Receivers
 
@@ -285,4 +292,40 @@ class WeatherMetroTrioReceiver : BaseWeatherReceiver(targetAspect = 3.0f, widget
 class WeatherMicroReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "MICRO") {
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeatherMicroBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
+}
+
+// 10. Weather Celestial Receiver (2x2 / Minimalist Lunar Poster)
+class WeatherCelestialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "CELESTIAL") {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateWeatherCelestialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
+}
+
+// 11. Weather Lunar Solo Receiver (2x2 / Transparent Floating Sphere)
+class WeatherLunarSoloReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "LUNAR_SOLO") {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateWeatherLunarSoloBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
+}
+
+// 12. Weather Orbit Dial Receiver (2x2 / Minimalist Circular Gauge)
+class WeatherOrbitDialReceiver : BaseWeatherReceiver(targetAspect = 1.0f, widgetTypeTag = "ORBIT_DIAL") {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateWeatherOrbitDialBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }

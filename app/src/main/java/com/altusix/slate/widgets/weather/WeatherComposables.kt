@@ -14,6 +14,10 @@ import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
 import java.util.Calendar
+import android.graphics.RadialGradient
+import android.graphics.Shader
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 
 // -------------------------------------------------------------------------
 // VECTOR DRAWABLE HELPERS
@@ -94,6 +98,38 @@ fun drawWeatherIcon(
     if (resId != 0) {
         drawVectorDrawable(canvas, context, resId, iconRect, color)
     }
+}
+
+data class MoonPhaseInfo(
+    val phaseRatio: Float,       // 0.0 (New) -> 0.5 (Full) -> 1.0 (New)
+    val illuminationPercent: Int, // 0 to 100%
+    val phaseName: String         // e.g. "Waxing Gibbous"
+)
+
+fun calculateCurrentMoonPhase(calendar: Calendar = Calendar.getInstance()): MoonPhaseInfo {
+    // Known reference new moon: January 11, 2024, 11:57 UTC
+    val refTimeMillis = 1704974220000L
+    val synodicMonthMillis = 29.53058867 * 24.0 * 60.0 * 60.0 * 1000.0
+
+    val diff = (calendar.timeInMillis - refTimeMillis).toDouble()
+    val cycles = diff / synodicMonthMillis
+    val phaseRatio = (cycles - Math.floor(cycles)).toFloat()
+
+    // Illumination fraction: 0% at New Moon (0.0), 100% at Full Moon (0.5)
+    val illumination = ((1f - Math.cos(phaseRatio * 2.0 * Math.PI).toFloat()) / 2f * 100f).toInt()
+
+    val phaseName = when {
+        phaseRatio < 0.03f || phaseRatio > 0.97f -> "New Moon"
+        phaseRatio < 0.22f -> "Waxing Crescent"
+        phaseRatio < 0.28f -> "First Quarter"
+        phaseRatio < 0.47f -> "Waxing Gibbous"
+        phaseRatio < 0.53f -> "Full Moon"
+        phaseRatio < 0.72f -> "Waning Gibbous"
+        phaseRatio < 0.78f -> "Last Quarter"
+        else -> "Waning Crescent"
+    }
+
+    return MoonPhaseInfo(phaseRatio, illumination, phaseName)
 }
 
 // -------------------------------------------------------------------------
@@ -1741,6 +1777,464 @@ fun generateWeatherMicroBitmap(
     val tempY = topBound + (availableH / 2f) + (tempTextSize * 0.38f)
 
     canvas.drawText(tempStr, cardRect.left + padX, tempY, tempPaint)
+
+    return bitmap
+}
+
+// 10. Weather Celestial Lunar (2x2 / Minimalist Lunar Poster)
+fun generateWeatherCelestialBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+
+    val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val size = minOf(w - (margin * 2f), h - (margin * 2f))
+        val leftX = (w - size) / 2f
+        val topY = (h - size) / 2f
+        RectF(leftX, topY, leftX + size, topY + size)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+
+    // 1. Dual-Axis Proportional Scalar
+    val baseRef = scaleFactor * 140f
+    val propScale = minOf(cardW / baseRef, cardH / baseRef).coerceIn(0.65f, 1.55f)
+    val s = scaleFactor * propScale
+
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(minOf(cardW, cardH) / 2f)
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val weather = WeatherPreferences.getCachedWeatherData(context)
+    val unit = WeatherPreferences.getUnit(context)
+
+    // -------------------------------------------------------------------------
+    // 2. CELESTIAL SPHERE: Realistic 3D Phase Lighting
+    // -------------------------------------------------------------------------
+    val sphereRadius = cardH * 0.58f
+    val sphereCx = cardRect.right + (cardW * 0.04f)
+    val sphereCy = cardRect.centerY()
+    val sphereRect = RectF(
+        sphereCx - sphereRadius,
+        sphereCy - sphereRadius,
+        sphereCx + sphereRadius,
+        sphereCy + sphereRadius
+    )
+
+    // Clip strictly to card boundary
+    val cardPath = Path().apply {
+        addRoundRect(cardRect, outerRadius, outerRadius, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(cardPath)
+
+    val moonRes = getDrawableResId(context, "img_lunar_sphere")
+    if (moonRes != 0) {
+        val moonDrawable = androidx.core.content.ContextCompat.getDrawable(context, moonRes)
+        moonDrawable?.let {
+            it.setBounds(
+                sphereRect.left.toInt(),
+                sphereRect.top.toInt(),
+                sphereRect.right.toInt(),
+                sphereRect.bottom.toInt()
+            )
+            it.draw(canvas)
+        }
+
+        // Apply soft celestial lighting & dynamic phase shader
+        drawSoftLunarLighting(canvas, sphereRect, sphereCx, sphereCy, sphereRadius, s)
+    } else {
+        val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#3A3A3C")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(sphereCx, sphereCy, sphereRadius, fallbackPaint)
+    }
+
+    canvas.restore()
+
+    // -------------------------------------------------------------------------
+    // 3. LEFT SECTION: Typography & Temperature
+    // -------------------------------------------------------------------------
+    val padX = (cardW * 0.11f).coerceIn(s * 12f, s * 22f)
+    val padY = (cardH * 0.11f).coerceIn(s * 12f, s * 22f)
+    val maxTextW = (sphereCx - sphereRadius) - (cardRect.left + padX) + (s * 6f)
+
+    // Top: City Name
+    var cityTextSize = (s * 12.5f).coerceIn(s * 10f, s * 19f)
+    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = cityTextSize
+        typeface = getSlateFont(context, weight = 500)
+    }
+    var displayCity = weather.cityName
+    while (cityPaint.measureText(displayCity) > maxTextW && cityTextSize > s * 8f) {
+        cityTextSize -= s * 0.3f
+        cityPaint.textSize = cityTextSize
+    }
+    val cityY = cardRect.top + padY + cityTextSize
+    canvas.drawText(displayCity, cardRect.left + padX, cityY, cityPaint)
+
+    // Top: Weather Condition
+    var condTextSize = (s * 12f).coerceIn(s * 8.5f, s * 16f)
+    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = condTextSize
+        typeface = getSlateFont(context, weight = 400)
+    }
+    var displayCond = weather.conditionText
+    while (condPaint.measureText(displayCond) > maxTextW && condTextSize > s * 7.5f) {
+        condTextSize -= s * 0.3f
+        condPaint.textSize = condTextSize
+    }
+    val condY = cityY + condTextSize + (s * 3.5f)
+    canvas.drawText(displayCond, cardRect.left + padX, condY, condPaint)
+
+    // Bottom: Clean Sleek Degree
+    val tempTextSize = (cardH * 0.25f).coerceIn(s * 28f, s * 48f)
+    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = tempTextSize
+        typeface = getSlateFont(context, weight = 300)
+    }
+    val tempY = cardRect.bottom - padY
+    val tempStr = "${WeatherPreferences.formatTempValue(weather.currentTemp, unit)}°"
+    canvas.drawText(tempStr, cardRect.left + padX, tempY, tempPaint)
+
+    return bitmap
+}
+
+
+// 11. Weather Lunar Solo (Standalone Transparent Sphere)
+fun generateWeatherLunarSoloBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val size = minOf(w, h)
+    val margin = scaleFactor * 4f
+    val sphereRadius = (size / 2f) - margin
+    val cx = w / 2f
+    val cy = h / 2f
+
+    val sphereRect = RectF(
+        cx - sphereRadius,
+        cy - sphereRadius,
+        cx + sphereRadius,
+        cy + sphereRadius
+    )
+
+    val baseRef = scaleFactor * 140f
+    val propScale = (sphereRadius * 2f / baseRef).coerceIn(0.65f, 1.6f)
+    val s = scaleFactor * propScale
+
+    // 1. Strict circular clip ensures ZERO halo or glow can ever bleed outside
+    val moonClip = Path().apply {
+        addCircle(cx, cy, sphereRadius, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(moonClip)
+
+    val moonRes = getDrawableResId(context, "img_lunar_sphere")
+    if (moonRes != 0) {
+        val moonDrawable = androidx.core.content.ContextCompat.getDrawable(context, moonRes)
+        moonDrawable?.let {
+            // 2. Compensate for the 15.1% transparent margin baked into the SVG asset
+            val assetScale = 1.0f / 0.8491f // ~1.178x zoom
+            val assetRadius = sphereRadius * assetScale
+            val assetRect = RectF(
+                cx - assetRadius,
+                cy - assetRadius,
+                cx + assetRadius,
+                cy + assetRadius
+            )
+
+            it.setBounds(
+                assetRect.left.toInt(),
+                assetRect.top.toInt(),
+                assetRect.right.toInt(),
+                assetRect.bottom.toInt()
+            )
+            it.draw(canvas)
+        }
+
+        drawSoftLunarLighting(canvas, sphereRect, cx, cy, sphereRadius, s)
+    } else {
+        val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#3A3A3C")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy, sphereRadius, fallbackPaint)
+    }
+
+    canvas.restore()
+    return bitmap
+}
+
+/**
+ * Renders smooth photographic terminator shading with elevated earthshine,
+ * keeping the crater topography and maria visible in the shadow.
+ */
+private fun drawSoftLunarLighting(
+    canvas: Canvas,
+    sphereRect: RectF,
+    cx: Float,
+    cy: Float,
+    r: Float,
+    s: Float
+) {
+    val phase = calculateCurrentMoonPhase()
+    val isWaxing = phase.phaseRatio <= 0.5f
+
+    // 1. Calculate normalized terminator position [-1.0f .. 1.0f]
+    val t = if (isWaxing) {
+        1.0f - (phase.phaseRatio * 4.0f)
+    } else {
+        1.0f - ((phase.phaseRatio - 0.5f) * 4.0f)
+    }
+
+    val tScreen = ((t + 1.0f) / 2.0f).coerceIn(0.05f, 0.95f)
+    val penumbra = 0.14f // Soft, natural twilight transition
+
+    // Elevated earthshine tone (~25% gray): dims the dark side without crushing crater detail
+    val earthshine = Color.parseColor("#222222")
+    val fullLight = Color.WHITE
+
+    val colors: IntArray
+    val stops: FloatArray
+
+    if (isWaxing) {
+        val s1 = (tScreen - penumbra).coerceIn(0.01f, 0.95f)
+        val s2 = (tScreen + penumbra).coerceIn(s1 + 0.02f, 0.99f)
+        colors = intArrayOf(earthshine, earthshine, fullLight, fullLight)
+        stops = floatArrayOf(0.0f, s1, s2, 1.0f)
+    } else {
+        val s1 = (tScreen - penumbra).coerceIn(0.01f, 0.95f)
+        val s2 = (tScreen + penumbra).coerceIn(s1 + 0.02f, 0.99f)
+        colors = intArrayOf(fullLight, fullLight, earthshine, earthshine)
+        stops = floatArrayOf(0.0f, s1, s2, 1.0f)
+    }
+
+    // 2. Primary Directional Terminator Shader
+    val terminatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.MULTIPLY)
+        shader = android.graphics.LinearGradient(
+            sphereRect.left, cy,
+            sphereRect.right, cy,
+            colors, stops,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawCircle(cx, cy, r, terminatorPaint)
+
+    // 3. Spherical Curvature & Limb Shading (Softened edge to preserve dark-side visibility)
+    val lightFocusX = if (isWaxing) cx + (r * 0.35f) else cx - (r * 0.35f)
+    val volumePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.MULTIPLY)
+        shader = android.graphics.RadialGradient(
+            lightFocusX, cy, r * 1.45f,
+            intArrayOf(
+                Color.WHITE,
+                Color.WHITE,
+                Color.parseColor("#E0E2EA"),
+                Color.parseColor("#7E818C") // Softened falloff that prevents pitch-black edges
+            ),
+            floatArrayOf(0.0f, 0.65f, 0.88f, 1.0f),
+            android.graphics.Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawCircle(cx, cy, r, volumePaint)
+}
+
+// 12. Weather Orbit Dial (2x2 / Minimalist Circular Gauge)
+fun generateWeatherOrbitDialBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val accentColor = config.accentColorHex.toInt()
+
+    val margin = scaleFactor * 3.5f
+    val size = minOf(w - (margin * 2f), h - (margin * 2f))
+    val cx = w / 2f
+    val cy = h / 2f
+    val outerRadius = size / 2f
+
+    // Dual-Axis Proportional Scalar
+    val baseRef = scaleFactor * 140f
+    val propScale = (size / baseRef).coerceIn(0.65f, 1.55f)
+    val s = scaleFactor * propScale
+
+    // Outer Dark Disc
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(
+            (config.opacity.coerceIn(0f, 1f) * 255).toInt(),
+            Color.red(bgColor),
+            Color.green(bgColor),
+            Color.blue(bgColor)
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, outerRadius, bgPaint)
+
+    val weather = WeatherPreferences.getCachedWeatherData(context)
+    val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
+
+    // -------------------------------------------------------------------------
+    // 1. SLEEK RIM GAUGE (Current Temp position within Daily Min -> Max)
+    // -------------------------------------------------------------------------
+    val barStrokeW = s * 3.8f
+    val barRadius = outerRadius - (barStrokeW / 2f) - (s * 3.5f)
+    val barBounds = RectF(cx - barRadius, cy - barRadius, cx + barRadius, cy + barRadius)
+
+    // Background track ring
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = barStrokeW
+        color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
+    }
+    canvas.drawCircle(cx, cy, barRadius, trackPaint)
+
+    val minT = weather.tempMin
+    val maxT = weather.tempMax
+    val curT = weather.currentTemp
+    val tempRatio = if (maxT > minT) {
+        ((curT - minT) / (maxT - minT)).coerceIn(0.06f, 1.0f)
+    } else {
+        0.5f
+    }
+    val sweepAngle = 360f * tempRatio
+
+    // Active illuminated arc with rounded caps
+    val activeBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = barStrokeW
+        strokeCap = Paint.Cap.ROUND
+        color = if (accentColor != 0 && accentColor != Color.WHITE) accentColor else primaryText
+    }
+    canvas.drawArc(barBounds, -90f, sweepAngle, false, activeBarPaint)
+
+    // -------------------------------------------------------------------------
+    // 2. UNCLUTTERED EDITORIAL TYPOGRAPHY & LAYOUT
+    // -------------------------------------------------------------------------
+    val iconSize = (size * 0.15f).coerceIn(s * 15f, s * 24f)
+    val tempTextSize = (size * 0.29f).coerceIn(s * 28f, s * 46f)
+    var condTextSize = (s * 11f).coerceIn(s * 8f, s * 14f)
+    var cityTextSize = (s * 10f).coerceIn(s * 7.5f, s * 13f)
+    val dateTextSize = (s * 8.5f).coerceIn(s * 6.5f, s * 11f)
+
+    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = tempTextSize
+        typeface = getSlateFont(context, weight = 300) // Sleek light sans
+        textAlign = Paint.Align.CENTER
+    }
+
+    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = condTextSize
+        typeface = getSlateFont(context, weight = 400)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = cityTextSize
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = dateTextSize
+        typeface = getSlateFont(context, weight = 400)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val maxTextW = barRadius * 1.35f
+    var displayCond = weather.conditionText
+    while (condPaint.measureText(displayCond) > maxTextW && condTextSize > s * 7.5f) {
+        condTextSize -= s * 0.3f
+        condPaint.textSize = condTextSize
+    }
+
+    var displayCity = weather.cityName
+    while (cityPaint.measureText(displayCity) > maxTextW && cityTextSize > s * 7f) {
+        cityTextSize -= s * 0.3f
+        cityPaint.textSize = cityTextSize
+    }
+
+    val dateStr = java.text.SimpleDateFormat("EEE, d MMM", java.util.Locale.getDefault()).format(java.util.Date())
+
+    // Harmonious spacing between groups
+    val tempVisualH = tempTextSize * 0.74f
+    val gapIconToTemp = s * 4.5f
+    val gapTempToCond = s * 4.0f
+    val gapCondToBottom = s * 10.0f
+    val gapCityToDate = s * 2.5f
+
+    val totalH = iconSize + gapIconToTemp + tempVisualH + gapTempToCond + condTextSize + gapCondToBottom + cityTextSize + gapCityToDate + dateTextSize
+    val startY = cy - (totalH / 2f)
+
+    // 1. Top: Weather Glyph
+    val iconTop = startY
+    val iconRect = RectF(cx - (iconSize / 2f), iconTop, cx + (iconSize / 2f), iconTop + iconSize)
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+
+    // 2. Center: Large Editorial Degree
+    val tempY = iconRect.bottom + gapIconToTemp + tempVisualH
+    val tempStr = "${WeatherPreferences.formatTempValue(weather.currentTemp, unit)}°"
+    canvas.drawText(tempStr, cx, tempY, tempPaint)
+
+    // 3. Middle: Condition Subtitle
+    val condY = tempY + gapTempToCond + (condTextSize * 0.85f)
+    canvas.drawText(displayCond, cx, condY, condPaint)
+
+    // 4. Bottom Anchor: City & Date
+    val cityY = condY + gapCondToBottom + (cityTextSize * 0.85f)
+    canvas.drawText(displayCity, cx, cityY, cityPaint)
+
+    val dateY = cityY + gapCityToDate + (dateTextSize * 0.85f)
+    canvas.drawText(dateStr, cx, dateY, datePaint)
 
     return bitmap
 }
