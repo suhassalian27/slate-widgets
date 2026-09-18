@@ -104,9 +104,16 @@ abstract class BaseWeatherReceiver(
         widgetId: Int
     ): Bitmap = renderWidgetBitmap(context, widgetId, config, isResponsive, wDp, hDp)
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        // Automatically start background sync when the first widget instance is placed
+        WeatherSyncWorker.enqueue(context)
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            WeatherSyncWorker.enqueue(context)
             val manager = AppWidgetManager.getInstance(context) ?: return
             val ids = manager.getAppWidgetIds(ComponentName(context, this::class.java)) ?: intArrayOf()
             for (id in ids) {
@@ -116,6 +123,8 @@ abstract class BaseWeatherReceiver(
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        // Keep the periodic worker active whenever the OS sends an update cycle
+        WeatherSyncWorker.enqueue(context)
         for (id in appWidgetIds) {
             updateSingleWidget(context, appWidgetManager, id)
         }

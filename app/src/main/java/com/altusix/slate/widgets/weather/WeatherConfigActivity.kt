@@ -64,6 +64,9 @@ class WeatherConfigActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
 
+        // Ensure background scheduler is running
+        WeatherSyncWorker.enqueue(this)
+
         widgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
@@ -138,6 +141,8 @@ class WeatherConfigActivity : ComponentActivity() {
                         if (fresh != null) {
                             WeatherPreferences.setCachedWeatherData(this@WeatherConfigActivity, fresh)
                             weatherData = fresh
+                            // Immediately push fresh data to all active widgets on screen
+                            updateAllWeatherWidgets(this@WeatherConfigActivity)
                         }
                         isSyncing = false
                     }
@@ -155,7 +160,11 @@ class WeatherConfigActivity : ComponentActivity() {
 
                 fun saveAndFinish() {
                     saveSlateWidgetConfig(this@WeatherConfigActivity, widgetId, currentSlateConfig, isResponsive)
+                    // Ensure periodic worker is running
+                    WeatherSyncWorker.enqueue(this@WeatherConfigActivity)
+                    // Refresh widgets immediately
                     updateAllWeatherWidgets(this@WeatherConfigActivity)
+
                     if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                         try {
                             val manager = AppWidgetManager.getInstance(this@WeatherConfigActivity)
@@ -190,7 +199,7 @@ class WeatherConfigActivity : ComponentActivity() {
                         val slot = remember(widgetClassName) {
                             when {
                                 widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") || widgetClassName.contains("FluidPebble") ->
-                                    WeatherPreviewSlot(288, 120, 260.dp, 108.dp) // Standard 4x2 preview slot
+                                    WeatherPreviewSlot(288, 120, 260.dp, 108.dp)
                                 widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") || widgetClassName.contains("SolarTrack") ->
                                     WeatherPreviewSlot(280, 60, 260.dp, 56.dp)
                                 widgetClassName.contains("MetroTrio") ->
@@ -248,7 +257,6 @@ class WeatherConfigActivity : ComponentActivity() {
                     }
                 ) {
                     if (selectedTabKey == "LOCATION") {
-                        // Current City & Sync Card
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -292,7 +300,6 @@ class WeatherConfigActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Sync Button
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
@@ -324,7 +331,6 @@ class WeatherConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // Temperature Unit Switcher
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             SectionTitle(title = "Temperature Unit")
                             Row(
@@ -350,6 +356,7 @@ class WeatherConfigActivity : ComponentActivity() {
                                             .clickable {
                                                 currentUnit = unitKey
                                                 WeatherPreferences.setUnit(this@WeatherConfigActivity, unitKey)
+                                                updateAllWeatherWidgets(this@WeatherConfigActivity)
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -364,7 +371,6 @@ class WeatherConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // Search Global Cities
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             SectionTitle(title = "Search & Change City")
                             OutlinedTextField(
@@ -395,7 +401,6 @@ class WeatherConfigActivity : ComponentActivity() {
                             )
                         }
 
-                        // Search Results or Popular Cities
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -449,7 +454,6 @@ class WeatherConfigActivity : ComponentActivity() {
                             }
                         }
                     } else {
-                        // TAB 2: WIDGET THEME & STYLE
                         val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
