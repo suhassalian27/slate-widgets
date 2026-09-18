@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.components.*
@@ -51,7 +53,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
+@OptIn(ExperimentalLayoutApi::class)
 class WeatherConfigActivity : ComponentActivity() {
 
     private enum class WeatherColorTarget { BACKGROUND, ACCENT }
@@ -64,7 +68,14 @@ class WeatherConfigActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
 
-        // Ensure background scheduler is running
+        // 1. Transparent status and navigation bars matching SocialConfigActivity
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+
         WeatherSyncWorker.enqueue(this)
 
         widgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -81,517 +92,516 @@ class WeatherConfigActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0A0A0C), surface = Color(0xFF16161B))) {
-                val coroutineScope = rememberCoroutineScope()
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .imePadding(), // Eliminates black bar above keyboard
+                    color = Color(0xFF0A0A0C)
+                ) {
+                    val coroutineScope = rememberCoroutineScope()
 
-                var currentCity by remember { mutableStateOf(WeatherPreferences.getSelectedCity(this@WeatherConfigActivity)) }
-                var currentUnit by remember { mutableStateOf(WeatherPreferences.getUnit(this@WeatherConfigActivity)) }
-                var weatherData by remember { mutableStateOf(WeatherPreferences.getCachedWeatherData(this@WeatherConfigActivity)) }
-                var isSyncing by remember { mutableStateOf(false) }
+                    var currentCity by remember { mutableStateOf(WeatherPreferences.getSelectedCity(this@WeatherConfigActivity)) }
+                    var currentUnit by remember { mutableStateOf(WeatherPreferences.getUnit(this@WeatherConfigActivity)) }
+                    var weatherData by remember { mutableStateOf(WeatherPreferences.getCachedWeatherData(this@WeatherConfigActivity)) }
+                    var isSyncing by remember { mutableStateOf(false) }
 
-                var selectedBgHex by remember { mutableLongStateOf(0xFF161618L) }
-                var selectedAccentHex by remember { mutableLongStateOf(defaultTheme.accentHex) }
-                var opacity by remember { mutableFloatStateOf(1.0f) }
-                var isResponsive by remember { mutableStateOf(true) }
-                var activePickerTarget by remember { mutableStateOf<WeatherColorTarget?>(null) }
+                    var selectedBgHex by remember { mutableLongStateOf(0xFF161618L) }
+                    var selectedAccentHex by remember { mutableLongStateOf(defaultTheme.accentHex) }
+                    var opacity by remember { mutableFloatStateOf(1.0f) }
+                    var isResponsive by remember { mutableStateOf(true) }
+                    var activePickerTarget by remember { mutableStateOf<WeatherColorTarget?>(null) }
 
-                var searchQuery by remember { mutableStateOf("") }
-                var searchResults by remember { mutableStateOf<List<WeatherCity>>(emptyList()) }
-                var isSearching by remember { mutableStateOf(false) }
-                var searchJob by remember { mutableStateOf<Job?>(null) }
+                    var searchQuery by remember { mutableStateOf("") }
+                    var searchResults by remember { mutableStateOf<List<WeatherCity>>(emptyList()) }
+                    var isSearching by remember { mutableStateOf(false) }
+                    var searchJob by remember { mutableStateOf<Job?>(null) }
 
-                var selectedTabKey by remember { mutableStateOf("LOCATION") }
+                    var selectedTabKey by remember { mutableStateOf("LOCATION") }
 
-                val tabs = remember {
-                    listOf(
-                        ConfigTabItem("LOCATION", "Location & Units"),
-                        ConfigTabItem("STYLE", "Widget Theme")
+                    val tabs = remember {
+                        listOf(
+                            ConfigTabItem("LOCATION", "Location & Units"),
+                            ConfigTabItem("STYLE", "Widget Theme")
+                        )
+                    }
+                    val widgetName = catalogItem?.name ?: "Weather Widget"
+
+                    // Auto-collapse preview height when typing to preserve list space
+                    val isImeVisible = WindowInsets.isImeVisible
+                    val previewHeight by animateDpAsState(
+                        targetValue = if (isImeVisible && selectedTabKey == "LOCATION") 0.dp else 165.dp,
+                        label = "previewHeight"
                     )
-                }
-                val widgetName = catalogItem?.name ?: "Weather Widget"
 
-                LaunchedEffect(widgetId) {
-                    val prefs = getSharedPreferences("slate_widget_prefs", MODE_PRIVATE)
-                    opacity = prefs.getFloat("widget_${widgetId}_opacity", 1.0f)
-                    isResponsive = prefs.getBoolean("widget_${widgetId}_is_responsive", true)
-                    selectedBgHex = prefs.getLong("widget_${widgetId}_bg_color", 0xFF161618L)
-                    selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
-                }
+                    LaunchedEffect(widgetId) {
+                        val prefs = getSharedPreferences("slate_widget_prefs", MODE_PRIVATE)
+                        opacity = prefs.getFloat("widget_${widgetId}_opacity", 1.0f)
+                        isResponsive = prefs.getBoolean("widget_${widgetId}_is_responsive", true)
+                        selectedBgHex = prefs.getLong("widget_${widgetId}_bg_color", 0xFF161618L)
+                        selectedAccentHex = prefs.getLong("widget_${widgetId}_accent_color", defaultTheme.accentHex)
+                    }
 
-                // Debounced live city search
-                LaunchedEffect(searchQuery) {
-                    searchJob?.cancel()
-                    if (searchQuery.trim().length >= 2) {
-                        searchJob = coroutineScope.launch {
-                            delay(400)
-                            isSearching = true
-                            val results = WeatherRepository.searchCities(searchQuery)
-                            searchResults = results
+                    // Debounced live city search
+                    LaunchedEffect(searchQuery) {
+                        searchJob?.cancel()
+                        if (searchQuery.trim().length >= 2) {
+                            searchJob = coroutineScope.launch {
+                                delay(400)
+                                isSearching = true
+                                val results = WeatherRepository.searchCities(searchQuery)
+                                searchResults = results
+                                isSearching = false
+                            }
+                        } else {
+                            searchResults = emptyList()
                             isSearching = false
                         }
-                    } else {
-                        searchResults = emptyList()
-                        isSearching = false
                     }
-                }
 
-                fun syncWeatherForCity(city: WeatherCity) {
-                    coroutineScope.launch {
-                        isSyncing = true
-                        val fresh = WeatherRepository.fetchWeather(city.latitude, city.longitude, city.name)
-                        if (fresh != null) {
-                            WeatherPreferences.setCachedWeatherData(this@WeatherConfigActivity, fresh)
-                            weatherData = fresh
-                            // Immediately push fresh data to all active widgets on screen
-                            updateAllWeatherWidgets(this@WeatherConfigActivity)
-                        }
-                        isSyncing = false
-                    }
-                }
-
-                val currentSlateConfig = remember(selectedBgHex, selectedAccentHex, opacity) {
-                    val themeMode = if (calculateLuminance(selectedBgHex) > 0.5f) "LIGHT" else "DARK"
-                    SlateWidgetConfig(
-                        themeMode = themeMode,
-                        backgroundColorHex = selectedBgHex,
-                        opacity = opacity,
-                        accentColorHex = selectedAccentHex
-                    )
-                }
-
-                fun saveAndFinish() {
-                    saveSlateWidgetConfig(this@WeatherConfigActivity, widgetId, currentSlateConfig, isResponsive)
-                    // Ensure periodic worker is running
-                    WeatherSyncWorker.enqueue(this@WeatherConfigActivity)
-                    // Refresh widgets immediately
-                    updateAllWeatherWidgets(this@WeatherConfigActivity)
-
-                    if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                        try {
-                            val manager = AppWidgetManager.getInstance(this@WeatherConfigActivity)
-                            val info = manager.getAppWidgetInfo(widgetId)
-                            if (info != null) {
-                                val receiverClass = Class.forName(info.provider.className)
-                                val receiver = receiverClass.getDeclaredConstructor().newInstance() as? BaseWeatherReceiver
-                                receiver?.updateSingleWidget(this@WeatherConfigActivity, manager, widgetId)
+                    fun syncWeatherForCity(city: WeatherCity) {
+                        coroutineScope.launch {
+                            isSyncing = true
+                            val fresh = WeatherRepository.fetchWeather(city.latitude, city.longitude, city.name)
+                            if (fresh != null) {
+                                WeatherPreferences.setCachedWeatherData(this@WeatherConfigActivity, fresh)
+                                weatherData = fresh
+                                updateAllWeatherWidgets(this@WeatherConfigActivity)
                             }
-                        } catch (_: Exception) {}
-                    }
-                    val resultIntent = Intent().apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                    }
-                    setResult(Activity.RESULT_OK, resultIntent)
-                    finish()
-                }
-
-                SlateConfigScaffold(
-                    title = "Weather",
-                    subtitle = widgetName.ifEmpty { null },
-                    accentColor = Color(selectedAccentHex),
-                    tabs = tabs,
-                    selectedTabKey = selectedTabKey,
-                    onTabSelected = { selectedTabKey = it },
-                    onBackClick = { finish() },
-                    onSaveClick = { saveAndFinish() },
-                    scrollable = selectedTabKey == "STYLE",
-                    previewHeight = 175.dp,
-                    previewContent = {
-                        val context = LocalContext.current
-                        val slot = remember(widgetClassName) {
-                            when {
-                                widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") || widgetClassName.contains("FluidPebble") ->
-                                    WeatherPreviewSlot(288, 120, 260.dp, 108.dp)
-                                widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") || widgetClassName.contains("SolarTrack") ->
-                                    WeatherPreviewSlot(280, 60, 260.dp, 56.dp)
-                                widgetClassName.contains("MetroTrio") ->
-                                    WeatherPreviewSlot(240, 65, 230.dp, 62.dp)
-                                widgetClassName.contains("Micro") ->
-                                    WeatherPreviewSlot(100, 85, 95.dp, 80.dp)
-                                else ->
-                                    WeatherPreviewSlot(160, 133, 150.dp, 125.dp)
-                            }
-                        }
-
-                        val previewBitmap = remember(weatherData, currentSlateConfig, isResponsive, widgetClassName, currentUnit) {
-                            when {
-                                widgetClassName.contains("Horizon") -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("BentoGlance") -> generateWeatherBentoGlanceBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("DaylightArc") -> generateWeatherDaylightArcBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("PillDock") -> generateWeatherPillDockBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("Editorial") -> generateWeatherEditorialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("MinimalistDual") -> generateWeatherMinimalistDualBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("CompactDial") -> generateWeatherCompactDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("MetroTrio") -> generateWeatherMetroTrioBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("Micro") -> generateWeatherMicroBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("Celestial") -> generateWeatherCelestialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("LunarSolo") -> generateWeatherLunarSoloBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("OrbitDial") -> generateWeatherOrbitDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("SolarTrack") -> generateWeatherSolarTrackBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                widgetClassName.contains("FluidPebble") -> generateWeatherFluidPebbleBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                                else -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(slot.displayW, slot.displayH)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0xFF101014))
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (!isResponsive) Color(selectedAccentHex).copy(alpha = 0.45f) else Color(0xFF262630),
-                                        shape = RoundedCornerShape(20.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    bitmap = previewBitmap.asImageBitmap(),
-                                    contentDescription = "Weather Widget Preview",
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                            isSyncing = false
                         }
                     }
-                ) {
-                    if (selectedTabKey == "LOCATION") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF141418))
-                                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(selectedAccentHex).copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.LocationOn,
-                                        contentDescription = null,
-                                        tint = Color(selectedAccentHex),
-                                        modifier = Modifier.size(18.dp)
-                                    )
+
+                    val currentSlateConfig = remember(selectedBgHex, selectedAccentHex, opacity) {
+                        val themeMode = if (calculateLuminance(selectedBgHex) > 0.5f) "LIGHT" else "DARK"
+                        SlateWidgetConfig(
+                            themeMode = themeMode,
+                            backgroundColorHex = selectedBgHex,
+                            opacity = opacity,
+                            accentColorHex = selectedAccentHex
+                        )
+                    }
+
+                    fun saveAndFinish() {
+                        saveSlateWidgetConfig(this@WeatherConfigActivity, widgetId, currentSlateConfig, isResponsive)
+                        WeatherSyncWorker.enqueue(this@WeatherConfigActivity)
+                        updateAllWeatherWidgets(this@WeatherConfigActivity)
+
+                        if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                            try {
+                                val manager = AppWidgetManager.getInstance(this@WeatherConfigActivity)
+                                val info = manager.getAppWidgetInfo(widgetId)
+                                if (info != null) {
+                                    val receiverClass = Class.forName(info.provider.className)
+                                    val receiver = receiverClass.getDeclaredConstructor().newInstance() as? BaseWeatherReceiver
+                                    receiver?.updateSingleWidget(this@WeatherConfigActivity, manager, widgetId)
                                 }
-                                Column {
-                                    Text(
-                                        text = currentCity.name,
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = if (currentCity.country.isNotBlank()) "${currentCity.admin1.ifBlank { "" }} ${currentCity.country}".trim() else "Selected City",
-                                        color = Color(0xFF8E8E93),
-                                        fontSize = 10.sp
-                                    )
+                            } catch (_: Exception) {}
+                        }
+                        val resultIntent = Intent().apply {
+                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                        }
+                        setResult(Activity.RESULT_OK, resultIntent)
+                        finish()
+                    }
+
+                    SlateConfigScaffold(
+                        title = "Weather",
+                        subtitle = widgetName.ifEmpty { null },
+                        accentColor = Color(selectedAccentHex),
+                        tabs = tabs,
+                        selectedTabKey = selectedTabKey,
+                        onTabSelected = { selectedTabKey = it },
+                        onBackClick = { finish() },
+                        onSaveClick = { saveAndFinish() },
+                        scrollable = selectedTabKey == "STYLE",
+                        previewHeight = previewHeight,
+                        previewContent = {
+                            val context = LocalContext.current
+                            val slot = remember(widgetClassName) {
+                                when {
+                                    widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") || widgetClassName.contains("FluidPebble") ->
+                                        WeatherPreviewSlot(288, 120, 260.dp, 108.dp)
+                                    widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") || widgetClassName.contains("SolarTrack") ->
+                                        WeatherPreviewSlot(280, 60, 260.dp, 56.dp)
+                                    widgetClassName.contains("MetroTrio") ->
+                                        WeatherPreviewSlot(240, 65, 230.dp, 62.dp)
+                                    widgetClassName.contains("Micro") ->
+                                        WeatherPreviewSlot(100, 85, 95.dp, 80.dp)
+                                    else ->
+                                        WeatherPreviewSlot(160, 133, 150.dp, 125.dp)
                                 }
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF1F1F26))
-                                    .clickable(enabled = !isSyncing) { syncWeatherForCity(currentCity) }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSyncing) {
-                                    CircularProgressIndicator(
-                                        color = Color(selectedAccentHex),
-                                        modifier = Modifier.size(14.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Text("Sync", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                    }
+                            val previewBitmap = remember(weatherData, currentSlateConfig, isResponsive, widgetClassName, currentUnit) {
+                                when {
+                                    widgetClassName.contains("Horizon") -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("BentoGlance") -> generateWeatherBentoGlanceBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("DaylightArc") -> generateWeatherDaylightArcBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("PillDock") -> generateWeatherPillDockBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("Editorial") -> generateWeatherEditorialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("MinimalistDual") -> generateWeatherMinimalistDualBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("CompactDial") -> generateWeatherCompactDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("MetroTrio") -> generateWeatherMetroTrioBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("Micro") -> generateWeatherMicroBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("Celestial") -> generateWeatherCelestialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("LunarSolo") -> generateWeatherLunarSoloBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("OrbitDial") -> generateWeatherOrbitDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("SolarTrack") -> generateWeatherSolarTrackBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    widgetClassName.contains("FluidPebble") -> generateWeatherFluidPebbleBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                    else -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 }
                             }
-                        }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SectionTitle(title = "Temperature Unit")
+                            // 2. Pure borderless Image preview matching Social Studio exactly
+                            Image(
+                                bitmap = previewBitmap.asImageBitmap(),
+                                contentDescription = "Weather Widget Preview",
+                                modifier = Modifier.size(slot.displayW, slot.displayH)
+                            )
+                        }
+                    ) {
+                        if (selectedTabKey == "LOCATION") {
+                            // Current City & Sync Card
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(Color(0xFF141418))
-                                    .border(1.dp, Color(0xFF24242C), RoundedCornerShape(12.dp))
-                                    .padding(3.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                                    .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                listOf(
-                                    WeatherPreferences.UNIT_CELSIUS to "Celsius (°C)",
-                                    WeatherPreferences.UNIT_FAHRENHEIT to "Fahrenheit (°F)"
-                                ).forEach { (unitKey, label) ->
-                                    val isSelected = currentUnit == unitKey
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
                                     Box(
                                         modifier = Modifier
-                                            .weight(1f)
-                                            .height(34.dp)
-                                            .clip(RoundedCornerShape(9.dp))
-                                            .background(if (isSelected) Color(0xFF282832) else Color.Transparent)
-                                            .clickable {
-                                                currentUnit = unitKey
-                                                WeatherPreferences.setUnit(this@WeatherConfigActivity, unitKey)
-                                                updateAllWeatherWidgets(this@WeatherConfigActivity)
-                                            },
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(selectedAccentHex).copy(alpha = 0.15f)),
                                         contentAlignment = Alignment.Center
                                     ) {
+                                        Icon(
+                                            imageVector = Icons.Default.LocationOn,
+                                            contentDescription = null,
+                                            tint = Color(selectedAccentHex),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Column {
                                         Text(
-                                            text = label,
-                                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                            text = currentCity.name,
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (currentCity.country.isNotBlank()) "${currentCity.admin1.ifBlank { "" }} ${currentCity.country}".trim() else "Selected City",
+                                            color = Color(0xFF8E8E93),
+                                            fontSize = 10.sp
                                         )
                                     }
                                 }
-                            }
-                        }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SectionTitle(title = "Search & Change City")
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search city (e.g. London, Tokyo, New York...)", color = Color(0xFF8E8E93), fontSize = 12.sp) },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp)) },
-                                trailingIcon = {
-                                    if (isSearching) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF1F1F26))
+                                        .clickable(enabled = !isSyncing) { syncWeatherForCity(currentCity) }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSyncing) {
                                         CircularProgressIndicator(
                                             color = Color(selectedAccentHex),
                                             modifier = Modifier.size(14.dp),
                                             strokeWidth = 2.dp
                                         )
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(selectedAccentHex),
-                                    unfocusedBorderColor = Color(0xFF24242C),
-                                    focusedContainerColor = Color(0xFF141418),
-                                    unfocusedContainerColor = Color(0xFF141418),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                )
-                            )
-                        }
-
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF141418))
-                                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp)),
-                            contentPadding = PaddingValues(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            val displayList = if (searchResults.isNotEmpty()) searchResults else DEFAULT_CITIES
-
-                            items(displayList) { city ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (city.name == currentCity.name) Color(0xFF22222C) else Color(0xFF1A1A22))
-                                        .clickable {
-                                            currentCity = city
-                                            WeatherPreferences.setSelectedCity(this@WeatherConfigActivity, city)
-                                            syncWeatherForCity(city)
+                                    } else {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text("Sync", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                         }
-                                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = city.name,
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = "${city.admin1.ifBlank { "" }} ${city.country}".trim(),
-                                            color = Color(0xFF8E8E93),
-                                            fontSize = 10.sp
-                                        )
-                                    }
-
-                                    if (city.name == currentCity.name) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = Color(selectedAccentHex),
-                                            modifier = Modifier.size(16.dp)
-                                        )
                                     }
                                 }
                             }
-                        }
-                    } else {
-                        val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SectionTitle(title = "Background")
-                            val bgPresets = listOf(
-                                0xFF161618L to "Matte",
-                                0xFF000000L to "AMOLED",
-                                0xFFFFFFFFL to "Light"
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                bgPresets.forEach { (hex, label) ->
-                                    SelectableChip(
-                                        label = label,
-                                        isSelected = selectedBgHex == hex,
-                                        colorPreview = Color(hex),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        selectedBgHex = hex
-                                        if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) selectedAccentHex = 0xFF000000L
-                                        else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) selectedAccentHex = 0xFFFFFFFFL
-                                    }
-                                }
-
-                                val isCustomBg = bgPresets.none { it.first == selectedBgHex }
-                                RainbowPickerChip(
-                                    isSelected = isCustomBg,
-                                    activeColor = if (isCustomBg) Color(selectedBgHex) else null,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    activePickerTarget = WeatherColorTarget.BACKGROUND
-                                }
-                            }
-                        }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            SectionTitle(title = "Accent Color")
-                            val accentPresets = if (isLightBg) {
-                                listOf(0xFF000000L, 0xFF38ACFFL, 0xFFFF9500L, 0xFF00D166L, 0xFFFF3B30L, 0xFFAF52DEL)
-                            } else {
-                                listOf(0xFFFFFFFFL, 0xFF38ACFFL, 0xFFFF9500L, 0xFF00D166L, 0xFFFF3B30L, 0xFFAF52DEL)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                accentPresets.forEach { hex ->
-                                    ProfessionalSwatchCircle(
-                                        color = Color(hex),
-                                        isSelected = selectedAccentHex == hex,
-                                        onClick = { selectedAccentHex = hex }
-                                    )
-                                }
-
-                                val isCustomAccent = accentPresets.none { it == selectedAccentHex }
-                                RainbowCustomCircle(
-                                    isSelected = isCustomAccent,
-                                    activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
-                                    onClick = { activePickerTarget = WeatherColorTarget.ACCENT }
-                                )
-                            }
-                        }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SectionTitle(title = "Surface Translucency")
-                                Text(
-                                    text = "${(opacity * 100).toInt()}%",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            ModernOpacitySlider(value = opacity, onValueChange = { opacity = it })
-                        }
-
-                        if (hasModeOption) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SectionTitle(title = "Sizing Mode")
+                            // Temperature Unit Switcher
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                SectionTitle(title = "Temperature Unit")
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(Color(0xFF141416))
-                                        .padding(4.dp),
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF141418))
+                                        .border(1.dp, Color(0xFF24242C), RoundedCornerShape(12.dp))
+                                        .padding(3.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsiveVal, label) ->
-                                        val isSelected = isResponsive == responsiveVal
+                                    listOf(
+                                        WeatherPreferences.UNIT_CELSIUS to "Celsius (°C)",
+                                        WeatherPreferences.UNIT_FAHRENHEIT to "Fahrenheit (°F)"
+                                    ).forEach { (unitKey, label) ->
+                                        val isSelected = currentUnit == unitKey
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(38.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
-                                                .clickable { isResponsive = responsiveVal },
+                                                .height(34.dp)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .background(if (isSelected) Color(0xFF282832) else Color.Transparent)
+                                                .clickable {
+                                                    currentUnit = unitKey
+                                                    WeatherPreferences.setUnit(this@WeatherConfigActivity, unitKey)
+                                                    updateAllWeatherWidgets(this@WeatherConfigActivity)
+                                                },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = label,
                                                 color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                                fontSize = 13.sp,
+                                                fontSize = 12.sp,
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                                             )
                                         }
                                     }
                                 }
                             }
+
+                            // Search Global Cities
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                SectionTitle(title = "Search & Change City")
+                                OutlinedTextField(
+                                    value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    placeholder = { Text("Search city (e.g. London, Tokyo, New York...)", color = Color(0xFF8E8E93), fontSize = 12.sp) },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp)) },
+                                    trailingIcon = {
+                                        if (isSearching) {
+                                            CircularProgressIndicator(
+                                                color = Color(selectedAccentHex),
+                                                modifier = Modifier.size(14.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color(selectedAccentHex),
+                                        unfocusedBorderColor = Color(0xFF24242C),
+                                        focusedContainerColor = Color(0xFF141418),
+                                        unfocusedContainerColor = Color(0xFF141418),
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    )
+                                )
+                            }
+
+                            // Search Results or Popular Cities
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF141418))
+                                    .border(1.dp, Color(0xFF24242C), RoundedCornerShape(14.dp)),
+                                contentPadding = PaddingValues(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val displayList = if (searchResults.isNotEmpty()) searchResults else DEFAULT_CITIES
+
+                                items(displayList) { city ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (city.name == currentCity.name) Color(0xFF22222C) else Color(0xFF1A1A22))
+                                            .clickable {
+                                                currentCity = city
+                                                WeatherPreferences.setSelectedCity(this@WeatherConfigActivity, city)
+                                                syncWeatherForCity(city)
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = city.name,
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = "${city.admin1.ifBlank { "" }} ${city.country}".trim(),
+                                                color = Color(0xFF8E8E93),
+                                                fontSize = 10.sp
+                                            )
+                                        }
+
+                                        if (city.name == currentCity.name) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color(selectedAccentHex),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // TAB 2: WIDGET THEME & STYLE
+                            val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SectionTitle(title = "Background")
+                                val bgPresets = listOf(
+                                    0xFF161618L to "Matte",
+                                    0xFF000000L to "AMOLED",
+                                    0xFFFFFFFFL to "Light"
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    bgPresets.forEach { (hex, label) ->
+                                        SelectableChip(
+                                            label = label,
+                                            isSelected = selectedBgHex == hex,
+                                            colorPreview = Color(hex),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            selectedBgHex = hex
+                                            if (hex == 0xFFFFFFFFL && selectedAccentHex == 0xFFFFFFFFL) selectedAccentHex = 0xFF000000L
+                                            else if (hex != 0xFFFFFFFFL && selectedAccentHex == 0xFF000000L) selectedAccentHex = 0xFFFFFFFFL
+                                        }
+                                    }
+
+                                    val isCustomBg = bgPresets.none { it.first == selectedBgHex }
+                                    RainbowPickerChip(
+                                        isSelected = isCustomBg,
+                                        activeColor = if (isCustomBg) Color(selectedBgHex) else null,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        activePickerTarget = WeatherColorTarget.BACKGROUND
+                                    }
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                SectionTitle(title = "Accent Color")
+                                val accentPresets = if (isLightBg) {
+                                    listOf(0xFF000000L, 0xFF38ACFFL, 0xFFFF9500L, 0xFF00D166L, 0xFFFF3B30L, 0xFFAF52DEL)
+                                } else {
+                                    listOf(0xFFFFFFFFL, 0xFF38ACFFL, 0xFFFF9500L, 0xFF00D166L, 0xFFFF3B30L, 0xFFAF52DEL)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    accentPresets.forEach { hex ->
+                                        ProfessionalSwatchCircle(
+                                            color = Color(hex),
+                                            isSelected = selectedAccentHex == hex,
+                                            onClick = { selectedAccentHex = hex }
+                                        )
+                                    }
+
+                                    val isCustomAccent = accentPresets.none { it == selectedAccentHex }
+                                    RainbowCustomCircle(
+                                        isSelected = isCustomAccent,
+                                        activeColor = if (isCustomAccent) Color(selectedAccentHex) else null,
+                                        onClick = { activePickerTarget = WeatherColorTarget.ACCENT }
+                                    )
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    SectionTitle(title = "Surface Translucency")
+                                    Text(
+                                        text = "${(opacity * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                ModernOpacitySlider(value = opacity, onValueChange = { opacity = it })
+                            }
+
+                            if (hasModeOption) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    SectionTitle(title = "Sizing Mode")
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(Color(0xFF141416))
+                                            .padding(4.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        listOf(true to "Responsive", false to "Fixed Aspect").forEach { (responsiveVal, label) ->
+                                            val isSelected = isResponsive == responsiveVal
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(38.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(if (isSelected) Color(0xFF2C2C30) else Color.Transparent)
+                                                    .clickable { isResponsive = responsiveVal },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                                    fontSize = 13.sp,
+                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                }
 
-                activePickerTarget?.let { target ->
-                    val initialColor = if (target == WeatherColorTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
-                    CustomColorPickerDialog(
-                        initialColor = initialColor,
-                        title = if (target == WeatherColorTarget.BACKGROUND) "Custom Background" else "Custom Accent",
-                        onDismiss = { activePickerTarget = null },
-                        onColorSelected = { color ->
-                            val hex = (color.toArgb().toLong() and 0xFFFFFFFFL)
-                            if (target == WeatherColorTarget.BACKGROUND) {
-                                selectedBgHex = hex
-                            } else {
-                                selectedAccentHex = hex
+                    if (activePickerTarget != null) {
+                        val initialColor = if (activePickerTarget == WeatherColorTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
+                        CustomColorPickerDialog(
+                            initialColor = initialColor,
+                            title = if (activePickerTarget == WeatherColorTarget.BACKGROUND) "Custom Background" else "Custom Accent",
+                            onDismiss = { activePickerTarget = null },
+                            onColorSelected = { color ->
+                                val hex = (color.toArgb().toLong() and 0xFFFFFFFFL)
+                                if (activePickerTarget == WeatherColorTarget.BACKGROUND) {
+                                    selectedBgHex = hex
+                                } else {
+                                    selectedAccentHex = hex
+                                }
+                                activePickerTarget = null
                             }
-                            activePickerTarget = null
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -790,9 +800,37 @@ private fun ModernOpacitySlider(
             activeTrackColor = Color.Transparent,
             inactiveTrackColor = Color.Transparent
         ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp)
+        track = { sliderState ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF18181C))
+                    .border(0.5.dp, Color(0xFF242428), RoundedCornerShape(4.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(sliderState.value)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.White.copy(alpha = 0.25f), Color.White)
+                            )
+                        )
+                )
+            }
+        },
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .border(2.dp, Color(0xFF0A0A0C), CircleShape)
+            )
+        }
     )
 }
 

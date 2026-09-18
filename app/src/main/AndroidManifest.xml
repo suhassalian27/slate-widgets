@@ -4447,6 +4447,7 @@
             android:name=".widgets.weather.WeatherConfigActivity"
             android:exported="true"
             android:theme="@style/Theme.Slate"
+            android:windowSoftInputMode="adjustResize"
             android:label="Weather Studio">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
