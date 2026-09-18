@@ -189,16 +189,14 @@ class WeatherConfigActivity : ComponentActivity() {
                         val context = LocalContext.current
                         val slot = remember(widgetClassName) {
                             when {
-                                widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") ->
-                                    WeatherPreviewSlot(288, 120, 260.dp, 108.dp)
+                                widgetClassName.contains("Horizon") || widgetClassName.contains("BentoGlance") || widgetClassName.contains("FluidPebble") ->
+                                    WeatherPreviewSlot(288, 120, 260.dp, 108.dp) // Standard 4x2 preview slot
                                 widgetClassName.contains("PillDock") || widgetClassName.contains("HourlyRibbon") || widgetClassName.contains("SolarTrack") ->
-                                    WeatherPreviewSlot(280, 60, 260.dp, 56.dp)   // 4x1 Pill Slot
+                                    WeatherPreviewSlot(280, 60, 260.dp, 56.dp)
                                 widgetClassName.contains("MetroTrio") ->
                                     WeatherPreviewSlot(240, 65, 230.dp, 62.dp)
                                 widgetClassName.contains("Micro") ->
                                     WeatherPreviewSlot(100, 85, 95.dp, 80.dp)
-                                widgetClassName.contains("Celestial") || widgetClassName.contains("LunarSolo") || widgetClassName.contains("OrbitDial") ->
-                                    WeatherPreviewSlot(160, 133, 150.dp, 125.dp)
                                 else ->
                                     WeatherPreviewSlot(160, 133, 150.dp, 125.dp)
                             }
@@ -219,6 +217,7 @@ class WeatherConfigActivity : ComponentActivity() {
                                 widgetClassName.contains("LunarSolo") -> generateWeatherLunarSoloBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("OrbitDial") -> generateWeatherOrbitDialBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 widgetClassName.contains("SolarTrack") -> generateWeatherSolarTrackBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
+                                widgetClassName.contains("FluidPebble") -> generateWeatherFluidPebbleBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                                 else -> generateWeatherHorizonBitmap(context, currentSlateConfig, isResponsive, slot.slotWDp, slot.slotHDp, 0)
                             }
                         }

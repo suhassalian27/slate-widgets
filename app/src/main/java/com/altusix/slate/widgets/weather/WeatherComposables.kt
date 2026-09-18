@@ -2639,3 +2639,151 @@ private fun drawCelestialHorizon(
         }
     }
 }
+
+// 14. Weather Fluid Pebble (4x2 / Organic Dual-Lobe Horizon)
+fun generateWeatherFluidPebbleBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val secondaryText = if (isLight) Color.parseColor("#787880") else Color.parseColor("#99FFFFFF")
+    val accentColor = config.accentColorHex.toInt()
+
+    // -------------------------------------------------------------------------
+    // 1. CANONICAL VIRTUAL VIEWPORT (320 x 200 @ 1.6:1 4x2 Aspect Ratio)
+    // -------------------------------------------------------------------------
+    val canonicalW = 320f
+    val canonicalH = 200f
+
+    val margin = scaleFactor * 3.0f
+    val availW = (w - margin * 2f).coerceAtLeast(10f)
+    val availH = (h - margin * 2f).coerceAtLeast(10f)
+
+    // Uniform scale prevents distortion across any screen or grid size
+    val uniformScale = minOf(availW / canonicalW, availH / canonicalH)
+    val offsetX = margin + (availW - canonicalW * uniformScale) / 2f
+    val offsetY = margin + (availH - canonicalH * uniformScale) / 2f
+
+    canvas.save()
+    canvas.translate(offsetX, offsetY)
+    canvas.scale(uniformScale, uniformScale)
+
+    // -------------------------------------------------------------------------
+    // 2. ORGANIC DUAL-LOBE PEBBLE SILHOUETTE
+    // -------------------------------------------------------------------------
+    val pebblePath = Path().apply {
+        moveTo(160f, 52f)
+        cubicTo(192f, 50f, 238f, 40f, 264f, 52f)
+        cubicTo(294f, 65f, 310f, 92f, 310f, 118f)
+        cubicTo(310f, 146f, 290f, 172f, 260f, 174f)
+        cubicTo(230f, 176f, 195f, 162f, 160f, 162f)
+        cubicTo(125f, 162f, 85f, 185f, 55f, 182f)
+        cubicTo(22f, 178f, 10f, 145f, 10f, 110f)
+        cubicTo(10f, 65f, 25f, 20f, 65f, 18f)
+        cubicTo(100f, 16f, 130f, 54f, 160f, 52f)
+        close()
+    }
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(
+            (config.opacity.coerceIn(0f, 1f) * 255).toInt(),
+            Color.red(bgColor),
+            Color.green(bgColor),
+            Color.blue(bgColor)
+        )
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(pebblePath, bgPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f
+        color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(25, 255, 255, 255)
+    }
+    canvas.drawPath(pebblePath, borderPaint)
+
+    val weather = WeatherPreferences.getCachedWeatherData(context)
+    val unit = WeatherPreferences.getUnit(context)
+    val isNight = isNightTime(weather)
+
+    // -------------------------------------------------------------------------
+    // 3. LEFT LOBE TYPOGRAPHY (City, Weather Condition & Large Degree)
+    // -------------------------------------------------------------------------
+    val leftX = 48f
+
+    val cityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = 14f
+        typeface = getSlateFont(context, weight = 600)
+    }
+
+    val condPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = 11.5f
+        typeface = getSlateFont(context, weight = 400)
+    }
+
+    val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryText
+        textSize = 50f
+        typeface = getSlateFont(context, weight = 300)
+    }
+
+    var displayCity = weather.cityName
+    var displayCond = weather.conditionText
+    val maxTextW = 105f
+
+    while (cityPaint.measureText(displayCity) > maxTextW && cityPaint.textSize > 9f) {
+        cityPaint.textSize -= 0.5f
+    }
+    while (condPaint.measureText(displayCond) > maxTextW && condPaint.textSize > 8f) {
+        condPaint.textSize -= 0.5f
+    }
+
+    canvas.drawText(displayCity, leftX, 58f, cityPaint)
+    canvas.drawText(displayCond, leftX, 74f, condPaint)
+
+    val tempStr = "${WeatherPreferences.formatTempValue(weather.currentTemp, unit)}°"
+    canvas.drawText(tempStr, leftX, 140f, tempPaint)
+
+    // -------------------------------------------------------------------------
+    // 4. RIGHT LOBE: Weather Icon (Accent Color) & "Feels Like" Subtitle
+    // -------------------------------------------------------------------------
+    val rightCx = 236f
+    val iconSize = 54f
+    val iconCenterY = 94f
+
+    val iconRect = RectF(
+        rightCx - (iconSize / 2f),
+        iconCenterY - (iconSize / 2f),
+        rightCx + (iconSize / 2f),
+        iconCenterY + (iconSize / 2f)
+    )
+
+    // Draw dynamic weather glyph tinted with user's chosen accent color
+    drawWeatherIcon(canvas, context, weather.weatherCode, iconRect, accentColor, isNight)
+
+    // "Feels like" subtitle anchored underneath
+    val feelsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = 10f
+        typeface = getSlateFont(context, weight = 400)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val feelsLikeStr = "Feels like ${WeatherPreferences.formatTempValue(weather.feelsLike, unit)}°"
+    canvas.drawText(feelsLikeStr, rightCx, 150f, feelsPaint)
+
+    canvas.restore()
+    return bitmap
+}

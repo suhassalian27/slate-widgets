@@ -210,7 +210,8 @@ fun getWeatherWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo(name = "Weather Celestial", sizeText = "2x2", category = "Weather", receiverClass = WeatherCelestialReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Lunar Solo", sizeText = "2x2", category = "Weather", receiverClass = WeatherLunarSoloReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo(name = "Weather Orbit Dial", sizeText = "2x2", category = "Weather", receiverClass = WeatherOrbitDialReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo(name = "Weather Solar Track", sizeText = "4x1", category = "Weather", receiverClass = WeatherSolarTrackReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo(name = "Weather Solar Track", sizeText = "4x1", category = "Weather", receiverClass = WeatherSolarTrackReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo(name = "Weather Fluid Pebble", sizeText = "4x2", category = "Weather", receiverClass = WeatherFluidPebbleReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -229,7 +230,8 @@ fun updateAllWeatherWidgets(context: Context) {
         WeatherCelestialReceiver(),
         WeatherLunarSoloReceiver(),
         WeatherOrbitDialReceiver(),
-        WeatherSolarTrackReceiver()
+        WeatherSolarTrackReceiver(),
+        WeatherFluidPebbleReceiver()
     )
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
@@ -342,4 +344,16 @@ class WeatherSolarTrackReceiver : BaseWeatherReceiver(targetAspect = 3.6f, widge
         wDp: Int,
         hDp: Int
     ): Bitmap = generateWeatherSolarTrackBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
+}
+
+// 14. Weather Fluid Pebble Receiver (4x2 / Organic Dual-Lobe Horizon)
+class WeatherFluidPebbleReceiver : BaseWeatherReceiver(targetAspect = 1.6f, widgetTypeTag = "FLUID_PEBBLE") {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateWeatherFluidPebbleBitmap(context, config, isResponsive, wDp, hDp, appWidgetId)
 }

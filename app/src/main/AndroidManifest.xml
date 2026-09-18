@@ -4608,6 +4608,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x1" />
         </receiver>
+        <!-- 14. Weather Fluid Pebble Receiver (4x2) -->
+        <receiver
+            android:name=".widgets.weather.WeatherFluidPebbleReceiver"
+            android:exported="true"
+            android:label="Weather Fluid Pebble">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4x2" />
+        </receiver>
 
     </application>
 </manifest>
