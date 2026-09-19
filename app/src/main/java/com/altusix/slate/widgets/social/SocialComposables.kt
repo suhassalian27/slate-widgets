@@ -515,8 +515,17 @@ fun generateSocialGridBitmap(
     val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
+    val cardRect = if (isResponsive || rows == 1 || targetRatio >= 2.5f) {
+        // Horizontal bars (5x1, 4x1, 3x1) must ALWAYS span 100% width to match the launcher grid
+        if (!isResponsive && targetRatio > 0f) {
+            val maxAllowedH = h - (margin * 2f)
+            val idealH = (w - (margin * 2f)) / targetRatio
+            val cardH = idealH.coerceAtMost(maxAllowedH)
+            val topY = (h - cardH) / 2f
+            RectF(margin, topY, w - margin, topY + cardH)
+        } else {
+            RectF(margin, margin, w - margin, h - margin)
+        }
     } else {
         var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio

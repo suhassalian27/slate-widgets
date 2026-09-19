@@ -244,7 +244,7 @@ class SocialBar5Receiver : BaseSocialGridReceiver(
     slotCount = 5,
     defaultLayoutResId = R.layout.widget_base_row_5,
     layoutTag = "BAR_5",
-    targetAspect = 5.0f
+    targetAspect = 0f
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
         val isVertical = isResponsive && (hDp > wDp)
@@ -312,7 +312,7 @@ class SocialMessaging4Receiver : BaseSocialGridReceiver(
     slotCount = 4,
     defaultLayoutResId = R.layout.widget_base_row_4,
     layoutTag = "MESSAGING_4",
-    targetAspect = 4.0f
+    targetAspect = 0f // Set to 0f for width-dominant fit
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
         val isVertical = isResponsive && (hDp > wDp)
@@ -328,13 +328,12 @@ class SocialMessaging4Receiver : BaseSocialGridReceiver(
         widgetId: Int
     ): Bitmap = generateSocialMessaging4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
-
 // 9. Social Stream (3 Apps Row - 3x1 / 1x3 Pivot)
 class SocialStream3Receiver : BaseSocialGridReceiver(
     slotCount = 3,
     defaultLayoutResId = R.layout.widget_base_row_3,
     layoutTag = "STREAM_3",
-    targetAspect = 3.0f
+    targetAspect = 0f // Set to 0f for width-dominant fit
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
         val isVertical = isResponsive && (hDp > wDp)
