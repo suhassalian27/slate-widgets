@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
@@ -15,7 +16,6 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
-import android.graphics.PointF
 
 fun getAppIconBitmap(context: Context, packageName: String, size: Int): Bitmap? {
     return try {
@@ -49,8 +49,9 @@ private fun drawSlotContent(
     val minDim = minOf(tileW, tileH)
     val showText = showAppNames && !isMicro && tileH >= scaleFactor * 32f
 
-    val iconRatio = if (showText) 0.46f else 0.58f
-    val iconSize = (minDim * iconRatio).coerceAtLeast(scaleFactor * 12f)
+    val baseRatio = if (showText) 0.46f else 0.58f
+    val maxIconSize = scaleFactor * (if (showText) 40f else 46f)
+    val iconSize = (minDim * baseRatio).coerceIn(scaleFactor * 12f, maxIconSize)
 
     val iconCy = if (showText) tileRect.centerY() - (scaleFactor * 5f) else tileRect.centerY()
     val gap = scaleFactor * 6f
@@ -114,7 +115,7 @@ private fun drawSlotContent(
     }
 }
 
-// Universal App Folder Grid Generator with Concentric Per-Corner Radii
+// Universal App Folder Grid Generator with Concentric Inner Clipping & Unified Spacing
 fun generateAppFolderGridBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -123,22 +124,8 @@ fun generateAppFolderGridBitmap(
     wDp: Int,
     hDp: Int,
     widgetId: Int,
-    cols: Int = when (folderConfig.slotCount) {
-        3 -> if (wDp >= hDp) 3 else 1
-        4 -> if (wDp > hDp * 2.5f) 4 else 2
-        5 -> 5
-        8 -> 4
-        9 -> 3
-        else -> 2
-    },
-    rows: Int = when (folderConfig.slotCount) {
-        3 -> if (wDp >= hDp) 1 else 3
-        4 -> if (wDp > hDp * 2.5f) 1 else 2
-        5 -> 1
-        8 -> 2
-        9 -> 3
-        else -> 2
-    }
+    cols: Int,
+    rows: Int
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -150,12 +137,20 @@ fun generateAppFolderGridBitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    // 1. Dual-Mode Geometry
+    // 1. Dual-Mode Geometry (Width-Dominant for horizontal bars)
     val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
+    val cardRect = if (isResponsive || rows == 1 || targetRatio >= 2.5f) {
+        if (!isResponsive && targetRatio > 0f) {
+            val maxAllowedH = h - (margin * 2f)
+            val idealH = (w - (margin * 2f)) / targetRatio
+            val cardH = idealH.coerceAtMost(maxAllowedH)
+            val topY = (h - cardH) / 2f
+            RectF(margin, topY, w - margin, topY + cardH)
+        } else {
+            RectF(margin, margin, w - margin, h - margin)
+        }
     } else {
         var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
@@ -178,13 +173,24 @@ fun generateAppFolderGridBitmap(
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    // 2. Proportional Padding & Edge Fill
+    // 2. Tightened Uniform Spacing (Scales from 1.8dp up to 5.5dp)
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val pad = (minDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 9f)
-    val gap = (minDim * 0.035f).coerceIn(scaleFactor * 2.5f, scaleFactor * 6f)
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    val availableW = cardRect.width() - (pad * 2f) - (gap * (cols - 1))
-    val availableH = cardRect.height() - (pad * 2f) - (gap * (rows - 1))
+    // 3. Mathematical Concentric Inner Boundary (R_inner = R_outer - spacing)
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val availableW = innerCardRect.width() - (spacing * (cols - 1))
+    val availableH = innerCardRect.height() - (spacing * (rows - 1))
     val tileW = availableW / cols
     val tileH = availableH / rows
 
@@ -194,40 +200,51 @@ fun generateAppFolderGridBitmap(
         style = Paint.Style.FILL
     }
 
-    // 3. Concentric Per-Corner Radius
-    val minTileDim = minOf(tileW, tileH)
-    val squircleRadius = minTileDim * 0.28f
-    val concentricRadius = (outerRadius - pad).coerceIn(squircleRadius, minTileDim / 2f)
+    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(minOf(tileW, tileH) / 2f)
 
     for (i in 0 until slotCount) {
         val col = i % cols
         val row = i / cols
 
-        val tileLeft = cardRect.left + pad + col * (tileW + gap)
-        val tileTop = cardRect.top + pad + row * (tileH + gap)
+        val tileLeft = innerCardRect.left + col * (tileW + spacing)
+        val tileTop = innerCardRect.top + row * (tileH + spacing)
         val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
 
-        val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
+        val isTopOuter = (row == 0)
+        val isBottomOuter = (row == rows - 1)
+        val isLeftOuter = (col == 0)
+        val isRightOuter = (col == cols - 1)
 
-        // Concentric Corner Radii Mapping for Edge Tiles
-        val tl = if (col == 0 && row == 0) concentricRadius else squircleRadius
-        val tr = if (col == cols - 1 && row == 0) concentricRadius else squircleRadius
-        val br = if (col == cols - 1 && row == rows - 1) concentricRadius else squircleRadius
-        val bl = if (col == 0 && row == rows - 1) concentricRadius else squircleRadius
+        val tl = if (isTopOuter && isLeftOuter) 0f else innerCornerRadius
+        val tr = if (isTopOuter && isRightOuter) 0f else innerCornerRadius
+        val br = if (isBottomOuter && isRightOuter) 0f else innerCornerRadius
+        val bl = if (isBottomOuter && isLeftOuter) 0f else innerCornerRadius
 
         val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
         val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
 
         canvas.save()
+        canvas.clipPath(innerCardPath)
         canvas.clipPath(tilePath)
 
         if (folderConfig.showTileBackground) {
             canvas.drawPath(tilePath, tilePaint)
         }
 
+        val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
         drawSlotContent(
-            canvas, context, tileRect, slotConfig, folderConfig.showAppNames,
-            isLight, scaleFactor, primaryText, secondaryText
+            canvas = canvas,
+            context = context,
+            tileRect = tileRect,
+            slotConfig = slotConfig,
+            showAppNames = folderConfig.showAppNames,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            isMicro = cols >= 4 && rows >= 2
         )
         canvas.restore()
     }
@@ -283,6 +300,10 @@ private fun buildRoundedTrianglePath(
     return path
 }
 
+// ============================================================================
+// CONCRETE APP FOLDER GENERATORS
+// ============================================================================
+
 // 1. 4-APP FOLDER (2x2)
 fun generateAppFolder4Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 4)
@@ -291,47 +312,63 @@ fun generateAppFolder4Bitmap(context: Context, config: SlateWidgetConfig, isResp
 fun generateAppFolder4Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
     generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 2, rows = 2)
 
-// 2. 8-APP FOLDER (4x2)
+// 2. 8-APP FOLDER (4x2 / 2x4 Pivot)
 fun generateAppFolder8Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 8)
-    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 4, rows = 2)
+    return generateAppFolder8Bitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
-fun generateAppFolder8Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-    generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 4, rows = 2)
+fun generateAppFolder8Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 2 else 4
+    val rows = if (isVertical) 4 else 2
+    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = cols, rows = rows)
+}
 
-// 3. 3-APP HORIZONTAL (3x1)
+// 3. 3-APP HORIZONTAL (3x1 / 1x3 Pivot)
 fun generateAppFolderHorizontal3Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 3)
-    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 3, rows = 1)
+    return generateAppFolderHorizontal3Bitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
-fun generateAppFolderHorizontal3Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-    generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 3, rows = 1)
+fun generateAppFolderHorizontal3Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 3
+    val rows = if (isVertical) 3 else 1
+    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = cols, rows = rows)
+}
 
 // 4. 3-APP VERTICAL (1x3)
 fun generateAppFolderVertical3Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 3)
-    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 1, rows = 3)
+    return generateAppFolderVertical3Bitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
 fun generateAppFolderVertical3Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
     generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 1, rows = 3)
 
-// 5. 4-APP ROW (4x1)
+// 5. 4-APP ROW (4x1 / 1x4 Pivot)
 fun generateAppFolderRow4Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 4)
-    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 4, rows = 1)
+    return generateAppFolderRow4Bitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
-fun generateAppFolderRow4Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-    generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 4, rows = 1)
+fun generateAppFolderRow4Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 4
+    val rows = if (isVertical) 4 else 1
+    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = cols, rows = rows)
+}
 
-// 6. 5-APP ROW (5x1)
+// 6. 5-APP ROW (5x1 / 1x5 Pivot)
 fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 5)
-    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 5, rows = 1)
+    return generateAppFolderRow5Bitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
-fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-    generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = 5, rows = 1)
+fun generateAppFolderRow5Bitmap(context: Context, config: SlateWidgetConfig, folderConfig: AppFolderWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 1 else 5
+    val rows = if (isVertical) 5 else 1
+    return generateAppFolderGridBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId, cols = cols, rows = rows)
+}
 
-// 7. 6-APP CIRCLE DIAL (2x2 / Minimal Dial)
+// 7. 6-APP CIRCLE DIAL (2x2)
 fun generateAppFolderCircle6Bitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -347,8 +384,8 @@ fun generateAppFolderCircle6Bitmap(
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
+    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    // 1. Base Dial Plate
     val margin = scaleFactor * 1.5f
     val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
     val leftX = (w - cardSize) / 2f
@@ -369,11 +406,9 @@ fun generateAppFolderCircle6Bitmap(
     }
     canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
-    // 2. Proportional Geometry (Tightened to eliminate the center void)
-    val orbitRadius = outerRadius * 0.60f
-    val tileRadius = outerRadius * 0.40f
+    val orbitRadius = outerRadius * 0.62f
+    val tileRadius = outerRadius * 0.245f
 
-    // 3. Subtle Orbit Track
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -381,16 +416,18 @@ fun generateAppFolderCircle6Bitmap(
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
-    // 4. Frosted Neutral Hub (Grounds the center subtly without clashing colors)
-    val hubRadius = outerRadius * 0.14f
+    val hubRadius = outerRadius * 0.12f
     val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, hubRadius, hubPaint)
 
-    // 5. App Slots
-    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
 
     for (i in 0 until 6) {
         val angle = Math.toRadians((i * 60.0) - 90.0)
@@ -400,6 +437,10 @@ fun generateAppFolderCircle6Bitmap(
         val tileRect = RectF(slotX - tileRadius, slotY - tileRadius, slotX + tileRadius, slotY + tileRadius)
         val tileConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
 
+        if (folderConfig.showTileBackground) {
+            canvas.drawCircle(slotX, slotY, tileRadius, tilePaint)
+        }
+
         drawSlotContent(
             canvas = canvas,
             context = context,
@@ -408,7 +449,7 @@ fun generateAppFolderCircle6Bitmap(
             showAppNames = false,
             isLight = isLight,
             scaleFactor = scaleFactor,
-            primaryText = Color.WHITE,
+            primaryText = if (isLight) Color.BLACK else Color.WHITE,
             secondaryText = secondaryText,
             isMicro = false
         )
@@ -449,44 +490,66 @@ fun generateAppFolderBento7Bitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
     val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
-    val halfW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val halfH = (cardRect.height() - (pad * 2f) - gap) / 2f
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val halfW = (innerCardRect.width() - spacing) / 2f
+    val halfH = (innerCardRect.height() - spacing) / 2f
+    val innerCornerRadius = (minOf(halfW, halfH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
+
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+        color = innerCardBg
         style = Paint.Style.FILL
     }
 
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val sq = scaleFactor * 8f
-
     val bigRects = listOf(
-        RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + halfW, cardRect.top + pad + halfH),
-        RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + halfH),
-        RectF(cardRect.left + pad, cardRect.top + pad + halfH + gap, cardRect.left + pad + halfW, cardRect.bottom - pad)
+        RectF(innerCardRect.left, innerCardRect.top, innerCardRect.left + halfW, innerCardRect.top + halfH),
+        RectF(innerCardRect.left + halfW + spacing, innerCardRect.top, innerCardRect.right, innerCardRect.top + halfH),
+        RectF(innerCardRect.left, innerCardRect.top + halfH + spacing, innerCardRect.left + halfW, innerCardRect.bottom)
     )
 
     val bigRadiiList = listOf(
-        floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, sq, sq, sq, sq, concentricRadius, concentricRadius)
+        floatArrayOf(0f, 0f, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius),
+        floatArrayOf(innerCornerRadius, innerCornerRadius, 0f, 0f, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius),
+        floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, 0f, 0f)
     )
 
     for (i in 0..2) {
@@ -494,30 +557,37 @@ fun generateAppFolderBento7Bitmap(
         val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
         val tilePath = Path().apply { addRoundRect(rect, bigRadiiList[i], Path.Direction.CW) }
 
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
         if (folderConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
         drawSlotContent(canvas, context, rect, slotConfig, folderConfig.showAppNames, isLight, scaleFactor, primaryText, secondaryText)
+        canvas.restore()
     }
 
-    val q4Rect = RectF(cardRect.left + pad + halfW + gap, cardRect.top + pad + halfH + gap, cardRect.right - pad, cardRect.bottom - pad)
-    val subW = (q4Rect.width() - gap) / 2f
-    val subH = (q4Rect.height() - gap) / 2f
-
-    val microRadiiList = listOf(
-        floatArrayOf(sq, sq, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, sq, sq)
-    )
+    // Bottom-right quadrant with 4 small tiles (Slots 3 to 6)
+    val q4Rect = RectF(innerCardRect.left + halfW + spacing, innerCardRect.top + halfH + spacing, innerCardRect.right, innerCardRect.bottom)
+    val subW = (q4Rect.width() - spacing) / 2f
+    val subH = (q4Rect.height() - spacing) / 2f
 
     for (i in 0..3) {
         val col = i % 2
         val row = i / 2
-        val subRect = RectF(q4Rect.left + col * (subW + gap), q4Rect.top + row * (subH + gap), q4Rect.left + col * (subW + gap) + subW, q4Rect.top + row * (subH + gap) + subH)
-        val slotConfig = folderConfig.slots.getOrElse(i + 3) { AppSlotConfig() }
-        val tilePath = Path().apply { addRoundRect(subRect, microRadiiList[i], Path.Direction.CW) }
+        val subRect = RectF(q4Rect.left + col * (subW + spacing), q4Rect.top + row * (subH + spacing), q4Rect.left + col * (subW + spacing) + subW, q4Rect.top + row * (subH + spacing) + subH)
+
+        val br = if (col == 1 && row == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, br, br, innerCornerRadius, innerCornerRadius)
+        val tilePath = Path().apply { addRoundRect(subRect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
 
         if (folderConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
+        val slotConfig = folderConfig.slots.getOrElse(i + 3) { AppSlotConfig() }
         drawSlotContent(canvas, context, subRect, slotConfig, false, isLight, scaleFactor, primaryText, secondaryText, isMicro = true)
+        canvas.restore()
     }
     return bitmap
 }
@@ -578,57 +648,83 @@ fun generateAppFolderBento10LeftBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+        color = innerCardBg
         style = Paint.Style.FILL
     }
 
-    val leftW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val bigH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val sq = scaleFactor * 8f
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
-    val bigRadiiList = listOf(
-        floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, sq, sq, sq, sq, concentricRadius, concentricRadius)
-    )
+    val leftW = (innerCardRect.width() - spacing) / 2f
+    val bigH = (innerCardRect.height() - spacing) / 2f
 
     for (i in 0..1) {
-        val rect = RectF(cardRect.left + pad, cardRect.top + pad + i * (bigH + gap), cardRect.left + pad + leftW, cardRect.top + pad + i * (bigH + gap) + bigH)
+        val rect = RectF(innerCardRect.left, innerCardRect.top + i * (bigH + spacing), innerCardRect.left + leftW, innerCardRect.top + i * (bigH + spacing) + bigH)
+        val tl = if (i == 0) 0f else innerCornerRadius
+        val bl = if (i == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(tl, tl, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, bl, bl)
+
         val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
-        val tilePath = Path().apply { addRoundRect(rect, bigRadiiList[i], Path.Direction.CW) }
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
 
         if (folderConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
-        drawSlotContent(canvas, context, rect, slotConfig, folderConfig.showAppNames, isLight, scaleFactor, primaryText, secondaryText)
+        drawSlotContent(canvas, context, rect, slotConfig, folderConfig.showAppNames, isLight, scaleFactor, primaryText, secondaryText, isMicro = false)
+        canvas.restore()
     }
 
-    val rightLeft = cardRect.left + pad + leftW + gap
-    val rightW = cardRect.right - pad - rightLeft
-    val microW = (rightW - gap) / 2f
-    val microH = (cardRect.height() - (pad * 2f) - (gap * 3f)) / 4f
+    val rightLeft = innerCardRect.left + leftW + spacing
+    val rightW = innerCardRect.width() - leftW - spacing
+    val microW = (rightW - spacing) / 2f
+    val microH = (innerCardRect.height() - (3f * spacing)) / 4f
 
     for (i in 0..7) {
         val col = i % 2
         val row = i / 2
-        val tr = if (col == 1 && row == 0) concentricRadius else sq
-        val br = if (col == 1 && row == 3) concentricRadius else sq
-        val radii = floatArrayOf(sq, sq, tr, tr, br, br, sq, sq)
+        val tr = if (col == 1 && row == 0) 0f else innerCornerRadius
+        val br = if (col == 1 && row == 3) 0f else innerCornerRadius
+        val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, tr, tr, br, br, innerCornerRadius, innerCornerRadius)
 
-        val rect = RectF(rightLeft + col * (microW + gap), cardRect.top + pad + row * (microH + gap), rightLeft + col * (microW + gap) + microW, cardRect.top + pad + row * (microH + gap) + microH)
+        val rect = RectF(rightLeft + col * (microW + spacing), innerCardRect.top + row * (microH + spacing), rightLeft + col * (microW + spacing) + microW, innerCardRect.top + row * (microH + spacing) + microH)
         val slotConfig = folderConfig.slots.getOrElse(i + 2) { AppSlotConfig() }
         val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
 
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
         if (folderConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
         drawSlotContent(canvas, context, rect, slotConfig, false, isLight, scaleFactor, primaryText, secondaryText, isMicro = true)
+        canvas.restore()
     }
     return bitmap
 }
@@ -673,56 +769,83 @@ fun generateAppFolderBento10TopBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+        color = innerCardBg
         style = Paint.Style.FILL
     }
 
-    val topH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val bigW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val concentricRadius = (outerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val sq = scaleFactor * 8f
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
-    val bigRadiiList = listOf(
-        floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq)
-    )
+    val bigW = (innerCardRect.width() - spacing) / 2f
+    val topH = (innerCardRect.height() - spacing) / 2f
 
     for (i in 0..1) {
-        val rect = RectF(cardRect.left + pad + i * (bigW + gap), cardRect.top + pad, cardRect.left + pad + i * (bigW + gap) + bigW, cardRect.top + pad + topH)
+        val rect = RectF(innerCardRect.left + i * (bigW + spacing), innerCardRect.top, innerCardRect.left + i * (bigW + spacing) + bigW, innerCardRect.top + topH)
+        val tl = if (i == 0) 0f else innerCornerRadius
+        val tr = if (i == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(tl, tl, tr, tr, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
+
         val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
-        val tilePath = Path().apply { addRoundRect(rect, bigRadiiList[i], Path.Direction.CW) }
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
 
         if (folderConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
-        drawSlotContent(canvas, context, rect, slotConfig, folderConfig.showAppNames, isLight, scaleFactor, primaryText, secondaryText)
+        drawSlotContent(canvas, context, rect, slotConfig, folderConfig.showAppNames, isLight, scaleFactor, primaryText, secondaryText, isMicro = false)
+        canvas.restore()
     }
 
-    val bottomTop = cardRect.top + pad + topH + gap
-    val microW = (cardRect.width() - (pad * 2f) - (gap * 3f)) / 4f
-    val microH = (cardRect.bottom - pad - bottomTop - gap) / 2f
+    val bottomTop = innerCardRect.top + topH + spacing
+    val bottomH = innerCardRect.height() - topH - spacing
+    val microW = (innerCardRect.width() - (3f * spacing)) / 4f
+    val microH = (bottomH - spacing) / 2f
 
     for (i in 0..7) {
         val col = i % 4
         val row = i / 4
-        val bl = if (col == 0 && row == 1) concentricRadius else sq
-        val br = if (col == 3 && row == 1) concentricRadius else sq
-        val radii = floatArrayOf(sq, sq, sq, sq, br, br, bl, bl)
+        val bl = if (col == 0 && row == 1) 0f else innerCornerRadius
+        val br = if (col == 3 && row == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, br, br, bl, bl)
 
-        val rect = RectF(cardRect.left + pad + col * (microW + gap), bottomTop + row * (microH + gap), cardRect.left + pad + col * (microW + gap) + microW, bottomTop + row * (microH + gap) + microH)
+        val rect = RectF(innerCardRect.left + col * (microW + spacing), bottomTop + row * (microH + spacing), innerCardRect.left + col * (microW + spacing) + microW, bottomTop + row * (microH + spacing) + microH)
         val slotConfig = folderConfig.slots.getOrElse(i + 2) { AppSlotConfig() }
         val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
 
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
         if (folderConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
         drawSlotContent(canvas, context, rect, slotConfig, false, isLight, scaleFactor, primaryText, secondaryText, isMicro = true)
+        canvas.restore()
     }
     return bitmap
 }
@@ -732,7 +855,7 @@ fun generateAppFolderBento10TopBitmap(context: Context, config: SlateWidgetConfi
     return generateAppFolderBento10TopBitmap(context, config, folderConfig, isResponsive, wDp, hDp, widgetId)
 }
 
-// 12. 4-APP TRIANGLE / TRIFORCE FOLDER (2x2 - Fixed Proportional Geometry)
+// 12. 4-APP TRIANGLE FOLDER (2x2)
 fun generateAppFolderTriangle4Bitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -751,7 +874,6 @@ fun generateAppFolderTriangle4Bitmap(
     val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
 
-    // 1. Uniform Proportional Bounding Box (Strict Equilateral Geometry: H = sqrt(3)/2 * W)
     val margin = scaleFactor * 0.75f
     val availW = w - (margin * 2f)
     val availH = h - (margin * 2f)
@@ -770,12 +892,10 @@ fun generateAppFolderTriangle4Bitmap(
     val bottomY = topY + triH
     val cx = (leftX + rightX) / 2f
 
-    // Outer Triangle Vertices
     val outerApex = PointF(cx, topY)
     val outerBL = PointF(leftX, bottomY)
     val outerBR = PointF(rightX, bottomY)
 
-    // 2. Base Container Plate (Tighter corner radii prevent the apex from sagging downward)
     val outerCornerRadius = (minOf(triW, triH) * 0.11f).coerceIn(scaleFactor * 8f, scaleFactor * 18f)
     val outerPath = buildRoundedTrianglePath(
         outerApex, outerBL, outerBR,
@@ -789,7 +909,6 @@ fun generateAppFolderTriangle4Bitmap(
     }
     canvas.drawPath(outerPath, bgPaint)
 
-    // 3. Triforce Subdivisions (Tightened margins for maximum interior tile scale)
     val pad = (minOf(triW, triH) * 0.038f).coerceIn(scaleFactor * 3.5f, scaleFactor * 8f)
     val gap = (minOf(triW, triH) * 0.026f).coerceIn(scaleFactor * 2.5f, scaleFactor * 5.5f)
 
@@ -808,13 +927,9 @@ fun generateAppFolderTriangle4Bitmap(
     val mBC = PointF((inBL.x + inBR.x) / 2f, (inBL.y + inBR.y) / 2f)
 
     val subTriangles = listOf(
-        // Slot 0: Top (Apex)
         Triple(inApex, mAB, mAC),
-        // Slot 1: Bottom-Left
         Triple(mAB, inBL, mBC),
-        // Slot 2: Center (Inverted)
         Triple(mAC, mBC, mAB),
-        // Slot 3: Bottom-Right
         Triple(mAC, mBC, inBR)
     )
 
@@ -895,4 +1010,3 @@ fun generateAppFolderTriangle4Bitmap(
     val folderConfig = AppFolderWidgetConfig.load(context, widgetId, 4)
     return generateAppFolderTriangle4Bitmap(context, config, folderConfig, false, wDp, hDp, widgetId)
 }
-
