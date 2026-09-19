@@ -87,6 +87,24 @@ abstract class BaseGoogleReceiver : BaseCanvasWidgetProvider() {
         renderAndApplyWidget(context, appWidgetManager, appWidgetId, newOptions)
     }
 
+    protected fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+        val modeKey = "widget_${widgetId}_mode"
+        if (widgetPrefs.contains(modeKey)) {
+            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+        }
+        val respKey = "widget_${widgetId}_is_responsive"
+        if (widgetPrefs.contains(respKey)) {
+            return widgetPrefs.getBoolean(respKey, true)
+        }
+        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
+        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
+        return defaultResp
+    }
+
+    open fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int = R.layout.widget_base_single
+
     protected fun loadSlateWidgetConfig(context: Context, widgetId: Int, defaultOpacity: Float = 1.0f): SlateWidgetConfig {
         val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
         val bgKey = "widget_${widgetId}_bg_color"
@@ -230,29 +248,21 @@ class GoogleSearchCapsuleReceiver : BaseGoogleReceiver() {
     }
 }
 
-// 2. GOOGLE WORKSPACE QUAD (2x2)
+// 2. GOOGLE WORKSPACE QUAD (2x2 / 4x1 / 1x4 Pivot)
 class GoogleWorkspaceQuadReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp * 1.35f)
+        val isHorizontal = isResponsive && (wDp > hDp * 1.35f)
+        return when {
+            isHorizontal -> R.layout.widget_base_row_4
+            isVertical -> R.layout.widget_base_col_4
+            else -> R.layout.widget_base_grid_2x2
         }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
     }
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        // Preview Isolation: Strictly locked to Fixed 1:1 mode
-        return generateGoogleWorkspaceQuadBitmap(context, config, false, wDp, hDp, appWidgetId)
-    }
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+        generateGoogleWorkspaceQuadBitmap(context, config, false, wDp, hDp, appWidgetId)
 
     override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
         val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -264,9 +274,14 @@ class GoogleWorkspaceQuadReceiver : BaseGoogleReceiver() {
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
 
-        val views = RemoteViews(context.packageName, R.layout.widget_appfolder_grid4_layout)
+        val layoutId = resolveLayoutResId(isResponsive, wDp, hDp)
+        val views = RemoteViews(context.packageName, layoutId)
         val bitmap = generateGoogleWorkspaceQuadBitmap(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
 
         val intents = listOf(
             Intent(Intent.ACTION_WEB_SEARCH).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
@@ -275,51 +290,36 @@ class GoogleWorkspaceQuadReceiver : BaseGoogleReceiver() {
             context.packageManager.getLaunchIntentForPackage("com.google.android.apps.docs") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://drive.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
         )
 
-        val slotViewIds = intArrayOf(
-            R.id.touch_slot_0,
-            R.id.touch_slot_1,
-            R.id.touch_slot_2,
-            R.id.touch_slot_3
-        )
+        val slotIds = intArrayOf(R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3)
+        val legacySlotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3)
 
         for (i in 0..3) {
-            views.setOnClickPendingIntent(
-                slotViewIds[i],
-                PendingIntent.getActivity(
-                    context,
-                    widgetId * 100 + i,
-                    intents[i],
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+            val pi = PendingIntent.getActivity(
+                context, widgetId * 100 + i, intents[i],
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(slotIds[i], pi)
+            views.setOnClickPendingIntent(legacySlotIds[i], pi)
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
 
-// 3. GOOGLE TRIO BENTO (2x2)
+// 3. GOOGLE TRIO BENTO (2x2 / 3x1 / 1x3 Pivot)
 class GoogleTrioReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val aspectRatio = wDp.toFloat() / hDp.toFloat()
+        return when {
+            isResponsive && aspectRatio < 0.72f -> R.layout.widget_base_column_3
+            isResponsive && aspectRatio > 1.65f -> R.layout.widget_base_row_3
+            else -> R.layout.widget_bento_trio_layout
         }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
     }
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        return generateGoogleTrioBitmap(context, config, false, wDp, hDp, appWidgetId)
-    }
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+        generateGoogleTrioBitmap(context, config, false, wDp, hDp, appWidgetId)
 
     override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
         val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -331,24 +331,14 @@ class GoogleTrioReceiver : BaseGoogleReceiver() {
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
 
-        val aspectRatio = wDp.toFloat() / hDp.toFloat()
-
-        // Adaptive layout selection matching canvas reflow
-        val layoutResId = when {
-            isResponsive && aspectRatio < 0.72f -> {
-                val vLayout = context.resources.getIdentifier("widget_appfolder_grid3v_layout", "layout", context.packageName)
-                if (vLayout != 0) vLayout else R.layout.widget_bento_trio_layout
-            }
-            isResponsive && aspectRatio > 1.65f -> {
-                val hLayout = context.resources.getIdentifier("widget_appfolder_grid3_layout", "layout", context.packageName)
-                if (hLayout != 0) hLayout else R.layout.widget_bento_trio_layout
-            }
-            else -> R.layout.widget_bento_trio_layout
-        }
-
-        val views = RemoteViews(context.packageName, layoutResId)
+        val layoutId = resolveLayoutResId(isResponsive, wDp, hDp)
+        val views = RemoteViews(context.packageName, layoutId)
         val bitmap = generateGoogleTrioBitmap(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
 
         val directSearchIntent = Intent().apply {
             setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
@@ -366,50 +356,31 @@ class GoogleTrioReceiver : BaseGoogleReceiver() {
         val photosIntent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.photos")
             ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://photos.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
 
-        // slot_0: Google (top banner / left tile / top column)
-        // slot_1: YouTube (bottom-left / center tile / middle column)
-        // slot_2: Photos (bottom-right / right tile / bottom column)
         val intents = listOf(safeSearchIntent, youtubeIntent, photosIntent)
-        val slotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2)
+        val slotIds = intArrayOf(R.id.slot_0, R.id.slot_1, R.id.slot_2)
+        val legacySlotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2)
 
         for (i in 0..2) {
-            views.setOnClickPendingIntent(
-                slotIds[i],
-                PendingIntent.getActivity(
-                    context,
-                    widgetId * 100 + i,
-                    intents[i],
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+            val pi = PendingIntent.getActivity(
+                context, widgetId * 100 + i, intents[i],
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(slotIds[i], pi)
+            views.setOnClickPendingIntent(legacySlotIds[i], pi)
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
 
-// 4. GOOGLE 3x3 GRID FOLDER (2x2)
+// 4. GOOGLE 3x3 GRID FOLDER (2x2 / 9-App Hub)
 class GoogleGrid9Receiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int =
+        R.layout.widget_base_grid_3x3_layout
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        return generateGoogleGrid9Bitmap(context, config, false, wDp, hDp, appWidgetId)
-    }
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+        generateGoogleGrid9Bitmap(context, config, false, wDp, hDp, appWidgetId)
 
     override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
         val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -421,9 +392,13 @@ class GoogleGrid9Receiver : BaseGoogleReceiver() {
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
 
-        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_3x3_layout)
+        val views = RemoteViews(context.packageName, resolveLayoutResId(isResponsive, wDp, hDp))
         val bitmap = generateGoogleGrid9Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
 
         val pm = context.packageManager
         fun safeAppIntent(pkg: String, webUrl: String): Intent {
@@ -435,37 +410,18 @@ class GoogleGrid9Receiver : BaseGoogleReceiver() {
         }
 
         val intents = listOf(
-            // 0: Google Search
             Intent().apply {
                 setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }.let { if (it.resolveActivity(pm) != null) it else safeAppIntent("com.google.android.googlequicksearchbox", "https://www.google.com") },
-
-            // 1: Chrome
             safeAppIntent("com.android.chrome", "https://www.google.com/chrome"),
-
-            // 2: Gmail
             safeAppIntent("com.google.android.gm", "https://mail.google.com"),
-
-            // 3: Maps
             safeAppIntent("com.google.android.apps.maps", "https://maps.google.com"),
-
-            // 4: YouTube
             safeAppIntent("com.google.android.youtube", "https://youtube.com"),
-
-            // 5: Photos
             safeAppIntent("com.google.android.apps.photos", "https://photos.google.com"),
-
-            // 6: Drive
             safeAppIntent("com.google.android.apps.docs", "https://drive.google.com"),
-
-            // 7: Calendar
             safeAppIntent("com.google.android.calendar", "https://calendar.google.com"),
-
-            // 8: Gemini Live Voice Session
-            Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
+            Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
         )
 
         val slotIds = intArrayOf(
@@ -473,45 +429,35 @@ class GoogleGrid9Receiver : BaseGoogleReceiver() {
             R.id.slot_3, R.id.slot_4, R.id.slot_5,
             R.id.slot_6, R.id.slot_7, R.id.slot_8
         )
+        val legacySlotIds = intArrayOf(
+            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2,
+            R.id.touch_slot_3, R.id.touch_slot_4, R.id.touch_slot_5,
+            R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8
+        )
 
         for (i in 0..8) {
-            views.setOnClickPendingIntent(
-                slotIds[i],
-                PendingIntent.getActivity(
-                    context,
-                    widgetId * 100 + i,
-                    intents[i],
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+            val pi = PendingIntent.getActivity(
+                context, widgetId * 100 + i, intents[i],
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(slotIds[i], pi)
+            views.setOnClickPendingIntent(legacySlotIds[i], pi)
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
 
-// 5. GOOGLE MEGA FOLDER (4x2 / 10 Apps)
+// 5. GOOGLE MEGA FOLDER (4x2 / 5x2 / 2x5 Smart Pivot)
 class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_grid_2x5 else R.layout.widget_base_grid_5x2
     }
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        return generateGoogleMegaFolder10Bitmap(context, config, false, wDp, hDp, appWidgetId)
-    }
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+        generateGoogleMegaFolder10Bitmap(context, config, false, wDp, hDp, appWidgetId)
 
     override fun renderAndApplyWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, options: Bundle?) {
         val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -523,16 +469,14 @@ class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
 
-        val aspectRatio = wDp.toFloat() / hDp.toFloat()
-        val layoutResId = if (aspectRatio >= 1.1f) {
-            R.layout.widget_megafolder_10_layout
-        } else {
-            R.layout.widget_megafolder_10v_layout
-        }
-
-        val views = RemoteViews(context.packageName, layoutResId)
+        val layoutId = resolveLayoutResId(isResponsive, wDp, hDp)
+        val views = RemoteViews(context.packageName, layoutId)
         val bitmap = generateGoogleMegaFolder10Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
 
         val directSearchIntent = Intent().apply {
             setClassName("com.google.android.googlequicksearchbox", "com.google.android.googlequicksearchbox.SearchActivity")
@@ -558,20 +502,21 @@ class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
         )
 
         val slotIds = intArrayOf(
+            R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3, R.id.slot_4,
+            R.id.slot_5, R.id.slot_6, R.id.slot_7, R.id.slot_8, R.id.slot_9
+        )
+        val legacySlotIds = intArrayOf(
             R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3, R.id.touch_slot_4,
             R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8, R.id.touch_slot_9
         )
 
         for (i in 0 until 10) {
-            views.setOnClickPendingIntent(
-                slotIds[i],
-                PendingIntent.getActivity(
-                    context,
-                    widgetId * 100 + i,
-                    intents[i],
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+            val pi = PendingIntent.getActivity(
+                context, widgetId * 100 + i, intents[i],
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(slotIds[i], pi)
+            views.setOnClickPendingIntent(legacySlotIds[i], pi)
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)
@@ -581,21 +526,6 @@ class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
 // 6. YOUTUBE & MEDIA DISCOVERY CAPSULE (3x1 / 4x1)
 class GoogleMediaCapsuleReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateGoogleMediaCapsuleBitmap(context, config, false, wDp, hDp, appWidgetId)
@@ -671,21 +601,6 @@ class GoogleMediaCapsuleReceiver : BaseGoogleReceiver() {
 // 7. GOOGLE LIGHTBAR HORIZON (2x2)
 class GoogleLightbarReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateGoogleLightbarBitmap(context, config, false, wDp, hDp, appWidgetId)
@@ -724,21 +639,6 @@ class GoogleLightbarReceiver : BaseGoogleReceiver() {
 // 8. GOOGLE LENS VIEWFINDER (2x2)
 class GoogleLensReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateGoogleLensViewfinderBitmap(context, config, false, wDp, hDp, appWidgetId)
@@ -904,21 +804,6 @@ class GoogleSearchDockReceiver : BaseGoogleReceiver() {
 // 10. YOUTUBE DUAL-DIAL RECEIVER (2x2)
 class GoogleYouTubeDualReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateYouTubeVinylViewfinderBitmap(context, config, false, wDp, hDp, appWidgetId)
@@ -994,21 +879,6 @@ class GoogleYouTubeDualReceiver : BaseGoogleReceiver() {
 // 11. GOOGLE MAPS COMPASS & WAYPOINT RECEIVER (2x2)
 class GoogleMapsCompassReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateGoogleMapsCompassBitmap(context, config, false, wDp, hDp, appWidgetId)
@@ -1096,21 +966,6 @@ class GoogleMapsCompassReceiver : BaseGoogleReceiver() {
 // 12. GOOGLE WORKSPACE CHRONOMETER RECEIVER (2x2)
 class GoogleWorkspaceChronoReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateGoogleWorkspaceChronoBitmap(context, config, false, wDp, hDp, appWidgetId)
@@ -1190,21 +1045,6 @@ class GoogleWorkspaceChronoReceiver : BaseGoogleReceiver() {
 // 13. GOOGLE DRIVE & KEEP RECEIVER (2x2)
 class GoogleDriveTapeReelReceiver : BaseGoogleReceiver() {
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        val respKey = "widget_${widgetId}_is_responsive"
-        if (widgetPrefs.contains(respKey)) {
-            return widgetPrefs.getBoolean(respKey, true)
-        }
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResp = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(respKey, defaultResp).apply()
-        return defaultResp
-    }
 
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
         return generateGoogleDriveTapeReelBitmap(context, config, false, wDp, hDp, appWidgetId)
