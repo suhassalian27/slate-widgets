@@ -14,8 +14,13 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 
+// ============================================================================
+// AI WIDGETS CATALOG (19 Widgets)
+// ============================================================================
+
 fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
+        // Single Icon Widgets (2x2)
         SlateWidgetInfo("Gemini", "2x2", "AI", GeminiTextReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("ChatGPT Text", "2x2", "AI", ChatGptTextReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("ChatGPT Voice", "2x2", "AI", ChatGptVoiceReceiver::class.java, hasModeOption = true),
@@ -25,10 +30,14 @@ fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("DeepSeek", "2x2", "AI", DeepSeekReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Copilot", "2x2", "AI", CopilotReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Meta AI", "2x2", "AI", MetaAiReceiver::class.java, hasModeOption = true),
+
+        // Bar Widgets (4x1)
         SlateWidgetInfo("AI Primary Bar", "4x1", "AI", AiBarPrimaryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Dock Bar", "4x1", "AI", AiBarDock5Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Capsule Bar", "4x1", "AI", AiBarCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Dual Flagship Bar", "4x1", "AI", AiBarDualFlagshipReceiver::class.java, hasModeOption = true),
+
+        // Folder & Bento Widgets (2x2, 4x2, 3x2)
         SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java, hasModeOption = true),
@@ -38,9 +47,38 @@ fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
     )
 }
 
+// ============================================================================
+// HELPER: AI Launch Intent Factory
+// ============================================================================
+
+fun createAiPendingIntent(context: Context, target: AiTarget, widgetId: Int, slotIndex: Int): PendingIntent {
+    val intent = AiLauncherUtils.getLaunchIntent(context, target)
+    return PendingIntent.getActivity(
+        context,
+        widgetId * 100 + slotIndex,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+}
+
+// ============================================================================
+// BASE AI RECEIVER (Rendering, Geometry & State Management)
+// ============================================================================
+
 abstract class BaseAiReceiver(
     open val layoutResId: Int = R.layout.widget_base_single
 ) : AppWidgetProvider() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            val manager = AppWidgetManager.getInstance(context) ?: return
+            val ids = manager.getAppWidgetIds(ComponentName(context, this::class.java)) ?: intArrayOf()
+            for (id in ids) {
+                updateWidget(context, manager, id)
+            }
+        }
+    }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) updateWidget(context, appWidgetManager, widgetId)
@@ -49,6 +87,8 @@ abstract class BaseAiReceiver(
     override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
         updateWidget(context, appWidgetManager, appWidgetId)
     }
+
+    open fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int = layoutResId
 
     fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
         val options = appWidgetManager.getAppWidgetOptions(widgetId)
@@ -62,7 +102,8 @@ abstract class BaseAiReceiver(
         val config = loadSlateWidgetConfig(context, widgetId)
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
 
-        val views = RemoteViews(context.packageName, layoutResId)
+        val resolvedLayout = resolveLayoutResId(isResponsive, wDp, hDp)
+        val views = RemoteViews(context.packageName, resolvedLayout)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
         try {
@@ -75,6 +116,9 @@ abstract class BaseAiReceiver(
             try {
                 views.setOnClickPendingIntent(R.id.touch_slot_0, pi)
             } catch (_: Exception) {}
+            try {
+                views.setOnClickPendingIntent(R.id.slot_0, pi)
+            } catch (_: Exception) {}
         }
 
         setupTouchTargets(context, views, widgetId)
@@ -86,7 +130,6 @@ abstract class BaseAiReceiver(
         val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
         val bgKey = "widget_${widgetId}_bg_color"
 
-        // Snapshot and lock current global theme when the widget is first created
         if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
             val globalSettings = ThemePreferences(context).getThemeSettings()
             widgetPrefs.edit()
@@ -133,16 +176,16 @@ abstract class BaseAiReceiver(
     open fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {}
 }
 
+// ============================================================================
+// SINGLE AI WIDGET RECEIVERS (2x2)
+// ============================================================================
+
 abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseAiReceiver(R.layout.widget_base_single) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSingleAiIconBitmap(context, target, config, isResponsive, wDp, hDp, widgetId)
+
     override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? =
-        PendingIntent.getActivity(
-            context,
-            widgetId,
-            AiLauncherUtils.getLaunchIntent(context, target),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        createAiPendingIntent(context, target, widgetId, 0)
 }
 
 class GeminiTextReceiver : BaseSingleAiReceiver(AiTarget.GEMINI_TEXT)
@@ -155,6 +198,177 @@ class DeepSeekReceiver : BaseSingleAiReceiver(AiTarget.DEEPSEEK)
 class CopilotReceiver : BaseSingleAiReceiver(AiTarget.COPILOT)
 class MetaAiReceiver : BaseSingleAiReceiver(AiTarget.META_AI)
 
+// ============================================================================
+// MULTI-SLOT & FOLDER AI WIDGET RECEIVERS
+// ============================================================================
+
+abstract class BaseAiFolderReceiver(
+    open val slotCount: Int,
+    defaultLayoutResId: Int,
+    open val targets: List<AiTarget>
+) : BaseAiReceiver(defaultLayoutResId) {
+
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        val touchSlotIds = intArrayOf(
+            R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3, R.id.slot_4,
+            R.id.slot_5, R.id.slot_6, R.id.slot_7, R.id.slot_8, R.id.slot_9
+        )
+        val legacyTouchSlotIds = intArrayOf(
+            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3, R.id.touch_slot_4,
+            R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8, R.id.touch_slot_9
+        )
+
+        for (i in 0 until minOf(slotCount, targets.size)) {
+            val target = targets[i]
+            val pi = createAiPendingIntent(context, target, widgetId, i)
+            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
+            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// BARS (4x1 - With Smart Horizontal / Vertical Responsive Pivoting)
+// ----------------------------------------------------------------------------
+
+class AiBarPrimaryReceiver : BaseAiFolderReceiver(
+    slotCount = 4,
+    defaultLayoutResId = R.layout.widget_base_row_4,
+    targets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK)
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_col_4 else R.layout.widget_base_row_4
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarHeroPrimaryBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiBarDock5Receiver : BaseAiFolderReceiver(
+    slotCount = 5,
+    defaultLayoutResId = R.layout.widget_base_row_5,
+    targets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK, AiTarget.PERPLEXITY)
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_col_5 else R.layout.widget_base_row_5
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarDock5Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiBarCapsuleReceiver : BaseAiFolderReceiver(
+    slotCount = 4,
+    defaultLayoutResId = R.layout.widget_base_row_4,
+    targets = listOf(AiTarget.CHATGPT_VOICE, AiTarget.PERPLEXITY, AiTarget.CLAUDE, AiTarget.GEMINI_TEXT)
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_col_4 else R.layout.widget_base_row_4
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarCapsuleBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiBarDualFlagshipReceiver : BaseAiFolderReceiver(
+    slotCount = 2,
+    defaultLayoutResId = R.layout.widget_base_row_2,
+    targets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.GEMINI_TEXT)
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_column_2 else R.layout.widget_base_row_2
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiBarDualFlagshipBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+// ----------------------------------------------------------------------------
+// FOLDERS (2x2 / 4x2 / 3x2 / 3x3)
+// ----------------------------------------------------------------------------
+
+class AiFolder4ClassicReceiver : BaseAiFolderReceiver(
+    slotCount = 4,
+    defaultLayoutResId = R.layout.widget_base_grid_2x2,
+    targets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE)
+) {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder4ClassicBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiFolder6BentoHeroReceiver : BaseAiFolderReceiver(
+    slotCount = 6,
+    defaultLayoutResId = R.layout.widget_base_bento_hero_6,
+    targets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
+) {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder6BentoHeroBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiFolder8BentoSideReceiver : BaseAiFolderReceiver(
+    slotCount = 8,
+    defaultLayoutResId = R.layout.widget_base_bento_side_8,
+    targets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT,
+        AiTarget.CLAUDE, AiTarget.GROK,
+        AiTarget.PERPLEXITY, AiTarget.COPILOT,
+        AiTarget.DEEPSEEK, AiTarget.META_AI
+    )
+) {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder8BentoSideBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiFolder9GridReceiver : BaseAiFolderReceiver(
+    slotCount = 9,
+    defaultLayoutResId = R.layout.widget_base_grid_3x3_layout,
+    targets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT,
+        AiTarget.GROK, AiTarget.CLAUDE, AiTarget.DEEPSEEK,
+        AiTarget.PERPLEXITY, AiTarget.META_AI, AiTarget.POE
+    )
+) {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder9GridBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiFolder10MegaReceiver : BaseAiFolderReceiver(
+    slotCount = 10,
+    defaultLayoutResId = R.layout.widget_base_grid_5x2,
+    targets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK,
+        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI
+    )
+) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_grid_2x5 else R.layout.widget_base_grid_5x2
+    }
+
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder10MegaBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+class AiFolder7AsymmetricReceiver : BaseAiFolderReceiver(
+    slotCount = 7,
+    defaultLayoutResId = R.layout.widget_base_bento_asymmetric_7,
+    targets = listOf(
+        AiTarget.CHATGPT_TEXT, AiTarget.GROK, AiTarget.COPILOT,
+        AiTarget.GEMINI_TEXT, AiTarget.CLAUDE, AiTarget.PERPLEXITY, AiTarget.META_AI
+    )
+) {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder7AsymmetricBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+}
+
+// ============================================================================
+// UPDATE DISPATCHERS
+// ============================================================================
+
 fun updateAllAiWidgets(context: Context) {
     val receivers = listOf(
         GeminiTextReceiver(),
@@ -165,10 +379,20 @@ fun updateAllAiWidgets(context: Context) {
         PerplexityReceiver(),
         DeepSeekReceiver(),
         CopilotReceiver(),
-        MetaAiReceiver()
+        MetaAiReceiver(),
+        AiBarPrimaryReceiver(),
+        AiBarDock5Receiver(),
+        AiBarCapsuleReceiver(),
+        AiBarDualFlagshipReceiver(),
+        AiFolder4ClassicReceiver(),
+        AiFolder6BentoHeroReceiver(),
+        AiFolder8BentoSideReceiver(),
+        AiFolder9GridReceiver(),
+        AiFolder10MegaReceiver(),
+        AiFolder7AsymmetricReceiver()
     )
 
-    val manager = AppWidgetManager.getInstance(context)
+    val manager = AppWidgetManager.getInstance(context) ?: return
     for (receiver in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiver.javaClass)) ?: intArrayOf()
         for (id in ids) {
@@ -178,3 +402,6 @@ fun updateAllAiWidgets(context: Context) {
         }
     }
 }
+
+// Backward compatibility alias for legacy folder updates
+fun updateAllAiFolderWidgets(context: Context) = updateAllAiWidgets(context)

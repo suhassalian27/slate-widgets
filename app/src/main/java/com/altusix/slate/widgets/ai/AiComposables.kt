@@ -950,7 +950,7 @@ fun generateAiBarDualFlagshipBitmap(context: Context, config: SlateWidgetConfig,
     return bitmap
 }
 
-// 14. AI QUAD FOLDER (4x2 / Responsive)
+// 14. AI QUAD FOLDER (2x2 Grid)
 fun generateAiFolder4ClassicBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -968,41 +968,50 @@ fun generateAiFolder4ClassicBitmap(
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
+    val targetRatio = 1.0f
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        val size = minOf(w, h) - (margin * 2f)
-        val leftX = (w - size) / 2f
-        val topY = (h - size) / 2f
-        RectF(leftX, topY, leftX + size, topY + size)
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    // Dynamic padding and gaps relative to container dimensions
-    val padX = cardW * 0.08f
-    val padY = cardH * 0.08f
-    val gapX = cardW * 0.04f
-    val gapY = cardH * 0.04f
+    // Unified spacing and mathematical concentric inner boundary
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    val availW = cardW - (padX * 2f)
-    val availH = cardH - (padY * 2f)
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
 
-    // Expand tile width and height independently so inner tiles fill 100% of resized bounds
-    val tileW = ((availW - gapX) / 2f).toInt().coerceAtLeast(1)
-    val tileH = ((availH - gapY) / 2f).toInt().coerceAtLeast(1)
-
-    val startX = cardRect.left + padX
-    val startY = cardRect.top + padY
+    val tileW = (innerCardRect.width() - spacing) / 2f
+    val tileH = (innerCardRect.height() - spacing) / 2f
+    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(minOf(tileW, tileH) / 2f)
 
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
 
@@ -1011,28 +1020,49 @@ fun generateAiFolder4ClassicBitmap(
         listOf(AiTarget.PERPLEXITY, AiTarget.CLAUDE)
     )
 
-    grid.forEachIndexed { r, row ->
-        row.forEachIndexed { c, target ->
-            val tile = generateTileBitmap(
+    for (row in 0..1) {
+        for (col in 0..1) {
+            val target = grid[row][col]
+            val tileLeft = innerCardRect.left + col * (tileW + spacing)
+            val tileTop = innerCardRect.top + row * (tileH + spacing)
+            val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
+
+            val tl = if (row == 0 && col == 0) 0f else innerCornerRadius
+            val tr = if (row == 0 && col == 1) 0f else innerCornerRadius
+            val br = if (row == 1 && col == 1) 0f else innerCornerRadius
+            val bl = if (row == 1 && col == 0) 0f else innerCornerRadius
+
+            val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+            val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+
+            canvas.save()
+            canvas.clipPath(innerCardPath)
+            canvas.clipPath(tilePath)
+
+            val tileBitmap = generateTileBitmap(
                 context = context,
                 target = target,
                 bgColorInt = tileBgColor,
                 accentColorInt = accentColorInt,
                 isLight = isLight,
-                shapeStyle = AiShapeStyle.SQUIRCLE,
-                widthPx = tileW,
-                heightPx = tileH
+                shapeStyle = AiShapeStyle.FRAMELESS,
+                widthPx = tileW.toInt(),
+                heightPx = tileH.toInt()
             )
-            val xPos = startX + c * (tileW + gapX)
-            val yPos = startY + r * (tileH + gapY)
-            canvas.drawBitmap(tile, xPos, yPos, null)
+            val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = tileBgColor
+                style = Paint.Style.FILL
+            }
+            canvas.drawRect(tileRect, fillPaint)
+            canvas.drawBitmap(tileBitmap, tileLeft, tileTop, null)
+            canvas.restore()
         }
     }
 
     return bitmap
 }
 
-// 15. AI BENTO FOLDER (4x2 / Fixed 2:1 Hero Bento)
+// 15. AI BENTO FOLDER (6 Apps - 2 Hero Top + 4 Small Bottom)
 fun generateAiFolder6BentoHeroBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1051,95 +1081,125 @@ fun generateAiFolder6BentoHeroBitmap(
 
     val margin = scaleFactor * 1.5f
     val targetRatio = 2.0f
-
-    // Always enforce fixed 2:1 aspect ratio container to prevent vertical clipping
-    var cardH = h - (margin * 2f)
-    var cardW = cardH * targetRatio
-    if (cardW > w - (margin * 2f)) {
-        cardW = w - (margin * 2f)
-        cardH = cardW / targetRatio
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
-    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    // Inner padding and gap calculations
-    val pad = minOf(cardW, cardH) * 0.08f
-    val gap = minOf(cardW, cardH) * 0.04f
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    val availW = cardW - (pad * 2f)
-    val availH = cardH - (pad * 2f)
-
-    // Vertical distribution: 60% height for top hero row, 40% for bottom row
-    val topH = ((availH - gap) * 0.60f).toInt().coerceAtLeast(1)
-    val botH = (availH - gap - topH).toInt().coerceAtLeast(1)
-
-    // Horizontal distribution: Top row has 2 hero tiles, Bottom row has 4 small tiles
-    val topTileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
-    val botTileW = ((availW - (gap * 3f)) / 4f).toInt().coerceAtLeast(1)
-
-    val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
-
-    val startX = cardRect.left + pad
-    val startY = cardRect.top + pad
-
-    // Row 1: Top 2 Hero Tiles (Gemini & ChatGPT) - Concentric Outer Corner Shapes
-    val topTargets = listOf(
-        Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
-        Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.CORNER_TOP_RIGHT)
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
     )
-
-    topTargets.forEachIndexed { i, (target, shape) ->
-        val tile = generateTileBitmap(
-            context = context,
-            target = target,
-            bgColorInt = tileBgColor,
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            shapeStyle = shape,
-            widthPx = topTileW,
-            heightPx = topH
-        )
-        val tx = startX + i * (topTileW + gap)
-        canvas.drawBitmap(tile, tx, startY, null)
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
     }
 
-    // Row 2: Bottom 4 Small Tiles (Claude, Grok, DeepSeek, Meta AI) - Concentric Outer Corner Shapes
-    val botY = startY + topH + gap
-    val bottomItems = listOf(
-        Pair(AiTarget.CLAUDE, AiShapeStyle.CORNER_BOTTOM_LEFT),
-        Pair(AiTarget.GROK, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
-        Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-    )
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
-    bottomItems.forEachIndexed { i, (target, shape) ->
-        val tile = generateTileBitmap(
+    val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
+    val tileFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
+        style = Paint.Style.FILL
+    }
+
+    // Top 2 Hero Tiles
+    val topH = ((innerCardRect.height() - spacing) * 0.58f).coerceAtLeast(1f)
+    val topTileW = (innerCardRect.width() - spacing) / 2f
+    val topTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT)
+
+    for (i in 0..1) {
+        val left = innerCardRect.left + i * (topTileW + spacing)
+        val top = innerCardRect.top
+        val rect = RectF(left, top, left + topTileW, top + topH)
+
+        val tl = if (i == 0) 0f else innerCornerRadius
+        val tr = if (i == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(tl, tl, tr, tr, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+        canvas.drawRect(rect, tileFillPaint)
+
+        val tileBitmap = generateTileBitmap(
             context = context,
-            target = target,
+            target = topTargets[i],
             bgColorInt = tileBgColor,
             accentColorInt = accentColorInt,
             isLight = isLight,
-            shapeStyle = shape,
-            widthPx = botTileW,
-            heightPx = botH
+            shapeStyle = AiShapeStyle.FRAMELESS,
+            widthPx = topTileW.toInt(),
+            heightPx = topH.toInt()
         )
-        val bx = startX + i * (botTileW + gap)
-        canvas.drawBitmap(tile, bx, botY, null)
+        canvas.drawBitmap(tileBitmap, left, top, null)
+        canvas.restore()
+    }
+
+    // Bottom 4 Small Tiles
+    val botY = innerCardRect.top + topH + spacing
+    val botH = innerCardRect.height() - topH - spacing
+    val botTileW = (innerCardRect.width() - (spacing * 3f)) / 4f
+    val bottomTargets = listOf(AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
+
+    for (i in 0..3) {
+        val left = innerCardRect.left + i * (botTileW + spacing)
+        val rect = RectF(left, botY, left + botTileW, botY + botH)
+
+        val bl = if (i == 0) 0f else innerCornerRadius
+        val br = if (i == 3) 0f else innerCornerRadius
+        val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, br, br, bl, bl)
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+        canvas.drawRect(rect, tileFillPaint)
+
+        val tileBitmap = generateTileBitmap(
+            context = context,
+            target = bottomTargets[i],
+            bgColorInt = tileBgColor,
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            shapeStyle = AiShapeStyle.FRAMELESS,
+            widthPx = botTileW.toInt(),
+            heightPx = botH.toInt()
+        )
+        canvas.drawBitmap(tileBitmap, left, botY, null)
+        canvas.restore()
     }
 
     return bitmap
 }
 
-// 16. AI SIDE BENTO FOLDER (4x2 / Fixed 2:1 Hero Bento)
+// 16. AI SIDE BENTO FOLDER (8 Apps - 2 Stacked Left + 3x2 Right)
 fun generateAiFolder8BentoSideBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1158,105 +1218,135 @@ fun generateAiFolder8BentoSideBitmap(
 
     val margin = scaleFactor * 1.5f
     val targetRatio = 2.0f
-
-    // Enforce fixed 2:1 aspect ratio container to eliminate empty black space
-    var cardH = h - (margin * 2f)
-    var cardW = cardH * targetRatio
-    if (cardW > w - (margin * 2f)) {
-        cardW = w - (margin * 2f)
-        cardH = cardW / targetRatio
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
-    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    // Reduced gap and inner padding calculations for a tight, balanced bento
-    val pad = minOf(cardW, cardH) * 0.08f
-    val gap = minOf(cardW, cardH) * 0.03f
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    val availW = cardW - (pad * 2f)
-    val availH = cardH - (pad * 2f)
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
 
-    // Left side: 2 stacked hero tiles
-    val leftTileH = ((availH - gap) / 2f).toInt().coerceAtLeast(1)
-
-    // Right side: 3 rows x 2 columns of small tiles
-    val rightTileH = ((availH - (gap * 2f)) / 3f).toInt().coerceAtLeast(1)
-    val rightColW = ((availW * 0.48f - gap) / 2f).toInt().coerceAtLeast(1)
-
-    // Fill 100% of horizontal space dynamically between left and right sections
-    val rightGridW = (rightColW * 2) + gap.toInt()
-    val leftTileW = (availW - gap - rightGridW).toInt().coerceAtLeast(1)
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
+    val tileFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
+        style = Paint.Style.FILL
+    }
 
-    val startX = cardRect.left + pad
-    val startY = cardRect.top + pad
+    // Left Hero Tiles (Gemini & ChatGPT)
+    val leftTileW = (innerCardRect.width() - spacing) / 2f
+    val leftTileH = (innerCardRect.height() - spacing) / 2f
+    val leftTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT)
 
-    // Left Hero Section (Gemini & ChatGPT) - Concentric Outer Corners
-    val left1 = generateTileBitmap(
-        context = context,
-        target = AiTarget.GEMINI_TEXT,
-        bgColorInt = tileBgColor,
-        accentColorInt = accentColorInt,
-        isLight = isLight,
-        shapeStyle = AiShapeStyle.CORNER_TOP_LEFT,
-        widthPx = leftTileW,
-        heightPx = leftTileH
-    )
-    canvas.drawBitmap(left1, startX, startY, null)
+    for (i in 0..1) {
+        val left = innerCardRect.left
+        val top = innerCardRect.top + i * (leftTileH + spacing)
+        val rect = RectF(left, top, left + leftTileW, top + leftTileH)
 
-    val left2Y = startY + leftTileH + gap
-    val left2 = generateTileBitmap(
-        context = context,
-        target = AiTarget.CHATGPT_TEXT,
-        bgColorInt = tileBgColor,
-        accentColorInt = accentColorInt,
-        isLight = isLight,
-        shapeStyle = AiShapeStyle.CORNER_BOTTOM_LEFT,
-        widthPx = leftTileW,
-        heightPx = leftTileH
-    )
-    canvas.drawBitmap(left2, startX, left2Y, null)
+        val tl = if (i == 0) 0f else innerCornerRadius
+        val bl = if (i == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(tl, tl, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, bl, bl)
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
 
-    // Right Grid Section (3 rows x 2 columns) - Concentric Outer Corners
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+        canvas.drawRect(rect, tileFillPaint)
+
+        val tileBitmap = generateTileBitmap(
+            context = context,
+            target = leftTargets[i],
+            bgColorInt = tileBgColor,
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            shapeStyle = AiShapeStyle.FRAMELESS,
+            widthPx = leftTileW.toInt(),
+            heightPx = leftTileH.toInt()
+        )
+        canvas.drawBitmap(tileBitmap, left, top, null)
+        canvas.restore()
+    }
+
+    // Right Grid Section (3 rows x 2 columns)
+    val rightStartX = innerCardRect.left + leftTileW + spacing
+    val rightW = innerCardRect.width() - leftTileW - spacing
+    val rightColW = (rightW - spacing) / 2f
+    val rightRowH = (innerCardRect.height() - (spacing * 2f)) / 3f
+
     val rightGrid = listOf(
-        listOf(Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE), Pair(AiTarget.GROK, AiShapeStyle.CORNER_TOP_RIGHT)),
-        listOf(Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE), Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE)),
-        listOf(Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE), Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT))
+        listOf(AiTarget.CLAUDE, AiTarget.GROK),
+        listOf(AiTarget.PERPLEXITY, AiTarget.COPILOT),
+        listOf(AiTarget.DEEPSEEK, AiTarget.META_AI)
     )
 
-    val rightStartX = startX + leftTileW + gap
-    rightGrid.forEachIndexed { r, row ->
-        row.forEachIndexed { c, (target, shape) ->
-            val tile = generateTileBitmap(
+    for (r in 0..2) {
+        for (c in 0..1) {
+            val target = rightGrid[r][c]
+            val left = rightStartX + c * (rightColW + spacing)
+            val top = innerCardRect.top + r * (rightRowH + spacing)
+            val rect = RectF(left, top, left + rightColW, top + rightRowH)
+
+            val tr = if (r == 0 && c == 1) 0f else innerCornerRadius
+            val br = if (r == 2 && c == 1) 0f else innerCornerRadius
+            val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, tr, tr, br, br, innerCornerRadius, innerCornerRadius)
+            val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+            canvas.save()
+            canvas.clipPath(innerCardPath)
+            canvas.clipPath(tilePath)
+            canvas.drawRect(rect, tileFillPaint)
+
+            val tileBitmap = generateTileBitmap(
                 context = context,
                 target = target,
                 bgColorInt = tileBgColor,
                 accentColorInt = accentColorInt,
                 isLight = isLight,
-                shapeStyle = shape,
-                widthPx = rightColW,
-                heightPx = rightTileH
+                shapeStyle = AiShapeStyle.FRAMELESS,
+                widthPx = rightColW.toInt(),
+                heightPx = rightRowH.toInt()
             )
-            val rx = rightStartX + c * (rightColW + gap)
-            val ry = startY + r * (rightTileH + gap)
-            canvas.drawBitmap(tile, rx, ry, null)
+            canvas.drawBitmap(tileBitmap, left, top, null)
+            canvas.restore()
         }
     }
 
     return bitmap
 }
 
-// 17. AI 3x3 GRID FOLDER (2x2 / Responsive Multi-Axis AI Hub)
+// 17. AI 3x3 GRID FOLDER (3x3 Grid Hub)
 fun generateAiFolder9GridBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1273,7 +1363,6 @@ fun generateAiFolder9GridBitmap(
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    // 1. Dual-Mode Geometry
     val margin = scaleFactor * 1.5f
     val targetRatio = 1.0f
     val cardRect = if (isResponsive) {
@@ -1291,32 +1380,37 @@ fun generateAiFolder9GridBitmap(
     }
 
     val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
-
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    // 2. Uniform Tight Spacing & Edge Fill
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val gap = (minDim * 0.035f).coerceIn(scaleFactor * 2.5f, scaleFactor * 6f)
-    val pad = (minDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 9f)
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    val availW = cardRect.width() - (pad * 2f)
-    val availH = cardRect.height() - (pad * 2f)
-    val tileW = (availW - (gap * 2f)) / 3f
-    val tileH = (availH - (gap * 2f)) / 3f
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
 
-    // 3. Concentric Corner Curvature
-    val minTileDim = minOf(tileW, tileH)
-    val baseTileRadius = minTileDim * 0.28f
-    val outerEdgeRadius = (cardCornerRadius - pad).coerceIn(baseTileRadius, minTileDim / 2f)
+    val tileW = (innerCardRect.width() - (spacing * 2f)) / 3f
+    val tileH = (innerCardRect.height() - (spacing * 2f)) / 3f
+    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(minOf(tileW, tileH) / 2f)
 
-    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color.argb(22, 0, 0, 0) else Color.argb(38, 255, 255, 255)
+    val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
+    val tileFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
         style = Paint.Style.FILL
     }
 
@@ -1329,29 +1423,24 @@ fun generateAiFolder9GridBitmap(
     for (row in 0..2) {
         for (col in 0..2) {
             val target = gridTargets[row][col]
-            val tileLeft = cardRect.left + pad + col * (tileW + gap)
-            val tileTop = cardRect.top + pad + row * (tileH + gap)
+            val tileLeft = innerCardRect.left + col * (tileW + spacing)
+            val tileTop = innerCardRect.top + row * (tileH + spacing)
             val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
 
-            // Outer corner concentric rounding
-            val tl = if (row == 0 && col == 0) outerEdgeRadius else baseTileRadius
-            val tr = if (row == 0 && col == 2) outerEdgeRadius else baseTileRadius
-            val br = if (row == 2 && col == 2) outerEdgeRadius else baseTileRadius
-            val bl = if (row == 2 && col == 0) outerEdgeRadius else baseTileRadius
+            val tl = if (row == 0 && col == 0) 0f else innerCornerRadius
+            val tr = if (row == 0 && col == 2) 0f else innerCornerRadius
+            val br = if (row == 2 && col == 2) 0f else innerCornerRadius
+            val bl = if (row == 2 && col == 0) 0f else innerCornerRadius
 
-            val radii = floatArrayOf(
-                tl, tl,
-                tr, tr,
-                br, br,
-                bl, bl
-            )
-            val tilePath = Path().apply {
-                addRoundRect(tileRect, radii, Path.Direction.CW)
-            }
-            canvas.drawPath(tilePath, tileBgPaint)
+            val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+            val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
 
-            // Center icon vector inside tile
-            val iconSize = (minTileDim * 0.54f).toInt()
+            canvas.save()
+            canvas.clipPath(innerCardPath)
+            canvas.clipPath(tilePath)
+            canvas.drawRect(tileRect, tileFillPaint)
+
+            val iconSize = (minOf(tileW, tileH) * 0.52f).toInt()
             val iconCx = tileRect.centerX()
             val iconCy = tileRect.centerY()
 
@@ -1368,13 +1457,14 @@ fun generateAiFolder9GridBitmap(
                     draw(canvas)
                 }
             }
+            canvas.restore()
         }
     }
 
     return bitmap
 }
 
-// 18. AI MEGA FOLDER (4x2 / Adaptive Aspect Ratio)
+// 18. AI MEGA FOLDER (10 Apps - 5x2 / 2x5 Smart Pivot)
 fun generateAiFolder10MegaBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1391,11 +1481,16 @@ fun generateAiFolder10MegaBitmap(
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
+    val isVertical = isResponsive && (hDp > wDp)
+    val cols = if (isVertical) 2 else 5
+    val rows = if (isVertical) 5 else 2
+
     val margin = scaleFactor * 1.5f
+    val targetRatio = cols.toFloat() / rows.toFloat()
+
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        val targetRatio = 2.0f
         var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
         if (cardW > w - (margin * 2f)) {
@@ -1407,134 +1502,86 @@ fun generateAiFolder10MegaBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val aspectRatio = cardW / cardH
-
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val tileW = (innerCardRect.width() - (spacing * (cols - 1))) / cols
+    val tileH = (innerCardRect.height() - (spacing * (rows - 1))) / rows
+    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(minOf(tileW, tileH) / 2f)
 
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
+    val tileFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
+        style = Paint.Style.FILL
+    }
 
-    if (aspectRatio >= 1.1f) {
-        // ================================================================
-        // 1. WIDE MODE (5 Columns x 2 Rows)
-        // ================================================================
-        val pad = cardH * 0.05f
-        val gap = cardH * 0.02f
+    val targets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK,
+        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI
+    )
 
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
+    for (i in 0 until 10) {
+        val col = i % cols
+        val row = i / cols
+        val target = targets[i]
 
-        val tileW = ((availW - (gap * 4f)) / 5f).toInt().coerceAtLeast(1)
-        val tileH = ((availH - gap) / 2f).toInt().coerceAtLeast(1)
+        val tileLeft = innerCardRect.left + col * (tileW + spacing)
+        val tileTop = innerCardRect.top + row * (tileH + spacing)
+        val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
 
-        val startX = cardRect.left + pad
-        val startY = cardRect.top + pad
+        val tl = if (row == 0 && col == 0) 0f else innerCornerRadius
+        val tr = if (row == 0 && col == cols - 1) 0f else innerCornerRadius
+        val br = if (row == rows - 1 && col == cols - 1) 0f else innerCornerRadius
+        val bl = if (row == rows - 1 && col == 0) 0f else innerCornerRadius
 
-        val row1 = listOf(
-            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
-            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.GROK, AiShapeStyle.CORNER_TOP_RIGHT)
+        val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+        canvas.drawRect(tileRect, tileFillPaint)
+
+        val tileBitmap = generateTileBitmap(
+            context = context,
+            target = target,
+            bgColorInt = tileBgColor,
+            accentColorInt = accentColorInt,
+            isLight = isLight,
+            shapeStyle = AiShapeStyle.FRAMELESS,
+            widthPx = tileW.toInt(),
+            heightPx = tileH.toInt()
         )
-        val row2 = listOf(
-            Pair(AiTarget.PERPLEXITY, AiShapeStyle.CORNER_BOTTOM_LEFT),
-            Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.META_AI, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.POE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.PI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-        )
-
-        row1.forEachIndexed { i, (target, shape) ->
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = accentColorInt,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = tileW,
-                heightPx = tileH
-            )
-            val x = startX + i * (tileW + gap)
-            canvas.drawBitmap(tile, x, startY, null)
-        }
-
-        val row2Y = startY + tileH + gap
-        row2.forEachIndexed { i, (target, shape) ->
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = accentColorInt,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = tileW,
-                heightPx = tileH
-            )
-            val x = startX + i * (tileW + gap)
-            canvas.drawBitmap(tile, x, row2Y, null)
-        }
-    } else {
-        // ================================================================
-        // 2. TALL / VERTICAL MODE (2 Columns x 5 Rows)
-        // ================================================================
-        val pad = cardW * 0.06f
-        val gap = cardW * 0.035f
-
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
-
-        val tileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
-        val tileH = ((availH - (gap * 4f)) / 5f).toInt().coerceAtLeast(1)
-
-        val startX = cardRect.left + pad
-        val startY = cardRect.top + pad
-
-        val items = listOf(
-            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_TOP_LEFT),
-            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.CORNER_TOP_RIGHT),
-            Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.GROK, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.DEEPSEEK, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.META_AI, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.POE, AiShapeStyle.CORNER_BOTTOM_LEFT),
-            Pair(AiTarget.PI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-        )
-
-        items.forEachIndexed { i, (target, shape) ->
-            val r = i / 2
-            val c = i % 2
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = accentColorInt,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = tileW,
-                heightPx = tileH
-            )
-            val x = startX + c * (tileW + gap)
-            val y = startY + r * (tileH + gap)
-            canvas.drawBitmap(tile, x, y, null)
-        }
+        canvas.drawBitmap(tileBitmap, tileLeft, tileTop, null)
+        canvas.restore()
     }
 
     return bitmap
 }
 
-
-// 19. AI ASYMMETRIC BENTO (3x2 / Adaptive Aspect Ratio)
+// 19. AI ASYMMETRIC BENTO (7 Apps)
 fun generateAiFolder7AsymmetricBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1552,10 +1599,10 @@ fun generateAiFolder7AsymmetricBitmap(
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
+    val targetRatio = 1.5f
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
-        val targetRatio = 1.5f
         var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
         if (cardW > w - (margin * 2f)) {
@@ -1567,162 +1614,129 @@ fun generateAiFolder7AsymmetricBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val aspectRatio = cardW / cardH
-
-    val cornerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
+
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
     val tileBgColor = if (isLight) Color.parseColor("#0A000000") else Color.parseColor("#14FFFFFF")
+    val tileFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
+        style = Paint.Style.FILL
+    }
 
-    if (aspectRatio >= 1.1f) {
-        // ================================================================
-        // 1. WIDE MODE (Side Hero + Stacked Column + 4-Column Bottom Row)
-        // ================================================================
-        val pad = minOf(cardW, cardH) * 0.08f
-        val gap = minOf(cardW, cardH) * 0.035f
+    // Top Hero (Left) and 2 Stacked Right
+    val topH = ((innerCardRect.height() - spacing) * 0.62f).coerceAtLeast(1f)
+    val rightColW = (innerCardRect.width() * 0.36f).coerceAtLeast(1f)
+    val heroW = innerCardRect.width() - spacing - rightColW
+    val rightTileH = (topH - spacing) / 2f
 
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
+    // Big Hero Tile (ChatGPT)
+    val heroRect = RectF(innerCardRect.left, innerCardRect.top, innerCardRect.left + heroW, innerCardRect.top + topH)
+    val heroRadii = floatArrayOf(0f, 0f, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
+    val heroPath = Path().apply { addRoundRect(heroRect, heroRadii, Path.Direction.CW) }
 
-        val topH = ((availH - gap) * 0.64f).toInt().coerceAtLeast(1)
-        val botH = (availH - gap - topH).toInt().coerceAtLeast(1)
+    canvas.save()
+    canvas.clipPath(innerCardPath)
+    canvas.clipPath(heroPath)
+    val heroFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColorInt; style = Paint.Style.FILL }
+    canvas.drawRect(heroRect, heroFill)
+    val heroBitmap = generateTileBitmap(
+        context = context,
+        target = AiTarget.CHATGPT_TEXT,
+        bgColorInt = accentColorInt,
+        accentColorInt = if (isLight) Color.WHITE else Color.BLACK,
+        isLight = isLight,
+        shapeStyle = AiShapeStyle.FRAMELESS,
+        isPrimaryAccent = true,
+        widthPx = heroW.toInt(),
+        heightPx = topH.toInt()
+    )
+    canvas.drawBitmap(heroBitmap, innerCardRect.left, innerCardRect.top, null)
+    canvas.restore()
 
-        val rightColW = (availW * 0.34f).toInt().coerceAtLeast(1)
-        val heroW = (availW - gap - rightColW).toInt().coerceAtLeast(1)
-        val rightTileH = ((topH - gap) / 2f).toInt().coerceAtLeast(1)
+    // 2 Stacked Right (Grok & Copilot)
+    val rightX = innerCardRect.left + heroW + spacing
+    val rightTargets = listOf(AiTarget.GROK, AiTarget.COPILOT)
+    for (i in 0..1) {
+        val top = innerCardRect.top + i * (rightTileH + spacing)
+        val rect = RectF(rightX, top, rightX + rightColW, top + rightTileH)
 
-        val botTileW = ((availW - (gap * 3f)) / 4f).toInt().coerceAtLeast(1)
+        val tr = if (i == 0) 0f else innerCornerRadius
+        val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, tr, tr, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
+        val path = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
 
-        val startX = cardRect.left + pad
-        val startY = cardRect.top + pad
-
-        val bigTile = generateTileBitmap(
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(path)
+        canvas.drawRect(rect, tileFillPaint)
+        val b = generateTileBitmap(
             context = context,
-            target = AiTarget.CHATGPT_TEXT,
+            target = rightTargets[i],
             bgColorInt = tileBgColor,
             accentColorInt = accentColorInt,
             isLight = isLight,
-            shapeStyle = AiShapeStyle.CORNER_TOP_LEFT,
-            isPrimaryAccent = true,
-            widthPx = heroW,
-            heightPx = topH
+            shapeStyle = AiShapeStyle.FRAMELESS,
+            widthPx = rightColW.toInt(),
+            heightPx = rightTileH.toInt()
         )
-        canvas.drawBitmap(bigTile, startX, startY, null)
+        canvas.drawBitmap(b, rightX, top, null)
+        canvas.restore()
+    }
 
-        val rightX = startX + heroW + gap
-        val topRightTile = generateTileBitmap(
+    // Bottom Row of 4 Small Tiles
+    val botY = innerCardRect.top + topH + spacing
+    val botH = innerCardRect.height() - topH - spacing
+    val botTileW = (innerCardRect.width() - (spacing * 3f)) / 4f
+    val botTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CLAUDE, AiTarget.PERPLEXITY, AiTarget.META_AI)
+
+    for (i in 0..3) {
+        val left = innerCardRect.left + i * (botTileW + spacing)
+        val rect = RectF(left, botY, left + botTileW, botY + botH)
+
+        val bl = if (i == 0) 0f else innerCornerRadius
+        val br = if (i == 3) 0f else innerCornerRadius
+        val radii = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, br, br, bl, bl)
+        val path = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(path)
+        canvas.drawRect(rect, tileFillPaint)
+        val b = generateTileBitmap(
             context = context,
-            target = AiTarget.GROK,
+            target = botTargets[i],
             bgColorInt = tileBgColor,
             accentColorInt = accentColorInt,
             isLight = isLight,
-            shapeStyle = AiShapeStyle.CORNER_TOP_RIGHT,
-            widthPx = rightColW,
-            heightPx = rightTileH
+            shapeStyle = AiShapeStyle.FRAMELESS,
+            widthPx = botTileW.toInt(),
+            heightPx = botH.toInt()
         )
-        canvas.drawBitmap(topRightTile, rightX, startY, null)
-
-        val midRightTile = generateTileBitmap(
-            context = context,
-            target = AiTarget.COPILOT,
-            bgColorInt = tileBgColor,
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            shapeStyle = AiShapeStyle.SQUIRCLE,
-            widthPx = rightColW,
-            heightPx = rightTileH
-        )
-        canvas.drawBitmap(midRightTile, rightX, startY + rightTileH + gap, null)
-
-        val botY = startY + topH + gap
-        val bottomItems = listOf(
-            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.CORNER_BOTTOM_LEFT),
-            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.PERPLEXITY, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-        )
-
-        bottomItems.forEachIndexed { i, (target, shape) ->
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = accentColorInt,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = botTileW,
-                heightPx = botH
-            )
-            val bx = startX + i * (botTileW + gap)
-            canvas.drawBitmap(tile, bx, botY, null)
-        }
-    } else {
-        // ================================================================
-        // 2. TALL / VERTICAL MODE (Top Hero Banner + 2 Columns x 3 Rows Grid)
-        // ================================================================
-        val pad = cardW * 0.06f
-        val gap = cardW * 0.035f
-
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
-
-        val heroH = (availH * 0.26f).toInt().coerceAtLeast(1)
-        val remainingH = availH - gap - heroH
-        val tileH = ((remainingH - (gap * 2f)) / 3f).toInt().coerceAtLeast(1)
-        val tileW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
-
-        val startX = cardRect.left + pad
-        val startY = cardRect.top + pad
-
-        // Hero Banner spanning full width
-        val heroTile = generateTileBitmap(
-            context = context,
-            target = AiTarget.CHATGPT_TEXT,
-            bgColorInt = tileBgColor,
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            shapeStyle = AiShapeStyle.SQUIRCLE,
-            isPrimaryAccent = true,
-            widthPx = availW.toInt(),
-            heightPx = heroH
-        )
-        canvas.drawBitmap(heroTile, startX, startY, null)
-
-        // 3 Rows x 2 Columns
-        val gridStartY = startY + heroH + gap
-        val gridItems = listOf(
-            Pair(AiTarget.GROK, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.COPILOT, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.GEMINI_TEXT, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.PERPLEXITY, AiShapeStyle.CORNER_BOTTOM_LEFT),
-            Pair(AiTarget.META_AI, AiShapeStyle.CORNER_BOTTOM_RIGHT)
-        )
-
-        gridItems.forEachIndexed { i, (target, shape) ->
-            val r = i / 2
-            val c = i % 2
-            val tile = generateTileBitmap(
-                context = context,
-                target = target,
-                bgColorInt = tileBgColor,
-                accentColorInt = accentColorInt,
-                isLight = isLight,
-                shapeStyle = shape,
-                widthPx = tileW,
-                heightPx = tileH
-            )
-            val bx = startX + c * (tileW + gap)
-            val by = gridStartY + r * (tileH + gap)
-            canvas.drawBitmap(tile, bx, by, null)
-        }
+        canvas.drawBitmap(b, left, botY, null)
+        canvas.restore()
     }
 
     return bitmap
