@@ -239,8 +239,9 @@ class SocialConfigActivity : ComponentActivity() {
                                     widgetClassName.contains("Quad4") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 2, rows = 2)
                                     widgetClassName.contains("Matrix9") -> generateSocialGridBitmap(context, currentSlateConfig, socialConfig, isResponsive, 140, 140, 0, cols = 3, rows = 3)
                                     widgetClassName.contains("Deck10") -> generateSocialDeck10Bitmap(context, currentSlateConfig, isResponsive, 220, 110, 0, socialConfig)
-                                    widgetClassName.contains("Bento10Top") -> generateSocialBento10TopBitmap(context, currentSlateConfig, isResponsive, 220, 110, 0)
-                                    widgetClassName.contains("Bento10Left") -> generateSocialBento10LeftBitmap(context, currentSlateConfig, isResponsive, 220, 110, 0)
+                                    widgetClassName.contains("Bento10Top") -> generateSocialBento10TopBitmap(context = context, config = currentSlateConfig, isResponsive = isResponsive, wDp = 220, hDp = 110, widgetId = 0, socialConfig = socialConfig)
+                                    widgetClassName.contains("Bento10Left") -> generateSocialBento10LeftBitmap(
+                                        context = context, config = currentSlateConfig, isResponsive = isResponsive, wDp = 220, hDp = 110, widgetId = 0, socialConfig = socialConfig)
                                     widgetClassName.contains("Orbit6") -> generateSocialOrbit6Bitmap(
                                         context = context,
                                         config = currentSlateConfig,

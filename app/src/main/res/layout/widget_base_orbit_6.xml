@@ -4,21 +4,19 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Render Surface -->
     <ImageView
         android:id="@+id/widget_image_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitCenter" />
+        android:scaleType="fitCenter"
+        android:contentDescription="Social Orbit Widget" />
 
-    <!-- 3x2 Touch Target Matrix -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-
         android:orientation="vertical">
 
-        <!-- Top Row: Slots 0, 1, 2 -->
+        <!-- Top Row: Slot 5 (10 o'clock), Slot 0 (12 o'clock), Slot 1 (2 o'clock) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -26,31 +24,25 @@
             android:orientation="horizontal">
 
             <FrameLayout
-                android:id="@+id/touch_slot_0"
+                android:id="@+id/slot_5"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+                android:layout_weight="1" />
 
             <FrameLayout
-                android:id="@+id/touch_slot_1"
+                android:id="@+id/slot_0"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+                android:layout_weight="1" />
 
             <FrameLayout
-                android:id="@+id/touch_slot_2"
+                android:id="@+id/slot_1"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+                android:layout_weight="1" />
         </LinearLayout>
 
-        <!-- Bottom Row: Slots 3, 4, 5 -->
+        <!-- Bottom Row: Slot 4 (8 o'clock), Slot 3 (6 o'clock), Slot 2 (4 o'clock) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -58,28 +50,22 @@
             android:orientation="horizontal">
 
             <FrameLayout
-                android:id="@+id/touch_slot_3"
+                android:id="@+id/slot_4"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+                android:layout_weight="1" />
 
             <FrameLayout
-                android:id="@+id/touch_slot_4"
+                android:id="@+id/slot_3"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+                android:layout_weight="1" />
 
             <FrameLayout
-                android:id="@+id/touch_slot_5"
+                android:id="@+id/slot_2"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true" />
+                android:layout_weight="1" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

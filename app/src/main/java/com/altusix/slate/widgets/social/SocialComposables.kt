@@ -358,6 +358,24 @@ fun getSocialPresetDrawableResId(context: Context, presetId: String): Int {
 }
 
 /**
+ * Optical sizing normalization: balances visual area across circles,
+ * letterforms, and corner-to-corner diagonal vectors.
+ */
+private fun getOpticalIconScale(presetId: String): Float {
+    return when (presetId.lowercase()) {
+        "reddit" -> 1.18f    // Compares Snoo's head to other circular glyphs
+        "telegram" -> 0.88f  // Tames diagonal paper plane wings
+        "whatsapp" -> 1.05f  // Normalizes circular speech bubble
+        "threads" -> 1.04f   // Balances thin outline loop
+        "x" -> 0.92f         // Pulls in corner-to-corner diagonal points
+        "twitch" -> 0.92f    // Tames solid rectangular bulk
+        "snapchat" -> 0.93f  // Tames solid ghost silhouette
+        "discord" -> 0.94f   // Tames solid mask silhouette
+        else -> 1.0f
+    }
+}
+
+/**
  * Universal slot renderer: draws vector icon, package icon, placeholder, or app name.
  */
 private fun drawSocialSlot(
@@ -379,8 +397,13 @@ private fun drawSocialSlot(
     val minDim = minOf(tileW, tileH)
     val showText = socialConfig.showAppNames && !isMicro && tileH >= scaleFactor * 32f
 
-    val iconRatio = if (showText) 0.46f else 0.58f
-    val iconSize = (minDim * iconRatio).coerceAtLeast(scaleFactor * 12f)
+    val baseRatio = if (showText) 0.46f else 0.58f
+    val opticalMultiplier = if (slotConfig.isConfigured) getOpticalIconScale(slotConfig.presetId) else 1.0f
+
+    // Cap the maximum size so icons stay sleek even on large/stretched tiles
+    val maxIconSize = scaleFactor * (if (showText) 40f else 46f)
+    val iconSize = ((minDim * baseRatio) * opticalMultiplier).coerceIn(scaleFactor * 12f, maxIconSize)
+
     val iconCy = if (showText) tileRect.centerY() - (scaleFactor * 5f) else tileRect.centerY()
     val gap = scaleFactor * 6f
     val textY = iconCy + (iconSize / 2f) + gap + (scaleFactor * 8f)
@@ -511,12 +534,11 @@ fun generateSocialGridBitmap(
     val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#99FFFFFF")
     val accentColor = config.accentColorHex.toInt()
 
-    // 1. Dual-Mode Container Geometry
+    // 1. Dual-Mode Container Geometry (Width-Dominant for horizontal bars)
     val margin = scaleFactor * 1.5f
     val targetRatio = cols.toFloat() / rows.toFloat()
 
     val cardRect = if (isResponsive || rows == 1 || targetRatio >= 2.5f) {
-        // Horizontal bars (5x1, 4x1, 3x1) must ALWAYS span 100% width to match the launcher grid
         if (!isResponsive && targetRatio > 0f) {
             val maxAllowedH = h - (margin * 2f)
             val idealH = (w - (margin * 2f)) / targetRatio
@@ -548,13 +570,24 @@ fun generateSocialGridBitmap(
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    // 2. Proportional Padding & Edge Fill
+    // 2. Tightened Uniform Spacing (Scales from 1.8dp up to 5.5dp)
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val pad = (minDim * 0.045f).coerceIn(scaleFactor * 4f, scaleFactor * 9f)
-    val gap = (minDim * 0.035f).coerceIn(scaleFactor * 2.5f, scaleFactor * 6f)
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    val availableW = cardRect.width() - (pad * 2f) - (gap * (cols - 1))
-    val availableH = cardRect.height() - (pad * 2f) - (gap * (rows - 1))
+    // 3. Mathematical Concentric Inner Boundary (R_inner = R_outer - spacing)
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
+    val availableW = innerCardRect.width() - (spacing * (cols - 1))
+    val availableH = innerCardRect.height() - (spacing * (rows - 1))
     val tileW = availableW / cols
     val tileH = availableH / rows
 
@@ -564,23 +597,41 @@ fun generateSocialGridBitmap(
         style = Paint.Style.FILL
     }
 
-    // 3. Concentric Tile Corner Radius (R_inner = R_outer - pad)
-    val minTileDim = minOf(tileW, tileH)
-    val concentricRadius = maxOf(4f * scaleFactor, outerRadius - pad).coerceAtMost(minTileDim / 2f)
-    val tileCornerRadius = minOf(concentricRadius, minTileDim * 0.36f).coerceAtLeast(4f * scaleFactor)
+    // Soft radius strictly for interior seams between tiles
+    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(minOf(tileW, tileH) / 2f)
 
     for (i in 0 until slotCount) {
         val col = i % cols
         val row = i / cols
 
-        val tileLeft = cardRect.left + pad + col * (tileW + gap)
-        val tileTop = cardRect.top + pad + row * (tileH + gap)
+        val tileLeft = innerCardRect.left + col * (tileW + spacing)
+        val tileTop = innerCardRect.top + row * (tileH + spacing)
         val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
 
+        val isTopOuter = (row == 0)
+        val isBottomOuter = (row == rows - 1)
+        val isLeftOuter = (col == 0)
+        val isRightOuter = (col == cols - 1)
+
+        val tl = if (isTopOuter && isLeftOuter) 0f else innerCornerRadius
+        val tr = if (isTopOuter && isRightOuter) 0f else innerCornerRadius
+        val br = if (isBottomOuter && isRightOuter) 0f else innerCornerRadius
+        val bl = if (isBottomOuter && isLeftOuter) 0f else innerCornerRadius
+
+        val radii = floatArrayOf(
+            tl, tl,
+            tr, tr,
+            br, br,
+            bl, bl
+        )
+
         val slot = socialConfig.slots.getOrElse(i) { SocialSlotConfig() }
-        val tilePath = Path().apply { addRoundRect(tileRect, tileCornerRadius, tileCornerRadius, Path.Direction.CW) }
+        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
 
         canvas.save()
+        canvas.clipPath(innerCardPath)
         canvas.clipPath(tilePath)
 
         if (socialConfig.showTileBackground) {
@@ -682,8 +733,16 @@ fun generateSocialDeck10Bitmap(
 }
 
 // 5. Social Bento Top (10 Apps - 2 Large Top + 8 Small Bottom)
-fun generateSocialBento10TopBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 10, "BENTO_10_TOP")
+fun generateSocialBento10TopBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 10, "BENTO_10_TOP")
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -710,67 +769,153 @@ fun generateSocialBento10TopBitmap(context: Context, config: SlateWidgetConfig, 
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
+    // 1. Proportional spacing matching the rest of the social widgets
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    // 2. Concentric Inner Boundary for perfect outer corner alignment
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
         style = Paint.Style.FILL
     }
 
-    val topH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val bigW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val concentricRadius = (outerRadius - pad).coerceIn(scaleFactor * 6f, minOf(bigW, topH) / 2f)
-    val sq = scaleFactor * 8f
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
-    val bigRadiiList = listOf(
-        floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq)
-    )
+    // Dimensions for 2 Big Top Tiles
+    val bigW = (innerCardRect.width() - spacing) / 2f
+    val topH = (innerCardRect.height() - spacing) / 2f
 
     // Top 2 Big Tiles (Slots 0 and 1)
     for (i in 0..1) {
-        val rect = RectF(cardRect.left + pad + i * (bigW + gap), cardRect.top + pad, cardRect.left + pad + i * (bigW + gap) + bigW, cardRect.top + pad + topH)
-        val slot = socialConfig.slots.getOrElse(i) { SocialSlotConfig() }
-        val tilePath = Path().apply { addRoundRect(rect, bigRadiiList[i], Path.Direction.CW) }
+        val left = innerCardRect.left + i * (bigW + spacing)
+        val top = innerCardRect.top
+        val rect = RectF(left, top, left + bigW, top + topH)
 
-        if (socialConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
-        drawSocialSlot(canvas, context, rect, slot, socialConfig, isLight, scaleFactor, primaryText, secondaryText, accentColor, innerCardBg, isMicro = false)
+        val tl = if (i == 0) 0f else innerCornerRadius
+        val tr = if (i == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(
+            tl, tl,
+            tr, tr,
+            innerCornerRadius, innerCornerRadius,
+            innerCornerRadius, innerCornerRadius
+        )
+
+        val slot = resolvedConfig.slots.getOrElse(i) { SocialSlotConfig() }
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
+        if (resolvedConfig.showTileBackground) {
+            canvas.drawPath(tilePath, tilePaint)
+        }
+
+        drawSocialSlot(
+            canvas = canvas,
+            context = context,
+            tileRect = rect,
+            slotConfig = slot,
+            socialConfig = resolvedConfig,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            accentColor = accentColor,
+            tileBgColor = innerCardBg,
+            isMicro = false
+        )
+        canvas.restore()
     }
 
     // Bottom 8 Small Tiles (Slots 2 to 9, 2 rows of 4)
-    val bottomTop = cardRect.top + pad + topH + gap
-    val microW = (cardRect.width() - (pad * 2f) - (gap * 3f)) / 4f
-    val microH = (cardRect.bottom - pad - bottomTop - gap) / 2f
+    val bottomTop = innerCardRect.top + topH + spacing
+    val bottomH = innerCardRect.height() - topH - spacing
+    val microW = (innerCardRect.width() - (3f * spacing)) / 4f
+    val microH = (bottomH - spacing) / 2f
 
     for (i in 0..7) {
         val col = i % 4
         val row = i / 4
-        val bl = if (col == 0 && row == 1) concentricRadius else sq
-        val br = if (col == 3 && row == 1) concentricRadius else sq
-        val radii = floatArrayOf(sq, sq, sq, sq, br, br, bl, bl)
+        val left = innerCardRect.left + col * (microW + spacing)
+        val top = bottomTop + row * (microH + spacing)
+        val rect = RectF(left, top, left + microW, top + microH)
 
-        val rect = RectF(cardRect.left + pad + col * (microW + gap), bottomTop + row * (microH + gap), cardRect.left + pad + col * (microW + gap) + microW, bottomTop + row * (microH + gap) + microH)
-        val slot = socialConfig.slots.getOrElse(i + 2) { SocialSlotConfig() }
+        val bl = if (col == 0 && row == 1) 0f else innerCornerRadius
+        val br = if (col == 3 && row == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(
+            innerCornerRadius, innerCornerRadius,
+            innerCornerRadius, innerCornerRadius,
+            br, br,
+            bl, bl
+        )
+
+        val slot = resolvedConfig.slots.getOrElse(i + 2) { SocialSlotConfig() }
         val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
 
-        if (socialConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
-        drawSocialSlot(canvas, context, rect, slot, socialConfig, isLight, scaleFactor, primaryText, secondaryText, accentColor, innerCardBg, isMicro = true)
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
+        if (resolvedConfig.showTileBackground) {
+            canvas.drawPath(tilePath, tilePaint)
+        }
+
+        drawSocialSlot(
+            canvas = canvas,
+            context = context,
+            tileRect = rect,
+            slotConfig = slot,
+            socialConfig = resolvedConfig,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            accentColor = accentColor,
+            tileBgColor = innerCardBg,
+            isMicro = true
+        )
+        canvas.restore()
     }
 
     return bitmap
 }
 
 // 6. Social Bento Left (10 Apps - 2 Large Left + 8 Small Right)
-fun generateSocialBento10LeftBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
-    val socialConfig = SocialStorageManager.load(context, widgetId, 10, "BENTO_10_LEFT")
+fun generateSocialBento10LeftBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int,
+    socialConfig: SocialWidgetConfig? = null
+): Bitmap {
+    val resolvedConfig = socialConfig ?: SocialStorageManager.load(context, widgetId, 10, "BENTO_10_LEFT")
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -797,60 +942,137 @@ fun generateSocialBento10LeftBitmap(context: Context, config: SlateWidgetConfig,
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb((config.opacity.coerceIn(0f, 1f) * 255).toInt(), Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val pad = scaleFactor * 8f
-    val gap = scaleFactor * 8f
+    // 1. Proportional spacing matching the rest of the social widgets
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
+
+    // 2. Concentric Inner Boundary for perfect outer corner alignment
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
+    }
+
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerCardBg
         style = Paint.Style.FILL
     }
 
-    val leftW = (cardRect.width() - (pad * 2f) - gap) / 2f
-    val bigH = (cardRect.height() - (pad * 2f) - gap) / 2f
-    val concentricRadius = (outerRadius - pad).coerceIn(scaleFactor * 6f, minOf(leftW, bigH) / 2f)
-    val sq = scaleFactor * 8f
+    val innerCornerRadius = (minDim * 0.08f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(innerCardRadius)
 
-    val bigRadiiList = listOf(
-        floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, sq, sq),
-        floatArrayOf(sq, sq, sq, sq, sq, sq, concentricRadius, concentricRadius)
-    )
+    // Dimensions for Left 2 Big Tiles
+    val leftW = (innerCardRect.width() - spacing) / 2f
+    val bigH = (innerCardRect.height() - spacing) / 2f
 
     // Left 2 Big Tiles (Slots 0 and 1)
     for (i in 0..1) {
-        val rect = RectF(cardRect.left + pad, cardRect.top + pad + i * (bigH + gap), cardRect.left + pad + leftW, cardRect.top + pad + i * (bigH + gap) + bigH)
-        val slot = socialConfig.slots.getOrElse(i) { SocialSlotConfig() }
-        val tilePath = Path().apply { addRoundRect(rect, bigRadiiList[i], Path.Direction.CW) }
+        val left = innerCardRect.left
+        val top = innerCardRect.top + i * (bigH + spacing)
+        val rect = RectF(left, top, left + leftW, top + bigH)
 
-        if (socialConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
-        drawSocialSlot(canvas, context, rect, slot, socialConfig, isLight, scaleFactor, primaryText, secondaryText, accentColor, innerCardBg, isMicro = false)
+        val tl = if (i == 0) 0f else innerCornerRadius
+        val bl = if (i == 1) 0f else innerCornerRadius
+        val radii = floatArrayOf(
+            tl, tl,
+            innerCornerRadius, innerCornerRadius,
+            innerCornerRadius, innerCornerRadius,
+            bl, bl
+        )
+
+        val slot = resolvedConfig.slots.getOrElse(i) { SocialSlotConfig() }
+        val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
+        if (resolvedConfig.showTileBackground) {
+            canvas.drawPath(tilePath, tilePaint)
+        }
+
+        drawSocialSlot(
+            canvas = canvas,
+            context = context,
+            tileRect = rect,
+            slotConfig = slot,
+            socialConfig = resolvedConfig,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            accentColor = accentColor,
+            tileBgColor = innerCardBg,
+            isMicro = false
+        )
+        canvas.restore()
     }
 
     // Right 8 Small Tiles (Slots 2 to 9, 4 rows of 2)
-    val rightLeft = cardRect.left + pad + leftW + gap
-    val rightW = cardRect.right - pad - rightLeft
-    val microW = (rightW - gap) / 2f
-    val microH = (cardRect.height() - (pad * 2f) - (gap * 3f)) / 4f
+    val rightLeft = innerCardRect.left + leftW + spacing
+    val rightW = innerCardRect.width() - leftW - spacing
+    val microW = (rightW - spacing) / 2f
+    val microH = (innerCardRect.height() - (3f * spacing)) / 4f
 
     for (i in 0..7) {
         val col = i % 2
         val row = i / 2
-        val tr = if (col == 1 && row == 0) concentricRadius else sq
-        val br = if (col == 1 && row == 3) concentricRadius else sq
-        val radii = floatArrayOf(sq, sq, tr, tr, br, br, sq, sq)
+        val left = rightLeft + col * (microW + spacing)
+        val top = innerCardRect.top + row * (microH + spacing)
+        val rect = RectF(left, top, left + microW, top + microH)
 
-        val rect = RectF(rightLeft + col * (microW + gap), cardRect.top + pad + row * (microH + gap), rightLeft + col * (microW + gap) + microW, cardRect.top + pad + row * (microH + gap) + microH)
-        val slot = socialConfig.slots.getOrElse(i + 2) { SocialSlotConfig() }
+        val tr = if (col == 1 && row == 0) 0f else innerCornerRadius
+        val br = if (col == 1 && row == 3) 0f else innerCornerRadius
+        val radii = floatArrayOf(
+            innerCornerRadius, innerCornerRadius,
+            tr, tr,
+            br, br,
+            innerCornerRadius, innerCornerRadius
+        )
+
+        val slot = resolvedConfig.slots.getOrElse(i + 2) { SocialSlotConfig() }
         val tilePath = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
 
-        if (socialConfig.showTileBackground) canvas.drawPath(tilePath, tilePaint)
-        drawSocialSlot(canvas, context, rect, slot, socialConfig, isLight, scaleFactor, primaryText, secondaryText, accentColor, innerCardBg, isMicro = true)
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
+
+        if (resolvedConfig.showTileBackground) {
+            canvas.drawPath(tilePath, tilePaint)
+        }
+
+        drawSocialSlot(
+            canvas = canvas,
+            context = context,
+            tileRect = rect,
+            slotConfig = slot,
+            socialConfig = resolvedConfig,
+            isLight = isLight,
+            scaleFactor = scaleFactor,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            accentColor = accentColor,
+            tileBgColor = innerCardBg,
+            isMicro = true
+        )
+        canvas.restore()
     }
 
     return bitmap
@@ -892,9 +1114,11 @@ fun generateSocialOrbit6Bitmap(
     }
     canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
-    val orbitRadius = outerRadius * 0.60f
-    val tileRadius = outerRadius * 0.30f
+    // Balanced radial proportions: even margins between tiles, center hub, and outer ring
+    val orbitRadius = outerRadius * 0.62f
+    val tileRadius = outerRadius * 0.245f
 
+    // Orbit guide track
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -902,7 +1126,8 @@ fun generateSocialOrbit6Bitmap(
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
-    val hubRadius = outerRadius * 0.14f
+    // Center hub
+    val hubRadius = outerRadius * 0.12f
     val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
         style = Paint.Style.FILL
@@ -910,6 +1135,10 @@ fun generateSocialOrbit6Bitmap(
     canvas.drawCircle(cx, cy, hubRadius, hubPaint)
 
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
+    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerCardBg
+        style = Paint.Style.FILL
+    }
 
     for (i in 0 until 6) {
         val angle = Math.toRadians((i * 60.0) - 90.0)
@@ -918,6 +1147,11 @@ fun generateSocialOrbit6Bitmap(
 
         val tileRect = RectF(slotX - tileRadius, slotY - tileRadius, slotX + tileRadius, slotY + tileRadius)
         val slot = resolvedConfig.slots.getOrElse(i) { SocialSlotConfig() }
+
+        // Render circular tile background card when enabled
+        if (resolvedConfig.showTileBackground) {
+            canvas.drawCircle(slotX, slotY, tileRadius, tilePaint)
+        }
 
         drawSocialSlot(
             canvas = canvas,
