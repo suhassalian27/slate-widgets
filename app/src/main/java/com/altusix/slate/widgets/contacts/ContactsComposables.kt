@@ -1797,7 +1797,10 @@ fun generateTriangleContactBitmap(context: Context, config: SlateWidgetConfig, i
     generateShapedContactBitmap(context, config, LauncherShape.TRIANGLE, wDp, hDp, widgetId)
 
 
-// Universal Multi-Contact Grid Generator (Widgets 23 - 27) - Bento Tile Grid Layout
+// ============================================================================
+// UNIVERSAL MULTI-CONTACT GRID GENERATOR (Widgets 23 - 27)
+// ============================================================================
+
 fun generateMultiContactGridBitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -1822,22 +1825,36 @@ fun generateMultiContactGridBitmap(
     val b = Color.blue(accentColorInt) / 255f
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
 
-    val targetRatio = when (slotCount) {
-        2 -> 2.0f
-        3 -> 3.0f
-        4 -> 1.0f
-        6 -> 1.5f
-        8 -> 2.0f
-        else -> 1.0f
+    // 1. Determine Grid Dimension and Responsive Pivots
+    val isVertical = isResponsive && (hDp > wDp)
+    val (cols, rows) = when (slotCount) {
+        2 -> if (isVertical) 1 to 2 else 2 to 1
+        3 -> if (isVertical) 1 to 3 else 3 to 1
+        4 -> 2 to 2
+        6 -> 3 to 2
+        8 -> if (isVertical) 2 to 4 else 4 to 2
+        else -> 2 to 2
     }
 
-    val cardRect = if (isResponsive) {
-        RectF(0f, 0f, w, h)
+    val targetRatio = cols.toFloat() / rows.toFloat()
+    val margin = scaleFactor * 1.5f
+
+    // Width-Dominant container fit for single-row bars
+    val cardRect = if (isResponsive || rows == 1 || targetRatio >= 2.5f) {
+        if (!isResponsive && targetRatio > 0f) {
+            val maxAllowedH = h - (margin * 2f)
+            val idealH = (w - (margin * 2f)) / targetRatio
+            val cardH = idealH.coerceAtMost(maxAllowedH)
+            val topY = (h - cardH) / 2f
+            RectF(margin, topY, w - margin, topY + cardH)
+        } else {
+            RectF(margin, margin, w - margin, h - margin)
+        }
     } else {
-        var cardH = h
+        var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
-        if (cardW > w) {
-            cardW = w
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
             cardH = cardW / targetRatio
         }
         val leftX = (w - cardW) / 2f
@@ -1845,73 +1862,40 @@ fun generateMultiContactGridBitmap(
         RectF(leftX, topY, leftX + cardW, topY + cardH)
     }
 
-    val outerRadius = getStandardCornerRadius(scaleFactor)
+    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
+    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
 
-    // Outer Container Background
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
-    val aspectRatio = cardRect.width() / cardRect.height()
+    // 2. Uniform Proportional Spacing (1.8dp - 5.5dp)
+    val minDim = minOf(cardRect.width(), cardRect.height())
+    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
 
-    // Responsive aspect-ratio grid reflow logic
-    val (cols, rows) = if (isResponsive) {
-        when (slotCount) {
-            2 -> when {
-                aspectRatio >= 1.1f -> 2 to 1
-                else -> 1 to 2
-            }
-            3 -> when {
-                aspectRatio >= 1.6f -> 3 to 1
-                aspectRatio <= 0.65f -> 1 to 3
-                else -> 3 to 1
-            }
-            4 -> when {
-                aspectRatio >= 2.2f -> 4 to 1
-                aspectRatio <= 0.55f -> 1 to 4
-                else -> 2 to 2
-            }
-            6 -> when {
-                aspectRatio >= 2.5f -> 6 to 1
-                aspectRatio >= 1.2f -> 3 to 2
-                aspectRatio <= 0.45f -> 1 to 6
-                else -> 2 to 3
-            }
-            8 -> when {
-                aspectRatio >= 2.8f -> 8 to 1
-                aspectRatio >= 1.2f -> 4 to 2
-                aspectRatio <= 0.45f -> 1 to 8
-                else -> 2 to 4
-            }
-            else -> 2 to 2
-        }
-    } else {
-        when (slotCount) {
-            2 -> 2 to 1
-            3 -> 3 to 1
-            4 -> 2 to 2
-            6 -> 3 to 2
-            8 -> 4 to 2
-            else -> 2 to 2
-        }
+    // 3. Exact Concentric Inner Boundary Path
+    val innerCardRect = RectF(
+        cardRect.left + spacing,
+        cardRect.top + spacing,
+        cardRect.right - spacing,
+        cardRect.bottom - spacing
+    )
+    val innerCardRadius = maxOf(0f, outerRadius - spacing)
+    val innerCardPath = Path().apply {
+        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
     }
 
-    val pad = scaleFactor * 6f
-    val gap = scaleFactor * 6f
-
-    val availableW = (cardRect.width() - (pad * 2f) - (gap * (cols - 1))).coerceAtLeast(1f)
-    val availableH = (cardRect.height() - (pad * 2f) - (gap * (rows - 1))).coerceAtLeast(1f)
-
+    val availableW = innerCardRect.width() - (spacing * (cols - 1))
+    val availableH = innerCardRect.height() - (spacing * (rows - 1))
     val tileW = availableW / cols
     val tileH = availableH / rows
 
-    val defaultInnerR = (scaleFactor * 8f).coerceAtMost(minOf(tileW, tileH) * 0.20f)
-    val outerCornerR = (outerRadius - pad)
-        .coerceAtLeast(defaultInnerR)
-        .coerceAtMost(minOf(tileW, tileH) * 0.48f)
+    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
+        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
+        .coerceAtMost(minOf(tileW, tileH) / 2f)
 
     val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
     val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1923,98 +1907,83 @@ fun generateMultiContactGridBitmap(
         val col = i % cols
         val row = i / cols
 
-        val tileLeft = cardRect.left + pad + col * (tileW + gap)
-        val tileTop = cardRect.top + pad + row * (tileH + gap)
+        val tileLeft = innerCardRect.left + col * (tileW + spacing)
+        val tileTop = innerCardRect.top + row * (tileH + spacing)
         val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
+
+        val isTopOuter = (row == 0)
+        val isBottomOuter = (row == rows - 1)
+        val isLeftOuter = (col == 0)
+        val isRightOuter = (col == cols - 1)
+
+        // Outer-facing corners use 0f so innerCardPath produces the exact concentric arc
+        val tl = if (isTopOuter && isLeftOuter) 0f else innerCornerRadius
+        val tr = if (isTopOuter && isRightOuter) 0f else innerCornerRadius
+        val br = if (isBottomOuter && isRightOuter) 0f else innerCornerRadius
+        val bl = if (isBottomOuter && isLeftOuter) 0f else innerCornerRadius
+
+        val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
+        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
+
+        canvas.save()
+        canvas.clipPath(innerCardPath)
+        canvas.clipPath(tilePath)
 
         val slotConfig = loadSlotConfig(context, widgetId, i)
         val photoBitmap = if (slotConfig.isConfigured) loadContactPhoto(context, slotConfig.photoUri) else null
 
-        // Concentric corner radii matching the outer container's corners
-        val tl = if (col == 0 && row == 0) outerCornerR else defaultInnerR
-        val tr = if (col == cols - 1 && row == 0) outerCornerR else defaultInnerR
-        val br = if (col == cols - 1 && row == rows - 1) outerCornerR else defaultInnerR
-        val bl = if (col == 0 && row == rows - 1) outerCornerR else defaultInnerR
-
-        val cornerRadii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
-
-        val tilePath = Path().apply {
-            addRoundRect(tileRect, cornerRadii, Path.Direction.CW)
-        }
-
-        canvas.save()
-        canvas.clipPath(tilePath)
-
         if (!slotConfig.isConfigured) {
-            canvas.drawPath(tilePath, tilePaint)
+            canvas.drawRect(tileRect, tilePaint)
 
-            val maxTextWidth = tileW * 0.88f
-            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val minTileDim = minOf(tileW, tileH)
+            val placeholderRadius = (minTileDim * 0.26f).coerceIn(scaleFactor * 10f, scaleFactor * 22f)
+            val iconCy = if (tileH >= scaleFactor * 42f) tileRect.centerY() - (scaleFactor * 5f) else tileRect.centerY()
+
+            val discPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#2C2C2E")
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(tileRect.centerX(), iconCy, placeholderRadius, discPaint)
+
+            val plusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = secondaryText
-                typeface = getSlateFont(context, weight = 600)
+                textSize = placeholderRadius * 1.15f
+                typeface = getSlateFont(context, weight = 700)
                 textAlign = Paint.Align.CENTER
             }
+            val bounds = Rect()
+            plusPaint.getTextBounds("+", 0, 1, bounds)
+            canvas.drawText("+", tileRect.centerX(), iconCy + (bounds.height() / 2f), plusPaint)
 
-            val iconSize = (minOf(tileW, tileH) * 0.28f).coerceAtLeast(scaleFactor * 10f)
-            val singleLineText = "Tap to configure"
-            var singleLineFontSize = (tileH * 0.12f).coerceIn(scaleFactor * 7f, scaleFactor * 13f)
-            textPaint.textSize = singleLineFontSize
-
-            if (textPaint.measureText(singleLineText) <= maxTextWidth && tileH >= scaleFactor * 36f) {
-                val iconCy = tileRect.centerY() - (singleLineFontSize * 0.6f)
-                drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), iconCy, iconSize, Color.GRAY)
-
-                val textY = tileRect.centerY() + (iconSize * 0.48f) + (singleLineFontSize * 0.7f)
-                if (textY < tileRect.bottom - (pad * 0.5f)) {
-                    canvas.drawText(singleLineText, tileRect.centerX(), textY, textPaint)
+            if (tileH >= scaleFactor * 42f) {
+                val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = secondaryText
+                    typeface = getSlateFont(context, weight = 600)
+                    textAlign = Paint.Align.CENTER
+                    textSize = (minTileDim * 0.11f).coerceIn(scaleFactor * 7f, scaleFactor * 11f)
                 }
-            } else if (tileH >= scaleFactor * 28f) {
-                val line1 = "Tap to"
-                val line2 = "configure"
-
-                var multiFontSize = (tileH * 0.11f).coerceIn(scaleFactor * 6f, scaleFactor * 11f)
-                textPaint.textSize = multiFontSize
-
-                if (textPaint.measureText(line1) <= maxTextWidth && textPaint.measureText(line2) <= maxTextWidth) {
-                    val iconCy = tileRect.centerY() - (multiFontSize * 1.1f)
-                    drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), iconCy, iconSize * 0.85f, Color.GRAY)
-
-                    val textY1 = iconCy + (iconSize * 0.45f) + multiFontSize
-                    val textY2 = textY1 + (multiFontSize * 1.15f)
-                    if (textY2 < tileRect.bottom) {
-                        canvas.drawText(line1, tileRect.centerX(), textY1, textPaint)
-                        canvas.drawText(line2, tileRect.centerX(), textY2, textPaint)
-                    }
-                } else {
-                    drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), tileRect.centerY(), iconSize, Color.GRAY)
-                }
-            } else {
-                drawVectorIcon(canvas, context, R.drawable.ic_person, tileRect.centerX(), tileRect.centerY(), iconSize, Color.GRAY)
+                canvas.drawText("Add", tileRect.centerX(), iconCy + placeholderRadius + (scaleFactor * 10f), labelPaint)
             }
-
         } else if (photoBitmap != null) {
-            val targetRatio = tileRect.width() / tileRect.height()
-            val imgW = photoBitmap.width.toFloat()
-            val imgH = photoBitmap.height.toFloat()
-            val imgRatio = imgW / imgH
+            val imgRatio = photoBitmap.width.toFloat() / photoBitmap.height.toFloat()
+            val tileRatio = tileW / tileH
 
-            val srcRect = if (imgRatio > targetRatio) {
-                val cropW = imgH * targetRatio
-                val left = (imgW - cropW) / 2f
+            val srcRect = if (imgRatio > tileRatio) {
+                val cropW = photoBitmap.height * tileRatio
+                val left = (photoBitmap.width - cropW) / 2f
                 Rect(left.toInt(), 0, (left + cropW).toInt(), photoBitmap.height)
             } else {
-                val cropH = imgW / targetRatio
-                val top = (imgH - cropH) / 2f
+                val cropH = photoBitmap.width / tileRatio
+                val top = (photoBitmap.height - cropH) / 2f
                 Rect(0, top.toInt(), photoBitmap.width, (top + cropH).toInt())
             }
 
-            val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            canvas.drawBitmap(photoBitmap, srcRect, tileRect, imagePaint)
+            canvas.drawBitmap(photoBitmap, srcRect, tileRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
 
             val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = android.graphics.LinearGradient(
                     0f, tileRect.centerY(), 0f, tileRect.bottom,
-                    Color.TRANSPARENT, Color.argb(190, 0, 0, 0),
+                    Color.TRANSPARENT, Color.argb(200, 0, 0, 0),
                     android.graphics.Shader.TileMode.CLAMP
                 )
             }
@@ -2034,13 +2003,11 @@ fun generateMultiContactGridBitmap(
             }
 
             val displayName = formatSmartName(slotConfig.contactName, namePaint, maxTextWidth)
-            val textY = tileRect.bottom - (scaleFactor * 6f)
-            canvas.drawText(displayName, tileRect.centerX(), textY, namePaint)
-
+            canvas.drawText(displayName, tileRect.centerX(), tileRect.bottom - (scaleFactor * 6f), namePaint)
         } else {
-            canvas.drawPath(tilePath, tilePaint)
+            canvas.drawRect(tileRect, tilePaint)
 
-            val avatarRadius = (minOf(tileW, tileH) * 0.24f).coerceAtLeast(scaleFactor * 10f)
+            val avatarRadius = (minOf(tileW, tileH) * 0.24f).coerceIn(scaleFactor * 10f, scaleFactor * 24f)
             val avatarCy = tileRect.centerY() - (tileH * 0.08f)
             val avatarTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
 
@@ -2064,8 +2031,7 @@ fun generateMultiContactGridBitmap(
             }
 
             val displayName = formatSmartName(slotConfig.contactName, namePaint, maxTextWidth)
-            val textY = tileRect.bottom - (scaleFactor * 6f)
-            canvas.drawText(displayName, tileRect.centerX(), textY, namePaint)
+            canvas.drawText(displayName, tileRect.centerX(), tileRect.bottom - (scaleFactor * 6f), namePaint)
         }
 
         canvas.restore()

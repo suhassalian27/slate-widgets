@@ -615,8 +615,10 @@ class ContactsTriangleReceiver : BaseContactsReceiver() {
 
 abstract class BaseMultiContactGridReceiver(
     private val slotCount: Int,
-    private val layoutResId: Int
+    private val defaultLayoutResId: Int
 ) : BaseContactsReceiver() {
+
+    open fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int = defaultLayoutResId
 
     override fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
         val options = appWidgetManager.getAppWidgetOptions(widgetId)
@@ -628,35 +630,40 @@ abstract class BaseMultiContactGridReceiver(
 
         val isResponsive = parseAndLockIsResponsive(context, widgetId)
         val config = loadSlateWidgetConfig(context, widgetId)
-
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
 
-        val views = RemoteViews(context.packageName, layoutResId)
+        val resolvedLayout = resolveLayoutResId(isResponsive, wDp, hDp)
+        val views = RemoteViews(context.packageName, resolvedLayout)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
+
+        // Bind both standardized slot_0..7 and legacy touch_slot_0..7 IDs
         val touchSlotIds = intArrayOf(
+            R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3,
+            R.id.slot_4, R.id.slot_5, R.id.slot_6, R.id.slot_7
+        )
+        val legacyTouchSlotIds = intArrayOf(
             R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3,
             R.id.touch_slot_4, R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7
         )
 
+        var anyConfigured = false
+
         for (i in 0 until slotCount) {
             val slotConfig = loadSlotConfig(context, widgetId, i)
-            val targetViewId = touchSlotIds.getOrNull(i) ?: continue
-
-            if (!slotConfig.isConfigured) {
-                val configIntent = Intent(context, ContactsWidgetConfigActivity::class.java).apply {
+            val intent = if (!slotConfig.isConfigured) {
+                Intent(context, ContactsWidgetConfigActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     putExtra("extra_slot_index", i)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
-                val pi = PendingIntent.getActivity(
-                    context, widgetId * 100 + i, configIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(targetViewId, pi)
             } else {
+                anyConfigured = true
                 val phoneDigits = slotConfig.phoneNumber.replace("[^0-9]".toRegex(), "")
-                val actionIntent = when (slotConfig.actionType) {
+                when (slotConfig.actionType) {
                     ContactActionType.CALL -> Intent(Intent.ACTION_DIAL).apply {
                         data = Uri.parse("tel:${slotConfig.phoneNumber}")
                     }
@@ -672,45 +679,76 @@ abstract class BaseMultiContactGridReceiver(
                 }.apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-
-                val pi = PendingIntent.getActivity(
-                    context, widgetId * 100 + i, actionIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(targetViewId, pi)
             }
+
+            val pi = PendingIntent.getActivity(
+                context, widgetId * 100 + i, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
+            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
+        }
+
+        // Global fallback: Clicking the card background opens slot 0 setup if none are configured
+        if (!anyConfigured) {
+            val rootIntent = Intent(context, ContactsWidgetConfigActivity::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                putExtra("extra_slot_index", 0)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val rootPi = PendingIntent.getActivity(
+                context, widgetId, rootIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_image_view, rootPi)
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
 
-// 23. 2-Contact Grid
-class ContactsGrid2Receiver : BaseMultiContactGridReceiver(2, R.layout.widget_contacts_grid2_layout) {
+// 23. 2-Contact Grid (2x1 / 1x2 Pivot)
+class ContactsGrid2Receiver : BaseMultiContactGridReceiver(2, R.layout.widget_base_row_2) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_column_2 else R.layout.widget_base_row_2
+    }
+
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateGrid2ContactBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 24. 3-Contact Grid
-class ContactsGrid3Receiver : BaseMultiContactGridReceiver(3, R.layout.widget_contacts_grid3_layout) {
+// 24. 3-Contact Grid (3x1 / 1x3 Pivot)
+class ContactsGrid3Receiver : BaseMultiContactGridReceiver(3, R.layout.widget_base_row_3) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_column_3 else R.layout.widget_base_row_3
+    }
+
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateGrid3ContactBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 25. 4-Contact Grid
-class ContactsGrid4Receiver : BaseMultiContactGridReceiver(4, R.layout.widget_contacts_grid4_layout) {
+// 25. 4-Contact Grid (2x2 Grid)
+class ContactsGrid4Receiver : BaseMultiContactGridReceiver(4, R.layout.widget_base_grid_2x2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateGrid4ContactBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 26. 6-Contact Grid
-class ContactsGrid6Receiver : BaseMultiContactGridReceiver(6, R.layout.widget_contacts_grid6_layout) {
+// 26. 6-Contact Grid (3x2 Grid)
+class ContactsGrid6Receiver : BaseMultiContactGridReceiver(6, R.layout.widget_base_grid_3x2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateGrid6ContactBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
-// 27. 8-Contact Grid
-class ContactsGrid8Receiver : BaseMultiContactGridReceiver(8, R.layout.widget_contacts_grid8_layout) {
+// 27. 8-Contact Grid (4x2 / 2x4 Pivot)
+class ContactsGrid8Receiver : BaseMultiContactGridReceiver(8, R.layout.widget_base_grid_4x2) {
+    override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_grid_2x4 else R.layout.widget_base_grid_4x2
+    }
+
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateGrid8ContactBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
