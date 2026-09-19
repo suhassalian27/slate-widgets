@@ -42,7 +42,6 @@ import com.altusix.slate.ui.components.RainbowCustomCircle
 import com.altusix.slate.ui.components.SlateConfigScaffold
 import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
-import com.altusix.slate.widgets.ai.AiConfigActivity
 import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiWidgets
 import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
@@ -308,6 +307,9 @@ class WidgetConfigActivity : ComponentActivity() {
                 val isQuickToggles = remember(widgetClassName) {
                     getQuickTogglesWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
                 }
+                val isAi = remember(widgetClassName) {
+                    getAiWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+                }
 
                 SlateConfigScaffold(
                     title = "Customize Widget",
@@ -328,75 +330,142 @@ class WidgetConfigActivity : ComponentActivity() {
                     scrollable = true,
                     previewHeight = 180.dp,
                     previewContent = {
-                        if (isQuickToggles) {
-                            QuickToggleLivePreview(
-                                widgetClassName = widgetClassName,
-                                config = SlateWidgetConfig(
-                                    themeMode = if (isLightBg) "LIGHT" else "DARK",
-                                    backgroundColorHex = selectedBgHex,
-                                    opacity = opacity,
-                                    accentColorHex = selectedAccentHex
-                                ),
-                                isResponsive = isResponsive,
-                                appWidgetId = appWidgetId
-                            )
-                        } else {
-                            val previewBg = Color(selectedBgHex).copy(alpha = opacity)
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                isQuickToggles -> {
+                                    QuickToggleLivePreview(
+                                        widgetClassName = widgetClassName,
+                                        config = SlateWidgetConfig(
+                                            themeMode = if (isLightBg) "LIGHT" else "DARK",
+                                            backgroundColorHex = selectedBgHex,
+                                            opacity = opacity,
+                                            accentColorHex = selectedAccentHex
+                                        ),
+                                        isResponsive = isResponsive,
+                                        appWidgetId = appWidgetId
+                                    )
+                                }
 
-                            Box(
-                                modifier = Modifier
-                                    .size(148.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(previewBg)
-                                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
-                                    .padding(16.dp)
-                            ) {
-                                if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
-                                    Column(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                                            Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
-                                        }
-
-                                        val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
-                                            generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
-                                        }
-
-                                        Image(
-                                            bitmap = arcBitmap.asImageBitmap(),
-                                            contentDescription = "Arc Preview",
-                                            modifier = Modifier.size(100.dp, 50.dp)
+                                isAi -> {
+                                    // Render AI Widget Preview using your AI bitmap generator or preview composable
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    val aiConfig = remember(selectedBgHex, selectedAccentHex, opacity, isLightBg) {
+                                        SlateWidgetConfig(
+                                            themeMode = if (isLightBg) "LIGHT" else "DARK",
+                                            backgroundColorHex = selectedBgHex,
+                                            opacity = opacity,
+                                            accentColorHex = selectedAccentHex
                                         )
-
-                                        Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
                                     }
-                                } else {
-                                    Column(
-                                        modifier = Modifier.fillMaxSize(),
-                                        verticalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                                            Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+
+                                    // Dynamically invoke the receiver's bitmap generator
+                                    val previewBitmap = remember(widgetClassName, aiConfig, isResponsive) {
+                                        try {
+                                            val receiverClass = Class.forName(widgetClassName)
+                                            val receiver = receiverClass.getDeclaredConstructor().newInstance()
+                                            val method = receiverClass.getMethod(
+                                                "renderWidgetBitmap",
+                                                Context::class.java,
+                                                Int::class.javaPrimitiveType,
+                                                SlateWidgetConfig::class.java,
+                                                Boolean::class.javaPrimitiveType,
+                                                Int::class.javaPrimitiveType,
+                                                Int::class.javaPrimitiveType
+                                            )
+                                            method.invoke(receiver, context, appWidgetId, aiConfig, isResponsive, 180, 80) as? Bitmap
+                                        } catch (_: Exception) {
+                                            null
                                         }
-                                        Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                        LinearProgressIndicator(
-                                            progress = { 0.85f },
-                                            modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
-                                            color = Color(selectedAccentHex),
-                                            trackColor = textColor.copy(alpha = 0.15f)
+                                    }
+
+                                    if (previewBitmap != null) {
+                                        Image(
+                                            bitmap = previewBitmap.asImageBitmap(),
+                                            contentDescription = "AI Widget Preview",
+                                            modifier = Modifier.wrapContentSize()
                                         )
+                                    } else {
+                                        // Fallback pill container if reflection fails
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 220.dp, height = 64.dp)
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(Color(selectedBgHex).copy(alpha = opacity))
+                                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = widgetName.ifEmpty { "AI Widget" },
+                                                color = textColor,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                else -> {
+                                    // Battery widgets
+                                    val previewBg = Color(selectedBgHex).copy(alpha = opacity)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(148.dp)
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .background(previewBg)
+                                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
+                                            .padding(16.dp)
+                                    ) {
+                                        if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
+                                            Column(
+                                                modifier = Modifier.fillMaxSize(),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                                    Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                                }
+
+                                                val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
+                                                    generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
+                                                }
+
+                                                Image(
+                                                    bitmap = arcBitmap.asImageBitmap(),
+                                                    contentDescription = "Arc Preview",
+                                                    modifier = Modifier.size(100.dp, 50.dp)
+                                                )
+
+                                                Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                            }
+                                        } else {
+                                            Column(
+                                                modifier = Modifier.fillMaxSize(),
+                                                verticalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
+                                                    Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
+                                                }
+                                                Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                                LinearProgressIndicator(
+                                                    progress = { 0.85f },
+                                                    modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                                                    color = Color(selectedAccentHex),
+                                                    trackColor = textColor.copy(alpha = 0.15f)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
