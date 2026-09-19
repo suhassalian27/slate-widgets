@@ -174,7 +174,8 @@ class AppLauncherConfigActivity : ComponentActivity() {
                 }
 
                 fun saveAndFinish() {
-                    AppLauncherWidgetConfig.save(this@AppLauncherConfigActivity, appWidgetId, config)
+                    val finalConfig = config.copy(isResponsive = isResponsive)
+                    AppLauncherWidgetConfig.save(this@AppLauncherConfigActivity, appWidgetId, finalConfig)
                     saveSlateWidgetConfig(this@AppLauncherConfigActivity, appWidgetId, currentSlateConfig, isResponsive)
                     updateAllAppLauncherWidgets(this@AppLauncherConfigActivity)
                     setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
@@ -196,13 +197,16 @@ class AppLauncherConfigActivity : ComponentActivity() {
                     previewHeight = 180.dp,
                     previewContent = {
                         val context = LocalContext.current
-                        val previewBitmap = remember(config, currentSlateConfig, isResponsive, widgetClassName) {
+                        val previewConfig = remember(config, isResponsive) {
+                            config.copy(isResponsive = isResponsive)
+                        }
+                        val previewBitmap = remember(previewConfig, currentSlateConfig, isResponsive, widgetClassName) {
                             if (widgetClassName.contains("Pill", ignoreCase = true)) {
-                                generatePillLauncherBitmap(context, currentSlateConfig, config, 200, 100)
+                                generatePillLauncherBitmap(context, currentSlateConfig, previewConfig, 200, 100)
                             } else if (is2x1Widget) {
-                                generateRectangleLauncherBitmap(context, currentSlateConfig, config, 200, 100)
+                                generateRectangleLauncherBitmap(context, currentSlateConfig, previewConfig, 200, 100)
                             } else {
-                                generateAdaptiveLauncherBitmap(context, currentSlateConfig, config, 120, 120)
+                                generateAdaptiveLauncherBitmap(context, currentSlateConfig, previewConfig, 120, 120)
                             }
                         }
                         Image(

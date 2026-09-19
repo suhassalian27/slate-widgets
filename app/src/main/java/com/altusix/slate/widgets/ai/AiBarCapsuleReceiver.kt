@@ -4,10 +4,7 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
-import android.os.Bundle
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.data.local.SlateWidgetConfig
@@ -16,14 +13,12 @@ import com.altusix.slate.data.local.SlateWidgetConfig
 // HELPER: AI App Launch Pending Intent
 // ============================================================================
 
-fun getAiAppLaunchPendingIntent(context: Context, packageName: String, requestCode: Int): PendingIntent? {
-    val pm = context.packageManager
-    val launchIntent = pm.getLaunchIntentForPackage(packageName) ?: return null
-    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+fun createAiPendingIntent(context: Context, target: AiTarget, widgetId: Int, slotIndex: Int): PendingIntent {
+    val intent = AiLauncherUtils.getLaunchIntent(context, target)
     return PendingIntent.getActivity(
         context,
-        requestCode,
-        launchIntent,
+        widgetId * 100 + slotIndex,
+        intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 }
@@ -32,203 +27,198 @@ fun getAiAppLaunchPendingIntent(context: Context, packageName: String, requestCo
 // BARS (4x1)
 // ============================================================================
 
-class AiBarPrimaryReceiver : BaseAiReceiver() {
+class AiBarPrimaryReceiver : BaseAiReceiver(R.layout.widget_base_row_4) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiBarHeroPrimaryBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
-            ?: getAiAppLaunchPendingIntent(context, "com.google.android.googlequicksearchbox", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createAiPendingIntent(context, AiTarget.CHATGPT_TEXT, widgetId, 1))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createAiPendingIntent(context, AiTarget.CLAUDE, widgetId, 2))
+        views.setOnClickPendingIntent(R.id.touch_slot_3, createAiPendingIntent(context, AiTarget.GROK, widgetId, 3))
     }
 }
 
-class AiBarDock5Receiver : BaseAiReceiver() {
+class AiBarDock5Receiver : BaseAiReceiver(R.layout.widget_base_row_5) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiBarDock5Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createAiPendingIntent(context, AiTarget.CHATGPT_TEXT, widgetId, 1))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createAiPendingIntent(context, AiTarget.CLAUDE, widgetId, 2))
+        views.setOnClickPendingIntent(R.id.touch_slot_3, createAiPendingIntent(context, AiTarget.GROK, widgetId, 3))
+        views.setOnClickPendingIntent(R.id.touch_slot_4, createAiPendingIntent(context, AiTarget.PERPLEXITY, widgetId, 4))
     }
 }
 
-class AiBarCapsuleReceiver : BaseAiReceiver() {
+class AiBarCapsuleReceiver : BaseAiReceiver(R.layout.widget_base_row_4) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiBarCapsuleBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createAiPendingIntent(context, AiTarget.CHATGPT_VOICE, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createAiPendingIntent(context, AiTarget.PERPLEXITY, widgetId, 1))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createAiPendingIntent(context, AiTarget.CLAUDE, widgetId, 2))
+        views.setOnClickPendingIntent(R.id.touch_slot_3, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 3))
     }
 }
 
-class AiBarDualFlagshipReceiver : BaseAiReceiver() {
+class AiBarDualFlagshipReceiver : BaseAiReceiver(R.layout.widget_base_row_2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiBarDualFlagshipBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createAiPendingIntent(context, AiTarget.CHATGPT_TEXT, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 1))
     }
 }
 
 // ============================================================================
-// FOLDERS (2x2 / 4x2)
+// FOLDERS (2x2 / 4x2 / 3x2 / 3x3)
 // ============================================================================
 
-class AiFolder4ClassicReceiver : BaseAiReceiver() {
+class AiFolder4ClassicReceiver : BaseAiReceiver(R.layout.widget_base_grid_2x2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiFolder4ClassicBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.slot_0, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.slot_1, createAiPendingIntent(context, AiTarget.CHATGPT_TEXT, widgetId, 1))
+        views.setOnClickPendingIntent(R.id.slot_2, createAiPendingIntent(context, AiTarget.PERPLEXITY, widgetId, 2))
+        views.setOnClickPendingIntent(R.id.slot_3, createAiPendingIntent(context, AiTarget.CLAUDE, widgetId, 3))
     }
 }
 
-class AiFolder6BentoHeroReceiver : BaseAiReceiver() {
+class AiFolder6BentoHeroReceiver : BaseAiReceiver(R.layout.widget_base_bento_hero_6) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiFolder6BentoHeroBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createAiPendingIntent(context, AiTarget.CHATGPT_TEXT, widgetId, 1))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createAiPendingIntent(context, AiTarget.CLAUDE, widgetId, 2))
+        views.setOnClickPendingIntent(R.id.touch_slot_3, createAiPendingIntent(context, AiTarget.GROK, widgetId, 3))
+        views.setOnClickPendingIntent(R.id.touch_slot_4, createAiPendingIntent(context, AiTarget.DEEPSEEK, widgetId, 4))
+        views.setOnClickPendingIntent(R.id.touch_slot_5, createAiPendingIntent(context, AiTarget.META_AI, widgetId, 5))
     }
 }
 
-class AiFolder8BentoSideReceiver : BaseAiReceiver() {
+class AiFolder8BentoSideReceiver : BaseAiReceiver(R.layout.widget_base_bento_side_8) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiFolder8BentoSideBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.touch_slot_0, createAiPendingIntent(context, AiTarget.GEMINI_TEXT, widgetId, 0))
+        views.setOnClickPendingIntent(R.id.touch_slot_1, createAiPendingIntent(context, AiTarget.CHATGPT_TEXT, widgetId, 1))
+        views.setOnClickPendingIntent(R.id.touch_slot_2, createAiPendingIntent(context, AiTarget.CLAUDE, widgetId, 2))
+        views.setOnClickPendingIntent(R.id.touch_slot_3, createAiPendingIntent(context, AiTarget.GROK, widgetId, 3))
+        views.setOnClickPendingIntent(R.id.touch_slot_4, createAiPendingIntent(context, AiTarget.PERPLEXITY, widgetId, 4))
+        views.setOnClickPendingIntent(R.id.touch_slot_5, createAiPendingIntent(context, AiTarget.COPILOT, widgetId, 5))
+        views.setOnClickPendingIntent(R.id.touch_slot_6, createAiPendingIntent(context, AiTarget.DEEPSEEK, widgetId, 6))
+        views.setOnClickPendingIntent(R.id.touch_slot_7, createAiPendingIntent(context, AiTarget.META_AI, widgetId, 7))
     }
 }
 
-class AiFolder9GridReceiver : BaseAiReceiver() {
+class AiFolder9GridReceiver : BaseAiReceiver(R.layout.widget_base_grid_3x3_layout) {
+    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
+        generateAiFolder9GridBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (widgetId in appWidgetIds) {
-            val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            renderAndApplyWidget(context, appWidgetManager, widgetId, options)
-        }
-    }
-
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
-        renderAndApplyWidget(context, appWidgetManager, appWidgetId, newOptions)
-    }
-
-    override fun renderBitmapForWidget(
-        context: Context,
-        config: SlateWidgetConfig,
-        isResponsive: Boolean,
-        wDp: Int,
-        hDp: Int,
-        widgetId: Int
-    ): Bitmap = generateAiFolder9GridBitmap(context, config, isResponsive, wDp, hDp, widgetId)
-
-    fun renderAndApplyWidget(
-        context: Context,
-        appWidgetManager: AppWidgetManager,
-        widgetId: Int,
-        options: Bundle?
-    ) {
-        val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
-        val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
-        val wDp = if (wDpRaw <= 0) 160 else wDpRaw
-        val hDp = if (hDpRaw <= 0) 160 else hDpRaw
-
-        val isResponsive = parseAndLockIsResponsive(context, widgetId)
-        val config = loadSlateWidgetConfig(context, widgetId)
-
-        val views = RemoteViews(context.packageName, R.layout.widget_base_grid_3x3_layout)
-        val bitmap = generateAiFolder9GridBitmap(context, config, isResponsive, wDp, hDp, widgetId)
-        views.setImageViewBitmap(R.id.widget_image_view, bitmap)
-
-        val pm = context.packageManager
-        fun safeAiIntent(pkg: String, webUrl: String): Intent {
-            return pm.getLaunchIntentForPackage(pkg)?.apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            } ?: Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-        }
-
-        // 9 distinct AI launch targets matching the grid order
-        val intents = listOf(
-            // Row 0
-            safeAiIntent("com.google.android.apps.bard", "https://gemini.google.com"),
-            safeAiIntent("com.openai.chatgpt", "https://chatgpt.com"),
-            safeAiIntent("com.microsoft.copilot", "https://copilot.microsoft.com"),
-            // Row 1
-            safeAiIntent("com.x.android", "https://x.com/i/grok"),
-            safeAiIntent("com.anthropic.claude", "https://claude.ai"),
-            safeAiIntent("com.deepseek.chat", "https://chat.deepseek.com"),
-            // Row 2
-            safeAiIntent("ai.perplexity.app.android", "https://www.perplexity.ai"),
-            safeAiIntent("com.facebook.katana", "https://www.meta.ai"),
-            safeAiIntent("com.quora.poe.android", "https://poe.com")
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        val targets = listOf(
+            AiTarget.GEMINI_TEXT,
+            AiTarget.CHATGPT_TEXT,
+            AiTarget.COPILOT,
+            AiTarget.GROK,
+            AiTarget.CLAUDE,
+            AiTarget.DEEPSEEK,
+            AiTarget.PERPLEXITY,
+            AiTarget.META_AI,
+            AiTarget.POE
         )
-
         val slotIds = intArrayOf(
             R.id.slot_0, R.id.slot_1, R.id.slot_2,
             R.id.slot_3, R.id.slot_4, R.id.slot_5,
             R.id.slot_6, R.id.slot_7, R.id.slot_8
         )
-
-        for (i in 0..8) {
-            views.setOnClickPendingIntent(
-                slotIds[i],
-                PendingIntent.getActivity(
-                    context,
-                    widgetId * 100 + i,
-                    intents[i],
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            )
+        for (i in targets.indices) {
+            views.setOnClickPendingIntent(slotIds[i], createAiPendingIntent(context, targets[i], widgetId, i))
         }
-
-        appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
 
-class AiFolder10MegaReceiver : BaseAiReceiver() {
+class AiFolder10MegaReceiver : BaseAiReceiver(R.layout.widget_base_grid_5x2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiFolder10MegaBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.google.android.apps.bard", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        val targets = listOf(
+            AiTarget.GEMINI_TEXT,
+            AiTarget.CHATGPT_TEXT,
+            AiTarget.COPILOT,
+            AiTarget.CLAUDE,
+            AiTarget.GROK,
+            AiTarget.PERPLEXITY,
+            AiTarget.DEEPSEEK,
+            AiTarget.META_AI,
+            AiTarget.POE,
+            AiTarget.PI
+        )
+        val slotIds = intArrayOf(
+            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3, R.id.touch_slot_4,
+            R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8, R.id.touch_slot_9
+        )
+        for (i in targets.indices) {
+            views.setOnClickPendingIntent(slotIds[i], createAiPendingIntent(context, targets[i], widgetId, i))
+        }
     }
 }
 
-class AiFolder7AsymmetricReceiver : BaseAiReceiver() {
+class AiFolder7AsymmetricReceiver : BaseAiReceiver(R.layout.widget_base_bento_asymmetric_7) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateAiFolder7AsymmetricBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 
-    override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? {
-        return getAiAppLaunchPendingIntent(context, "com.openai.chatgpt", widgetId)
+    override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
+        val targets = listOf(
+            AiTarget.GEMINI_TEXT,
+            AiTarget.CHATGPT_TEXT,
+            AiTarget.COPILOT,
+            AiTarget.CLAUDE,
+            AiTarget.GROK,
+            AiTarget.PERPLEXITY,
+            AiTarget.DEEPSEEK
+        )
+        val slotIds = intArrayOf(
+            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2,
+            R.id.touch_slot_3, R.id.touch_slot_4, R.id.touch_slot_5, R.id.touch_slot_6
+        )
+        for (i in targets.indices) {
+            views.setOnClickPendingIntent(slotIds[i], createAiPendingIntent(context, targets[i], widgetId, i))
+        }
     }
 }
 
 fun updateAllAiFolderWidgets(context: Context) {
-    val receivers = listOf(
-        AiBarPrimaryReceiver::class.java,
-        AiBarDock5Receiver::class.java,
-        AiBarCapsuleReceiver::class.java,
-        AiBarDualFlagshipReceiver::class.java,
-        AiFolder4ClassicReceiver::class.java,
-        AiFolder6BentoHeroReceiver::class.java,
-        AiFolder8BentoSideReceiver::class.java,
-        AiFolder9GridReceiver::class.java,
-        AiFolder10MegaReceiver::class.java,
-        AiFolder7AsymmetricReceiver::class.java
+    val receivers: List<BaseAiReceiver> = listOf(
+        AiBarPrimaryReceiver(),
+        AiBarDock5Receiver(),
+        AiBarCapsuleReceiver(),
+        AiBarDualFlagshipReceiver(),
+        AiFolder4ClassicReceiver(),
+        AiFolder6BentoHeroReceiver(),
+        AiFolder8BentoSideReceiver(),
+        AiFolder9GridReceiver(),
+        AiFolder10MegaReceiver(),
+        AiFolder7AsymmetricReceiver()
     )
 
     val manager = AppWidgetManager.getInstance(context)
     for (receiver in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiver).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver.javaClass)) ?: intArrayOf()
+        for (id in ids) {
+            try {
+                receiver.updateWidget(context, manager, id)
+            } catch (_: Exception) {}
         }
     }
 }

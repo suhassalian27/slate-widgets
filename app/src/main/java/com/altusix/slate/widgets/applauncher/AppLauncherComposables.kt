@@ -367,10 +367,14 @@ fun generateSquircleLauncherBitmap(context: Context, slateConfig: SlateWidgetCon
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
 
     val margin = scaleFactor * 1.5f
-    val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
-    val leftX = (w - cardSize) / 2f
-    val topY = (h - cardSize) / 2f
-    val rect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    val rect = if (launcherConfig.isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
+        val leftX = (w - cardSize) / 2f
+        val topY = (h - cardSize) / 2f
+        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    }
 
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = cardBg
@@ -385,46 +389,46 @@ fun generateSquircleLauncherBitmap(context: Context, slateConfig: SlateWidgetCon
 }
 
 fun generatePentagonLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_PENTAGON, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_PENTAGON), wDp, hDp)
 
 fun generateFlowerLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_FLOWER, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_FLOWER), wDp, hDp)
 
 fun generateCloverLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_CLOVER, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_CLOVER), wDp, hDp)
 
 fun generateDiamondLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_DIAMOND, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_DIAMOND), wDp, hDp)
 
 fun generateOctagonLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_OCTAGON, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.M3_OCTAGON), wDp, hDp)
 
 fun generateCircleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.CIRCLE, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.CIRCLE), wDp, hDp)
 
 fun generateBlobBottomRightLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_RIGHT, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_RIGHT), wDp, hDp)
 
 fun generateBlobBottomLeftLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_LEFT, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_BOTTOM_LEFT), wDp, hDp)
 
 fun generateBlobTopRightLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_RIGHT, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_RIGHT), wDp, hDp)
 
 fun generateBlobTopLeftLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_LEFT, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.BLOB_TOP_LEFT), wDp, hDp)
 
 fun generatePixelStarLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.PIXEL_STAR, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.PIXEL_STAR), wDp, hDp)
 
 fun generateStar5LauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.STAR_5, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.STAR_5), wDp, hDp)
 
 fun generateHeartLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.HEART, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.HEART), wDp, hDp)
 
 fun generateTriangleLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.TRIANGLE, isResponsive = false), wDp, hDp)
+    generateAdaptiveLauncherBitmap(context, slateConfig, launcherConfig.copy(shape = LauncherShape.TRIANGLE), wDp, hDp)
 
 // 3. GLITCH TEXT LAUNCHER (2x2)
 fun generateGlitchTextLauncherBitmap(context: Context, slateConfig: SlateWidgetConfig, launcherConfig: AppLauncherWidgetConfig, wDp: Int, hDp: Int): Bitmap {

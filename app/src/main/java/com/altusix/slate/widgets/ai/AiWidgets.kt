@@ -1,4 +1,4 @@
-﻿package com.altusix.slate.widgets.ai
+package com.altusix.slate.widgets.ai
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -30,15 +30,18 @@ fun getAiWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("AI Capsule Bar", "4x1", "AI", AiBarCapsuleReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Dual Flagship Bar", "4x1", "AI", AiBarDualFlagshipReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Quad Folder", "2x2", "AI", AiFolder4ClassicReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java, hasModeOption = false),
-        SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("AI Bento Folder", "4x2", "AI", AiFolder6BentoHeroReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("AI Side Bento Folder", "4x2", "AI", AiFolder8BentoSideReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI 3x3 Grid Folder", "2x2", "AI", AiFolder9GridReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Mega Folder", "4x2", "AI", AiFolder10MegaReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("AI Asymmetric Bento", "3x2", "AI", AiFolder7AsymmetricReceiver::class.java, hasModeOption = true)
     )
 }
 
-abstract class BaseAiReceiver : AppWidgetProvider() {
+abstract class BaseAiReceiver(
+    open val layoutResId: Int = R.layout.widget_base_single
+) : AppWidgetProvider() {
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (widgetId in appWidgetIds) updateWidget(context, appWidgetManager, widgetId)
     }
@@ -59,11 +62,22 @@ abstract class BaseAiReceiver : AppWidgetProvider() {
         val config = loadSlateWidgetConfig(context, widgetId)
         val bitmap = renderBitmapForWidget(context, config, isResponsive, wDp, hDp, widgetId)
 
-        val views = RemoteViews(context.packageName, R.layout.widget_image_container)
+        val views = RemoteViews(context.packageName, layoutResId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
+
         val pi = getClickPendingIntent(context, widgetId)
-        if (pi != null) views.setOnClickPendingIntent(R.id.widget_image_view, pi)
+        if (pi != null) {
+            views.setOnClickPendingIntent(R.id.widget_image_view, pi)
+            try {
+                views.setOnClickPendingIntent(R.id.touch_slot_0, pi)
+            } catch (_: Exception) {}
+        }
+
+        setupTouchTargets(context, views, widgetId)
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
@@ -111,14 +125,24 @@ abstract class BaseAiReceiver : AppWidgetProvider() {
     }
 
     abstract fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap
+
+    open fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        renderBitmapForWidget(context, config, isResponsive, wDp, hDp, appWidgetId)
+
     open fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? = null
+    open fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {}
 }
 
-abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseAiReceiver() {
+abstract class BaseSingleAiReceiver(private val target: AiTarget) : BaseAiReceiver(R.layout.widget_base_single) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
         generateSingleAiIconBitmap(context, target, config, isResponsive, wDp, hDp, widgetId)
     override fun getClickPendingIntent(context: Context, widgetId: Int): PendingIntent? =
-        PendingIntent.getActivity(context, widgetId, AiLauncherUtils.getLaunchIntent(context, target), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        PendingIntent.getActivity(
+            context,
+            widgetId,
+            AiLauncherUtils.getLaunchIntent(context, target),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 }
 
 class GeminiTextReceiver : BaseSingleAiReceiver(AiTarget.GEMINI_TEXT)
@@ -133,26 +157,24 @@ class MetaAiReceiver : BaseSingleAiReceiver(AiTarget.META_AI)
 
 fun updateAllAiWidgets(context: Context) {
     val receivers = listOf(
-        GeminiTextReceiver::class.java,
-        ChatGptTextReceiver::class.java,
-        ChatGptVoiceReceiver::class.java,
-        ClaudeReceiver::class.java,
-        GrokReceiver::class.java,
-        PerplexityReceiver::class.java,
-        DeepSeekReceiver::class.java,
-        CopilotReceiver::class.java,
-        MetaAiReceiver::class.java
+        GeminiTextReceiver(),
+        ChatGptTextReceiver(),
+        ChatGptVoiceReceiver(),
+        ClaudeReceiver(),
+        GrokReceiver(),
+        PerplexityReceiver(),
+        DeepSeekReceiver(),
+        CopilotReceiver(),
+        MetaAiReceiver()
     )
 
     val manager = AppWidgetManager.getInstance(context)
     for (receiver in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiver).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver.javaClass)) ?: intArrayOf()
+        for (id in ids) {
+            try {
+                receiver.updateWidget(context, manager, id)
+            } catch (_: Exception) {}
         }
     }
 }

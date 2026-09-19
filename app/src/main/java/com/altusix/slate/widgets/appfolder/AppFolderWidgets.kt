@@ -87,6 +87,10 @@ abstract class BaseAppFolderGridReceiver(private val slotCount: Int, private val
         val views = RemoteViews(context.packageName, layoutResId)
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
+        try {
+            views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
+        } catch (_: Exception) {}
+
         // Maps both naming conventions (widget_base_grid_3x3 uses slot_x, older layouts use touch_slot_x)
         val touchSlotIds = intArrayOf(
             R.id.slot_0, R.id.slot_1, R.id.slot_2,
@@ -152,6 +156,9 @@ abstract class BaseAppFolderGridReceiver(private val slotCount: Int, private val
     }
 
     abstract fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap
+
+    open fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        renderBitmapForWidget(context, config, isResponsive, wDp, hDp, appWidgetId)
 }
 
 
@@ -174,35 +181,33 @@ fun getAppFolderWidgetsCatalog(): List<SlateWidgetInfo> {
 
 fun updateAllAppFolderWidgets(context: Context) {
     val manager = AppWidgetManager.getInstance(context)
-    val receivers = listOf(
-        AppFolder4Receiver::class.java,
-        AppFolder8Receiver::class.java,
-        AppFolderHorizontal3Receiver::class.java,
-        AppFolderVertical3Receiver::class.java,
-        AppFolderRow4Receiver::class.java,
-        AppFolderRow5Receiver::class.java,
-        AppFolderCircle6Receiver::class.java,
-        AppFolderBento7Receiver::class.java,
-        AppFolderGrid9Receiver::class.java,
-        AppFolderBento10LeftReceiver::class.java,
-        AppFolderBento10TopReceiver::class.java,
-        AppFolderTriangle4Receiver::class.java
+    val receivers: List<BaseAppFolderGridReceiver> = listOf(
+        AppFolder4Receiver(),
+        AppFolder8Receiver(),
+        AppFolderHorizontal3Receiver(),
+        AppFolderVertical3Receiver(),
+        AppFolderRow4Receiver(),
+        AppFolderRow5Receiver(),
+        AppFolderCircle6Receiver(),
+        AppFolderBento7Receiver(),
+        AppFolderGrid9Receiver(),
+        AppFolderBento10LeftReceiver(),
+        AppFolderBento10TopReceiver(),
+        AppFolderTriangle4Receiver()
     )
-    for (receiverClass in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiverClass).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver.javaClass)) ?: intArrayOf()
+        for (id in ids) {
+            try {
+                receiver.updateWidget(context, manager, id)
+            } catch (_: Exception) {}
         }
     }
 }
 
 
 // 1. 4-APP FOLDER (2x2)
-class AppFolder4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_appfolder_grid4_layout) {
+class AppFolder4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_base_grid_2x2) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolder4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
@@ -212,17 +217,17 @@ class AppFolder8Receiver : BaseAppFolderGridReceiver(8, R.layout.widget_base_gri
 }
 
 // 3. 3-APP HORIZONTAL (3x1)
-class AppFolderHorizontal3Receiver : BaseAppFolderGridReceiver(3, R.layout.widget_appfolder_grid3_layout) {
+class AppFolderHorizontal3Receiver : BaseAppFolderGridReceiver(3, R.layout.widget_base_row_3) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolderHorizontal3Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 4. 3-APP VERTICAL (1x3)
-class AppFolderVertical3Receiver : BaseAppFolderGridReceiver(3, R.layout.widget_appfolder_grid3v_layout) {
+class AppFolderVertical3Receiver : BaseAppFolderGridReceiver(3, R.layout.widget_base_column_3) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolderVertical3Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // 5. 4-APP ROW (4x1)
-class AppFolderRow4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_appfolder_grid4row_layout) {
+class AppFolderRow4Receiver : BaseAppFolderGridReceiver(4, R.layout.widget_base_row_4) {
     override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap = generateAppFolderRow4Bitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 

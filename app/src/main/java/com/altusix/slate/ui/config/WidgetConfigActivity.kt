@@ -42,6 +42,8 @@ import com.altusix.slate.ui.components.RainbowCustomCircle
 import com.altusix.slate.ui.components.SlateConfigScaffold
 import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiFolderWidgets
+import com.altusix.slate.widgets.ai.AiConfigActivity
+import com.altusix.slate.widgets.ai.getAiWidgetsCatalog
 import com.altusix.slate.widgets.ai.updateAllAiWidgets
 import com.altusix.slate.widgets.appfolder.getAppFolderWidgetsCatalog
 import com.altusix.slate.widgets.applauncher.getAppLauncherWidgetsCatalog
@@ -122,6 +124,17 @@ class WidgetConfigActivity : ComponentActivity() {
 
         val widgetInfo = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
         widgetClassName = widgetInfo?.provider?.className ?: ""
+
+        val isAi = getAiWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        if (isAi) {
+            val forwardIntent = Intent(this, AiConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
 
         val isAppFolder = getAppFolderWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         val isAppLauncher = getAppLauncherWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
