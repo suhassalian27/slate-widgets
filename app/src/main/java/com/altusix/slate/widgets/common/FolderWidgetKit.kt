@@ -27,9 +27,9 @@ const val FOLDER_MARGIN_DP = 1.5f
 const val FOLDER_TRIANGLE_MARGIN_DP = 0.75f
 
 // Spacing & Gutters
-const val FOLDER_SPACING_RATIO = 0.032f
+const val FOLDER_SPACING_RATIO = 0.035f
 const val FOLDER_MIN_SPACING_DP = 1.8f
-const val FOLDER_MAX_SPACING_DP = 5.5f
+const val FOLDER_MAX_SPACING_DP = 6.0f
 
 // Corner Radii Proportions & Limits
 const val FOLDER_CORNER_RATIO_GRID = 0.20f
@@ -51,11 +51,20 @@ fun getFolderInnerBgColor(isLight: Boolean, customColor: Int? = null): Int {
 }
 
 /**
- * Calculates uniform spacing proportional to container size with min/max dp clamps.
+ * Smart Area-Aware Spacing.
+ * Uses sqrt(w * h) so elongated 1-row bars (4x1, 5x1) compute the same gap
+ * as equivalent 2x2 grids, while still scaling down gracefully on compact widgets.
  */
-fun getFolderSpacing(minDim: Float, scaleFactor: Float): Float {
-    return (minDim * FOLDER_SPACING_RATIO).coerceIn(scaleFactor * FOLDER_MIN_SPACING_DP, scaleFactor * FOLDER_MAX_SPACING_DP)
+fun getFolderSpacing(w: Float, h: Float, scaleFactor: Float): Float {
+    val effectiveDim = kotlin.math.sqrt((w * h).toDouble()).toFloat()
+    return (effectiveDim * FOLDER_SPACING_RATIO).coerceIn(
+        scaleFactor * FOLDER_MIN_SPACING_DP,
+        scaleFactor * FOLDER_MAX_SPACING_DP
+    )
 }
+
+fun getFolderSpacing(rect: RectF, scaleFactor: Float): Float =
+    getFolderSpacing(rect.width(), rect.height(), scaleFactor)
 
 /**
  * Calculates uniform inner corner radius with min/max clamps.
@@ -134,7 +143,7 @@ fun renderUniversalFolderGrid(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -248,7 +257,7 @@ fun renderUniversalBentoHero6(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -368,7 +377,7 @@ fun renderUniversalBentoSide8(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -493,7 +502,7 @@ fun renderUniversalBentoTop10(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -615,7 +624,7 @@ fun renderUniversalBentoLeft10(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -737,7 +746,7 @@ fun renderUniversalBentoAsymmetric7(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -870,7 +879,7 @@ fun renderUniversalBentoQuadrant7(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
@@ -1177,7 +1186,7 @@ fun renderUniversalBentoTrio3(
     canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
 
     val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = getFolderSpacing(minDim, scaleFactor)
+    val spacing = getFolderSpacing(cardRect, scaleFactor)
 
     val innerCardRect = RectF(
         cardRect.left + spacing,
