@@ -21,19 +21,65 @@ import com.altusix.slate.widgets.common.renderUniversalBentoTop10
 import com.altusix.slate.widgets.common.renderUniversalBentoLeft10
 import com.altusix.slate.widgets.common.renderUniversalBentoQuadrant7
 import com.altusix.slate.widgets.common.renderUniversalTriangle4
+import android.graphics.BitmapShader
+import android.graphics.Shader
+const val SQUIRCLE_EXPONENT = 3.4
+
+/**
+ * Generates a mathematical superellipse squircle path (|x/a|^n + |y/b|^n = 1).
+ */
+fun buildSquirclePath(
+    left: Float,
+    top: Float,
+    right: Float,
+    bottom: Float,
+    n: Double = SQUIRCLE_EXPONENT
+): Path {
+    val path = Path()
+    val rx = (right - left) / 2f
+    val ry = (bottom - top) / 2f
+    val cx = left + rx
+    val cy = top + ry
+
+    val steps = 72
+    val stepAngle = 2.0 * Math.PI / steps
+
+    for (i in 0 until steps) {
+        val theta = i * stepAngle
+        val cosT = Math.cos(theta)
+        val sinT = Math.sin(theta)
+
+        val x = cx + rx * Math.signum(cosT).toFloat() * Math.pow(Math.abs(cosT), 2.0 / n).toFloat()
+        val y = cy + ry * Math.signum(sinT).toFloat() * Math.pow(Math.abs(sinT), 2.0 / n).toFloat()
+
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    path.close()
+    return path
+}
 
 fun getAppIconBitmap(context: Context, packageName: String, size: Int): Bitmap? {
     return try {
         val drawable: Drawable = context.packageManager.getApplicationIcon(packageName)
-        if (drawable is BitmapDrawable && drawable.bitmap != null) {
-            Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
-        } else {
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            drawable.setBounds(0, 0, canvas.width, canvas.height)
-            drawable.draw(canvas)
-            bitmap
+
+        // 1. Draw raw icon onto a canvas
+        val rawBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val rawCanvas = Canvas(rawBitmap)
+        drawable.setBounds(0, 0, size, size)
+        drawable.draw(rawCanvas)
+
+        // 2. Clip with the squircle mask
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            shader = BitmapShader(rawBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
         }
+
+        val squirclePath = buildSquirclePath(0f, 0f, size.toFloat(), size.toFloat())
+        canvas.drawPath(squirclePath, paint)
+
+        rawBitmap.recycle()
+        output
     } catch (_: Exception) { null }
 }
 
@@ -62,17 +108,26 @@ private fun drawSlotContent(
     val gap = scaleFactor * 6f
     val textY = iconCy + (iconSize / 2f) + gap + (scaleFactor * 8f)
 
+    val iconRect = RectF(
+        tileRect.centerX() - (iconSize / 2f),
+        iconCy - (iconSize / 2f),
+        tileRect.centerX() + (iconSize / 2f),
+        iconCy + (iconSize / 2f)
+    )
+
     if (!slotConfig.isConfigured) {
         val placeholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#2C2C2E")
             style = Paint.Style.FILL
         }
-        val radius = iconSize / 2f
-        canvas.drawCircle(tileRect.centerX(), iconCy, radius, placeholderPaint)
+
+        // Draw squircle for unconfigured slot placeholders
+        val squirclePath = buildSquirclePath(iconRect.left, iconRect.top, iconRect.right, iconRect.bottom)
+        canvas.drawPath(squirclePath, placeholderPaint)
 
         val plusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = secondaryText
-            textSize = radius * 1.1f
+            textSize = (iconSize / 2f) * 1.1f
             typeface = getSlateFont(context, weight = 700)
             textAlign = Paint.Align.CENTER
         }
@@ -93,12 +148,6 @@ private fun drawSlotContent(
     } else {
         val appIcon = getAppIconBitmap(context, slotConfig.packageName, iconSize.toInt())
         if (appIcon != null) {
-            val iconRect = RectF(
-                tileRect.centerX() - (iconSize / 2f),
-                iconCy - (iconSize / 2f),
-                tileRect.centerX() + (iconSize / 2f),
-                iconCy + (iconSize / 2f)
-            )
             canvas.drawBitmap(appIcon, null, iconRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
         }
 
@@ -306,6 +355,7 @@ fun generateAppFolderCircle6Bitmap(
     val cx = cardRect.centerX()
     val cy = cardRect.centerY()
 
+    // 1. Outer Widget Dial Card
     val outerRadius = cardSize / 2f
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(
@@ -318,9 +368,8 @@ fun generateAppFolderCircle6Bitmap(
     }
     canvas.drawCircle(cx, cy, outerRadius, bgPaint)
 
-    val orbitRadius = outerRadius * 0.62f
-    val tileRadius = outerRadius * 0.245f
-
+    // 2. Subtle Orbit Track Guide
+    val orbitRadius = outerRadius * 0.58f
     val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(16, 0, 0, 0) else Color.argb(22, 255, 255, 255)
         style = Paint.Style.STROKE
@@ -328,30 +377,29 @@ fun generateAppFolderCircle6Bitmap(
     }
     canvas.drawCircle(cx, cy, orbitRadius, guidePaint)
 
-    val hubRadius = outerRadius * 0.12f
+    // 3. Center Hub Indicator
+    val hubRadius = outerRadius * 0.08f
     val hubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) Color.argb(18, 0, 0, 0) else Color.argb(26, 255, 255, 255)
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, hubRadius, hubPaint)
 
-    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
-    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = innerCardBg
-        style = Paint.Style.FILL
-    }
+    // 4. Large App Icons (Compensates for drawSlotContent's internal margins)
+    val iconBoundingRadius = outerRadius * 0.40f
 
     for (i in 0 until 6) {
         val angle = Math.toRadians((i * 60.0) - 90.0)
         val slotX = cx + (orbitRadius * Math.cos(angle)).toFloat()
         val slotY = cy + (orbitRadius * Math.sin(angle)).toFloat()
 
-        val tileRect = RectF(slotX - tileRadius, slotY - tileRadius, slotX + tileRadius, slotY + tileRadius)
+        val tileRect = RectF(
+            slotX - iconBoundingRadius,
+            slotY - iconBoundingRadius,
+            slotX + iconBoundingRadius,
+            slotY + iconBoundingRadius
+        )
         val tileConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
-
-        if (folderConfig.showTileBackground) {
-            canvas.drawCircle(slotX, slotY, tileRadius, tilePaint)
-        }
 
         drawSlotContent(
             canvas = canvas,
@@ -363,7 +411,7 @@ fun generateAppFolderCircle6Bitmap(
             scaleFactor = scaleFactor,
             primaryText = if (isLight) Color.BLACK else Color.WHITE,
             secondaryText = secondaryText,
-            isMicro = false
+            isMicro = true
         )
     }
 

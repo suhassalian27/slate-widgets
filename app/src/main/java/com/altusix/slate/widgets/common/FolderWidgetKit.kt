@@ -1009,6 +1009,8 @@ fun buildRoundedTrianglePath(
 
 /**
  * 9. Universal 4-App Triforce Triangle Layout Engine
+ * Equilateral geometry where the outer perimeter padding and the inner dividing gaps
+ * are mathematically identical (both equal to G).
  */
 fun renderUniversalTriangle4(
     context: Context,
@@ -1030,7 +1032,7 @@ fun renderUniversalTriangle4(
     val margin = scaleFactor * FOLDER_TRIANGLE_MARGIN_DP
     val availW = w - (margin * 2f)
     val availH = h - (margin * 2f)
-    val equilateralRatio = 0.8660254f
+    val equilateralRatio = 0.8660254f // sqrt(3) / 2
 
     var triW = availW
     var triH = triW * equilateralRatio
@@ -1062,28 +1064,34 @@ fun renderUniversalTriangle4(
     }
     canvas.drawPath(outerPath, bgPaint)
 
-    val pad = (minOf(triW, triH) * 0.038f).coerceIn(scaleFactor * 3.5f, scaleFactor * 8f)
-    val gap = (minOf(triW, triH) * 0.026f).coerceIn(scaleFactor * 2.5f, scaleFactor * 5.5f)
+    // Standardized uniform gap & side padding (G)
+    val gap = (minOf(triW, triH) * FOLDER_SPACING_RATIO).coerceIn(
+        scaleFactor * FOLDER_MIN_SPACING_DP,
+        scaleFactor * FOLDER_MAX_SPACING_DP
+    )
 
     val mainCentroid = PointF(cx, (topY + bottomY + bottomY) / 3f)
-    val scalePad = (1f - (3f * pad / triH)).coerceAtLeast(0.1f)
 
-    fun insetPoint(pt: PointF): PointF =
-        PointF(mainCentroid.x + (pt.x - mainCentroid.x) * scalePad, mainCentroid.y + (pt.y - mainCentroid.y) * scalePad)
+    // Step 1: Inset parent triangle by G / 2
+    val scaleParent = (1f - (1.5f * gap / triH)).coerceIn(0.5f, 0.99f)
 
-    val inApex = insetPoint(outerApex)
-    val inBL = insetPoint(outerBL)
-    val inBR = insetPoint(outerBR)
+    fun insetParent(pt: PointF): PointF =
+        PointF(mainCentroid.x + (pt.x - mainCentroid.x) * scaleParent, mainCentroid.y + (pt.y - mainCentroid.y) * scaleParent)
 
+    val inApex = insetParent(outerApex)
+    val inBL = insetParent(outerBL)
+    val inBR = insetParent(outerBR)
+
+    // Midpoints of the inset parent triangle
     val mAB = PointF((inApex.x + inBL.x) / 2f, (inApex.y + inBL.y) / 2f)
     val mAC = PointF((inApex.x + inBR.x) / 2f, (inApex.y + inBR.y) / 2f)
     val mBC = PointF((inBL.x + inBR.x) / 2f, (inBL.y + inBR.y) / 2f)
 
     val subTriangles = listOf(
-        Triple(inApex, mAB, mAC),
-        Triple(mAB, inBL, mBC),
-        Triple(mAC, mBC, mAB),
-        Triple(mAC, mBC, inBR)
+        Triple(inApex, mAB, mAC), // 0: Top
+        Triple(mAB, inBL, mBC),   // 1: Bottom-Left
+        Triple(mAC, mBC, mAB),   // 2: Center Inverted
+        Triple(mAC, mBC, inBR)    // 3: Bottom-Right
     )
 
     val innerCardBg = getFolderInnerBgColor(isLight, customTileBgColor)
@@ -1092,10 +1100,12 @@ fun renderUniversalTriangle4(
         style = Paint.Style.FILL
     }
 
-    val subH = triH * scalePad / 2f
-    val shrinkFactor = (1f - (1.2f * gap / subH)).coerceIn(0.6f, 0.98f)
-    val outerRad = (outerCornerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val innerRad = (gap * 1.2f).coerceIn(scaleFactor * 3.5f, scaleFactor * 8f)
+    // Step 2: Inset each sub-triangle by G / 2 (creating total G on sides and between tiles)
+    val subH = (triH * scaleParent) / 2f
+    val shrinkFactor = (1f - (1.5f * gap / subH)).coerceIn(0.6f, 0.98f)
+
+    val outerRad = (outerCornerRadius - gap).coerceAtLeast(scaleFactor * 4f)
+    val innerRad = (gap * 0.85f).coerceIn(scaleFactor * 3f, scaleFactor * 7f)
 
     for (i in 0..3) {
         val (v0, v1, v2) = subTriangles[i]
@@ -1123,7 +1133,7 @@ fun renderUniversalTriangle4(
             canvas.drawPath(tilePath, tilePaint)
         }
 
-        val tileBoxSize = subH * shrinkFactor * 0.82f
+        val tileBoxSize = subH * shrinkFactor * 0.78f
         val slotRect = RectF(
             centroid.x - tileBoxSize / 2f,
             centroid.y - tileBoxSize / 2f,
