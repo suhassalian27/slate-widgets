@@ -18,12 +18,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -46,6 +51,9 @@ import com.altusix.slate.ui.components.*
 import com.altusix.slate.widgets.appfolder.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 
 class AppFolderWidgetConfigActivity : ComponentActivity() {
 
@@ -56,6 +64,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
     private var widgetClassName: String = ""
     private var slotCount = 4
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -86,8 +95,12 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                 var activePickerTarget by remember { mutableStateOf<AppFolderColorTarget?>(null) }
 
                 var installedApps by remember { mutableStateOf<List<InstalledAppItem>>(emptyList()) }
-                var searchQuery by remember { mutableStateOf("") }
                 var selectedTabKey by remember { mutableStateOf("APPS") }
+
+                // Bottom Sheet State
+                var showAppPickerSheet by remember { mutableStateOf(false) }
+                var targetSlotIndex by remember { mutableIntStateOf(0) }
+                var sheetSearchQuery by remember { mutableStateOf("") }
 
                 val tabs = remember {
                     listOf(
@@ -113,13 +126,17 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                             @Suppress("DEPRECATION")
                             pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
                         }
+
+                        // Fix 1: Deduplicate by packageName so multi-activity apps (e.g. Amazon) don't duplicate
                         val apps = resolved.map {
                             InstalledAppItem(
                                 label = it.loadLabel(pm).toString(),
                                 packageName = it.activityInfo.packageName,
                                 icon = try { it.loadIcon(pm) } catch (_: Exception) { null }
                             )
-                        }.sortedBy { it.label }
+                        }
+                            .distinctBy { it.packageName }
+                            .sortedBy { it.label }
 
                         withContext(Dispatchers.Main) { installedApps = apps }
                     }
@@ -155,7 +172,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                     onTabSelected = { selectedTabKey = it },
                     onBackClick = { finish() },
                     onSaveClick = { saveAndFinish() },
-                    scrollable = selectedTabKey == "STYLE",
+                    scrollable = true,
                     previewHeight = 180.dp,
                     previewContent = {
                         val context = LocalContext.current
@@ -184,6 +201,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                     }
                 ) {
                     if (selectedTabKey == "APPS") {
+                        // Header
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -210,73 +228,35 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        Row(
+                        // Main Screen Assigned Slots Dock
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color(0xFF141418))
                                 .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
-                                .padding(10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            for (i in 0 until slotCount) {
-                                val slot = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
-                                val appItem = installedApps.find { it.packageName == slot.packageName }
-
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (slot.isConfigured) Color(0xFF22222A) else Color(0xFF18181E))
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (slot.isConfigured) Color(selectedAccentHex).copy(alpha = 0.6f) else Color(0xFF26262E),
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable {
-                                            if (slot.isConfigured) {
-                                                val updatedSlots = folderConfig.slots.toMutableList()
-                                                updatedSlots[i] = AppSlotConfig()
-                                                folderConfig = folderConfig.copy(slots = updatedSlots)
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (slot.isConfigured && appItem?.icon != null) {
-                                        Image(
-                                            bitmap = appItem.icon.toImageBitmap(),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(28.dp)
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(2.dp)
-                                                .size(15.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFFFF3B30)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Remove",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(9.dp)
-                                            )
-                                        }
-                                    } else {
-                                        Text(
-                                            text = "${i + 1}",
-                                            color = Color(0xFF636366),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
+                            AssignedSlotsRow(
+                                slotCount = slotCount,
+                                folderConfig = folderConfig,
+                                installedApps = installedApps,
+                                activeTargetIndex = targetSlotIndex,
+                                accentColor = Color(selectedAccentHex),
+                                onSlotSelected = { i ->
+                                    targetSlotIndex = i
+                                    showAppPickerSheet = true
+                                },
+                                onSlotRemove = { i ->
+                                    val updatedSlots = folderConfig.slots.toMutableList()
+                                    updatedSlots[i] = AppSlotConfig()
+                                    folderConfig = folderConfig.copy(slots = updatedSlots)
                                 }
-                            }
+                            )
                         }
 
+                        // Toggle Options
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -330,91 +310,60 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search installed apps...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(18.dp)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(selectedAccentHex),
-                                unfocusedBorderColor = Color(0xFF24242C),
-                                focusedContainerColor = Color(0xFF141418),
-                                unfocusedContainerColor = Color(0xFF141418),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            )
-                        )
-
-                        val filteredApps = remember(searchQuery, installedApps) {
-                            if (searchQuery.isBlank()) installedApps
-                            else installedApps.filter { it.label.contains(searchQuery, ignoreCase = true) }
-                        }
-
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(4),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            items(filteredApps) { app ->
-                                val isSelected = folderConfig.slots.any { it.packageName == app.packageName }
-                                Column(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected) Color(0xFF22222A) else Color(0xFF141418))
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isSelected) Color(selectedAccentHex) else Color(0xFF24242C),
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable {
-                                            val updatedSlots = folderConfig.slots.toMutableList()
-                                            if (isSelected) {
-                                                val idx = updatedSlots.indexOfFirst { it.packageName == app.packageName }
-                                                if (idx != -1) updatedSlots[idx] = AppSlotConfig()
-                                            } else {
-                                                val emptyIdx = updatedSlots.indexOfFirst { !it.isConfigured }
-                                                if (emptyIdx != -1) {
-                                                    updatedSlots[emptyIdx] = AppSlotConfig(
-                                                        packageName = app.packageName,
-                                                        appName = app.label,
-                                                        isConfigured = true
-                                                    )
-                                                }
-                                            }
-                                            folderConfig = folderConfig.copy(slots = updatedSlots)
-                                        }
-                                        .padding(vertical = 8.dp, horizontal = 4.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    if (app.icon != null) {
-                                        Image(
-                                            bitmap = app.icon.toImageBitmap(),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFF2C2C30))
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = app.label,
-                                        color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                        // App Picker Trigger Button
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF141418))
+                                .border(1.dp, Color(0xFF24242C), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    val firstEmpty = folderConfig.slots.indexOfFirst { !it.isConfigured }
+                                    targetSlotIndex = if (firstEmpty != -1) firstEmpty else 0
+                                    showAppPickerSheet = true
                                 }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // 1. Leading App Grid Icon in an Accent-Tinted Squircle
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(selectedAccentHex).copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Apps,
+                                    contentDescription = null,
+                                    tint = Color(selectedAccentHex),
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
+
+                            // 2. Clean, Standard Title & Subtitle
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Select Apps",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "${installedApps.size} apps available",
+                                    color = Color(0xFF8E8E93),
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            // 3. Universal Navigation Chevron
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = Color(0xFF636366),
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     } else {
                         // TAB 2: WIDGET THEME & STYLE
@@ -540,6 +489,240 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
+                // =========================================================================
+                // MODAL APP PICKER SHEET (WITH EMBEDDED ASSIGNED DOCK)
+                // =========================================================================
+                if (showAppPickerSheet) {
+                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+                    ModalBottomSheet(
+                        onDismissRequest = {
+                            showAppPickerSheet = false
+                            sheetSearchQuery = ""
+                        },
+                        sheetState = sheetState,
+                        containerColor = Color(0xFF121216),
+                        contentColor = Color.White,
+                        dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF32323E)) }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight(0.88f)
+                                .imePadding()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Assign Apps",
+                                        color = Color.White,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Editing Slot ${targetSlotIndex + 1} of $slotCount",
+                                        color = Color(selectedAccentHex),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        showAppPickerSheet = false
+                                        sheetSearchQuery = ""
+                                    }
+                                ) {
+                                    Text("Done", color = Color(selectedAccentHex), fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Fix 2: Assigned Apps Dock Pinned Inside the Modal Popup
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF181820))
+                                    .border(1.dp, Color(0xFF262630), RoundedCornerShape(14.dp))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AssignedSlotsRow(
+                                    slotCount = slotCount,
+                                    folderConfig = folderConfig,
+                                    installedApps = installedApps,
+                                    activeTargetIndex = targetSlotIndex,
+                                    accentColor = Color(selectedAccentHex),
+                                    onSlotSelected = { i -> targetSlotIndex = i },
+                                    onSlotRemove = { i ->
+                                        val updatedSlots = folderConfig.slots.toMutableList()
+                                        updatedSlots[i] = AppSlotConfig()
+                                        folderConfig = folderConfig.copy(slots = updatedSlots)
+                                    }
+                                )
+                            }
+
+                            // Search Bar
+                            OutlinedTextField(
+                                value = sheetSearchQuery,
+                                onValueChange = { sheetSearchQuery = it },
+                                placeholder = { Text("Search installed apps...", color = Color(0xFF8E8E93), fontSize = 13.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = Color(0xFF8E8E93),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (sheetSearchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { sheetSearchQuery = "" }) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Clear",
+                                                tint = Color(0xFF8E8E93),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(selectedAccentHex),
+                                    unfocusedBorderColor = Color(0xFF282832),
+                                    focusedContainerColor = Color(0xFF18181E),
+                                    unfocusedContainerColor = Color(0xFF18181E),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+
+                            val filteredApps = remember(sheetSearchQuery, installedApps) {
+                                if (sheetSearchQuery.isBlank()) installedApps
+                                else installedApps.filter { it.label.contains(sheetSearchQuery, ignoreCase = true) }
+                            }
+
+                            // Scrollable Apps Grid
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(4),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(bottom = 16.dp)
+                            ) {
+                                items(filteredApps) { app ->
+                                    val assignedIdx = folderConfig.slots.indexOfFirst { it.packageName == app.packageName }
+                                    val isAssigned = assignedIdx != -1
+
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isAssigned) Color(0xFF22222E) else Color(0xFF16161C))
+                                            .border(
+                                                width = if (isAssigned) 1.5.dp else 1.dp,
+                                                color = if (isAssigned) Color(selectedAccentHex) else Color(0xFF24242C),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable {
+                                                val updatedSlots = folderConfig.slots.toMutableList()
+                                                if (isAssigned) {
+                                                    // Toggle off if already assigned
+                                                    updatedSlots[assignedIdx] = AppSlotConfig()
+                                                    targetSlotIndex = assignedIdx
+                                                } else {
+                                                    // Assign directly to current active target slot
+                                                    val slotToFill = targetSlotIndex.coerceIn(0, slotCount - 1)
+                                                    updatedSlots[slotToFill] = AppSlotConfig(
+                                                        packageName = app.packageName,
+                                                        appName = app.label,
+                                                        isConfigured = true
+                                                    )
+                                                    // Auto-advance target to next unconfigured slot
+                                                    val nextEmpty = updatedSlots.indexOfFirst { !it.isConfigured }
+                                                    if (nextEmpty != -1) {
+                                                        targetSlotIndex = nextEmpty
+                                                    }
+                                                }
+                                                folderConfig = folderConfig.copy(slots = updatedSlots)
+                                            }
+                                    ) {
+                                        // 1. Center Content: App Icon + App Name
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            if (app.icon != null) {
+                                                Image(
+                                                    bitmap = app.icon.toImageBitmap(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(36.dp)
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFF2C2C30))
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = app.label,
+                                                color = if (isAssigned) Color.White else Color(0xFF8E8E93),
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isAssigned) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+
+                                        // 2. Top-Right Corner Slot Badge with Centered Number
+                                        if (isAssigned) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(5.dp)
+                                                    .size(18.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(selectedAccentHex)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "${assignedIdx + 1}",
+                                                    color = Color.Black,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center,
+                                                    style = TextStyle(
+                                                        platformStyle = @Suppress("DEPRECATION") PlatformTextStyle(includeFontPadding = false),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Color Picker Dialog
                 activePickerTarget?.let { target ->
                     val initialColor = if (target == AppFolderColorTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
                     CustomColorPickerDialog(
@@ -587,6 +770,137 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
             putBoolean("widget_${widgetId}_is_responsive", isResponsive)
             putString("widget_${widgetId}_mode", if (isResponsive) "RESPONSIVE" else "FIXED")
             apply()
+        }
+    }
+}
+
+// =========================================================================
+// REUSABLE ASSIGNED SLOTS COMPONENTS (FIXES 2 & 3)
+// =========================================================================
+
+@Composable
+private fun AssignedSlotsRow(
+    slotCount: Int,
+    folderConfig: AppFolderWidgetConfig,
+    installedApps: List<AppFolderWidgetConfigActivity.InstalledAppItem>,
+    activeTargetIndex: Int,
+    accentColor: Color,
+    onSlotSelected: (Int) -> Unit,
+    onSlotRemove: (Int) -> Unit
+) {
+    if (slotCount <= 5) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            for (i in 0 until slotCount) {
+                AssignedSlotItem(
+                    index = i,
+                    slot = folderConfig.slots.getOrElse(i) { AppSlotConfig() },
+                    appItem = installedApps.find { it.packageName == folderConfig.slots.getOrNull(i)?.packageName },
+                    isActive = activeTargetIndex == i,
+                    accentColor = accentColor,
+                    onClick = { onSlotSelected(i) },
+                    onRemove = { onSlotRemove(i) }
+                )
+            }
+        }
+    } else {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items(slotCount) { i ->
+                AssignedSlotItem(
+                    index = i,
+                    slot = folderConfig.slots.getOrElse(i) { AppSlotConfig() },
+                    appItem = installedApps.find { it.packageName == folderConfig.slots.getOrNull(i)?.packageName },
+                    isActive = activeTargetIndex == i,
+                    accentColor = accentColor,
+                    onClick = { onSlotSelected(i) },
+                    onRemove = { onSlotRemove(i) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssignedSlotItem(
+    index: Int,
+    slot: AppSlotConfig,
+    appItem: AppFolderWidgetConfigActivity.InstalledAppItem?,
+    isActive: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    // Unclipped parent box with 5dp outer room for the top-right badge
+    Box(
+        modifier = Modifier
+            .padding(top = 5.dp, end = 5.dp)
+            .size(54.dp)
+    ) {
+        // Main slot tile body
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (slot.isConfigured) Color(0xFF1E1E26) else Color(0xFF15151B))
+                .border(
+                    width = if (isActive) 2.dp else 1.dp,
+                    color = if (isActive) accentColor else if (slot.isConfigured) Color(0xFF32323E) else Color(0xFF24242C),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            if (slot.isConfigured && appItem?.icon != null) {
+                Image(
+                    bitmap = appItem.icon.toImageBitmap(),
+                    contentDescription = slot.appName,
+                    modifier = Modifier.size(30.dp)
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = if (isActive) accentColor else Color(0xFF555562),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "${index + 1}",
+                        color = if (isActive) accentColor else Color(0xFF63636E),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Fix 3: Standard Cutout Remove Badge (Completely Unclipped)
+        if (slot.isConfigured) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 5.dp, y = (-5).dp)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF282834))
+                    .border(1.5.dp, Color(0xFF121216), CircleShape)
+                    .clickable { onRemove() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remove",
+                    tint = Color(0xFFFF5252),
+                    modifier = Modifier.size(11.dp)
+                )
+            }
         }
     }
 }
