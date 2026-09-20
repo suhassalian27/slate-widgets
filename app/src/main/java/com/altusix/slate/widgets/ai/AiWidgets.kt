@@ -228,10 +228,10 @@ class AiBarPrimaryReceiver : BaseAiFolderReceiver(
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
         val aspectRatio = wDp.toFloat() / hDp.toFloat()
-        return when {
-            aspectRatio >= 1.75f -> R.layout.widget_base_bento_left_1_right_3
-            aspectRatio >= 0.70f -> R.layout.widget_base_bento_top_1_bottom_3
-            else -> R.layout.widget_base_col_4
+        return if (isResponsive && aspectRatio < 2.0f) {
+            R.layout.widget_base_bento_top_1_bottom_3
+        } else {
+            R.layout.widget_base_bento_left_1_right_3
         }
     }
 
@@ -262,7 +262,7 @@ class AiBarDock5Receiver : BaseAiFolderReceiver(
 class AiBarCapsuleReceiver : BaseAiFolderReceiver(
     slotCount = 4,
     defaultLayoutResId = R.layout.widget_base_row_4,
-    targets = listOf(AiTarget.CHATGPT_VOICE, AiTarget.PERPLEXITY, AiTarget.CLAUDE, AiTarget.GEMINI_TEXT)
+    targets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE, AiTarget.GEMINI_TEXT)
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
         val isVertical = isResponsive && (hDp > wDp)
@@ -279,12 +279,24 @@ class AiBarDualFlagshipReceiver : BaseAiFolderReceiver(
     targets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.GEMINI_TEXT)
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
-        val isVertical = isResponsive && (hDp > wDp)
-        return if (isVertical) R.layout.widget_base_column_2 else R.layout.widget_base_row_2
+        val safeH = hDp.coerceAtLeast(1)
+        val aspectRatio = wDp.toFloat() / safeH.toFloat()
+        // Horizontal side-by-side uses row_2; Square & Tall use column_2
+        return if (isResponsive && aspectRatio < 1.75f) {
+            R.layout.widget_base_column_2
+        } else {
+            R.layout.widget_base_row_2
+        }
     }
 
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-        generateAiBarDualFlagshipBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateAiBarDualFlagshipBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 // ----------------------------------------------------------------------------

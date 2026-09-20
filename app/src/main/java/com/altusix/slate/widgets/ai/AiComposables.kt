@@ -652,7 +652,7 @@ fun generateAiBarCapsuleBitmap(
     val rows = if (isVertical) 4 else 1
 
     val targets = listOf(
-        AiTarget.CHATGPT_VOICE,
+        AiTarget.CHATGPT_TEXT,
         AiTarget.PERPLEXITY,
         AiTarget.CLAUDE,
         AiTarget.GEMINI_TEXT
@@ -671,6 +671,96 @@ fun generateAiBarCapsuleBitmap(
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
+}
+
+private fun drawDualFlagshipPill(
+    context: Context,
+    target: AiTarget,
+    labelText: String,
+    accentColorInt: Int,
+    isLight: Boolean,
+    widthPx: Int,
+    heightPx: Int,
+    scaleFactor: Float
+): Bitmap {
+    val w = widthPx.coerceAtLeast(1)
+    val h = heightPx.coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val pillRect = RectF(0f, 0f, w.toFloat(), h.toFloat())
+
+    // Always a true pill (capsule) with semicircular ends
+    val pillRadius = minOf(w.toFloat(), h.toFloat()) / 2f
+
+    val tileBgColor = if (isLight) Color.parseColor("#0F000000") else Color.parseColor("#1C1C1E")
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tileBgColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, bgPaint)
+
+    val iconColor = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val resId = context.resources.getIdentifier(target.drawableResName, "drawable", context.packageName)
+    val drawable = if (resId != 0) ContextCompat.getDrawable(context, resId)?.mutate() else null
+    drawable?.setTint(iconColor)
+
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = iconColor
+        typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
+    }
+
+    val isVerticalStack = h > w * 0.85f
+
+    if (isVerticalStack) {
+        // Tall mode: Icon on top, label centered below
+        val iconSize = (minOf(w, h) * 0.38f).coerceIn(scaleFactor * 22f, scaleFactor * 44f)
+        val textSize = (h * 0.16f).coerceIn(scaleFactor * 11f, scaleFactor * 17f)
+        textPaint.textSize = textSize
+
+        val textGap = scaleFactor * 6f
+        val totalH = iconSize + textGap + textSize
+        val topY = (h - totalH) / 2f
+
+        val iconCx = w / 2f
+        val iconCy = topY + (iconSize / 2f)
+
+        drawable?.let {
+            val l = (iconCx - iconSize / 2f).toInt()
+            val t = (iconCy - iconSize / 2f).toInt()
+            it.setBounds(l, t, (l + iconSize).toInt(), (t + iconSize).toInt())
+            it.draw(canvas)
+        }
+
+        val textBaseline = topY + iconSize + textGap + (textSize * 0.85f)
+        canvas.drawText(labelText, w / 2f, textBaseline, textPaint)
+    } else {
+        // Horizontal mode: Icon + Label side-by-side
+        val iconSize = (h * 0.44f).coerceIn(scaleFactor * 16f, scaleFactor * 30f)
+        val textSize = (h * 0.36f).coerceIn(scaleFactor * 12f, scaleFactor * 19f)
+        textPaint.textSize = textSize
+
+        val textW = textPaint.measureText(labelText)
+        val textGap = scaleFactor * 8f
+        val totalW = iconSize + textGap + textW
+
+        val startX = (w - totalW) / 2f
+        val iconLeft = startX.toInt()
+        val iconTop = ((h - iconSize) / 2f).toInt()
+
+        drawable?.let {
+            it.setBounds(iconLeft, iconTop, (iconLeft + iconSize).toInt(), (iconTop + iconSize).toInt())
+            it.draw(canvas)
+        }
+
+        val textX = startX + iconSize + textGap + (textW / 2f)
+        val fm = textPaint.fontMetrics
+        val textY = (h / 2f) - ((fm.ascent + fm.descent) / 2f)
+        canvas.drawText(labelText, textX, textY, textPaint)
+    }
+
+    return bitmap
 }
 
 // 13. AI DUAL FLAGSHIP BAR (4x1 / 2x1 / 1x2 Pivot)
@@ -716,81 +806,53 @@ fun generateAiBarDualFlagshipBitmap(
         style = Paint.Style.FILL
     }
 
-    if (aspectRatio >= 2.0f) {
+    if (aspectRatio >= 1.75f) {
+        // Mode 1: Wide Pill Bar (Side-by-Side Pills)
         val cornerRadius = cardH / 2f
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
         val pad = cardH * 0.08f
         val innerH = cardH - (pad * 2f)
         val availW = cardW - (pad * 2f)
-
-        val innerTopY = cardRect.top + pad
-        val startX = cardRect.left + pad
-
         val gap = innerH * 0.08f
         val pillW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
 
-        // GPT Pill
-        val leftPill = drawPillBaseBitmap(
-            context = context,
-            target = AiTarget.CHATGPT_TEXT,
-            labelText = "GPT",
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            widthPx = pillW,
-            heightPx = innerH.toInt(),
-            isCenteredLayout = true
+        val leftPill = drawDualFlagshipPill(
+            context, AiTarget.CHATGPT_TEXT, "GPT", accentColorInt, isLight, pillW, innerH.toInt(), scaleFactor
         )
-        canvas.drawBitmap(leftPill, startX, innerTopY, null)
+        canvas.drawBitmap(leftPill, cardRect.left + pad, cardRect.top + pad, null)
 
-        // Gemini Pill
-        val rightPill = drawPillBaseBitmap(
-            context = context,
-            target = AiTarget.GEMINI_TEXT,
-            labelText = "Gemini",
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            widthPx = pillW,
-            heightPx = innerH.toInt(),
-            isCenteredLayout = true
+        val rightPill = drawDualFlagshipPill(
+            context, AiTarget.GEMINI_TEXT, "Gemini", accentColorInt, isLight, pillW, innerH.toInt(), scaleFactor
         )
-        canvas.drawBitmap(rightPill, startX + pillW + gap, innerTopY, null)
+        canvas.drawBitmap(rightPill, cardRect.left + pad + pillW + gap, cardRect.top + pad, null)
     } else {
-        val cornerRadius = getStandardCornerRadius(scaleFactor)
+        // Mode 2 & 3: Vertical Pill (when tall) or Squircle (when square) with 2 Stacked Pills
+        val cornerRadius = if (aspectRatio < 0.85f) {
+            cardW / 2f // Pure vertical capsule in 1x2 mode
+        } else {
+            getStandardCornerRadius(scaleFactor) // Clean squircle in 2x2 mode
+        }
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
         val pad = minOf(cardW, cardH) * 0.06f
-        val gap = minOf(cardW, cardH) * 0.035f
-
+        val gap = minOf(cardW, cardH) * 0.04f
         val availW = cardW - (pad * 2f)
         val availH = cardH - (pad * 2f)
 
         val pillH = ((availH - gap) / 2f).toInt().coerceAtLeast(1)
+        val pillW = availW.toInt().coerceAtLeast(1)
 
         val startX = cardRect.left + pad
         val startY = cardRect.top + pad
 
-        val topPill = drawPillBaseBitmap(
-            context = context,
-            target = AiTarget.CHATGPT_TEXT,
-            labelText = "GPT",
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            widthPx = availW.toInt(),
-            heightPx = pillH,
-            isCenteredLayout = true
+        val topPill = drawDualFlagshipPill(
+            context, AiTarget.CHATGPT_TEXT, "GPT", accentColorInt, isLight, pillW, pillH, scaleFactor
         )
         canvas.drawBitmap(topPill, startX, startY, null)
 
-        val botPill = drawPillBaseBitmap(
-            context = context,
-            target = AiTarget.GEMINI_TEXT,
-            labelText = "Gemini",
-            accentColorInt = accentColorInt,
-            isLight = isLight,
-            widthPx = availW.toInt(),
-            heightPx = pillH,
-            isCenteredLayout = true
+        val botPill = drawDualFlagshipPill(
+            context, AiTarget.GEMINI_TEXT, "Gemini", accentColorInt, isLight, pillW, pillH, scaleFactor
         )
         canvas.drawBitmap(botPill, startX, startY + pillH + gap, null)
     }
