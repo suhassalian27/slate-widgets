@@ -930,7 +930,7 @@ fun generateAiFolder10MegaBitmap(
 
     val targets = listOf(
         AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK,
-        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI
+        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.MISTRAL
     )
 
     return renderUniversalFolderGrid(

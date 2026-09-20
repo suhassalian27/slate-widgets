@@ -1374,3 +1374,4 @@ fun RemoteViews.bindFolderTouchPendingIntents(
         legacyTouchSlotIds.getOrNull(i)?.let { setOnClickPendingIntent(it, pi) }
     }
 }
+

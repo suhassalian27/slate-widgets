@@ -223,16 +223,26 @@ abstract class BaseAiFolderReceiver(
 
 class AiBarPrimaryReceiver : BaseAiFolderReceiver(
     slotCount = 4,
-    defaultLayoutResId = R.layout.widget_base_row_4,
+    defaultLayoutResId = R.layout.widget_base_bento_left_1_right_3,
     targets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK)
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {
-        val isVertical = isResponsive && (hDp > wDp)
-        return if (isVertical) R.layout.widget_base_col_4 else R.layout.widget_base_row_4
+        val aspectRatio = wDp.toFloat() / hDp.toFloat()
+        return when {
+            aspectRatio >= 1.75f -> R.layout.widget_base_bento_left_1_right_3
+            aspectRatio >= 0.70f -> R.layout.widget_base_bento_top_1_bottom_3
+            else -> R.layout.widget_base_col_4
+        }
     }
 
-    override fun renderBitmapForWidget(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap =
-        generateAiBarHeroPrimaryBitmap(context, config, isResponsive, wDp, hDp, widgetId)
+    override fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = generateAiBarHeroPrimaryBitmap(context, config, isResponsive, wDp, hDp, widgetId)
 }
 
 class AiBarDock5Receiver : BaseAiFolderReceiver(
@@ -331,7 +341,7 @@ class AiFolder10MegaReceiver : BaseAiFolderReceiver(
     defaultLayoutResId = R.layout.widget_base_grid_5x2,
     targets = listOf(
         AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK,
-        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.PI
+        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.MISTRAL
     )
 ) {
     override fun resolveLayoutResId(isResponsive: Boolean, wDp: Int, hDp: Int): Int {

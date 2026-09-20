@@ -18,11 +18,10 @@ enum class AiTarget(
     GROK("Grok", "ai.x.grok", "ic_grok"),
     PERPLEXITY("Perplexity", "ai.perplexity.app.android", "ic_perplexity"),
     DEEPSEEK("DeepSeek", "com.deepseek.chat", "ic_deepseek"),
-    COPILOT("Copilot", "com.microsoft.copilot", "ic_copilot"),
+    COPILOT("Copilot", "com.microsoft.office.officehubrow", "ic_copilot"),
     META_AI("Meta AI", "com.facebook.stella", "ic_meta_ai"),
     POE("Poe", "com.poe.android", "ic_poe"),
-    PI("Pi AI", "ai.inflection.pi", "ic_pi"),
-    CHARACTER_AI("Character.AI", "ai.character.app", "ic_character")
+    MISTRAL("Mistral", "ai.mistral.chat", "ic_mistral"),
 }
 
 object AiLauncherUtils {
