@@ -14,6 +14,7 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.config.ContactsWidgetConfigActivity
+import com.altusix.slate.widgets.common.bindFolderTouchSlots
 
 fun getContactsWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -640,21 +641,12 @@ abstract class BaseMultiContactGridReceiver(
             views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
         } catch (_: Exception) {}
 
-        // Bind both standardized slot_0..7 and legacy touch_slot_0..7 IDs
-        val touchSlotIds = intArrayOf(
-            R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3,
-            R.id.slot_4, R.id.slot_5, R.id.slot_6, R.id.slot_7
-        )
-        val legacyTouchSlotIds = intArrayOf(
-            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3,
-            R.id.touch_slot_4, R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7
-        )
-
         var anyConfigured = false
 
-        for (i in 0 until slotCount) {
+        // Delegated to FolderWidgetKit: automatically binds slot_0..7 and touch_slot_0..7
+        views.bindFolderTouchSlots(context, widgetId, slotCount) { i ->
             val slotConfig = loadSlotConfig(context, widgetId, i)
-            val intent = if (!slotConfig.isConfigured) {
+            if (!slotConfig.isConfigured) {
                 Intent(context, ContactsWidgetConfigActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     putExtra("extra_slot_index", i)
@@ -680,14 +672,6 @@ abstract class BaseMultiContactGridReceiver(
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
             }
-
-            val pi = PendingIntent.getActivity(
-                context, widgetId * 100 + i, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
-            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
         }
 
         // Global fallback: Clicking the card background opens slot 0 setup if none are configured

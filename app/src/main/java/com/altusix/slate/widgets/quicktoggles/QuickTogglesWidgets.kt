@@ -15,7 +15,7 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import android.app.NotificationManager
-
+import com.altusix.slate.widgets.common.bindFolderTouchPendingIntents
 
 // =========================================================================
 // CATALOG & BROADCAST UPDATES
@@ -446,47 +446,68 @@ class QuickTogglesControlCenterReceiver : BaseQuickTogglesReceiver(R.layout.widg
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.touch_slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0))
-        views.setOnClickPendingIntent(R.id.touch_slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1))
-        views.setOnClickPendingIntent(R.id.touch_slot_2, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 2))
-        views.setOnClickPendingIntent(R.id.touch_slot_3, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 3))
-        views.setOnClickPendingIntent(R.id.touch_slot_4, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 4))
-        views.setOnClickPendingIntent(R.id.touch_slot_5, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 5))
-        views.setOnClickPendingIntent(R.id.touch_slot_6, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createLocationIntent(), appWidgetId, 6))
-        views.setOnClickPendingIntent(R.id.touch_slot_7, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 7))
+        val intents = listOf(
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1),
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 2),
+            createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 3),
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 4),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 5),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createLocationIntent(), appWidgetId, 6),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 7)
+        )
+        views.bindFolderTouchPendingIntents(8) { i -> intents.getOrNull(i) }
     }
 }
 
 // =========================================================================
-// 2. MINIMALIST ACTION TOOLBAR (4x1)
+// 2. MINIMALIST ACTION TOOLBAR (5x1 / 1x5 Pivot)
 // =========================================================================
 class QuickTogglesToolbarReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_row_5, targetAspect = 4.0f) {
+
+    override fun getLayoutResId(wDp: Int, hDp: Int, isResponsive: Boolean): Int {
+        val isVertical = isResponsive && (hDp > wDp)
+        return if (isVertical) R.layout.widget_base_col_5 else R.layout.widget_base_row_5
+    }
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateMinimalistToolbarBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.touch_slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0))
-        views.setOnClickPendingIntent(R.id.touch_slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1))
-        views.setOnClickPendingIntent(R.id.touch_slot_2, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 2))
-        views.setOnClickPendingIntent(R.id.touch_slot_3, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 3))
-        views.setOnClickPendingIntent(R.id.touch_slot_4, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 4))
+        val intents = listOf(
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 0),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 1),
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 2),
+            createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 3),
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 4)
+        )
+        views.bindFolderTouchPendingIntents(5) { i -> intents.getOrNull(i) }
     }
 }
 
 // =========================================================================
-// 3. CONNECTIVITY DUO BENTO (2x2)
+// 3. CONNECTIVITY DUO BENTO (2x2 / 1x2 / 2x1 Pivot)
 // =========================================================================
 class QuickTogglesConnectivityReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_column_2, targetAspect = 1.0f) {
+
+    override fun getLayoutResId(wDp: Int, hDp: Int, isResponsive: Boolean): Int {
+        val isWide = isResponsive && (wDp > hDp * 1.35f)
+        return if (isWide) R.layout.widget_base_row_2 else R.layout.widget_base_column_2
+    }
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateConnectivityBentoBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.touch_slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 10))
-        views.setOnClickPendingIntent(R.id.touch_slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 11))
+        val intents = listOf(
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 10),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 11)
+        )
+        views.bindFolderTouchPendingIntents(2) { i -> intents.getOrNull(i) }
     }
 }
 
@@ -494,16 +515,20 @@ class QuickTogglesConnectivityReceiver : BaseQuickTogglesReceiver(R.layout.widge
 // 4. QUAD ACTION MATRIX (2x2)
 // =========================================================================
 class QuickTogglesQuadReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_grid_2x2, targetAspect = 1.0f) {
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateQuadActionMatrixBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.slot_0, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 20))
-        views.setOnClickPendingIntent(R.id.slot_1, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 21))
-        views.setOnClickPendingIntent(R.id.slot_2, createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 22))
-        views.setOnClickPendingIntent(R.id.slot_3, createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 23))
+        val intents = listOf(
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createWifiIntent(), appWidgetId, 20),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBluetoothIntent(), appWidgetId, 21),
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_TORCH, appWidgetId, 22),
+            createBroadcastPendingIntent(context, ACTION_CYCLE_SOUND, appWidgetId, 23)
+        )
+        views.bindFolderTouchPendingIntents(4) { i -> intents.getOrNull(i) }
     }
 }
 
@@ -557,21 +582,25 @@ class QuickTogglesTorchSwitchReceiver : BaseQuickTogglesReceiver(R.layout.widget
 }
 
 // =========================================================================
-// 12. SYSTEM UTILITY DECK (4x2)
+// 12. SYSTEM UTILITY DECK (4x2 / 3x2)
 // =========================================================================
 class QuickTogglesUtilityDeckReceiver : BaseQuickTogglesReceiver(R.layout.widget_base_grid_3x2, targetAspect = 2.0f) {
+
     override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val state = QuickTogglesStateManager.readCurrentState(context)
         return generateSystemUtilityDeckBitmap(context, state, config, isResponsive, wDp, hDp)
     }
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, appWidgetId: Int) {
-        views.setOnClickPendingIntent(R.id.touch_slot_0, createBroadcastPendingIntent(context, ACTION_CYCLE_TIMEOUT, appWidgetId, 100))
-        views.setOnClickPendingIntent(R.id.touch_slot_1, createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 101))
-        views.setOnClickPendingIntent(R.id.touch_slot_2, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBatterySaverIntent(), appWidgetId, 102))
-        views.setOnClickPendingIntent(R.id.touch_slot_3, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 103))
-        views.setOnClickPendingIntent(R.id.touch_slot_4, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createAirplaneIntent(), appWidgetId, 104))
-        views.setOnClickPendingIntent(R.id.touch_slot_5, createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 105))
+        val intents = listOf(
+            createBroadcastPendingIntent(context, ACTION_CYCLE_TIMEOUT, appWidgetId, 100),
+            createBroadcastPendingIntent(context, ACTION_TOGGLE_ROTATE, appWidgetId, 101),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createBatterySaverIntent(), appWidgetId, 102),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createDisplaySettingsIntent(), appWidgetId, 103),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createAirplaneIntent(), appWidgetId, 104),
+            createTrampolineActivityPendingIntent(context, QuickTogglesStateManager.createHotspotIntent(context), appWidgetId, 105)
+        )
+        views.bindFolderTouchPendingIntents(6) { i -> intents.getOrNull(i) }
     }
 }
 

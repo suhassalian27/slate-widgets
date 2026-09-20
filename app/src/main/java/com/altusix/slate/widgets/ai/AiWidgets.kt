@@ -13,6 +13,7 @@ import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.widgets.common.bindFolderTouchSlots
 
 // ============================================================================
 // AI WIDGETS CATALOG (19 Widgets)
@@ -209,20 +210,9 @@ abstract class BaseAiFolderReceiver(
 ) : BaseAiReceiver(defaultLayoutResId) {
 
     override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
-        val touchSlotIds = intArrayOf(
-            R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3, R.id.slot_4,
-            R.id.slot_5, R.id.slot_6, R.id.slot_7, R.id.slot_8, R.id.slot_9
-        )
-        val legacyTouchSlotIds = intArrayOf(
-            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3, R.id.touch_slot_4,
-            R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8, R.id.touch_slot_9
-        )
-
-        for (i in 0 until minOf(slotCount, targets.size)) {
-            val target = targets[i]
-            val pi = createAiPendingIntent(context, target, widgetId, i)
-            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
-            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
+        val totalSlots = minOf(slotCount, targets.size)
+        views.bindFolderTouchSlots(context, widgetId, totalSlots) { i ->
+            AiLauncherUtils.getLaunchIntent(context, targets[i])
         }
     }
 }

@@ -2,6 +2,7 @@ package com.altusix.slate.widgets.google
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -16,6 +17,34 @@ import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
 import android.graphics.Shader
 import android.graphics.RadialGradient
+import com.altusix.slate.widgets.common.renderUniversalBentoTrio3
+import com.altusix.slate.widgets.common.renderUniversalFolderGrid
+
+// ============================================================================
+// HELPER: Vector Slot Drawer for Google Tiles
+// ============================================================================
+
+private fun drawGoogleSlotVector(
+    canvas: Canvas,
+    context: Context,
+    tileRect: RectF,
+    resId: Int,
+    accentColorInt: Int,
+    scaleFactor: Float,
+    ratio: Float = 0.44f,
+    maxSizeDp: Float = 44f
+) {
+    val drawable = ContextCompat.getDrawable(context, resId)?.mutate() ?: return
+    drawable.setTint(accentColorInt)
+
+    val minDim = minOf(tileRect.width(), tileRect.height())
+    val iconSize = (minDim * ratio).coerceIn(scaleFactor * 14f, scaleFactor * maxSizeDp).toInt()
+
+    val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
+    val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
+    drawable.setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+    drawable.draw(canvas)
+}
 
 // 1. GOOGLE SEARCH CAPSULE (4x1)
 fun generateGoogleSearchCapsuleBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
@@ -117,15 +146,8 @@ fun generateGoogleWorkspaceQuadBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
-    // 1. Aspect Ratio Reflow Logic
     val isVertical = isResponsive && (hDp > wDp * 1.35f)
     val isHorizontal = isResponsive && (wDp > hDp * 1.35f)
     val cols = when {
@@ -139,69 +161,6 @@ fun generateGoogleWorkspaceQuadBitmap(
         else -> 2
     }
 
-    val targetRatio = cols.toFloat() / rows.toFloat()
-    val margin = scaleFactor * 1.5f
-
-    // Width-Dominant container fit for single-row bars
-    val cardRect = if (isResponsive || rows == 1 || targetRatio >= 2.5f) {
-        if (!isResponsive && targetRatio > 0f) {
-            val maxAllowedH = h - (margin * 2f)
-            val idealH = (w - (margin * 2f)) / targetRatio
-            val cardH = idealH.coerceAtMost(maxAllowedH)
-            val topY = (h - cardH) / 2f
-            RectF(margin, topY, w - margin, topY + cardH)
-        } else {
-            RectF(margin, margin, w - margin, h - margin)
-        }
-    } else {
-        var cardH = h - (margin * 2f)
-        var cardW = cardH * targetRatio
-        if (cardW > w - (margin * 2f)) {
-            cardW = w - (margin * 2f)
-            cardH = cardW / targetRatio
-        }
-        val leftX = (w - cardW) / 2f
-        val topY = (h - cardH) / 2f
-        RectF(leftX, topY, leftX + cardW, topY + cardH)
-    }
-
-    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
-    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
-
-    // 2. Uniform Proportional Spacing (1.8dp - 5.5dp)
-    val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
-
-    // 3. Exact Concentric Inner Boundary Path
-    val innerCardRect = RectF(
-        cardRect.left + spacing,
-        cardRect.top + spacing,
-        cardRect.right - spacing,
-        cardRect.bottom - spacing
-    )
-    val innerCardRadius = maxOf(0f, outerRadius - spacing)
-    val innerCardPath = Path().apply {
-        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
-    }
-
-    val availableW = innerCardRect.width() - (spacing * (cols - 1))
-    val availableH = innerCardRect.height() - (spacing * (rows - 1))
-    val tileW = availableW / cols
-    val tileH = availableH / rows
-
-    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
-        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
-        .coerceAtMost(minOf(tileW, tileH) / 2f)
-
-    val innerBgColor = if (isLight) Color.parseColor("#EAEAEF") else Color.parseColor("#161618")
-    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = innerBgColor; style = Paint.Style.FILL }
-
     val iconDrawables = listOf(
         R.drawable.ic_google_logo,
         R.drawable.ic_youtube,
@@ -209,46 +168,19 @@ fun generateGoogleWorkspaceQuadBitmap(
         R.drawable.ic_drive
     )
 
-    val maxIconSize = scaleFactor * 46f
-    val iconSize = (minOf(tileW, tileH) * 0.44f).coerceIn(scaleFactor * 16f, maxIconSize).toInt()
-
-    for (index in 0 until 4) {
-        val col = index % cols
-        val row = index / cols
-        val left = innerCardRect.left + col * (tileW + spacing)
-        val top = innerCardRect.top + row * (tileH + spacing)
-        val tileRect = RectF(left, top, left + tileW, top + tileH)
-
-        val isTopOuter = (row == 0)
-        val isBottomOuter = (row == rows - 1)
-        val isLeftOuter = (col == 0)
-        val isRightOuter = (col == cols - 1)
-
-        val tl = if (isTopOuter && isLeftOuter) 0f else innerCornerRadius
-        val tr = if (isTopOuter && isRightOuter) 0f else innerCornerRadius
-        val br = if (isBottomOuter && isRightOuter) 0f else innerCornerRadius
-        val bl = if (isBottomOuter && isLeftOuter) 0f else innerCornerRadius
-
-        val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
-        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
-
-        canvas.save()
-        canvas.clipPath(innerCardPath)
-        canvas.clipPath(tilePath)
-        canvas.drawRect(tileRect, innerPaint)
-
-        val resId = iconDrawables[index]
-        ContextCompat.getDrawable(context, resId)?.mutate()?.apply {
-            setTint(accentColorInt)
-            val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
-            val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
-            setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
-            draw(canvas)
-        }
-        canvas.restore()
+    return renderUniversalFolderGrid(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        cols = cols,
+        rows = rows,
+        showTileBackground = true
+    ) { canvas, tileRect, index, scaleFactor, _ ->
+        val resId = iconDrawables.getOrElse(index) { R.drawable.ic_google_logo }
+        drawGoogleSlotVector(canvas, context, tileRect, resId, accentColorInt, scaleFactor, ratio = 0.44f, maxSizeDp = 46f)
     }
-
-    return bitmap
 }
 
 // 3. GOOGLE TRIO BENTO (2x2: Top Google Banner + YouTube & Photos / 3x1 / 1x3 Pivot)
@@ -260,59 +192,7 @@ fun generateGoogleTrioBitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-
-    val margin = scaleFactor * 1.5f
-    val targetRatio = 1.0f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        var cardH = h - (margin * 2f)
-        var cardW = cardH * targetRatio
-        if (cardW > w - (margin * 2f)) {
-            cardW = w - (margin * 2f)
-            cardH = cardW / targetRatio
-        }
-        val leftX = (w - cardW) / 2f
-        val topY = (h - cardH) / 2f
-        RectF(leftX, topY, leftX + cardW, topY + cardH)
-    }
-
-    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
-    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
-
-    val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
-
-    val innerCardRect = RectF(
-        cardRect.left + spacing,
-        cardRect.top + spacing,
-        cardRect.right - spacing,
-        cardRect.bottom - spacing
-    )
-    val innerCardRadius = maxOf(0f, outerRadius - spacing)
-    val innerCardPath = Path().apply {
-        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
-    }
-
-    val innerCornerRadius = (minDim * 0.08f)
-        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
-        .coerceAtMost(innerCardRadius)
-
-    val innerBgColor = if (isLight) Color.parseColor("#EAEAEF") else Color.parseColor("#161618")
-    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = innerBgColor; style = Paint.Style.FILL }
 
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColorInt
@@ -321,223 +201,38 @@ fun generateGoogleTrioBitmap(
         letterSpacing = 0.06f
     }
 
-    val aspectRatio = cardRect.width() / cardRect.height()
-
-    when {
-        // --- 1. TALL VERTICAL STRIP (1 Column x 3 Rows) ---
-        isResponsive && aspectRatio < 0.72f -> {
-            val tileW = innerCardRect.width()
-            val tileH = (innerCardRect.height() - (spacing * 2f)) / 3f
-            val iconSize = (minOf(tileW, tileH) * 0.44f).coerceIn(scaleFactor * 16f, scaleFactor * 46f).toInt()
-
-            // Tile 0: Google (Top)
-            val tile0 = RectF(innerCardRect.left, innerCardRect.top, innerCardRect.right, innerCardRect.top + tileH)
-            val r0 = floatArrayOf(0f, 0f, 0f, 0f, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
-            val p0 = Path().apply { addRoundRect(tile0, r0, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(p0)
-            canvas.drawRect(tile0, innerPaint)
-
-            var targetTextSize = tile0.height() * 0.36f
-            textPaint.textSize = targetTextSize
-            val maxW = tile0.width() * 0.82f
-            val measuredW = textPaint.measureText("GOOGLE")
-            if (measuredW > maxW) {
-                targetTextSize *= (maxW / measuredW)
+    return renderUniversalBentoTrio3(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        showTileBackground = true
+    ) { canvas, tileRect, index, scaleFactor, isBanner ->
+        when (index) {
+            0 -> {
+                // Top Google Slot: Draw "GOOGLE" wordmark if space allows, otherwise Google 'G' icon
+                var targetTextSize = tileRect.height() * (if (isBanner) 0.40f else 0.36f)
                 textPaint.textSize = targetTextSize
-            }
-            if (targetTextSize >= scaleFactor * 13f) {
-                val fm = textPaint.fontMetrics
-                val textY = tile0.centerY() - ((fm.descent + fm.ascent) / 2f)
-                canvas.drawText("GOOGLE", tile0.centerX(), textY, textPaint)
-            } else {
-                ContextCompat.getDrawable(context, R.drawable.ic_google_logo)?.mutate()?.apply {
-                    setTint(accentColorInt)
-                    setBounds((tile0.centerX() - iconSize / 2f).toInt(), (tile0.centerY() - iconSize / 2f).toInt(), (tile0.centerX() + iconSize / 2f).toInt(), (tile0.centerY() + iconSize / 2f).toInt())
-                    draw(canvas)
+                val maxTextWidth = tileRect.width() * 0.85f
+                val measuredWidth = textPaint.measureText("GOOGLE")
+                if (measuredWidth > maxTextWidth) {
+                    targetTextSize *= (maxTextWidth / measuredWidth)
+                    textPaint.textSize = targetTextSize
+                }
+
+                if (targetTextSize >= scaleFactor * 13f) {
+                    val fm = textPaint.fontMetrics
+                    val textY = tileRect.centerY() - ((fm.descent + fm.ascent) / 2f)
+                    canvas.drawText("GOOGLE", tileRect.centerX(), textY, textPaint)
+                } else {
+                    drawGoogleSlotVector(canvas, context, tileRect, R.drawable.ic_google_logo, accentColorInt, scaleFactor)
                 }
             }
-            canvas.restore()
-
-            // Tile 1: YouTube (Middle)
-            val tile1 = RectF(innerCardRect.left, tile0.bottom + spacing, innerCardRect.right, tile0.bottom + spacing + tileH)
-            val r1 = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
-            val p1 = Path().apply { addRoundRect(tile1, r1, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(p1)
-            canvas.drawRect(tile1, innerPaint)
-            ContextCompat.getDrawable(context, R.drawable.ic_youtube)?.mutate()?.apply {
-                setTint(accentColorInt)
-                setBounds((tile1.centerX() - iconSize / 2f).toInt(), (tile1.centerY() - iconSize / 2f).toInt(), (tile1.centerX() + iconSize / 2f).toInt(), (tile1.centerY() + iconSize / 2f).toInt())
-                draw(canvas)
-            }
-            canvas.restore()
-
-            // Tile 2: Photos (Bottom)
-            val tile2 = RectF(innerCardRect.left, tile1.bottom + spacing, innerCardRect.right, innerCardRect.bottom)
-            val r2 = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, 0f, 0f, 0f, 0f)
-            val p2 = Path().apply { addRoundRect(tile2, r2, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(p2)
-            canvas.drawRect(tile2, innerPaint)
-            ContextCompat.getDrawable(context, R.drawable.ic_goolge_photos)?.mutate()?.apply {
-                setTint(accentColorInt)
-                setBounds((tile2.centerX() - iconSize / 2f).toInt(), (tile2.centerY() - iconSize / 2f).toInt(), (tile2.centerX() + iconSize / 2f).toInt(), (tile2.centerY() + iconSize / 2f).toInt())
-                draw(canvas)
-            }
-            canvas.restore()
-        }
-
-        // --- 2. WIDE HORIZONTAL STRIP (3 Columns x 1 Row) ---
-        isResponsive && aspectRatio > 1.65f -> {
-            val tileW = (innerCardRect.width() - (spacing * 2f)) / 3f
-            val tileH = innerCardRect.height()
-            val iconSize = (minOf(tileW, tileH) * 0.44f).coerceIn(scaleFactor * 16f, scaleFactor * 46f).toInt()
-
-            // Tile 0: Google (Left)
-            val tile0 = RectF(innerCardRect.left, innerCardRect.top, innerCardRect.left + tileW, innerCardRect.bottom)
-            val r0 = floatArrayOf(0f, 0f, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, 0f, 0f)
-            val p0 = Path().apply { addRoundRect(tile0, r0, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(p0)
-            canvas.drawRect(tile0, innerPaint)
-
-            var targetTextSize = tile0.height() * 0.36f
-            textPaint.textSize = targetTextSize
-            val maxW = tile0.width() * 0.82f
-            val measuredW = textPaint.measureText("GOOGLE")
-            if (measuredW > maxW) {
-                targetTextSize *= (maxW / measuredW)
-                textPaint.textSize = targetTextSize
-            }
-            if (targetTextSize >= scaleFactor * 13f) {
-                val fm = textPaint.fontMetrics
-                val textY = tile0.centerY() - ((fm.descent + fm.ascent) / 2f)
-                canvas.drawText("GOOGLE", tile0.centerX(), textY, textPaint)
-            } else {
-                ContextCompat.getDrawable(context, R.drawable.ic_google_logo)?.mutate()?.apply {
-                    setTint(accentColorInt)
-                    setBounds((tile0.centerX() - iconSize / 2f).toInt(), (tile0.centerY() - iconSize / 2f).toInt(), (tile0.centerX() + iconSize / 2f).toInt(), (tile0.centerY() + iconSize / 2f).toInt())
-                    draw(canvas)
-                }
-            }
-            canvas.restore()
-
-            // Tile 1: YouTube (Center)
-            val tile1 = RectF(tile0.right + spacing, innerCardRect.top, tile0.right + spacing + tileW, innerCardRect.bottom)
-            val r1 = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
-            val p1 = Path().apply { addRoundRect(tile1, r1, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(p1)
-            canvas.drawRect(tile1, innerPaint)
-            ContextCompat.getDrawable(context, R.drawable.ic_youtube)?.mutate()?.apply {
-                setTint(accentColorInt)
-                setBounds((tile1.centerX() - iconSize / 2f).toInt(), (tile1.centerY() - iconSize / 2f).toInt(), (tile1.centerX() + iconSize / 2f).toInt(), (tile1.centerY() + iconSize / 2f).toInt())
-                draw(canvas)
-            }
-            canvas.restore()
-
-            // Tile 2: Photos (Right)
-            val tile2 = RectF(tile1.right + spacing, innerCardRect.top, innerCardRect.right, innerCardRect.bottom)
-            val r2 = floatArrayOf(innerCornerRadius, innerCornerRadius, 0f, 0f, 0f, 0f, innerCornerRadius, innerCornerRadius)
-            val p2 = Path().apply { addRoundRect(tile2, r2, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(p2)
-            canvas.drawRect(tile2, innerPaint)
-            ContextCompat.getDrawable(context, R.drawable.ic_goolge_photos)?.mutate()?.apply {
-                setTint(accentColorInt)
-                setBounds((tile2.centerX() - iconSize / 2f).toInt(), (tile2.centerY() - iconSize / 2f).toInt(), (tile2.centerX() + iconSize / 2f).toInt(), (tile2.centerY() + iconSize / 2f).toInt())
-                draw(canvas)
-            }
-            canvas.restore()
-        }
-
-        // --- 3. STANDARD BENTO (Top Full-Width Banner + Bottom 2 Tiles) ---
-        else -> {
-            val availableH = innerCardRect.height() - spacing
-            val topH = availableH * 0.48f
-            val bottomH = availableH - topH
-            val bottomTileW = (innerCardRect.width() - spacing) / 2f
-            val iconSize = (minOf(bottomTileW, bottomH) * 0.44f).coerceIn(scaleFactor * 16f, scaleFactor * 46f).toInt()
-
-            // Top Google Banner
-            val topRect = RectF(innerCardRect.left, innerCardRect.top, innerCardRect.right, innerCardRect.top + topH)
-            val topRadii = floatArrayOf(0f, 0f, 0f, 0f, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius)
-            val topPath = Path().apply { addRoundRect(topRect, topRadii, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(topPath)
-            canvas.drawRect(topRect, innerPaint)
-
-            var targetTextSize = topRect.height() * 0.40f
-            textPaint.textSize = targetTextSize
-            val maxTextWidth = topRect.width() * 0.85f
-            val measuredWidth = textPaint.measureText("GOOGLE")
-            if (measuredWidth > maxTextWidth) {
-                targetTextSize *= (maxTextWidth / measuredWidth)
-                textPaint.textSize = targetTextSize
-            }
-            if (targetTextSize >= scaleFactor * 13f) {
-                val fm = textPaint.fontMetrics
-                val textY = topRect.centerY() - ((fm.descent + fm.ascent) / 2f)
-                canvas.drawText("GOOGLE", topRect.centerX(), textY, textPaint)
-            } else {
-                ContextCompat.getDrawable(context, R.drawable.ic_google_logo)?.mutate()?.apply {
-                    setTint(accentColorInt)
-                    setBounds((topRect.centerX() - iconSize / 2f).toInt(), (topRect.centerY() - iconSize / 2f).toInt(), (topRect.centerX() + iconSize / 2f).toInt(), (topRect.centerY() + iconSize / 2f).toInt())
-                    draw(canvas)
-                }
-            }
-            canvas.restore()
-
-            // Bottom-Left (YouTube)
-            val bLeftRect = RectF(innerCardRect.left, topRect.bottom + spacing, innerCardRect.left + bottomTileW, innerCardRect.bottom)
-            val bLeftRadii = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, 0f, 0f)
-            val bLeftPath = Path().apply { addRoundRect(bLeftRect, bLeftRadii, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(bLeftPath)
-            canvas.drawRect(bLeftRect, innerPaint)
-            ContextCompat.getDrawable(context, R.drawable.ic_youtube)?.mutate()?.apply {
-                setTint(accentColorInt)
-                setBounds((bLeftRect.centerX() - iconSize / 2f).toInt(), (bLeftRect.centerY() - iconSize / 2f).toInt(), (bLeftRect.centerX() + iconSize / 2f).toInt(), (bLeftRect.centerY() + iconSize / 2f).toInt())
-                draw(canvas)
-            }
-            canvas.restore()
-
-            // Bottom-Right (Photos)
-            val bRightRect = RectF(bLeftRect.right + spacing, topRect.bottom + spacing, innerCardRect.right, innerCardRect.bottom)
-            val bRightRadii = floatArrayOf(innerCornerRadius, innerCornerRadius, innerCornerRadius, innerCornerRadius, 0f, 0f, innerCornerRadius, innerCornerRadius)
-            val bRightPath = Path().apply { addRoundRect(bRightRect, bRightRadii, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(bRightPath)
-            canvas.drawRect(bRightRect, innerPaint)
-            ContextCompat.getDrawable(context, R.drawable.ic_goolge_photos)?.mutate()?.apply {
-                setTint(accentColorInt)
-                setBounds((bRightRect.centerX() - iconSize / 2f).toInt(), (bRightRect.centerY() - iconSize / 2f).toInt(), (bRightRect.centerX() + iconSize / 2f).toInt(), (bRightRect.centerY() + iconSize / 2f).toInt())
-                draw(canvas)
-            }
-            canvas.restore()
+            1 -> drawGoogleSlotVector(canvas, context, tileRect, R.drawable.ic_youtube, accentColorInt, scaleFactor)
+            2 -> drawGoogleSlotVector(canvas, context, tileRect, R.drawable.ic_goolge_photos, accentColorInt, scaleFactor)
         }
     }
-
-    return bitmap
 }
 
 // 4. GOOGLE 3x3 GRID FOLDER (2x2 / 9-App Hub)
@@ -549,64 +244,7 @@ fun generateGoogleGrid9Bitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-
-    val margin = scaleFactor * 1.5f
-    val targetRatio = 1.0f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        var cardH = h - (margin * 2f)
-        var cardW = cardH * targetRatio
-        if (cardW > w - (margin * 2f)) {
-            cardW = w - (margin * 2f)
-            cardH = cardW / targetRatio
-        }
-        val leftX = (w - cardW) / 2f
-        val topY = (h - cardH) / 2f
-        RectF(leftX, topY, leftX + cardW, topY + cardH)
-    }
-
-    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
-    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
-
-    val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
-
-    val innerCardRect = RectF(
-        cardRect.left + spacing,
-        cardRect.top + spacing,
-        cardRect.right - spacing,
-        cardRect.bottom - spacing
-    )
-    val innerCardRadius = maxOf(0f, outerRadius - spacing)
-    val innerCardPath = Path().apply {
-        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
-    }
-
-    val tileW = (innerCardRect.width() - (spacing * 2f)) / 3f
-    val tileH = (innerCardRect.height() - (spacing * 2f)) / 3f
-    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
-        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
-        .coerceAtMost(minOf(tileW, tileH) / 2f)
-
-    val innerCardBg = if (isLight) Color.parseColor("#F2F2F7") else Color.parseColor("#1C1C1E")
-    val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = innerCardBg
-        style = Paint.Style.FILL
-    }
 
     val googleIcons = listOf(
         R.drawable.ic_google_logo,
@@ -620,46 +258,22 @@ fun generateGoogleGrid9Bitmap(
         R.drawable.ic_gemini_live
     )
 
-    val maxIconSize = scaleFactor * 42f
-    val iconSize = (minOf(tileW, tileH) * 0.52f).coerceIn(scaleFactor * 14f, maxIconSize).toInt()
-
-    for (row in 0..2) {
-        for (col in 0..2) {
-            val index = row * 3 + col
-            val tileLeft = innerCardRect.left + col * (tileW + spacing)
-            val tileTop = innerCardRect.top + row * (tileH + spacing)
-            val tileRect = RectF(tileLeft, tileTop, tileLeft + tileW, tileTop + tileH)
-
-            val tl = if (row == 0 && col == 0) 0f else innerCornerRadius
-            val tr = if (row == 0 && col == 2) 0f else innerCornerRadius
-            val br = if (row == 2 && col == 2) 0f else innerCornerRadius
-            val bl = if (row == 2 && col == 0) 0f else innerCornerRadius
-
-            val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
-            val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
-
-            canvas.save()
-            canvas.clipPath(innerCardPath)
-            canvas.clipPath(tilePath)
-            canvas.drawRect(tileRect, tilePaint)
-
-            if (index < googleIcons.size) {
-                ContextCompat.getDrawable(context, googleIcons[index])?.mutate()?.apply {
-                    setTint(accentColorInt)
-                    val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
-                    val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
-                    setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
-                    draw(canvas)
-                }
-            }
-            canvas.restore()
-        }
+    return renderUniversalFolderGrid(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        cols = 3,
+        rows = 3,
+        showTileBackground = true
+    ) { canvas, tileRect, index, scaleFactor, _ ->
+        val resId = googleIcons.getOrElse(index) { R.drawable.ic_google_logo }
+        drawGoogleSlotVector(canvas, context, tileRect, resId, accentColorInt, scaleFactor, ratio = 0.52f, maxSizeDp = 42f)
     }
-
-    return bitmap
 }
 
-// 5. GOOGLE MEGA FOLDER (4x2: 5x2 / 2x5 Smart Pivot)
+// 5. GOOGLE MEGA FOLDER (4x2 / 5x2 / 2x5 Smart Pivot)
 fun generateGoogleMegaFolder10Bitmap(
     context: Context,
     config: SlateWidgetConfig,
@@ -668,66 +282,11 @@ fun generateGoogleMegaFolder10Bitmap(
     hDp: Int,
     widgetId: Int
 ): Bitmap {
-    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
-    val w = canvas.width.toFloat()
-    val h = canvas.height.toFloat()
-
-    val isLight = config.themeMode == "LIGHT"
-    val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val isVertical = isResponsive && (hDp > wDp)
     val cols = if (isVertical) 2 else 5
     val rows = if (isVertical) 5 else 2
-
-    val margin = scaleFactor * 1.5f
-    val targetRatio = cols.toFloat() / rows.toFloat()
-
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        var cardH = h - (margin * 2f)
-        var cardW = cardH * targetRatio
-        if (cardW > w - (margin * 2f)) {
-            cardW = w - (margin * 2f)
-            cardH = cardW / targetRatio
-        }
-        val leftX = (w - cardW) / 2f
-        val topY = (h - cardH) / 2f
-        RectF(leftX, topY, leftX + cardW, topY + cardH)
-    }
-
-    val maxCardRadius = minOf(cardRect.width(), cardRect.height()) / 2f
-    val outerRadius = getStandardCornerRadius(scaleFactor).coerceAtMost(maxCardRadius)
-    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(cardRect, outerRadius, outerRadius, bgPaint)
-
-    val minDim = minOf(cardRect.width(), cardRect.height())
-    val spacing = (minDim * 0.032f).coerceIn(scaleFactor * 1.8f, scaleFactor * 5.5f)
-
-    val innerCardRect = RectF(
-        cardRect.left + spacing,
-        cardRect.top + spacing,
-        cardRect.right - spacing,
-        cardRect.bottom - spacing
-    )
-    val innerCardRadius = maxOf(0f, outerRadius - spacing)
-    val innerCardPath = Path().apply {
-        addRoundRect(innerCardRect, innerCardRadius, innerCardRadius, Path.Direction.CW)
-    }
-
-    val tileW = (innerCardRect.width() - (spacing * (cols - 1))) / cols
-    val tileH = (innerCardRect.height() - (spacing * (rows - 1))) / rows
-    val innerCornerRadius = (minOf(tileW, tileH) * 0.20f)
-        .coerceIn(scaleFactor * 2.0f, scaleFactor * 7.0f)
-        .coerceAtMost(minOf(tileW, tileH) / 2f)
-
-    val innerBgColor = if (isLight) Color.parseColor("#EAEAEF") else Color.parseColor("#161618")
-    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = innerBgColor; style = Paint.Style.FILL }
 
     val iconDrawables = listOf(
         R.drawable.ic_google_logo,
@@ -742,40 +301,19 @@ fun generateGoogleMegaFolder10Bitmap(
         R.drawable.ic_google_gemini
     )
 
-    val maxIconSize = scaleFactor * 42f
-    val iconSize = (minOf(tileW, tileH) * 0.44f).coerceIn(scaleFactor * 14f, maxIconSize).toInt()
-
-    for (index in 0 until 10) {
-        val col = index % cols
-        val row = index / cols
-        val left = innerCardRect.left + col * (tileW + spacing)
-        val top = innerCardRect.top + row * (tileH + spacing)
-        val tileRect = RectF(left, top, left + tileW, top + tileH)
-
-        val tl = if (row == 0 && col == 0) 0f else innerCornerRadius
-        val tr = if (row == 0 && col == cols - 1) 0f else innerCornerRadius
-        val br = if (row == rows - 1 && col == cols - 1) 0f else innerCornerRadius
-        val bl = if (row == rows - 1 && col == 0) 0f else innerCornerRadius
-
-        val radii = floatArrayOf(tl, tl, tr, tr, br, br, bl, bl)
-        val tilePath = Path().apply { addRoundRect(tileRect, radii, Path.Direction.CW) }
-
-        canvas.save()
-        canvas.clipPath(innerCardPath)
-        canvas.clipPath(tilePath)
-        canvas.drawRect(tileRect, innerPaint)
-
-        ContextCompat.getDrawable(context, iconDrawables[index])?.mutate()?.apply {
-            setTint(accentColorInt)
-            val iconLeft = (tileRect.centerX() - iconSize / 2f).toInt()
-            val iconTop = (tileRect.centerY() - iconSize / 2f).toInt()
-            setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
-            draw(canvas)
-        }
-        canvas.restore()
+    return renderUniversalFolderGrid(
+        context = context,
+        config = config,
+        isResponsive = isResponsive,
+        wDp = wDp,
+        hDp = hDp,
+        cols = cols,
+        rows = rows,
+        showTileBackground = true
+    ) { canvas, tileRect, index, scaleFactor, _ ->
+        val resId = iconDrawables.getOrElse(index) { R.drawable.ic_google_logo }
+        drawGoogleSlotVector(canvas, context, tileRect, resId, accentColorInt, scaleFactor, ratio = 0.44f, maxSizeDp = 42f)
     }
-
-    return bitmap
 }
 
 // 6. YOUTUBE & MEDIA DISCOVERY CAPSULE (3x1 / 4x1)

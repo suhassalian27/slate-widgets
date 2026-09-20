@@ -16,6 +16,7 @@ import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import android.speech.RecognizerIntent
+import com.altusix.slate.widgets.common.bindFolderTouchSlots
 
 fun getGoogleWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -290,18 +291,7 @@ class GoogleWorkspaceQuadReceiver : BaseGoogleReceiver() {
             context.packageManager.getLaunchIntentForPackage("com.google.android.apps.docs") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://drive.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
         )
 
-        val slotIds = intArrayOf(R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3)
-        val legacySlotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3)
-
-        for (i in 0..3) {
-            val pi = PendingIntent.getActivity(
-                context, widgetId * 100 + i, intents[i],
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(slotIds[i], pi)
-            views.setOnClickPendingIntent(legacySlotIds[i], pi)
-        }
-
+        views.bindFolderTouchSlots(context, widgetId, 4) { i -> intents.getOrNull(i) }
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
@@ -357,18 +347,7 @@ class GoogleTrioReceiver : BaseGoogleReceiver() {
             ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://photos.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
 
         val intents = listOf(safeSearchIntent, youtubeIntent, photosIntent)
-        val slotIds = intArrayOf(R.id.slot_0, R.id.slot_1, R.id.slot_2)
-        val legacySlotIds = intArrayOf(R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2)
-
-        for (i in 0..2) {
-            val pi = PendingIntent.getActivity(
-                context, widgetId * 100 + i, intents[i],
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(slotIds[i], pi)
-            views.setOnClickPendingIntent(legacySlotIds[i], pi)
-        }
-
+        views.bindFolderTouchSlots(context, widgetId, 3) { i -> intents.getOrNull(i) }
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
@@ -424,26 +403,7 @@ class GoogleGrid9Receiver : BaseGoogleReceiver() {
             Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
         )
 
-        val slotIds = intArrayOf(
-            R.id.slot_0, R.id.slot_1, R.id.slot_2,
-            R.id.slot_3, R.id.slot_4, R.id.slot_5,
-            R.id.slot_6, R.id.slot_7, R.id.slot_8
-        )
-        val legacySlotIds = intArrayOf(
-            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2,
-            R.id.touch_slot_3, R.id.touch_slot_4, R.id.touch_slot_5,
-            R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8
-        )
-
-        for (i in 0..8) {
-            val pi = PendingIntent.getActivity(
-                context, widgetId * 100 + i, intents[i],
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(slotIds[i], pi)
-            views.setOnClickPendingIntent(legacySlotIds[i], pi)
-        }
-
+        views.bindFolderTouchSlots(context, widgetId, 9) { i -> intents.getOrNull(i) }
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }
@@ -501,24 +461,7 @@ class GoogleMegaFolderReceiver : BaseGoogleReceiver() {
             context.packageManager.getLaunchIntentForPackage("com.google.android.apps.bard") ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://gemini.google.com")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
         )
 
-        val slotIds = intArrayOf(
-            R.id.slot_0, R.id.slot_1, R.id.slot_2, R.id.slot_3, R.id.slot_4,
-            R.id.slot_5, R.id.slot_6, R.id.slot_7, R.id.slot_8, R.id.slot_9
-        )
-        val legacySlotIds = intArrayOf(
-            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3, R.id.touch_slot_4,
-            R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7, R.id.touch_slot_8, R.id.touch_slot_9
-        )
-
-        for (i in 0 until 10) {
-            val pi = PendingIntent.getActivity(
-                context, widgetId * 100 + i, intents[i],
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(slotIds[i], pi)
-            views.setOnClickPendingIntent(legacySlotIds[i], pi)
-        }
-
+        views.bindFolderTouchSlots(context, widgetId, 10) { i -> intents.getOrNull(i) }
         appWidgetManager.updateAppWidget(widgetId, views)
     }
 }

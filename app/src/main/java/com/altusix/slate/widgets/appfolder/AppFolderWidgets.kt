@@ -14,6 +14,7 @@ import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.ui.config.AppFolderWidgetConfigActivity
+import com.altusix.slate.widgets.common.bindFolderTouchSlots
 
 private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
@@ -107,25 +108,12 @@ abstract class BaseAppFolderGridReceiver(
             views.setViewPadding(R.id.layout_grid_root, 0, 0, 0, 0)
         } catch (_: Exception) {}
 
-        // Complete 10-slot arrays mapping both modern slot_x and legacy touch_slot_x
-        val touchSlotIds = intArrayOf(
-            R.id.slot_0, R.id.slot_1, R.id.slot_2,
-            R.id.slot_3, R.id.slot_4, R.id.slot_5,
-            R.id.slot_6, R.id.slot_7, R.id.slot_8,
-            R.id.slot_9
-        )
-        val legacyTouchSlotIds = intArrayOf(
-            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3,
-            R.id.touch_slot_4, R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7,
-            R.id.touch_slot_8, R.id.touch_slot_9
-        )
-
         val folderConfig = AppFolderWidgetConfig.load(context, widgetId, slotCount)
 
-        for (i in 0 until slotCount) {
+        // Single call handles both slot_0..9 and legacy touch_slot_0..9
+        views.bindFolderTouchSlots(context, widgetId, slotCount) { i ->
             val slotConfig = folderConfig.slots.getOrElse(i) { AppSlotConfig() }
-
-            val intent = if (!slotConfig.isConfigured) {
+            if (!slotConfig.isConfigured) {
                 Intent(context, AppFolderWidgetConfigActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     putExtra("extra_slot_index", i)
@@ -140,18 +128,9 @@ abstract class BaseAppFolderGridReceiver(
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
             }
-
-            val pi = PendingIntent.getActivity(
-                context,
-                widgetId * 100 + i,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
-            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
         }
 
+        // Global fallback: If no apps configured, tapping the background card opens config
         if (folderConfig.slots.none { it.isConfigured }) {
             val rootIntent = Intent(context, AppFolderWidgetConfigActivity::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)

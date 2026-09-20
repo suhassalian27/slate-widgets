@@ -14,6 +14,7 @@ import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.widgets.common.bindFolderTouchSlots
 
 private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
@@ -147,25 +148,12 @@ abstract class BaseSocialGridReceiver(
 
         views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
-        // Complete 10-slot array (0 through 9)
-        val touchSlotIds = intArrayOf(
-            R.id.slot_0, R.id.slot_1, R.id.slot_2,
-            R.id.slot_3, R.id.slot_4, R.id.slot_5,
-            R.id.slot_6, R.id.slot_7, R.id.slot_8,
-            R.id.slot_9
-        )
-        val legacyTouchSlotIds = intArrayOf(
-            R.id.touch_slot_0, R.id.touch_slot_1, R.id.touch_slot_2, R.id.touch_slot_3,
-            R.id.touch_slot_4, R.id.touch_slot_5, R.id.touch_slot_6, R.id.touch_slot_7,
-            R.id.touch_slot_8, R.id.touch_slot_9
-        )
-
         val socialConfig = SocialStorageManager.load(context, widgetId, slotCount, layoutTag)
 
-        for (i in 0 until slotCount) {
+        // Single unified binding for slot_0..9 and legacy touch_slot_0..9
+        views.bindFolderTouchSlots(context, widgetId, slotCount) { i ->
             val slot = socialConfig.slots.getOrElse(i) { SocialSlotConfig() }
-
-            val intent = if (!slot.isConfigured) {
+            if (!slot.isConfigured) {
                 Intent(context, SocialConfigActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     putExtra("extra_slot_index", i)
@@ -174,16 +162,6 @@ abstract class BaseSocialGridReceiver(
             } else {
                 SocialStorageManager.createLaunchIntent(context, slot)
             }
-
-            val pi = PendingIntent.getActivity(
-                context,
-                widgetId * 100 + i,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            touchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
-            legacyTouchSlotIds.getOrNull(i)?.let { views.setOnClickPendingIntent(it, pi) }
         }
 
         if (socialConfig.slots.none { it.isConfigured }) {
