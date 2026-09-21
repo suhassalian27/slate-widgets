@@ -2,7 +2,6 @@ package com.altusix.slate.widgets.ai
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -114,8 +113,12 @@ class AiWidgetConfigActivity : ComponentActivity() {
         val widgetName = catalogItem?.name ?: "AI Widget"
         val hasModeOption = catalogItem?.hasModeOption ?: true
 
-        slotCount = determineSlotCount(widgetClassName)
-        val defaultTargets = determineDefaultTargets(widgetClassName, slotCount)
+        // Check if widget is a single fixed AI icon (e.g. ChatGPT, Gemini, Claude)
+        val singleTarget = getSingleAiTarget(widgetClassName)
+        val isSingleAi = singleTarget != null
+
+        slotCount = if (isSingleAi) 1 else determineSlotCount(widgetClassName)
+        val defaultTargets = if (isSingleAi) listOf(singleTarget!!) else determineDefaultTargets(widgetClassName, slotCount)
         val defaultTheme = ThemePreferences(this).getThemeSettings()
 
         setContent {
@@ -128,17 +131,22 @@ class AiWidgetConfigActivity : ComponentActivity() {
                 var opacity by remember { mutableFloatStateOf(1.0f) }
                 var isResponsive by remember { mutableStateOf(true) }
                 var activePickerTarget by remember { mutableStateOf<AiColorTarget?>(null) }
-                var selectedTabKey by remember { mutableStateOf("MODELS") }
+                var selectedTabKey by remember { mutableStateOf(if (isSingleAi) "STYLE" else "MODELS") }
 
                 var showAiPickerSheet by remember { mutableStateOf(false) }
                 var targetSlotIndex by remember { mutableIntStateOf(0) }
                 var sheetSearchQuery by remember { mutableStateOf("") }
 
-                val tabs = remember {
-                    listOf(
-                        ConfigTabItem("MODELS", "AI Models"),
-                        ConfigTabItem("STYLE", "Widget Theme")
-                    )
+                // Single-icon widgets hide the AI Models tab and only show Widget Theme
+                val tabs = remember(isSingleAi) {
+                    if (isSingleAi) {
+                        emptyList()
+                    } else {
+                        listOf(
+                            ConfigTabItem("MODELS", "AI Models"),
+                            ConfigTabItem("STYLE", "Widget Theme")
+                        )
+                    }
                 }
 
                 val availableTargets = remember { AiTarget.entries.toList() }
@@ -162,10 +170,11 @@ class AiWidgetConfigActivity : ComponentActivity() {
                 }
 
                 fun saveAndFinish() {
-                    AiWidgetConfig.save(this@AiWidgetConfigActivity, widgetId, aiConfig)
+                    if (!isSingleAi) {
+                        AiWidgetConfig.save(this@AiWidgetConfigActivity, widgetId, aiConfig)
+                    }
                     saveSlateWidgetConfig(this@AiWidgetConfigActivity, widgetId, currentSlateConfig, isResponsive)
 
-                    // Refresh all AI widgets and push an immediate update intent to this widget
                     updateAllAiWidgets(this@AiWidgetConfigActivity)
                     val manager = AppWidgetManager.getInstance(this@AiWidgetConfigActivity)
                     val info = manager.getAppWidgetInfo(widgetId)
@@ -185,8 +194,8 @@ class AiWidgetConfigActivity : ComponentActivity() {
                 }
 
                 SlateConfigScaffold(
-                    title = "AI Studio",
-                    subtitle = widgetName,
+                    title = if (isSingleAi) widgetName else "AI Studio",
+                    subtitle = if (isSingleAi) null else widgetName,
                     accentColor = Color(selectedAccentHex),
                     tabs = tabs,
                     selectedTabKey = selectedTabKey,
@@ -198,18 +207,19 @@ class AiWidgetConfigActivity : ComponentActivity() {
                     previewContent = {
                         val context = LocalContext.current
 
-                        // 1. Read exact homescreen dimensions from AppWidgetOptions
                         val (screenWDp, screenHDp) = remember(widgetId, isResponsive) {
                             val manager = AppWidgetManager.getInstance(context)
                             val options = manager?.getAppWidgetOptions(widgetId)
                             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
                             val fallbackW = when {
+                                isSingleAi -> 140
                                 widgetClassName.contains("DualFlagship") || widgetClassName.contains("Primary") || widgetClassName.contains("Capsule") || widgetClassName.contains("Dock") -> 240
                                 widgetClassName.contains("Mega") || widgetClassName.contains("Side") || widgetClassName.contains("BentoHero") -> 220
                                 else -> 150
                             }
                             val fallbackH = when {
+                                isSingleAi -> 140
                                 widgetClassName.contains("DualFlagship") || widgetClassName.contains("Primary") || widgetClassName.contains("Capsule") || widgetClassName.contains("Dock") -> 75
                                 widgetClassName.contains("Mega") || widgetClassName.contains("Side") || widgetClassName.contains("BentoHero") -> 120
                                 else -> 150
@@ -232,9 +242,9 @@ class AiWidgetConfigActivity : ComponentActivity() {
                             finalW to finalH
                         }
 
-                        // 2. Render using the exact dimensions from homescreen
                         val previewBitmap = remember(aiConfig, currentSlateConfig, isResponsive, widgetClassName, screenWDp, screenHDp) {
                             when {
+                                singleTarget != null -> generateSingleAiIconBitmap(context, singleTarget, currentSlateConfig, isResponsive, screenWDp, screenHDp, widgetId)
                                 widgetClassName.contains("DualFlagship") -> generateAiBarDualFlagshipBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
                                 widgetClassName.contains("Primary") -> generateAiBarHeroPrimaryBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
                                 widgetClassName.contains("Dock5") -> generateAiBarDock5Bitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
@@ -248,15 +258,18 @@ class AiWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // 3. Scale proportionally inside preview box
-                        val aspect = (screenWDp.toFloat() / screenHDp.toFloat().coerceAtLeast(1f)).coerceIn(0.3f, 4.5f)
-                        val maxBoxW = 260f
-                        val maxBoxH = 145f
-
-                        val (dispW, dispH) = if (aspect > (maxBoxW / maxBoxH)) {
-                            maxBoxW.dp to (maxBoxW / aspect).dp
-                        } else {
-                            (maxBoxH * aspect).dp to maxBoxH.dp
+                        val previewModifier = remember(widgetClassName, isSingleAi) {
+                            when {
+                                isSingleAi -> Modifier.size(130.dp)
+                                widgetClassName.contains("DualFlagship") || widgetClassName.contains("Primary") || widgetClassName.contains("Capsule") || widgetClassName.contains("Dock") ->
+                                    Modifier.size(width = 240.dp, height = 75.dp)
+                                widgetClassName.contains("Mega") || widgetClassName.contains("Side") || widgetClassName.contains("BentoHero") ->
+                                    Modifier.size(width = 220.dp, height = 120.dp)
+                                widgetClassName.contains("Asymmetric") ->
+                                    Modifier.size(width = 180.dp, height = 120.dp)
+                                else ->
+                                    Modifier.size(130.dp)
+                            }
                         }
 
                         Box(
@@ -266,12 +279,12 @@ class AiWidgetConfigActivity : ComponentActivity() {
                             Image(
                                 bitmap = previewBitmap.asImageBitmap(),
                                 contentDescription = "AI Widget Preview",
-                                modifier = Modifier.size(dispW, dispH)
+                                modifier = previewModifier
                             )
                         }
                     }
                 ) {
-                    if (selectedTabKey == "MODELS") {
+                    if (!isSingleAi && selectedTabKey == "MODELS") {
                         // Header
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -377,7 +390,7 @@ class AiWidgetConfigActivity : ComponentActivity() {
                             )
                         }
                     } else {
-                        // TAB 2: WIDGET THEME & STYLE
+                        // WIDGET THEME & STYLE TAB
                         val isLightBg = calculateLuminance(selectedBgHex) > 0.5f
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -500,8 +513,8 @@ class AiWidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
-                // Modal Picker Sheet
-                if (showAiPickerSheet) {
+                // Modal Picker Sheet (Only available for Multi-AI widgets)
+                if (!isSingleAi && showAiPickerSheet) {
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
                     ModalBottomSheet(
@@ -706,7 +719,7 @@ class AiWidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
-                // Color Picker
+                // Color Picker Dialog
                 activePickerTarget?.let { target ->
                     val initialColor = if (target == AiColorTarget.BACKGROUND) Color(selectedBgHex) else Color(selectedAccentHex)
                     CustomColorPickerDialog(
@@ -721,6 +734,21 @@ class AiWidgetConfigActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    private fun getSingleAiTarget(className: String): AiTarget? {
+        return when {
+            className.contains("GeminiText") -> AiTarget.GEMINI_TEXT
+            className.contains("ChatGptText") -> AiTarget.CHATGPT_TEXT
+            className.contains("ChatGptVoice") -> AiTarget.CHATGPT_VOICE
+            className.contains("Claude") && !className.contains("Folder") && !className.contains("Bar") -> AiTarget.CLAUDE
+            className.contains("Grok") && !className.contains("Folder") && !className.contains("Bar") -> AiTarget.GROK
+            className.contains("Perplexity") && !className.contains("Folder") && !className.contains("Bar") -> AiTarget.PERPLEXITY
+            className.contains("DeepSeek") && !className.contains("Folder") && !className.contains("Bar") -> AiTarget.DEEPSEEK
+            className.contains("Copilot") && !className.contains("Folder") && !className.contains("Bar") -> AiTarget.COPILOT
+            className.contains("MetaAi") && !className.contains("Folder") && !className.contains("Bar") -> AiTarget.META_AI
+            else -> null
         }
     }
 
