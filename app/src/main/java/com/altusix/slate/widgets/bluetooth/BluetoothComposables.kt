@@ -10,6 +10,9 @@ import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
 import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
+import kotlin.div
+import kotlin.text.toFloat
+import kotlin.times
 
 // =========================================================================
 // CANVAS BITMAP GENERATORS FOR NATIVE REMOTE VIEWS
@@ -332,53 +335,54 @@ fun generateEarbudsSquareBitmap(
 }
 
 /**
- * 2. Bluetooth Circular Dial Widget (2x2 Square / Responsive)
- * Features a unique audio-segmented 36-dash radial gauge, inner precision halo,
+ * 2. Bluetooth Circular Dial Widget (Strict 1:1 Circle)
+ * Audio-segmented 36-dash radial gauge, inner precision halo,
  * centered TWS earbud graphics, percentage readout, and multi-line status text.
  */
 fun generateBluetoothCircularDialBitmap(
     context: Context,
     deviceData: BluetoothDeviceData,
     slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val cx = w / 2f
+    val cy = h / 2f
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val dimColor = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x1CFFFFFF).toArgb()
+    val dimColor = if (isLight) 0x14000000 else 0x1CFFFFFF
 
-    val rect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
-    } else {
-        val cardSize = minOf(w, h).toFloat()
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
-
-    val cardSize = minOf(rect.width(), rect.height())
-    val cx = rect.centerX()
-    val cy = rect.centerY()
-
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, cardSize / 2f, bgPaint)
 
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawCircle(cx, cy, cardSize / 2f, borderPaint)
+
     // Gauge and Halo Logic
     val dynamicScale = (cardSize / 300f).coerceAtLeast(0.5f)
-    val margin = cardSize * 0.055f
-    val outerRadius = (cardSize / 2f) - margin
+    val ringMargin = cardSize * 0.055f
+    val outerRadius = (cardSize / 2f) - ringMargin
 
     val totalDashes = 36
     val activeDashes = if (deviceData.isConnected) {
@@ -421,14 +425,14 @@ fun generateBluetoothCircularDialBitmap(
 
     val haloRadius = dashInnerR - (8f * dynamicScale)
     val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0x18000000).toArgb() else Color(0x22FFFFFF).toArgb()
+        color = if (isLight) 0x18000000 else 0x22FFFFFF
         strokeWidth = 1.4f * dynamicScale
         style = Paint.Style.STROKE
     }
     canvas.drawCircle(cx, cy, haloRadius, haloPaint)
 
     val notchDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (deviceData.isConnected) accentColor else (if (isLight) Color(0x30000000).toArgb() else Color(0x40FFFFFF).toArgb())
+        color = if (deviceData.isConnected) accentColor else (if (isLight) 0x30000000 else 0x40FFFFFF)
         style = Paint.Style.FILL
     }
     val dotRadius = 2.2f * dynamicScale
@@ -439,28 +443,19 @@ fun generateBluetoothCircularDialBitmap(
         canvas.drawCircle(notchX, notchY, dotRadius, notchDotPaint)
     }
 
-    // =========================================================================
-    // 🎛️ SPACING AND SIZE CONTROLS
-    // =========================================================================
-
-    // 1. Earbud Size (Decrease divisor to make buds larger, default is 145f)
-    val earbudScaleDivisor = 140f
-    val earbudScale = (cardSize / (earbudScaleDivisor * density)).coerceAtLeast(0.40f)
+    // Earbud & Typography Layout
+    val earbudScale = (cardSize / (140f * scaleFactor)).coerceAtLeast(0.40f)
     val earbudSpacing = cardSize * 0.12f
 
-    // 2. Text Sizes
     val pctTextSize = cardSize * 0.12f
     val statusTextSize = cardSize * 0.042f
 
-    // 3. Gaps (Drastically reduced to pull elements tight together)
     val gapBudsToPct = cardSize * 0.04f
     val gapPctToStatus = cardSize * 0.04f
     val lineSpacing = cardSize * 0.050f
 
-    // =========================================================================
-
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
-    val secondaryTextColor = if (isLight) Color(0x99000000).toArgb() else Color(0x99FFFFFF).toArgb()
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
 
     val (line1, line2) = when {
         deviceData.needsPermission -> Pair("PERMISSION", "REQUIRED")
@@ -484,28 +479,21 @@ fun generateBluetoothCircularDialBitmap(
         letterSpacing = 0.05f
     }
 
-    // Optical text height calculation (removes invisible Android font padding for exact centering)
     val pctOpticalH = pctTextSize * 0.75f
     val statusOpticalH = statusTextSize * 0.75f
 
-    // Earbud bounds height calculation
-    val earbudTopExtent = 18f * density * earbudScale
-    val earbudBottomExtent = 23f * density * earbudScale
+    val earbudTopExtent = 18f * scaleFactor * earbudScale
+    val earbudBottomExtent = 23f * scaleFactor * earbudScale
 
-    // Unified Block Height Calculation
     val totalBlockH = earbudTopExtent + earbudBottomExtent +
             gapBudsToPct + pctOpticalH +
             gapPctToStatus + statusOpticalH +
             (if (hasLine2) lineSpacing else 0f)
 
     val blockOffsetY = cardSize * 0.025f
-
-    // Center the entire block perfectly to the canvas center (cy)
     val blockTop = cy - (totalBlockH / 2f) + blockOffsetY
 
-    // Component Y placements (Calculated sequentially from top to bottom)
     val earbudCy = blockTop + earbudTopExtent
-
     val pctBaselineY = earbudCy + earbudBottomExtent + gapBudsToPct + pctOpticalH
     val line1BaselineY = pctBaselineY + gapPctToStatus + statusOpticalH
 
@@ -518,7 +506,7 @@ fun generateBluetoothCircularDialBitmap(
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density
+        density = scaleFactor
     )
     drawScaledEarbudGraphic(
         canvas = canvas,
@@ -528,7 +516,7 @@ fun generateBluetoothCircularDialBitmap(
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density
+        density = scaleFactor
     )
 
     // 2. Draw Percentage
@@ -550,46 +538,34 @@ fun generateBluetoothCircularDialBitmap(
 }
 
 /**
- * 3. Bluetooth Ring Widget (2x2 Square / Responsive)
- * Features a thick outer battery progress ring, inner background circle,
+ * 3. Bluetooth Ring Widget (Strict 1:1 Circle)
+ * Outer battery progress ring, inner background circle,
  * TWS earbud graphics, status/percentage readout, and multi-line device label.
  */
 fun generateBluetoothRingBitmap(
     context: Context,
     deviceData: BluetoothDeviceData,
     slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val cx = w / 2f
+    val cy = h / 2f
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
-    val dimColor = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x22FFFFFF).toArgb()
-
-    val rect = if (isResponsive) {
-        RectF(0f, 0f, w.toFloat(), h.toFloat())
-    } else {
-        val cardSize = minOf(w, h).toFloat()
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
-
-    val cardSize = minOf(rect.width(), rect.height())
-    val cx = rect.centerX()
-    val cy = rect.centerY()
+    val dimColor = if (isLight) 0x14000000 else 0x22FFFFFF
 
     // 1. Draw Outer Ring
     val ringStrokeWidth = cardSize * 0.13f
-    val ringRadius = (cardSize / 2f) - (ringStrokeWidth / 2f) - (2f * density)
+    val ringRadius = (cardSize / 2f) - (ringStrokeWidth / 2f) - (scaleFactor * 1.5f)
 
     val ringRect = RectF(
         cx - ringRadius,
@@ -621,33 +597,37 @@ fun generateBluetoothRingBitmap(
 
     // 2. Draw Inner Background
     val innerRadius = ringRadius - (ringStrokeWidth / 2f)
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val innerBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, innerRadius, innerBgPaint)
 
-    // =========================================================================
-    // 🎛️ SPACING AND SIZE CONTROLS (Matched to Widget 2)
-    // =========================================================================
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawCircle(cx, cy, innerRadius, borderPaint)
 
-    // 1. Earbud Size (Decrease divisor to make buds larger, default is 145f)
-    val earbudScaleDivisor = 145f
-    val earbudScale = (cardSize / (earbudScaleDivisor * density)).coerceAtLeast(0.40f)
+    // Earbud & Typography Layout
+    val earbudScale = (cardSize / (145f * scaleFactor)).coerceAtLeast(0.40f)
     val earbudSpacing = cardSize * 0.12f
 
-    // 2. Text Sizes
     val pctTextSize = cardSize * 0.12f
     val statusTextSize = cardSize * 0.042f
 
-    // 3. Unified Gap (Equal space between Earbuds <-> Percentage <-> Status)
     val elementGap = cardSize * 0.03f
     val lineSpacing = cardSize * 0.050f
 
-    // =========================================================================
-
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
-    val secondaryTextColor = if (isLight) Color(0x99000000).toArgb() else Color(0x99FFFFFF).toArgb()
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
 
     val (line1, line2) = when {
         deviceData.needsPermission -> Pair("PERMISSION", "REQUIRED")
@@ -671,31 +651,21 @@ fun generateBluetoothRingBitmap(
         letterSpacing = 0.05f
     }
 
-    // Optical text height calculation (removes invisible Android font padding for exact centering)
-    val pctMetrics = pctPaint.fontMetrics
-    val statusMetrics = statusPaint.fontMetrics
-
     val pctOpticalH = pctTextSize * 0.75f
     val statusOpticalH = statusTextSize * 0.75f
 
-    // Earbud bounds height calculation
-    val earbudTopExtent = 18f * density * earbudScale
-    val earbudBottomExtent = 23f * density * earbudScale
+    val earbudTopExtent = 18f * scaleFactor * earbudScale
+    val earbudBottomExtent = 23f * scaleFactor * earbudScale
 
-    // Unified Block Height Calculation
     val totalBlockH = earbudTopExtent + earbudBottomExtent +
             elementGap + pctOpticalH +
             elementGap + statusOpticalH +
             (if (hasLine2) lineSpacing else 0f)
 
     val blockOffsetY = cardSize * 0.025f
-
-    // Center the entire block perfectly to the canvas center (cy)
     val blockTop = cy - (totalBlockH / 2f) + blockOffsetY
 
-    // Component Y placements (Calculated sequentially from top to bottom)
     val earbudCy = blockTop + earbudTopExtent
-
     val pctBaselineY = earbudCy + earbudBottomExtent + elementGap + pctOpticalH
     val line1BaselineY = pctBaselineY + elementGap + statusOpticalH
 
@@ -708,7 +678,7 @@ fun generateBluetoothRingBitmap(
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density
+        density = scaleFactor
     )
     drawScaledEarbudGraphic(
         canvas = canvas,
@@ -718,7 +688,7 @@ fun generateBluetoothRingBitmap(
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density
+        density = scaleFactor
     )
 
     // 2. Draw Percentage
@@ -740,13 +710,12 @@ fun generateBluetoothRingBitmap(
 }
 
 /**
- * 4. Bluetooth Earbuds Volume Control Widget (2x2 / Responsive)
+ * 4. Bluetooth Earbuds Volume Control Widget (Strict 1:1 Fixed Square)
  */
 fun generateEarbudsVolumeControlBitmap(
     context: Context,
     deviceData: BluetoothDeviceData,
     slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -756,28 +725,42 @@ fun generateEarbudsVolumeControlBitmap(
     val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
+    val trackColor = if (isLight) 0x14000000 else 0x1EFFFFFF
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
-    val rect = if (isResponsive) {
-        RectF(0f, 0f, w, h)
-    } else {
-        val cardSize = minOf(w, h)
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
+    // Strict 1:1 square bounds
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val rect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val paddingHorizontal = rect.width() * 0.065f
-    val paddingTopBottom = rect.height() * 0.05f
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, borderPaint)
+
+    val paddingHorizontal = cardSize * 0.065f
+    val paddingTopBottom = cardSize * 0.05f
 
     val contentRect = RectF(
         rect.left + paddingHorizontal,
@@ -809,14 +792,14 @@ fun generateEarbudsVolumeControlBitmap(
     val earbudSpacing = 16f * scaleFactor * baseScale
 
     val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (deviceData.isConnected) accentColor else if (isLight) Color(0xFF161618).toArgb() else Color.White.toArgb()
+        color = if (deviceData.isConnected) accentColor else primaryTextColor
         textSize = statusTextSize
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
 
     val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFF636366).toArgb() else Color.Gray.toArgb()
+        color = secondaryTextColor
         textSize = nameTextSize
         typeface = getSlateFont(context, weight = 400)
         textAlign = Paint.Align.CENTER
@@ -849,7 +832,7 @@ fun generateEarbudsVolumeControlBitmap(
     val barLeft = leftCx - (barW / 2f)
     val barRect = RectF(barLeft, barTop, barLeft + barW, barTop + barH)
 
-    // Draw Left Panel
+    // Draw Left Panel Earbuds
     drawScaledEarbudGraphic(
         canvas = canvas,
         cx = leftCx - earbudSpacing,
@@ -882,7 +865,7 @@ fun generateEarbudsVolumeControlBitmap(
     canvas.drawText(displayName.take(18), leftCx, nameY, namePaint)
 
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x22FFFFFF).toArgb()
+        color = trackColor
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(barRect, barH / 2f, barH / 2f, trackPaint)
@@ -900,12 +883,11 @@ fun generateEarbudsVolumeControlBitmap(
     // Right Rect: Volume Capsule Track
     val volCapsuleRadius = rightRect.width() / 2f
     val volBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0xFF222226).toArgb()
+        color = if (isLight) 0x14000000 else 0xFF222226.toInt()
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(rightRect, volCapsuleRadius, volCapsuleRadius, volBgPaint)
 
-    // Fallback volume level for clear rendering
     val rawVol = deviceData.volumeLevel
     val volPct = if (rawVol <= 0) 0.35f else (rawVol.coerceIn(0, 100) / 100f)
     val fillHeight = rightRect.height() * volPct
@@ -924,10 +906,10 @@ fun generateEarbudsVolumeControlBitmap(
         }
 
         canvas.save()
-        val clipPath = Path().apply {
+        val volClipPath = Path().apply {
             addRoundRect(rightRect, volCapsuleRadius, volCapsuleRadius, Path.Direction.CW)
         }
-        canvas.clipPath(clipPath)
+        canvas.clipPath(volClipPath)
         canvas.drawRect(volFillRect, volActivePaint)
         canvas.restore()
     }
@@ -948,9 +930,9 @@ fun generateEarbudsVolumeControlBitmap(
             val g = ((accentColor shr 8) and 0xFF) / 255f
             val b = (accentColor and 0xFF) / 255f
             val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
-            if (luminance > 0.5f) Color(0xFF121214).toArgb() else Color.White.toArgb()
+            if (luminance > 0.5f) 0xFF121214.toInt() else android.graphics.Color.WHITE
         } else {
-            if (isLight) Color(0xFF2C2C30).toArgb() else Color.White.toArgb()
+            if (isLight) 0xFF2C2C30.toInt() else android.graphics.Color.WHITE
         }
     }
 
@@ -976,15 +958,13 @@ fun generateEarbudsVolumeControlBitmap(
     return bitmap
 }
 
-
 /**
- * 5. Bluetooth Tri-Battery Studio Dock Widget (Fixed Proportional Aspect Ratio)
+ * 5. Bluetooth Tri-Battery Studio Dock Widget (Strict 1:1 Fixed Square)
  */
 fun generateBluetoothTriBatteryDockBitmap(
     context: Context,
     deviceData: BluetoothDeviceData,
     slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -994,31 +974,49 @@ fun generateBluetoothTriBatteryDockBitmap(
     val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
+    val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
+    val podBgColor = if (isLight) 0x0A000000 else 0x14FFFFFF
+    val trackBarColor = if (isLight) 0x12000000 else 0x1AFFFFFF
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
-    val cardSize = minOf(w, h)
+    // Standard outer boundary margin
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
-    val rect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
+    // 1. Card Surface & Edge Border
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val paddingH = cardSize * 0.065f
-    val paddingV = cardSize * 0.065f
-    val contentRect = RectF(rect.left + paddingH, rect.top + paddingV, rect.right - paddingH, rect.bottom - paddingV)
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
-    val secondaryTextColor = if (isLight) Color(0x99000000).toArgb() else Color(0x99FFFFFF).toArgb()
-    val podBgColor = if (isLight) Color(0xFFF2F2F7).toArgb() else Color(0xFF1E1E22).toArgb()
+    // 2. Compact Content Padding
+    val padH = cardSize * 0.05f
+    val padV = cardSize * 0.05f
+    val contentRect = RectF(cardRect.left + padH, cardRect.top + padV, cardRect.right - padH, cardRect.bottom - padV)
 
-    val headerTextSize = contentRect.width() * 0.058f
+    // 3. Header Row: Device Name & Status Dot
+    val headerTextSize = (contentRect.width() * 0.052f).coerceIn(scaleFactor * 8.5f, scaleFactor * 12.5f)
     val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
         textSize = headerTextSize
@@ -1027,64 +1025,72 @@ fun generateBluetoothTriBatteryDockBitmap(
         letterSpacing = 0.05f
     }
 
-    val headerY = contentRect.top + headerTextSize
-    val deviceTitle = if (deviceData.needsPermission) "GRANT PERMISSION" else if (deviceData.isConnected) deviceData.deviceName.uppercase() else "DISCONNECTED"
-    canvas.drawText(deviceTitle.take(18), contentRect.left, headerY, headerPaint)
-
-    val dotRadius = headerTextSize * 0.35f
+    val dotRadius = headerTextSize * 0.32f
     val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (deviceData.isConnected) accentColor else Color(0xFFFF3B30).toArgb()
+        color = if (deviceData.isConnected) accentColor else 0xFFFF3B30.toInt()
         style = Paint.Style.FILL
     }
-    canvas.drawCircle(contentRect.right - dotRadius, headerY - (headerTextSize * 0.35f), dotRadius, dotPaint)
 
-    val headerHeight = headerTextSize + (cardSize * 0.045f)
+    val deviceTitle = if (deviceData.needsPermission) "GRANT PERMISSION" else if (deviceData.isConnected) deviceData.deviceName.uppercase() else "DISCONNECTED"
+
+    val fmHeader = headerPaint.fontMetrics
+    val headerY = contentRect.top + headerTextSize - fmHeader.descent
+    canvas.drawText(deviceTitle.take(20), contentRect.left, headerY, headerPaint)
+    canvas.drawCircle(contentRect.right - dotRadius, headerY - (headerTextSize * 0.32f), dotRadius, dotPaint)
+
+    // 4. Pods Area Layout
+    val headerHeight = headerTextSize + (cardSize * 0.035f)
     val podsArea = RectF(contentRect.left, contentRect.top + headerHeight, contentRect.right, contentRect.bottom)
 
-    val podGap = podsArea.width() * 0.04f
-    val topRowH = (podsArea.height() - podGap) * 0.57f
-    val bottomRowH = (podsArea.height() - podGap) * 0.43f
-
+    val podGap = podsArea.width() * 0.035f
+    val topRowH = (podsArea.height() - podGap) * 0.58f
+    val bottomRowH = (podsArea.height() - podGap) * 0.42f
     val podW = (podsArea.width() - podGap) / 2f
-    val podRadius = (cardCornerRadius - paddingH).coerceAtLeast(scaleFactor * 6f)
+    val podRadius = scaleFactor * 12f
 
     val podBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = podBgColor
         style = Paint.Style.FILL
     }
-
-    val trackBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isLight) Color(0xFFE5E5EA).toArgb() else Color(0x22FFFFFF).toArgb()
-        style = Paint.Style.FILL
+    val podBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x10000000 else 0x16FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.75f
     }
 
+    val trackBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = trackBarColor
+        style = Paint.Style.FILL
+    }
     val activeBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.FILL
     }
 
     val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        textSize = topRowH * 0.18f
+        color = secondaryTextColor
+        textSize = (topRowH * 0.15f).coerceIn(scaleFactor * 8.5f, scaleFactor * 12f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.RIGHT
     }
 
     val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = topRowH * 0.22f
+        textSize = (topRowH * 0.22f).coerceIn(scaleFactor * 13f, scaleFactor * 20f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.RIGHT
     }
 
-    val earbudScale = (topRowH * 0.45f) / (38f * scaleFactor)
+    val earbudScale = ((topRowH * 0.48f) / (46f * scaleFactor)).coerceIn(0.40f, 1.4f)
+    val miniBarH = (topRowH * 0.07f).coerceIn(scaleFactor * 4f, scaleFactor * 6.5f)
 
     // POD 1: LEFT EARBUD
     val leftPod = RectF(podsArea.left, podsArea.top, podsArea.left + podW, podsArea.top + topRowH)
     canvas.drawRoundRect(leftPod, podRadius, podRadius, podBgPaint)
+    canvas.drawRoundRect(leftPod, podRadius, podRadius, podBorderPaint)
 
-    val leftBudCx = leftPod.left + (leftPod.width() * 0.26f)
-    val leftBudCy = leftPod.top + (leftPod.height() * 0.38f)
+    val leftBudCx = leftPod.left + (leftPod.width() * 0.28f)
+    val leftBudCy = leftPod.top + (leftPod.height() * 0.40f)
 
     drawScaledEarbudGraphic(
         canvas = canvas,
@@ -1097,32 +1103,33 @@ fun generateBluetoothTriBatteryDockBitmap(
         density = scaleFactor
     )
 
-    val textRightX = leftPod.right - (leftPod.width() * 0.10f)
-    canvas.drawText("L", textRightX, leftPod.top + (leftPod.height() * 0.28f), badgePaint)
+    val textRightX = leftPod.right - (leftPod.width() * 0.12f)
+    canvas.drawText("L", textRightX, leftPod.top + (leftPod.height() * 0.30f), badgePaint)
 
     val leftPctText = if (deviceData.isConnected) "${deviceData.leftBattery}%" else "--"
     canvas.drawText(leftPctText, textRightX, leftPod.top + (leftPod.height() * 0.58f), pctPaint)
 
-    val miniBarH = leftPod.height() * 0.065f
-    val miniBarRect = RectF(
+    val leftMiniBarRect = RectF(
         leftPod.left + (leftPod.width() * 0.10f),
-        leftPod.bottom - (leftPod.height() * 0.16f),
+        leftPod.bottom - (leftPod.height() * 0.14f) - miniBarH,
         leftPod.right - (leftPod.width() * 0.10f),
-        leftPod.bottom - (leftPod.height() * 0.16f) + miniBarH
+        leftPod.bottom - (leftPod.height() * 0.14f)
     )
-    canvas.drawRoundRect(miniBarRect, miniBarH / 2f, miniBarH / 2f, trackBarPaint)
-    if (deviceData.isConnected) {
+    canvas.drawRoundRect(leftMiniBarRect, miniBarH / 2f, miniBarH / 2f, trackBarPaint)
+    if (deviceData.isConnected && deviceData.leftBattery > 0) {
         val pct = deviceData.leftBattery.coerceIn(0, 100) / 100f
-        val activeRect = RectF(miniBarRect.left, miniBarRect.top, miniBarRect.left + (miniBarRect.width() * pct), miniBarRect.bottom)
+        val fillW = leftMiniBarRect.width() * pct
+        val activeRect = RectF(leftMiniBarRect.left, leftMiniBarRect.top, leftMiniBarRect.left + fillW.coerceAtLeast(miniBarH), leftMiniBarRect.bottom)
         canvas.drawRoundRect(activeRect, miniBarH / 2f, miniBarH / 2f, activeBarPaint)
     }
 
     // POD 2: RIGHT EARBUD
     val rightPod = RectF(podsArea.right - podW, podsArea.top, podsArea.right, podsArea.top + topRowH)
     canvas.drawRoundRect(rightPod, podRadius, podRadius, podBgPaint)
+    canvas.drawRoundRect(rightPod, podRadius, podRadius, podBorderPaint)
 
-    val rightBudCx = rightPod.left + (rightPod.width() * 0.26f)
-    val rightBudCy = rightPod.top + (rightPod.height() * 0.38f)
+    val rightBudCx = rightPod.left + (rightPod.width() * 0.28f)
+    val rightBudCy = rightPod.top + (rightPod.height() * 0.40f)
 
     drawScaledEarbudGraphic(
         canvas = canvas,
@@ -1135,31 +1142,33 @@ fun generateBluetoothTriBatteryDockBitmap(
         density = scaleFactor
     )
 
-    val rightTextRightX = rightPod.right - (rightPod.width() * 0.10f)
-    canvas.drawText("R", rightTextRightX, rightPod.top + (rightPod.height() * 0.28f), badgePaint)
+    val rightTextRightX = rightPod.right - (rightPod.width() * 0.12f)
+    canvas.drawText("R", rightTextRightX, rightPod.top + (rightPod.height() * 0.30f), badgePaint)
 
     val rightPctText = if (deviceData.isConnected) "${deviceData.rightBattery}%" else "--"
     canvas.drawText(rightPctText, rightTextRightX, rightPod.top + (rightPod.height() * 0.58f), pctPaint)
 
     val rightMiniBarRect = RectF(
         rightPod.left + (rightPod.width() * 0.10f),
-        rightPod.bottom - (rightPod.height() * 0.16f),
+        rightPod.bottom - (rightPod.height() * 0.14f) - miniBarH,
         rightPod.right - (rightPod.width() * 0.10f),
-        rightPod.bottom - (rightPod.height() * 0.16f) + miniBarH
+        rightPod.bottom - (rightPod.height() * 0.14f)
     )
     canvas.drawRoundRect(rightMiniBarRect, miniBarH / 2f, miniBarH / 2f, trackBarPaint)
-    if (deviceData.isConnected) {
+    if (deviceData.isConnected && deviceData.rightBattery > 0) {
         val pct = deviceData.rightBattery.coerceIn(0, 100) / 100f
-        val activeRect = RectF(rightMiniBarRect.left, rightMiniBarRect.top, rightMiniBarRect.left + (rightMiniBarRect.width() * pct), rightMiniBarRect.bottom)
+        val fillW = rightMiniBarRect.width() * pct
+        val activeRect = RectF(rightMiniBarRect.left, rightMiniBarRect.top, rightMiniBarRect.left + fillW.coerceAtLeast(miniBarH), rightMiniBarRect.bottom)
         canvas.drawRoundRect(activeRect, miniBarH / 2f, miniBarH / 2f, activeBarPaint)
     }
 
-    // POD 3: CHARGING CASE
+    // POD 3: CHARGING CASE (Tightly Clustered & Bounded Spacing)
     val casePod = RectF(podsArea.left, podsArea.bottom - bottomRowH, podsArea.right, podsArea.bottom)
     canvas.drawRoundRect(casePod, podRadius, podRadius, podBgPaint)
+    canvas.drawRoundRect(casePod, podRadius, podRadius, podBorderPaint)
 
-    val caseScale = (bottomRowH * 0.45f) / (17f * scaleFactor)
-    val caseCx = casePod.left + (casePod.width() * 0.16f)
+    val caseScale = ((bottomRowH * 0.45f) / (20f * scaleFactor)).coerceIn(0.40f, 1.3f)
+    val caseCx = casePod.left + (casePod.width() * 0.13f)
     val caseCy = casePod.centerY()
 
     drawScaledCaseGraphic(
@@ -1172,28 +1181,42 @@ fun generateBluetoothTriBatteryDockBitmap(
         density = scaleFactor
     )
 
-    val textStartX = casePod.left + (casePod.width() * 0.33f)
+    val textStartX = casePod.left + (casePod.width() * 0.27f)
+
+    // Tightly bound title and percentage vertical stack inside the case pod
+    val caseTitleSize = (bottomRowH * 0.24f).coerceIn(scaleFactor * 8.5f, scaleFactor * 11.5f)
+    val casePctSize = (bottomRowH * 0.36f).coerceIn(scaleFactor * 12f, scaleFactor * 17.5f)
 
     val caseTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = casePod.height() * 0.20f
+        textSize = caseTitleSize
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.LEFT
-        letterSpacing = 0.06f
+        letterSpacing = 0.05f
     }
-    canvas.drawText("CASE", textStartX, casePod.top + (casePod.height() * 0.38f), caseTitlePaint)
-
-    val casePctText = if (deviceData.isConnected) "${deviceData.caseBattery}%" else "--"
     val casePctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = casePod.height() * 0.26f
+        textSize = casePctSize
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.LEFT
     }
-    canvas.drawText(casePctText, textStartX, casePod.top + (casePod.height() * 0.72f), casePctPaint)
 
-    val caseBarW = casePod.width() * 0.30f
-    val caseBarH = casePod.height() * 0.12f
+    val fmCaseTitle = caseTitlePaint.fontMetrics
+    val fmCasePct = casePctPaint.fontMetrics
+
+    val caseTextStackH = (fmCaseTitle.descent - fmCaseTitle.ascent) + (scaleFactor * 2f) + (fmCasePct.descent - fmCasePct.ascent)
+    val caseStackTop = casePod.top + (casePod.height() - caseTextStackH) / 2f
+
+    val caseTitleY = caseStackTop - fmCaseTitle.ascent
+    val casePctY = caseStackTop + (fmCaseTitle.descent - fmCaseTitle.ascent) + (scaleFactor * 2f) - fmCasePct.ascent
+
+    canvas.drawText("CASE", textStartX, caseTitleY, caseTitlePaint)
+    val casePctText = if (deviceData.isConnected) "${deviceData.caseBattery}%" else "--"
+    canvas.drawText(casePctText, textStartX, casePctY, casePctPaint)
+
+    // Case Battery Bar on the Right
+    val caseBarW = casePod.width() * 0.32f
+    val caseBarH = (bottomRowH * 0.15f).coerceIn(scaleFactor * 4.5f, scaleFactor * 7.5f)
     val caseBarRect = RectF(
         casePod.right - (casePod.width() * 0.08f) - caseBarW,
         casePod.centerY() - (caseBarH / 2f),
@@ -1201,9 +1224,10 @@ fun generateBluetoothTriBatteryDockBitmap(
         casePod.centerY() + (caseBarH / 2f)
     )
     canvas.drawRoundRect(caseBarRect, caseBarH / 2f, caseBarH / 2f, trackBarPaint)
-    if (deviceData.isConnected) {
+    if (deviceData.isConnected && deviceData.caseBattery > 0) {
         val pct = deviceData.caseBattery.coerceIn(0, 100) / 100f
-        val activeRect = RectF(caseBarRect.left, caseBarRect.top, caseBarRect.left + (caseBarRect.width() * pct), caseBarRect.bottom)
+        val fillW = caseBarRect.width() * pct
+        val activeRect = RectF(caseBarRect.left, caseBarRect.top, caseBarRect.left + fillW.coerceAtLeast(caseBarH), caseBarRect.bottom)
         canvas.drawRoundRect(activeRect, caseBarH / 2f, caseBarH / 2f, activeBarPaint)
     }
 
@@ -1211,43 +1235,50 @@ fun generateBluetoothTriBatteryDockBitmap(
 }
 
 /**
- * 6. Bluetooth Tri-Battery Circular Stage Widget (2x2 / Responsive)
+ * 6. Bluetooth Tri-Battery Circular Stage Widget (Strict 1:1 Fixed Circle)
  */
 fun generateBluetoothTriBatteryCircleBitmap(
     context: Context,
     deviceData: BluetoothDeviceData,
     slateConfig: SlateWidgetConfig,
-    isResponsive: Boolean,
     wDp: Int,
     hDp: Int
 ): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val w = (wDp * density).toInt().coerceAtLeast(1)
-    val h = (hDp * density).toInt().coerceAtLeast(1)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val isLight = slateConfig.themeMode == "LIGHT"
-    val bgColor = Color(slateConfig.backgroundColorHex).copy(alpha = slateConfig.opacity).toArgb()
+    val bgColor = getSafeBgColor(slateConfig)
     val accentColor = Color(slateConfig.accentColorHex).toArgb()
 
-    val cardSize = minOf(w, h).toFloat()
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w, h) - (margin * 2f)
     val cx = w / 2f
     val cy = h / 2f
-    val radius = (cardSize / 2f) - (2f * density)
+    val radius = cardSize / 2f
 
+    val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
     canvas.drawCircle(cx, cy, radius, bgPaint)
 
-    val primaryTextColor = if (isLight) Color(0xFF161618).toArgb() else Color(0xFFFFFFFF).toArgb()
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawCircle(cx, cy, radius, borderPaint)
 
-    val earbudScale = (radius / (50f * density)).coerceAtLeast(0.40f)
-
-    val earbudSpread = radius * 0.2f
+    val earbudScale = (radius / (50f * scaleFactor)).coerceAtLeast(0.40f)
 
     drawScaledEarbudGraphic(
         canvas = canvas,
@@ -1257,19 +1288,19 @@ fun generateBluetoothTriBatteryCircleBitmap(
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density,
+        density = scaleFactor,
         flipTip = false
     )
 
     drawScaledEarbudGraphic(
         canvas = canvas,
-        cx = cx - (radius * -0.28f),
-        cy = cy - (radius * -0.14f),
+        cx = cx + (radius * 0.28f),
+        cy = cy - (radius * 0.14f),
         angleDeg = 30f,
         scale = earbudScale,
         accentColor = accentColor,
         isLightMode = isLight,
-        density = density,
+        density = scaleFactor,
         flipTip = true
     )
 
@@ -1282,9 +1313,9 @@ fun generateBluetoothTriBatteryCircleBitmap(
         else -> "DISCONNECTED"
     }
 
-    val statusTextSize = (radius * 0.15f).coerceIn(8f * density, 16f * density)
+    val statusTextSize = (radius * 0.15f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
     val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (deviceData.isConnected) accentColor else Color(0xFFFF3B30).toArgb()
+        color = if (deviceData.isConnected) accentColor else 0xFFFF3B30.toInt()
         textSize = statusTextSize
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
@@ -1304,9 +1335,9 @@ fun generateBluetoothTriBatteryCircleBitmap(
     val cVal = if (deviceData.isConnected) "${deviceData.caseBattery}%" else "--"
     val batteryText = "L $lVal  /  R $rVal  /  C $cVal"
 
-    val batteryTextSize = (radius * 0.12f).coerceIn(8f * density, 15f * density)
+    val batteryTextSize = (radius * 0.12f).coerceIn(scaleFactor * 8f, scaleFactor * 15f)
     val batteryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (deviceData.isConnected) accentColor else Color(0xFFFF3B30).toArgb()
+        color = if (deviceData.isConnected) accentColor else 0xFFFF3B30.toInt()
         textSize = batteryTextSize
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER

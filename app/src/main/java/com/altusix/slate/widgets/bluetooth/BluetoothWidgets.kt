@@ -14,6 +14,7 @@ import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.data.local.SlateWidgetConfig
 import com.altusix.slate.data.local.loadSlateWidgetConfig
+import kotlin.or
 
 // =========================================================================
 // CATALOG PROVIDER
@@ -22,11 +23,11 @@ import com.altusix.slate.data.local.loadSlateWidgetConfig
 fun getBluetoothWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Bluetooth Earbuds", "2x2", "Bluetooth", EarbudsSquareReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Bluetooth Circular Dial", "2x2", "Bluetooth", EarbudsCircularReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Bluetooth Ring Widget", "2x2", "Bluetooth", EarbudsRingReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Bluetooth Volume Control", "2x2", "Bluetooth", EarbudsVolumeReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Bluetooth Tri-Battery Dock", "2x2", "Bluetooth", EarbudsTriDockReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Bluetooth Tri-Battery Circle", "2x2", "Bluetooth", EarbudsTriCircleReceiver::class.java, hasModeOption = true)
+        SlateWidgetInfo("Bluetooth Circular Dial", "2x2", "Bluetooth", EarbudsCircularReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Bluetooth Ring Widget", "2x2", "Bluetooth", EarbudsRingReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Bluetooth Volume Control", "2x2", "Bluetooth", EarbudsVolumeReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Bluetooth Tri-Battery Dock", "2x2", "Bluetooth", EarbudsTriDockReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Bluetooth Tri-Battery Circle", "2x2", "Bluetooth", EarbudsTriCircleReceiver::class.java, hasModeOption = false)
     )
 }
 
@@ -224,7 +225,7 @@ class EarbudsCircularReceiver : BaseBluetoothReceiver(targetAspect = 1.0f) {
         } else {
             BluetoothDataReader.readCurrentDeviceStatus(context)
         }
-        return generateBluetoothCircularDialBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+        return generateBluetoothCircularDialBitmap(context, deviceData, config, wDp, hDp)
     }
 }
 
@@ -245,12 +246,12 @@ class EarbudsRingReceiver : BaseBluetoothReceiver(targetAspect = 1.0f) {
         } else {
             BluetoothDataReader.readCurrentDeviceStatus(context)
         }
-        return generateBluetoothRingBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+        return generateBluetoothRingBitmap(context, deviceData, config, wDp, hDp)
     }
 }
 
 /**
- * 4. Bluetooth Earbuds Volume Control Receiver (2x2 with Interactive Volume Buttons)
+ * 4. Bluetooth Earbuds Volume Control Receiver (Fixed 2x2)
  */
 class EarbudsVolumeReceiver : AppWidgetProvider() {
 
@@ -265,7 +266,6 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
         context: Context,
         appWidgetId: Int,
         config: SlateWidgetConfig,
-        isResponsive: Boolean,
         wDp: Int,
         hDp: Int
     ): Bitmap {
@@ -274,7 +274,7 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
         } else {
             BluetoothDataReader.readCurrentDeviceStatus(context)
         }
-        return generateEarbudsVolumeControlBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+        return generateEarbudsVolumeControlBitmap(context, deviceData, config, wDp, hDp)
     }
 
     fun renderBitmapForWidget(
@@ -284,7 +284,7 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
         wDp: Int,
         hDp: Int,
         widgetId: Int
-    ): Bitmap = renderWidgetBitmap(context, widgetId, config, isResponsive, wDp, hDp)
+    ): Bitmap = renderWidgetBitmap(context, widgetId, config, wDp, hDp)
 
     override fun onReceive(context: Context, intent: Intent) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -338,7 +338,6 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
     ) {
         try {
             val config = loadSlateWidgetConfig(context, appWidgetId)
-            val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
 
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -353,34 +352,27 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
             val hDp = if (hDpRaw <= 0) fallbackSize.second else hDpRaw
             val density = context.resources.displayMetrics.density
 
+            val currentAspect = wDp.toFloat() / hDp.toFloat()
             val padH: Int
             val padV: Int
             val effWDp: Int
             val effHDp: Int
 
-            if (!isResponsive && targetAspect > 0f) {
-                val currentAspect = wDp.toFloat() / hDp.toFloat()
-                if (currentAspect > targetAspect) {
-                    val contentW = hDp * targetAspect
-                    padH = (((wDp - contentW) / 2f) * density).toInt()
-                    padV = 0
-                    effWDp = maxOf(1, contentW.toInt())
-                    effHDp = hDp
-                } else {
-                    val contentH = wDp / targetAspect
-                    padH = 0
-                    padV = (((hDp - contentH) / 2f) * density).toInt()
-                    effWDp = wDp
-                    effHDp = maxOf(1, contentH.toInt())
-                }
-            } else {
-                padH = 0
+            if (currentAspect > targetAspect) {
+                val contentW = hDp * targetAspect
+                padH = (((wDp - contentW) / 2f) * density).toInt()
                 padV = 0
-                effWDp = wDp
+                effWDp = maxOf(1, contentW.toInt())
                 effHDp = hDp
+            } else {
+                val contentH = wDp / targetAspect
+                padH = 0
+                padV = (((hDp - contentH) / 2f) * density).toInt()
+                effWDp = wDp
+                effHDp = maxOf(1, contentH.toInt())
             }
 
-            val bitmap = renderWidgetBitmap(context, appWidgetId, config, isResponsive, effWDp, effHDp)
+            val bitmap = renderWidgetBitmap(context, appWidgetId, config, effWDp, effHDp)
 
             val views = RemoteViews(context.packageName, R.layout.widget_split_vertical_control_layout)
             views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
@@ -437,7 +429,7 @@ class EarbudsVolumeReceiver : AppWidgetProvider() {
 }
 
 /**
- * 5. Bluetooth Tri-Battery Dock Receiver (Structured Pod Layout)
+ * 5. Bluetooth Tri-Battery Dock Receiver (Fixed 2x2)
  */
 class EarbudsTriDockReceiver : BaseBluetoothReceiver(targetAspect = 1.0f) {
     override fun renderWidgetBitmap(
@@ -453,12 +445,12 @@ class EarbudsTriDockReceiver : BaseBluetoothReceiver(targetAspect = 1.0f) {
         } else {
             BluetoothDataReader.readCurrentDeviceStatus(context)
         }
-        return generateBluetoothTriBatteryDockBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+        return generateBluetoothTriBatteryDockBitmap(context, deviceData, config, wDp, hDp)
     }
 }
 
 /**
- * 6. Bluetooth Tri-Battery Circle Receiver (Curved Arc Stage Layout)
+ * 6. Bluetooth Tri-Battery Circle Receiver (Fixed 2x2)
  */
 class EarbudsTriCircleReceiver : BaseBluetoothReceiver(targetAspect = 1.0f) {
     override fun renderWidgetBitmap(
@@ -474,7 +466,7 @@ class EarbudsTriCircleReceiver : BaseBluetoothReceiver(targetAspect = 1.0f) {
         } else {
             BluetoothDataReader.readCurrentDeviceStatus(context)
         }
-        return generateBluetoothTriBatteryCircleBitmap(context, deviceData, config, isResponsive, wDp, hDp)
+        return generateBluetoothTriBatteryCircleBitmap(context, deviceData, config, wDp, hDp)
     }
 }
 
