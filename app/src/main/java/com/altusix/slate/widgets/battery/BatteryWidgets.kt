@@ -2,6 +2,7 @@
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -10,31 +11,34 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.BatteryManager
 import android.os.Build
-import com.altusix.slate.core.model.SlateWidgetInfo
-import com.altusix.slate.core.receiver.BaseCanvasWidgetProvider
-import com.altusix.slate.data.local.SlateWidgetConfig
-import com.altusix.slate.utils.getSafeBgColor
+import android.os.Bundle
+import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
+import com.altusix.slate.R
+import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.service.BatteryWidgetService
+import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.data.local.loadSlateWidgetConfig
+import com.altusix.slate.utils.getSafeBgColor
 
 fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
-        SlateWidgetInfo("Dot Level Header", "2x2", "Battery", DotLevelHeaderBatteryReceiver::class.java),
-        SlateWidgetInfo("Dot Level Pure", "2x2", "Battery", DotLevelPureBatteryReceiver::class.java),
-        SlateWidgetInfo("Minimal Linear", "2x2", "Battery", MinimalLinearBatteryReceiver::class.java),
-        SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java),
-        SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java),
-        SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java),
+        SlateWidgetInfo("Dot Level Header", "2x2", "Battery", DotLevelHeaderBatteryReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Dot Level Pure", "2x2", "Battery", DotLevelPureBatteryReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Minimal Linear", "2x2", "Battery", MinimalLinearBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Multi-Device", "4x2", "Battery", BatteryMultiDeviceStatsReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java),
-        SlateWidgetInfo("Dot Level Meter Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java),
-        SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java),
-        SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java),
-        SlateWidgetInfo("Pixel Heart", "2x2", "Battery", PixelHeartBatteryReceiver::class.java),
+        SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Dot Level Meter Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Pixel Heart", "2x2", "Battery", PixelHeartBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Lightning Bolt", "2x2", "Battery", LightningBoltBatteryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Circular Dial", "2x2", "Battery", CircularRingBatteryReceiver::class.java),
-        SlateWidgetInfo("Vertical Pill", "1x2", "Battery", VerticalBatteryPillReceiver::class.java),
-        SlateWidgetInfo("Horizontal Pill", "2x1", "Battery", HorizontalBatteryPillReceiver::class.java)
+        SlateWidgetInfo("Circular Dial", "2x2", "Battery", CircularRingBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Vertical Pill", "1x2", "Battery", VerticalBatteryPillReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Horizontal Pill", "2x1", "Battery", HorizontalBatteryPillReceiver::class.java, hasModeOption = true)
     )
 }
 
@@ -126,73 +130,109 @@ fun readDetailedBatteryStatus(context: Context): DetailedBatteryData {
     }
 }
 
-fun updateAllBatteryWidgets(context: Context) {
-    val receivers = listOf(
-        DotLevelHeaderBatteryReceiver::class.java,
-        DotLevelPureBatteryReceiver::class.java,
-        MinimalLinearBatteryReceiver::class.java,
-        MinimalRingBatteryReceiver::class.java,
-        BatteryMultiDeviceStatsReceiver::class.java,
-        HorizontalBatteryReceiver::class.java,
-        ArcGaugeBatteryReceiver::class.java,
-        EditorialStatsBatteryReceiver::class.java,
-        DotMatrixBatteryLEDReceiver::class.java,
-        DotLevelMeterWideReceiver::class.java,
-        SegmentedPillBatteryReceiver::class.java,
-        PixelHeartBatteryReceiver::class.java,
-        LightningBoltBatteryReceiver::class.java,
-        CircularRingBatteryReceiver::class.java,
-        VerticalBatteryPillReceiver::class.java,
-        HorizontalBatteryPillReceiver::class.java
-    )
+fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
+    val modeKey = "widget_${widgetId}_mode"
+    val isResponsiveKey = "widget_${widgetId}_is_responsive"
 
-    val manager = AppWidgetManager.getInstance(context)
-    for (receiver in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
-        if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiver).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
-        }
+    if (widgetPrefs.contains(modeKey)) {
+        return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
     }
+    if (widgetPrefs.contains(isResponsiveKey)) {
+        return widgetPrefs.getBoolean(isResponsiveKey, true)
+    }
+
+    val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
+    val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
+    widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
+    return defaultResponsive
 }
 
-abstract class BaseBatteryReceiver : BaseCanvasWidgetProvider() {
+abstract class BaseBatteryReceiver(
+    open val targetAspect: Float = 1.0f
+) : AppWidgetProvider() {
+
+    abstract fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap
+
+    fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = renderWidgetBitmap(context, widgetId, config, isResponsive, wDp, hDp)
+
+    open fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? {
+        val intent = Intent(Intent.ACTION_POWER_USAGE_SUMMARY).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        return if (intent.resolveActivity(context.packageManager) != null) {
+            PendingIntent.getActivity(
+                context,
+                appWidgetId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            null
+        }
+    }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        // Start the real-time service when the first widget is placed
-        val serviceIntent = Intent(context, BatteryWidgetService::class.java)
-        ContextCompat.startForegroundService(context, serviceIntent)
+        try {
+            val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+            ContextCompat.startForegroundService(context, serviceIntent)
+        } catch (_: Exception) {}
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // Ensure the service restarts if the phone reboots or app updates
-        val serviceIntent = Intent(context, BatteryWidgetService::class.java)
-        ContextCompat.startForegroundService(context, serviceIntent)
+        try {
+            val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+            ContextCompat.startForegroundService(context, serviceIntent)
+        } catch (_: Exception) {}
+        for (appWidgetId in appWidgetIds) {
+            updateSingleWidget(context, appWidgetManager, appWidgetId)
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateSingleWidget(context, appWidgetManager, appWidgetId)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        // Stop the service when the last widget is removed to save battery
-        val serviceIntent = Intent(context, BatteryWidgetService::class.java)
-        context.stopService(serviceIntent)
+        try {
+            val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+            context.stopService(serviceIntent)
+        } catch (_: Exception) {}
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         val action = intent.action
 
-        // Failsafe restart of service
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            val serviceIntent = Intent(context, BatteryWidgetService::class.java)
-            ContextCompat.startForegroundService(context, serviceIntent)
+            try {
+                val serviceIntent = Intent(context, BatteryWidgetService::class.java)
+                ContextCompat.startForegroundService(context, serviceIntent)
+            } catch (_: Exception) {}
         }
 
-        // Standard system power fallbacks
         if (action == Intent.ACTION_POWER_CONNECTED ||
             action == Intent.ACTION_POWER_DISCONNECTED ||
             action == Intent.ACTION_BATTERY_LOW ||
@@ -202,80 +242,200 @@ abstract class BaseBatteryReceiver : BaseCanvasWidgetProvider() {
         }
     }
 
-    override fun getClickPendingIntent(context: Context, appWidgetId: Int): PendingIntent? = null
-}
+    fun updateSingleWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
+        try {
+            val config = loadSlateWidgetConfig(context, appWidgetId)
+            val isResponsive = if (appWidgetId == -1) true else parseAndLockIsResponsive(context, appWidgetId)
 
-// Minimal Linear Tile (2x2)
-class MinimalLinearBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateBatteryMinimalLinearBitmap(context, data, config, wDp, hDp)
-    }
-}
+            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val fallbackSize = when {
+                targetAspect >= 3.5f -> 280 to 70
+                targetAspect in 1.8f..2.4f -> 280 to 130
+                targetAspect in 0.4f..0.6f -> 70 to 140
+                else -> 150 to 150
+            }
 
-// Minimal Ring Tile (2x2)
-class MinimalRingBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateBatteryMinimalRingBitmap(context, data, config, wDp, hDp)
-    }
-}
+            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackSize.first) ?: fallbackSize.first
+            else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackSize.first) ?: fallbackSize.first
+            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackSize.second) ?: fallbackSize.second
+            else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackSize.second) ?: fallbackSize.second
 
-// 7. MULTI-DEVICE STATS BENTO (4x2 / Adaptive)
-class BatteryMultiDeviceStatsReceiver : BaseBatteryReceiver() {
+            val wDp = if (wDpRaw <= 0) fallbackSize.first else wDpRaw
+            val hDp = if (hDpRaw <= 0) fallbackSize.second else hDpRaw
+            val density = context.resources.displayMetrics.density
 
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        val isResponsiveKey = "widget_${widgetId}_is_responsive"
+            val padH: Int
+            val padV: Int
+            val effWDp: Int
+            val effHDp: Int
 
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
+            if (!isResponsive && targetAspect > 0f) {
+                val currentAspect = wDp.toFloat() / hDp.toFloat()
+                if (currentAspect > targetAspect) {
+                    val contentW = hDp * targetAspect
+                    padH = (((wDp - contentW) / 2f) * density).toInt()
+                    padV = 0
+                    effWDp = maxOf(1, contentW.toInt())
+                    effHDp = hDp
+                } else {
+                    val contentH = wDp / targetAspect
+                    padH = 0
+                    padV = (((hDp - contentH) / 2f) * density).toInt()
+                    effWDp = wDp
+                    effHDp = maxOf(1, contentH.toInt())
+                }
+            } else {
+                padH = 0
+                padV = 0
+                effWDp = wDp
+                effHDp = hDp
+            }
+
+            val bitmap = renderWidgetBitmap(context, appWidgetId, config, isResponsive, effWDp, effHDp)
+            val views = RemoteViews(context.packageName, R.layout.widget_base_single)
+
+            try {
+                views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
+            } catch (_: Exception) {}
+
+            views.setImageViewBitmap(R.id.widget_image_view, bitmap)
+
+            val clickIntent = getClickPendingIntent(context, appWidgetId)
+            if (clickIntent != null) {
+                views.setOnClickPendingIntent(R.id.touch_slot_0, clickIntent)
+            }
+
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        if (widgetPrefs.contains(isResponsiveKey)) {
-            return widgetPrefs.getBoolean(isResponsiveKey, true)
-        }
-
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
-        return defaultResponsive
     }
+}
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+fun updateAllBatteryWidgets(context: Context) {
+    val receivers = listOf(
+        DotLevelHeaderBatteryReceiver(),
+        DotLevelPureBatteryReceiver(),
+        MinimalLinearBatteryReceiver(),
+        MinimalRingBatteryReceiver(),
+        BatteryMultiDeviceStatsReceiver(),
+        HorizontalBatteryReceiver(),
+        ArcGaugeBatteryReceiver(),
+        EditorialStatsBatteryReceiver(),
+        DotMatrixBatteryLEDReceiver(),
+        DotLevelMeterWideReceiver(),
+        SegmentedPillBatteryReceiver(),
+        PixelHeartBatteryReceiver(),
+        LightningBoltBatteryReceiver(),
+        CircularRingBatteryReceiver(),
+        VerticalBatteryPillReceiver(),
+        HorizontalBatteryPillReceiver()
+    )
+
+    val manager = AppWidgetManager.getInstance(context) ?: return
+    for (receiver in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiver::class.java)) ?: intArrayOf()
+        if (ids.isNotEmpty()) {
+            for (id in ids) {
+                receiver.updateSingleWidget(context, manager, id)
+            }
+            val intent = Intent(context, receiver::class.java).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            context.sendBroadcast(intent)
+        }
+    }
+}
+
+// 1. Dot Level Header Tile (2x2)
+class DotLevelHeaderBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val isResponsive = parseAndLockIsResponsive(context, appWidgetId)
+        return generateDotLevelMeterWithHeaderBitmap(
+            context = context,
+            data = data,
+            config = config,
+            isResponsive = false,
+            wDp = wDp,
+            hDp = hDp
+        )
+    }
+}
+
+// 2. Dot Level Pure Tile (2x2)
+class DotLevelPureBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generateDotLevelMeterPureBitmap(context, data, config, wDp, hDp)
+    }
+}
+
+// 3. Minimal Linear Tile (2x2 / Responsive)
+class MinimalLinearBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generateBatteryMinimalLinearBitmap(context, data, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 4. Minimal Ring Tile (2x2)
+class MinimalRingBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generateBatteryMinimalRingBitmap(context, data, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 5. Arc Gauge Tile (2x2)
+class ArcGaugeBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generateArcGaugeTileBitmap(context, data, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 6. Editorial Stats Tile (2x2)
+class EditorialStatsBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generateEditorialStatsBitmap(context, data, config, isResponsive, wDp, hDp)
+    }
+}
+
+// 7. Multi-Device Stats Bento (4x2 / Adaptive)
+class BatteryMultiDeviceStatsReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
         return generateMultiDeviceBatteryBitmap(context, data, config, isResponsive, wDp, hDp, appWidgetId)
     }
 }
 
-// Horizontal Strip (4x1)
-class HorizontalBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateHorizontalStripBitmap(context, data, config, wDp, hDp)
-    }
-}
-
-// Arc Gauge Tile (2x2)
-class ArcGaugeBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateArcGaugeTileBitmap(context, data, config, wDp, hDp)
-    }
-}
-
-// Editorial Stats Tile (2x2)
-class EditorialStatsBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateEditorialStatsBitmap(context, data, config, wDp, hDp)
-    }
-}
-
-// Dot Matrix LED (4x2)
-class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 8. Dot Matrix LED (4x2)
+class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
         val density = context.resources.displayMetrics.density
         val scaleFactor = maxOf(density, 3.5f)
@@ -287,29 +447,13 @@ class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver() {
         val bgColor = getSafeBgColor(config)
         val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
         val bgArgb = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        return generateDotMatrixLEDBitmap(context, "${data.percentage}%", activeColor, dimColor, bgArgb, wPx, hPx)
+        return generateDotMatrixLEDBitmap(context, "${data.percentage}%", activeColor, dimColor, bgArgb, wPx, hPx, isResponsive)
     }
 }
 
-// Dot Level Header Tile (2x2)
-class DotLevelHeaderBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateDotLevelMeterWithHeaderBitmap(context, data, config, wDp, hDp)
-    }
-}
-
-// Dot Level Pure Tile (2x2)
-class DotLevelPureBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
-        val data = readDetailedBatteryStatus(context)
-        return generateDotLevelMeterPureBitmap(context, data, config, wDp, hDp)
-    }
-}
-
-// Dot Level Meter Wide (4x2)
-class DotLevelMeterWideReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 9. Dot Level Meter Wide (4x2)
+class DotLevelMeterWideReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
         val density = context.resources.displayMetrics.density
         val scaleFactor = maxOf(density, 3.5f)
@@ -321,52 +465,39 @@ class DotLevelMeterWideReceiver : BaseBatteryReceiver() {
         val bgColor = getSafeBgColor(config)
         val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
         val bgArgb = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        return generateCenteredLevelBitmap(context, data.percentage, activeColor, dimColor, bgArgb, wPx, hPx)
+        return generateCenteredLevelBitmap(context, data.percentage, activeColor, dimColor, bgArgb, wPx, hPx, isResponsive)
     }
 }
 
-// Segmented Pill Tile (2x2)
-class SegmentedPillBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 10. Horizontal Strip (4x1)
+class HorizontalBatteryReceiver : BaseBatteryReceiver(targetAspect = 4.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generateSegmentedPillTileBitmap(context, data, config, wDp, hDp)
+        return generateHorizontalStripBitmap(context, data, config, isResponsive, wDp, hDp)
     }
 }
 
-// Pixel Heart Tile (2x2)
-class PixelHeartBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 11. Segmented Pill Tile (2x2)
+class SegmentedPillBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generatePixelHeartBitmap(context, data, config, wDp, hDp)
+        return generateSegmentedPillTileBitmap(context, data, config, isResponsive, wDp, hDp)
     }
 }
 
-// Lightning Bolt Tile (2x2 / 4x2)
-class LightningBoltBatteryReceiver : BaseBatteryReceiver() {
-
-    private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
-        val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-        val modeKey = "widget_${widgetId}_mode"
-        val isResponsiveKey = "widget_${widgetId}_is_responsive"
-
-        if (widgetPrefs.contains(modeKey)) {
-            return widgetPrefs.getString(modeKey, "RESPONSIVE") == "RESPONSIVE"
-        }
-        if (widgetPrefs.contains(isResponsiveKey)) {
-            return widgetPrefs.getBoolean(isResponsiveKey, true)
-        }
-
-        val launcherPrefs = context.getSharedPreferences("slate_app_launcher_prefs", Context.MODE_PRIVATE)
-        val defaultResponsive = launcherPrefs.getBoolean("default_is_responsive", true)
-        widgetPrefs.edit().putBoolean(isResponsiveKey, defaultResponsive).apply()
-        return defaultResponsive
+// 12. Pixel Heart Tile (2x2)
+class PixelHeartBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+        val data = readDetailedBatteryStatus(context)
+        return generatePixelHeartBitmap(context, data, config, isResponsive, wDp, hDp)
     }
+}
 
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 13. Lightning Bolt Tile (2x2 / 4x2)
+class LightningBoltBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
         val isWide = wDp >= 200
-        val isResponsive = parseAndLockIsResponsive(context, appWidgetId)
-
         return generateWavyLightningBoltBitmap(
             context = context,
             data = data,
@@ -379,38 +510,38 @@ class LightningBoltBatteryReceiver : BaseBatteryReceiver() {
     }
 }
 
-// Circular Ring Dial (2x2)
-class CircularRingBatteryReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 14. Circular Ring Dial (2x2)
+class CircularRingBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
         val density = context.resources.displayMetrics.density
         val scaleFactor = maxOf(density, 3.5f)
         val wPx = (wDp * scaleFactor).toInt().coerceAtLeast(1)
         val hPx = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-        return generateCircularGaugeBitmap(context, data.percentage, data.isCharging, config, wPx, hPx)
+        return generateCircularGaugeBitmap(context, data.percentage, data.isCharging, config, wPx, hPx, isResponsive)
     }
 }
 
-// Vertical Pill (1x2)
-class VerticalBatteryPillReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 15. Vertical Pill (1x2)
+class VerticalBatteryPillReceiver : BaseBatteryReceiver(targetAspect = 0.5f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
         val density = context.resources.displayMetrics.density
         val scaleFactor = maxOf(density, 3.5f)
         val wPx = (wDp * scaleFactor).toInt().coerceAtLeast(1)
         val hPx = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-        return generateVerticalPillBitmap(context, data.percentage, data.isCharging, config, wPx, hPx)
+        return generateVerticalPillBitmap(context, data.percentage, data.isCharging, config, wPx, hPx, isResponsive)
     }
 }
 
-// Horizontal Pill (2x1)
-class HorizontalBatteryPillReceiver : BaseBatteryReceiver() {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap {
+// 16. Horizontal Pill (2x1)
+class HorizontalBatteryPillReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
+    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
         val data = readDetailedBatteryStatus(context)
         val density = context.resources.displayMetrics.density
         val scaleFactor = maxOf(density, 3.5f)
         val wPx = (wDp * scaleFactor).toInt().coerceAtLeast(1)
         val hPx = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-        return generateHorizontalPillBitmap(context, data.percentage, data.isCharging, config, wPx, hPx)
+        return generateHorizontalPillBitmap(context, data.percentage, data.isCharging, config, wPx, hPx, isResponsive)
     }
 }

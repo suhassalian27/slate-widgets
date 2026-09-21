@@ -322,9 +322,6 @@ class WidgetConfigActivity : ComponentActivity() {
                     getQuickTogglesWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
                 }
 
-                val isAi = remember(widgetClassName) {
-                    getAiWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
-                }
 
                 // -----------------------------------------------------------------
                 // LIVE HOMESCREEN BOUNDS & RATIO EXTRACTION
@@ -339,6 +336,8 @@ class WidgetConfigActivity : ComponentActivity() {
                         "4x2" -> 280 to 130
                         "3x1" -> 220 to 70
                         "3x2" -> 220 to 130
+                        "2x1" -> 160 to 80
+                        "1x2" -> 80 to 160
                         "1x1" -> 80 to 80
                         else -> 150 to 150
                     }
@@ -397,7 +396,7 @@ class WidgetConfigActivity : ComponentActivity() {
                                     isResponsive = isResponsive,
                                     appWidgetId = appWidgetId
                                 )
-                            } else if (isAi) {
+                            } else {
                                 val currentConfig = SlateWidgetConfig(
                                     themeMode = if (isLightBg) "LIGHT" else "DARK",
                                     backgroundColorHex = selectedBgHex,
@@ -405,37 +404,92 @@ class WidgetConfigActivity : ComponentActivity() {
                                     accentColorHex = selectedAccentHex
                                 )
 
-                                // Render dynamically with the exact homescreen width & height
-                                val previewBitmap = remember(selectedBgHex, selectedAccentHex, opacity, isResponsive, screenWDp, screenHDp) {
+                                val previewBitmap = remember(selectedBgHex, selectedAccentHex, opacity, isResponsive, screenWDp, screenHDp, widgetClassName) {
                                     try {
                                         val receiverClass = Class.forName(widgetClassName)
                                         val receiver = receiverClass.getDeclaredConstructor().newInstance()
-                                        val method = receiverClass.methods.firstOrNull {
-                                            it.name == "renderWidgetBitmap" && it.parameterTypes.size == 6
+
+                                        val targetAspect = try {
+                                            val getter = receiverClass.methods.firstOrNull { it.name == "getTargetAspect" }
+                                            (getter?.invoke(receiver) as? Float) ?: 1.0f
+                                        } catch (_: Exception) {
+                                            1.0f
                                         }
-                                        method?.invoke(receiver, context, appWidgetId, currentConfig, isResponsive, screenWDp, screenHDp) as? Bitmap
-                                    } catch (_: Exception) {
+
+                                        val effWDp: Int
+                                        val effHDp: Int
+                                        if (!isResponsive && targetAspect > 0f) {
+                                            val curAspect = screenWDp.toFloat() / screenHDp.toFloat()
+                                            if (curAspect > targetAspect) {
+                                                effWDp = maxOf(1, (screenHDp * targetAspect).toInt())
+                                                effHDp = screenHDp
+                                            } else {
+                                                effWDp = screenWDp
+                                                effHDp = maxOf(1, (screenWDp / targetAspect).toInt())
+                                            }
+                                        } else {
+                                            effWDp = screenWDp
+                                            effHDp = screenHDp
+                                        }
+
+                                        val method6 = receiverClass.methods.firstOrNull {
+                                            (it.name == "renderWidgetBitmap" || it.name == "renderBitmap") && it.parameterTypes.size == 6
+                                        }
+                                        if (method6 != null) {
+                                            method6.invoke(receiver, context, appWidgetId, currentConfig, isResponsive, effWDp, effHDp) as? Bitmap
+                                        } else {
+                                            val method5 = receiverClass.methods.firstOrNull {
+                                                (it.name == "renderWidgetBitmap" || it.name == "renderBitmap") && it.parameterTypes.size == 5
+                                            }
+                                            if (method5 != null) {
+                                                val types = method5.parameterTypes
+                                                if (types[1] == SlateWidgetConfig::class.java && types[2] == java.lang.Boolean.TYPE) {
+                                                    method5.invoke(receiver, context, currentConfig, isResponsive, effWDp, effHDp) as? Bitmap
+                                                } else if (types[1] == java.lang.Integer.TYPE && types[2] == SlateWidgetConfig::class.java) {
+                                                    method5.invoke(receiver, context, appWidgetId, currentConfig, effWDp, effHDp) as? Bitmap
+                                                } else {
+                                                    null
+                                                }
+                                            } else {
+                                                null
+                                            }
+                                        }
+                                    } catch (e: Exception) {
                                         null
                                     }
                                 }
 
                                 if (previewBitmap != null) {
-                                    // Scale proportionally inside the preview container
-                                    val aspect = (screenWDp.toFloat() / screenHDp.toFloat()).coerceIn(0.3f, 4.5f)
-                                    val maxBoxW = 260f
-                                    val maxBoxH = 145f
+                                    val cellAspect = (screenWDp.toFloat() / screenHDp.toFloat()).coerceIn(0.25f, 4.5f)
+                                    val maxBoxW = 280f
+                                    val maxBoxH = 150f
 
-                                    val (dispW, dispH) = if (aspect > (maxBoxW / maxBoxH)) {
-                                        maxBoxW.dp to (maxBoxW / aspect).dp
+                                    val (cellBoxW, cellBoxH) = if (cellAspect > (maxBoxW / maxBoxH)) {
+                                        maxBoxW.dp to (maxBoxW / cellAspect).dp
                                     } else {
-                                        (maxBoxH * aspect).dp to maxBoxH.dp
+                                        (maxBoxH * cellAspect).dp to maxBoxH.dp
                                     }
 
-                                    Image(
-                                        bitmap = previewBitmap.asImageBitmap(),
-                                        contentDescription = "AI Widget Preview",
-                                        modifier = Modifier.size(dispW, dispH)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(cellBoxW, cellBoxH)
+                                            .clip(RoundedCornerShape(20.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        val bmpAspect = previewBitmap.width.toFloat() / previewBitmap.height.toFloat()
+                                        val (imgW, imgH) = if (bmpAspect > (cellBoxW.value / cellBoxH.value)) {
+                                            cellBoxW to (cellBoxW / bmpAspect)
+                                        } else {
+                                            (cellBoxH * bmpAspect) to cellBoxH
+                                        }
+                                        Image(
+                                            bitmap = previewBitmap.asImageBitmap(),
+                                            contentDescription = "Widget Preview",
+                                            modifier = Modifier
+                                                .size(imgW, imgH)
+                                                .clip(RoundedCornerShape(16.dp))
+                                        )
+                                    }
                                 } else {
                                     Box(
                                         modifier = Modifier
@@ -445,67 +499,6 @@ class WidgetConfigActivity : ComponentActivity() {
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(text = widgetName, color = textColor, fontSize = 13.sp)
-                                    }
-                                }
-                            } else {
-                                // Default Battery Widgets
-                                val previewBg = Color(selectedBgHex).copy(alpha = opacity)
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(148.dp)
-                                        .clip(RoundedCornerShape(24.dp))
-                                        .background(previewBg)
-                                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
-                                        .padding(16.dp)
-                                ) {
-                                    if (widgetClassName.contains("ArcGaugeBatteryReceiver")) {
-                                        Column(
-                                            modifier = Modifier.fillMaxSize(),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                                                Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
-                                            }
-
-                                            val arcBitmap = remember(selectedAccentHex, selectedBgHex) {
-                                                generateArcGaugeBitmapPreview(85, Color(selectedAccentHex), textColor.copy(alpha = 0.15f))
-                                            }
-
-                                            Image(
-                                                bitmap = arcBitmap.asImageBitmap(),
-                                                contentDescription = "Arc Preview",
-                                                modifier = Modifier.size(100.dp, 50.dp)
-                                            )
-
-                                            Text(text = "85%", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                        }
-                                    } else {
-                                        Column(
-                                            modifier = Modifier.fillMaxSize(),
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(text = "BATTERY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f))
-                                                Text(text = "CHARGING", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(selectedAccentHex))
-                                            }
-                                            Text(text = "85%", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                            LinearProgressIndicator(
-                                                progress = { 0.85f },
-                                                modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
-                                                color = Color(selectedAccentHex),
-                                                trackColor = textColor.copy(alpha = 0.15f)
-                                            )
-                                        }
                                     }
                                 }
                             }
@@ -695,30 +688,6 @@ class WidgetConfigActivity : ComponentActivity() {
     }
 }
 
-private fun generateArcGaugeBitmapPreview(percentage: Int, accentColor: Color, trackColor: Color): Bitmap {
-    val bitmap = Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val strokeWidth = 32f
-    val padding = strokeWidth / 2f + 4f
-    val rectF = RectF(padding, padding, 200f - padding, 200f - padding)
-
-    val trackPaint = Paint().apply {
-        isAntiAlias = true
-        style = Paint.Style.STROKE
-        this.strokeWidth = strokeWidth
-        color = trackColor.toArgb()
-    }
-    val activePaint = Paint().apply {
-        isAntiAlias = true
-        style = Paint.Style.STROKE
-        this.strokeWidth = strokeWidth
-        color = accentColor.toArgb()
-    }
-
-    canvas.drawArc(rectF, 210f, 120f, false, trackPaint)
-    canvas.drawArc(rectF, 210f, (percentage / 100f) * 120f, false, activePaint)
-    return bitmap
-}
 
 @Composable
 fun SectionTitle(title: String) {
