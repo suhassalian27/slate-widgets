@@ -448,7 +448,14 @@ class EditorialStatsBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
 
 // 7. Multi-Device Stats Bento (4x2 / Adaptive)
 class BatteryMultiDeviceStatsReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
         return generateMultiDeviceBatteryBitmap(context, data, config, isResponsive, wDp, hDp, appWidgetId)
     }

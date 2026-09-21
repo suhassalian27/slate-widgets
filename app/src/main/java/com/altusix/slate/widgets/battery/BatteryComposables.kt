@@ -15,7 +15,13 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import kotlin.collections.minusAssign
+import kotlin.compareTo
+import kotlin.div
 import kotlin.math.roundToInt
+import kotlin.text.compareTo
+import kotlin.text.toFloat
+import kotlin.times
 
 private fun drawBoltIcon(
     context: Context,
@@ -851,9 +857,16 @@ fun generateEditorialStatsBitmap(
     return bitmap
 }
 
-
-// 7. MULTI-DEVICE STATS BENTO (4x2 / Adaptive)
-fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+// 7. MULTI-DEVICE STATS BENTO (4x2 Bento: 1 Hero Left + 2 Stacked Right)
+fun generateMultiDeviceBatteryBitmap(
+    context: Context,
+    data: DetailedBatteryData,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -863,8 +876,8 @@ fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData
     val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
     val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
     val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val trackColor = if (isLight) 0x1F000000 else 0x1FAFAFAF
-    val tileBgColor = if (isLight) 0x0A000000 else 0x18FFFFFF
+    val trackColor = if (isLight) 0x14000000 else 0x1FFFFFFF
+    val tileBgColor = if (isLight) 0x0A000000 else 0x14FFFFFF
 
     val margin = scaleFactor * 1.5f
     val cardRect = if (isResponsive) {
@@ -884,9 +897,10 @@ fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData
 
     val cardW = cardRect.width()
     val cardH = cardRect.height()
-    val aspectRatio = cardW / cardH
+    val aspectRatio = cardW / cardH.coerceAtLeast(1f)
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
+    // Outer Card Fill & Stroke
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
@@ -894,16 +908,35 @@ fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = minOf(cardW, cardH) * 0.08f
-    val gap = minOf(cardW, cardH) * 0.06f
-    val concentricRadius = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 6f)
-    val sq = (scaleFactor * 8f).coerceAtMost(minOf(cardW, cardH) * 0.22f)
-    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tileBgColor }
-    val trackPaintObj = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = trackColor }
+    val outerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, outerBorderPaint)
 
-    fun drawTile(rect: RectF, radii: FloatArray) {
+    // UNIFIED EQUAL SPACING: Outer padding and inner gaps are identical
+    val spacing = (minOf(cardW, cardH) * 0.055f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
+    val pad = spacing
+    val gap = spacing
+
+    val concentricRadius = (cardCornerRadius - pad).coerceAtLeast(scaleFactor * 8f)
+    val sq = (scaleFactor * 8f).coerceAtMost(concentricRadius * 0.5f)
+
+    val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tileBgColor }
+    val tileBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x10000000 else 0x14FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.75f
+    }
+    val trackPaintObj = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = trackColor }
+    val fillPaintObj = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor }
+
+    fun drawTileFrame(rect: RectF, radii: FloatArray): Path {
         val path = Path().apply { addRoundRect(rect, radii, Path.Direction.CW) }
         canvas.drawPath(path, tileBgPaint)
+        canvas.drawPath(path, tileBorderPaint)
+        return path
     }
 
     val heroRect: RectF
@@ -913,200 +946,275 @@ fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData
     val tempRadii: FloatArray
     val voltRadii: FloatArray
 
-    if (aspectRatio >= 1.1f) {
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
-        val heroW = availW * 0.40f
-        val heroH = availH
+    val availW = cardW - (pad * 2f)
+    val availH = cardH - (pad * 2f)
 
-        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.top + pad + heroH)
-        heroRadii = floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, concentricRadius, concentricRadius)
+    // =========================================================================
+    // GEOMETRY PARTITIONING
+    // =========================================================================
+    when {
+        // Mode 1: Tall / Column (1x2, 1x3) -> Stacked Rows
+        isResponsive && aspectRatio < 0.85f -> {
+            val totalGaps = gap * 2f
+            val heroH = (availH - totalGaps) * 0.46f
+            val statH = (availH - totalGaps - heroH) / 2f
 
-        val rightX = cardRect.left + pad + heroW + gap
-        val rightW = availW - heroW - gap
-        val statH = (availH - gap) / 2f
+            heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.right - pad, cardRect.top + pad + heroH)
+            heroRadii = floatArrayOf(concentricRadius, concentricRadius, concentricRadius, concentricRadius, sq, sq, sq, sq)
 
-        tempRect = RectF(rightX, cardRect.top + pad, rightX + rightW, cardRect.top + pad + statH)
-        tempRadii = floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq)
+            val tempTop = heroRect.bottom + gap
+            tempRect = RectF(cardRect.left + pad, tempTop, cardRect.right - pad, tempTop + statH)
+            tempRadii = floatArrayOf(sq, sq, sq, sq, sq, sq, sq, sq)
 
-        voltRect = RectF(rightX, cardRect.top + pad + statH + gap, rightX + rightW, cardRect.top + pad + availH)
-        voltRadii = floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, sq, sq)
-    } else {
-        val availW = cardW - (pad * 2f)
-        val availH = cardH - (pad * 2f)
-        val heroH = availH * 0.48f
-        val heroW = availW
+            val voltTop = tempRect.bottom + gap
+            voltRect = RectF(cardRect.left + pad, voltTop, cardRect.right - pad, cardRect.bottom - pad)
+            voltRadii = floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, concentricRadius, concentricRadius)
+        }
 
-        heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.top + pad + heroH)
-        heroRadii = floatArrayOf(concentricRadius, concentricRadius, concentricRadius, concentricRadius, sq, sq, sq, sq)
+        // Mode 2: Ultra-Wide Ribbon (5x1, aspect >= 3.0) -> 3 Columns side-by-side
+        isResponsive && aspectRatio >= 3.0f -> {
+            val totalGaps = gap * 2f
+            val heroW = (availW - totalGaps) * 0.38f
+            val statW = (availW - totalGaps - heroW) / 2f
 
-        val botY = cardRect.top + pad + heroH + gap
-        val botH = availH - heroH - gap
-        val statW = (availW - gap) / 2f
+            heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.bottom - pad)
+            heroRadii = floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, concentricRadius, concentricRadius)
 
-        tempRect = RectF(cardRect.left + pad, botY, cardRect.left + pad + statW, botY + botH)
-        tempRadii = floatArrayOf(sq, sq, sq, sq, sq, sq, concentricRadius, concentricRadius)
+            val tempLeft = heroRect.right + gap
+            tempRect = RectF(tempLeft, cardRect.top + pad, tempLeft + statW, cardRect.bottom - pad)
+            tempRadii = floatArrayOf(sq, sq, sq, sq, sq, sq, sq, sq)
 
-        voltRect = RectF(cardRect.left + pad + statW + gap, botY, cardRect.right - pad, botY + botH)
-        voltRadii = floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, sq, sq)
+            val voltLeft = tempRect.right + gap
+            voltRect = RectF(voltLeft, cardRect.top + pad, cardRect.right - pad, cardRect.bottom - pad)
+            voltRadii = floatArrayOf(sq, sq, concentricRadius, concentricRadius, concentricRadius, concentricRadius, sq, sq)
+        }
+
+        // Mode 3: STANDARD BENTO (Fixed Mode & Standard 4x2 / 3x2) -> 1 Hero Left + 2 Stacked Right
+        else -> {
+            val heroW = (availW - gap) * 0.44f
+            heroRect = RectF(cardRect.left + pad, cardRect.top + pad, cardRect.left + pad + heroW, cardRect.bottom - pad)
+            heroRadii = floatArrayOf(concentricRadius, concentricRadius, sq, sq, sq, sq, concentricRadius, concentricRadius)
+
+            val rightX = heroRect.right + gap
+            val rightW = availW - heroW - gap
+            val statH = (availH - gap) / 2f
+
+            tempRect = RectF(rightX, cardRect.top + pad, rightX + rightW, cardRect.top + pad + statH)
+            tempRadii = floatArrayOf(sq, sq, concentricRadius, concentricRadius, sq, sq, sq, sq)
+
+            voltRect = RectF(rightX, tempRect.bottom + gap, rightX + rightW, cardRect.bottom - pad)
+            voltRadii = floatArrayOf(sq, sq, sq, sq, concentricRadius, concentricRadius, sq, sq)
+        }
     }
 
-    // RENDER HERO TILE
-    drawTile(heroRect, heroRadii)
-    val heroH = heroRect.height()
-    val heroW = heroRect.width()
-    val heroPad = minOf(heroW, heroH) * 0.12f
+    // =========================================================================
+    // 1. RENDER HERO TILE (Percentage Directly on Top of Progress Bar)
+    // =========================================================================
+    val heroPath = drawTileFrame(heroRect, heroRadii)
+    canvas.save()
+    canvas.clipPath(heroPath)
+
+    val hPadX = (heroRect.width() * 0.10f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
+    val hPadY = (heroRect.height() * 0.10f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
+    val heroContentW = heroRect.width() - (hPadX * 2f)
+
+    // A. Bottom Linear Capsule Bar
+    val barH = (heroRect.height() * 0.10f).coerceIn(scaleFactor * 5f, scaleFactor * 11f)
+    val barBottom = heroRect.bottom - hPadY
+    val barTop = barBottom - barH
+    val heroTrackRect = RectF(heroRect.left + hPadX, barTop, heroRect.right - hPadX, barBottom)
+    canvas.drawRoundRect(heroTrackRect, barH / 2f, barH / 2f, trackPaintObj)
+
+    val fillRatio = (data.percentage.coerceIn(0, 100) / 100f)
+    val fillW = heroTrackRect.width() * fillRatio
+    if (fillW > 0f) {
+        val heroFillRect = RectF(heroTrackRect.left, barTop, heroTrackRect.left + fillW.coerceAtLeast(barH), barBottom)
+        canvas.drawRoundRect(heroFillRect, barH / 2f, barH / 2f, fillPaintObj)
+    }
+
+    // B. Top Header: "PHONE" on Left, "⚡ CHARGING" on Right
+    val topHeaderH = (heroRect.height() * 0.22f).coerceIn(scaleFactor * 12f, scaleFactor * 24f)
+    val topHeaderTop = heroRect.top + hPadY
+    val tagSize = (topHeaderH * 0.60f).coerceIn(scaleFactor * 8.5f, scaleFactor * 13f)
 
     val heroTagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = (heroH * 0.09f).coerceAtLeast(scaleFactor * 7f)
+        textSize = tagSize
         typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
     }
-    val fontMetricsHeroTag = heroTagPaint.fontMetrics
-    val heroTagY = heroRect.top + heroPad + (heroH * 0.04f) - (fontMetricsHeroTag.ascent + fontMetricsHeroTag.descent) / 2f
-    canvas.drawText("PHONE", heroRect.left + heroPad, heroTagY, heroTagPaint)
-
-    val statusColor = if (data.isCharging) accentColor else secondaryTextColor
-    val heroStatusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = statusColor
-        textSize = (heroH * 0.075f).coerceAtLeast(scaleFactor * 6.5f)
-        typeface = getSlateFont(context, weight = 700)
-    }
-    val fontMetricsHeroStatus = heroStatusPaint.fontMetrics
-    val statusCenterY = heroRect.top + heroPad + (heroH * 0.17f)
-    val heroStatusY = statusCenterY - (fontMetricsHeroStatus.ascent + fontMetricsHeroStatus.descent) / 2f
+    val fmTag = heroTagPaint.fontMetrics
+    val tagY = topHeaderTop + (topHeaderH / 2f) - (fmTag.ascent + fmTag.descent) / 2f
+    canvas.drawText("PHONE", heroRect.left + hPadX, tagY, heroTagPaint)
 
     if (data.isCharging) {
-        val iconSize = heroH * 0.075f
-        val iconGap = heroH * 0.015f
-        val iconLeft = heroRect.left + heroPad
-        val iconTop = statusCenterY - (iconSize / 2f)
-        drawBoltIcon(context, canvas, iconLeft, iconTop, iconSize, accentColor)
-        canvas.drawText("CHARGING", iconLeft + iconSize + iconGap, heroStatusY, heroStatusPaint)
-    } else {
-        canvas.drawText("BATTERY", heroRect.left + heroPad, heroStatusY, heroStatusPaint)
+        val chargePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            textSize = tagSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.RIGHT
+        }
+        val fmCharge = chargePaint.fontMetrics
+        val boltSize = tagSize * 1.05f
+        val boltGap = scaleFactor * 3f
+        val chargeRight = heroRect.right - hPadX
+
+        val fullText = "CHARGING"
+        val fullTextW = chargePaint.measureText(fullText)
+        val tagW = heroTagPaint.measureText("PHONE")
+
+        if (heroContentW - tagW - (scaleFactor * 8f) >= fullTextW + boltGap + boltSize) {
+            val iconLeft = chargeRight - fullTextW - boltGap - boltSize
+            val iconTop = tagY + fmCharge.ascent + ((tagSize - boltSize) / 2f)
+            drawBoltIcon(context, canvas, iconLeft, iconTop, boltSize, accentColor)
+            canvas.drawText(fullText, chargeRight, tagY, chargePaint)
+        } else {
+            val iconLeft = chargeRight - boltSize
+            val iconTop = tagY + fmTag.ascent + ((tagSize - boltSize) / 2f)
+            drawBoltIcon(context, canvas, iconLeft, iconTop, boltSize, accentColor)
+        }
+    }
+
+    // C. Percentage Grounded Directly Above the Progress Bar
+    val availablePctH = (barTop - (tagY + fmTag.descent) - (scaleFactor * 6f)).coerceAtLeast(1f)
+    var pctTextSize = (availablePctH * 0.72f).coerceIn(scaleFactor * 18f, scaleFactor * 48f)
+
+    val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryTextColor
+        textSize = pctTextSize
+        typeface = getSlateFont(context, weight = 700)
+        textAlign = Paint.Align.LEFT
     }
 
     val pctText = "${data.percentage}%"
-    var heroPctTextSize = heroH * 0.32f
-    val heroPctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = heroPctTextSize
-        typeface = getSlateFont(context, weight = 700)
+    while (pctPaint.measureText(pctText) > heroContentW && pctTextSize > scaleFactor * 10f) {
+        pctTextSize -= scaleFactor * 0.5f
+        pctPaint.textSize = pctTextSize
     }
 
-    val maxHeroPctW = heroW - (heroPad * 2f)
-    while (heroPctPaint.measureText(pctText) > maxHeroPctW && heroPctTextSize > scaleFactor * 8f) {
-        heroPctTextSize -= scaleFactor * 0.5f
-        heroPctPaint.textSize = heroPctTextSize
-    }
+    val fmPct = pctPaint.fontMetrics
+    // Placed directly on top of the bar with a 4dp gap
+    val gapAboveBar = scaleFactor * 4f
+    val pctY = barTop - gapAboveBar - fmPct.descent
+    canvas.drawText(pctText, heroRect.left + hPadX, pctY, pctPaint)
+    canvas.restore()
 
-    val fontMetricsHeroPct = heroPctPaint.fontMetrics
-    val heroPctY = heroRect.top + (heroH * 0.50f) - (fontMetricsHeroPct.ascent + fontMetricsHeroPct.descent) / 2f
-    canvas.drawText(pctText, heroRect.left + heroPad, heroPctY, heroPctPaint)
+    // =========================================================================
+    // 2. RENDER STAT CARDS (TEMPERATURE & VOLTAGE)
+    // =========================================================================
+    fun renderStatCard(rect: RectF, radii: FloatArray, fullLabel: String, shortLabel: String, valText: String, statRatio: Float) {
+        val tilePath = drawTileFrame(rect, radii)
+        canvas.save()
+        canvas.clipPath(tilePath)
 
-    val barH = heroH * 0.07f
-    val barTop = heroRect.bottom - heroPad - barH
-    val heroTrackRect = RectF(heroRect.left + heroPad, barTop, heroRect.right - heroPad, barTop + barH)
-    canvas.drawRoundRect(heroTrackRect, barH / 2f, barH / 2f, trackPaintObj)
+        val sPadX = (rect.width() * 0.10f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
+        val sPadY = (rect.height() * 0.11f).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
+        val availTileW = rect.width() - (sPadX * 2f)
 
-    val fillW = (heroTrackRect.width()) * (data.percentage.coerceIn(0, 100) / 100f)
-    if (fillW > 0f) {
-        val heroFillRect = RectF(heroTrackRect.left, barTop, heroTrackRect.left + fillW, barTop + barH)
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor }
-        canvas.drawRoundRect(heroFillRect, barH / 2f, barH / 2f, fillPaint)
-    }
+        // Bottom Progress Bar
+        val sBarH = (rect.height() * 0.11f).coerceIn(scaleFactor * 4f, scaleFactor * 8f)
+        val sBarBottom = rect.bottom - sPadY
+        val sBarTop = sBarBottom - sBarH
+        val sTrackRect = RectF(rect.left + sPadX, sBarTop, rect.right - sPadX, sBarBottom)
+        canvas.drawRoundRect(sTrackRect, sBarH / 2f, sBarH / 2f, trackPaintObj)
 
-    // STAT CARD RENDERER (BALANCED LABEL & VALUE SIZE + VALUE ABOVE PROGRESS BAR)
-    fun renderStatCard(rect: RectF, radii: FloatArray, fullLabel: String, shortLabel: String, valText: String, fillRatio: Float) {
-        drawTile(rect, radii)
-        val cardTileH = rect.height()
-        val cardTileW = rect.width()
+        val sFillW = sTrackRect.width() * statRatio.coerceIn(0.05f, 1f)
+        val sFillRect = RectF(sTrackRect.left, sBarTop, sTrackRect.left + sFillW.coerceAtLeast(sBarH), sBarBottom)
+        canvas.drawRoundRect(sFillRect, sBarH / 2f, sBarH / 2f, fillPaintObj)
 
-        val statPadX = cardTileW * 0.10f
-        val statPadY = cardTileH * 0.12f
-        val availTileW = cardTileW - (statPadX * 2f)
+        val contentTop = rect.top + sPadY
+        val contentAvailH = (sBarTop - contentTop - (scaleFactor * 2f)).coerceAtLeast(1f)
 
-        // Progress bar at the bottom
-        val statBarH = (cardTileH * 0.10f).coerceAtLeast(scaleFactor * 3.5f)
-        val statBarTop = rect.bottom - statPadY - statBarH
+        val isWideStat = rect.width() >= rect.height() * 1.85f
 
-        // Label paint - Increased size to balance prominently with the value
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = secondaryTextColor
-            textSize = (cardTileH * 0.22f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
-            typeface = getSlateFont(context, weight = 700)
-        }
+        if (isWideStat) {
+            // Side-by-Side Mode for flat tiles
+            val textSize = (contentAvailH * 0.70f).coerceIn(scaleFactor * 10f, scaleFactor * 20f)
+            val sValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = primaryTextColor
+                this.textSize = textSize
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.RIGHT
+            }
 
-        // Value paint - Prominent bold value text
-        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = primaryTextColor
-            textSize = (cardTileH * 0.24f).coerceIn(scaleFactor * 9f, scaleFactor * 18f)
-            typeface = getSlateFont(context, weight = 700)
-        }
+            val sLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = secondaryTextColor
+                this.textSize = (textSize * 0.75f).coerceIn(scaleFactor * 8.5f, scaleFactor * 13f)
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.LEFT
+            }
 
-        val valW = valuePaint.measureText(valText)
-        val minGap = cardTileH * 0.08f
+            var labelToUse = fullLabel
+            val valW = sValPaint.measureText(valText)
+            val gapBetween = scaleFactor * 6f
 
-        var displayLabel = fullLabel
-        if (labelPaint.measureText(displayLabel) + valW + minGap > availTileW) {
-            displayLabel = shortLabel
-        }
+            if (sLabelPaint.measureText(labelToUse) + valW + gapBetween > availTileW) {
+                labelToUse = shortLabel
+            }
+            while (sLabelPaint.measureText(labelToUse) + valW + gapBetween > availTileW && sLabelPaint.textSize > scaleFactor * 7f) {
+                sLabelPaint.textSize -= scaleFactor * 0.5f
+            }
 
-        val fitsSideBySide = (labelPaint.measureText(displayLabel) + valW + minGap <= availTileW)
+            val fmVal = sValPaint.fontMetrics
+            val fmLabel = sLabelPaint.fontMetrics
+            val centerY = contentTop + (contentAvailH / 2f)
 
-        if (fitsSideBySide) {
-            // SIDE-BY-SIDE: Both label and value aligned at top with balanced sizes
-            valuePaint.textAlign = Paint.Align.RIGHT
-            val fontMetricsLabel = labelPaint.fontMetrics
-            val fontMetricsVal = valuePaint.fontMetrics
-
-            val labelY = rect.top + statPadY + (cardTileH * 0.10f) - (fontMetricsLabel.ascent + fontMetricsLabel.descent) / 2f
-            val valY = rect.top + statPadY + (cardTileH * 0.10f) - (fontMetricsVal.ascent + fontMetricsVal.descent) / 2f
-
-            canvas.drawText(displayLabel, rect.left + statPadX, labelY, labelPaint)
-            canvas.drawText(valText, rect.right - statPadX, valY, valuePaint)
+            canvas.drawText(labelToUse, rect.left + sPadX, centerY - (fmLabel.ascent + fmLabel.descent) / 2f, sLabelPaint)
+            canvas.drawText(valText, rect.right - sPadX, centerY - (fmVal.ascent + fmVal.descent) / 2f, sValPaint)
         } else {
-            // STACKED: Label at top, Value placed directly above the progress bar
-            labelPaint.textAlign = Paint.Align.LEFT
-            valuePaint.textAlign = Paint.Align.RIGHT
+            // Stacked Vertical Layout: Label at Top, Value Grounded on Top of Bar
+            val titleSlotH = contentAvailH * 0.40f
+            val valueSlotH = contentAvailH * 0.60f
 
-            while (labelPaint.measureText(displayLabel) > availTileW && labelPaint.textSize > scaleFactor * 6f) {
-                labelPaint.textSize -= scaleFactor * 0.5f
+            val sLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = secondaryTextColor
+                textSize = (titleSlotH * 0.80f).coerceIn(scaleFactor * 7.5f, scaleFactor * 12f)
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.LEFT
             }
-            while (valuePaint.measureText(valText) > availTileW && valuePaint.textSize > scaleFactor * 8f) {
-                valuePaint.textSize -= scaleFactor * 0.5f
+
+            var labelToUse = fullLabel
+            if (sLabelPaint.measureText(labelToUse) > availTileW) {
+                labelToUse = shortLabel
+            }
+            while (sLabelPaint.measureText(labelToUse) > availTileW && sLabelPaint.textSize > scaleFactor * 6.5f) {
+                sLabelPaint.textSize -= scaleFactor * 0.5f
             }
 
-            val fontMetricsLabel = labelPaint.fontMetrics
-            val fontMetricsVal = valuePaint.fontMetrics
+            val fmLabel = sLabelPaint.fontMetrics
+            val labelY = contentTop + (titleSlotH / 2f) - (fmLabel.ascent + fmLabel.descent) / 2f
+            canvas.drawText(labelToUse, rect.left + sPadX, labelY, sLabelPaint)
 
-            val labelY = rect.top + statPadY + (cardTileH * 0.04f) - fontMetricsLabel.ascent
-            canvas.drawText(displayLabel, rect.left + statPadX, labelY, labelPaint)
+            val sValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = primaryTextColor
+                textSize = (valueSlotH * 0.82f).coerceIn(scaleFactor * 11f, scaleFactor * 24f)
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.LEFT
+            }
 
-            val valY = statBarTop - (cardTileH * 0.06f) - fontMetricsVal.descent
-            canvas.drawText(valText, rect.right - statPadX, valY, valuePaint)
+            while (sValPaint.measureText(valText) > availTileW && sValPaint.textSize > scaleFactor * 8f) {
+                sValPaint.textSize -= scaleFactor * 0.5f
+            }
+
+            val fmVal = sValPaint.fontMetrics
+            val valY = sBarTop - (scaleFactor * 3.5f) - fmVal.descent
+            canvas.drawText(valText, rect.left + sPadX, valY, sValPaint)
         }
 
-        val trackRect = RectF(rect.left + statPadX, statBarTop, rect.right - statPadX, statBarTop + statBarH)
-        canvas.drawRoundRect(trackRect, statBarH / 2f, statBarH / 2f, trackPaintObj)
-
-        val fillRect = RectF(trackRect.left, statBarTop, trackRect.left + (trackRect.width() * fillRatio), statBarTop + statBarH)
-        val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor }
-        canvas.drawRoundRect(fillRect, statBarH / 2f, statBarH / 2f, activePaint)
+        canvas.restore()
     }
 
-    // RENDER TEMP & VOLT TILES
-    val tempVal = data.tempText.replace("°C", "").toFloatOrNull() ?: 35f
+    val tempVal = data.tempText.replace("°C", "").trim().toFloatOrNull() ?: 35f
     val tempRatio = (tempVal / 50f).coerceIn(0.1f, 1f)
     renderStatCard(tempRect, tempRadii, "TEMPERATURE", "TEMP", data.tempText, tempRatio)
 
-    val voltVal = data.voltageText.replace("V", "").toFloatOrNull() ?: 3.8f
-    val voltRatio = (voltVal / 4.4f).coerceIn(0.1f, 1f)
+    val voltVal = data.voltageText.replace("V", "").trim().toFloatOrNull() ?: 3.8f
+    val voltRatio = ((voltVal - 3.2f) / (4.4f - 3.2f)).coerceIn(0.1f, 1f)
     renderStatCard(voltRect, voltRadii, "VOLTAGE", "VOLT", data.voltageText, voltRatio)
 
     return bitmap
 }
+
 
 // 8. Dot Matrix LED (4x2)
 fun generateDotMatrixLEDBitmap(
