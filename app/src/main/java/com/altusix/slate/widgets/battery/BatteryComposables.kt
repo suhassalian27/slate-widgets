@@ -455,12 +455,11 @@ fun generateBatteryMinimalLinearBitmap(
 }
 
 
-// 4. Minimal Ring (1:1 Square)
+// 4. Minimal Ring (Strict 1:1 Square)
 fun generateBatteryMinimalRingBitmap(
     context: Context,
     data: DetailedBatteryData,
     config: SlateWidgetConfig,
-    isResponsive: Boolean = false,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -469,19 +468,11 @@ fun generateBatteryMinimalRingBitmap(
     val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        val cardSize = minOf(w, h) - (margin * 2f)
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val cardSize = minOf(cardW, cardH)
-    val leftX = cardRect.left
-    val topY = cardRect.top
+    // Locked strictly to a centered 1:1 square
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -554,12 +545,11 @@ fun generateBatteryMinimalRingBitmap(
     return bitmap
 }
 
-// 5. Arc Battery (1:1 Square)
+// 5. Arc Battery (Strict 1:1 Square)
 fun generateArcGaugeTileBitmap(
     context: Context,
     data: DetailedBatteryData,
     config: SlateWidgetConfig,
-    isResponsive: Boolean = false,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -568,19 +558,11 @@ fun generateArcGaugeTileBitmap(
     val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        val cardSize = minOf(w, h) - (margin * 2f)
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val cardSize = minOf(cardW, cardH)
-    val leftX = cardRect.left
-    val topY = cardRect.top
+    // Locked strictly to a centered 1:1 square
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -633,7 +615,7 @@ fun generateArcGaugeTileBitmap(
     return bitmap
 }
 
-// 6. Editorial Stats (1:1 Square)
+// 6. Editorial Stats (Adaptive: Square, Wide 4x1, and Tall 1x2/2x4)
 fun generateEditorialStatsBitmap(
     context: Context,
     data: DetailedBatteryData,
@@ -657,17 +639,16 @@ fun generateEditorialStatsBitmap(
     }
     val cardW = cardRect.width()
     val cardH = cardRect.height()
-    val cardSize = minOf(cardW, cardH)
-    val leftX = cardRect.left
-    val topY = cardRect.top
+    val aspect = cardW / cardH.coerceAtLeast(1f)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
     val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val trackColorInt = if (isLight) 0x1F000000 else 0x2EFFFFFF
+    val trackColorInt = if (isLight) 0x1F000000 else 0x22FFFFFF
 
+    // 1. Background Surface with Subtle Edge Border
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
@@ -676,36 +657,200 @@ fun generateEditorialStatsBitmap(
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val pad = cardSize * 0.12f
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
+    // Shared Paint Setup
     val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = cardSize * 0.30f
         typeface = getSlateFont(context, weight = 700)
     }
-    val fontMetricsPct = pctPaint.fontMetrics
-    val pctY = topY + pad + (cardSize * 0.14f) - (fontMetricsPct.ascent + fontMetricsPct.descent) / 2f
-    canvas.drawText("${data.percentage}%", leftX + pad, pctY, pctPaint)
 
     val statPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = cardSize * 0.085f
         typeface = getSlateFont(context, weight = 600)
     }
-    val fontMetricsStat = statPaint.fontMetrics
-    val statY1 = topY + pad + (cardSize * 0.44f) - (fontMetricsStat.ascent + fontMetricsStat.descent) / 2f
-    val statY2 = topY + pad + (cardSize * 0.56f) - (fontMetricsStat.ascent + fontMetricsStat.descent) / 2f
 
-    canvas.drawText("• ${data.healthText}", leftX + pad, statY1, statPaint)
-    canvas.drawText("• ${data.secondaryStatText}", leftX + pad, statY2, statPaint)
+    // =========================================================================
+    // BRANCH 1: WIDE BAR MODE (4x1, 3x1, 5x1)
+    // =========================================================================
+    if (aspect >= 1.55f) {
+        val padX = (cardW * 0.06f).coerceIn(scaleFactor * 14f, scaleFactor * 26f)
+        val padY = (cardH * 0.13f).coerceIn(scaleFactor * 8f, scaleFactor * 16f)
+        val availW = cardW - (padX * 2f)
 
-    val barH = (cardSize * 0.10f).toInt()
-    val barW = (cardSize - (pad * 2f)).toInt()
-    val barBitmap = generateSegmentedBarBitmap(data.percentage, accentColorInt, trackColorInt, barW, barH)
-    canvas.drawBitmap(barBitmap, leftX + pad, topY + cardSize - pad - barH, null)
+        // Bottom Full-Width Segmented Bar
+        val barH = (cardH * 0.16f).coerceIn(scaleFactor * 8f, scaleFactor * 14f).toInt()
+        val barW = availW.toInt()
+        val barTopY = cardRect.bottom - padY - barH
+
+        val barBitmap = generateSegmentedBarBitmap(data.percentage, accentColorInt, trackColorInt, barW, barH)
+        canvas.drawBitmap(barBitmap, cardRect.left + padX, barTopY, null)
+
+        // Top Area Bounds
+        val topAreaH = barTopY - (cardRect.top + padY)
+        val topAreaCenterY = cardRect.top + padY + (topAreaH / 2f)
+
+        // 1. Percentage on the Left
+        val pctSize = (topAreaH * 0.88f).coerceIn(scaleFactor * 22f, scaleFactor * 42f)
+        pctPaint.textSize = pctSize
+        pctPaint.textAlign = Paint.Align.LEFT
+        val fmPct = pctPaint.fontMetrics
+        val pctY = topAreaCenterY - (fmPct.ascent + fmPct.descent) / 2f
+        val pctText = "${data.percentage}%"
+        canvas.drawText(pctText, cardRect.left + padX, pctY, pctPaint)
+        val pctWidth = pctPaint.measureText(pctText)
+
+        // 2. Charging Status Tag on the Far Right
+        val rightEdgeX = cardRect.right - padX
+        var statRightBound = rightEdgeX
+
+        if (data.isCharging) {
+            val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = accentColorInt
+                textSize = (pctSize * 0.38f).coerceIn(scaleFactor * 10f, scaleFactor * 14f)
+                typeface = getSlateFont(context, weight = 700)
+                textAlign = Paint.Align.RIGHT
+            }
+            val fmStatus = statusPaint.fontMetrics
+            val statusY = topAreaCenterY - (fmStatus.ascent + fmStatus.descent) / 2f
+            val statusText = "CHARGING"
+            val textW = statusPaint.measureText(statusText)
+            val iconSize = statusPaint.textSize * 1.1f
+            val gap = scaleFactor * 4f
+
+            val iconLeft = rightEdgeX - textW - gap - iconSize
+            val iconTop = topAreaCenterY - (iconSize / 2f)
+            drawBoltIcon(context, canvas, iconLeft, iconTop, iconSize, accentColorInt)
+            canvas.drawText(statusText, rightEdgeX, statusY, statusPaint)
+
+            statRightBound = iconLeft - (scaleFactor * 14f)
+        }
+
+        // 3. Middle Stacked Metadata Stats
+        val statsStartX = cardRect.left + padX + pctWidth + (scaleFactor * 16f)
+        if (statsStartX < statRightBound) {
+            val statSize = (topAreaH * 0.32f).coerceIn(scaleFactor * 10f, scaleFactor * 13f)
+            statPaint.textSize = statSize
+            statPaint.textAlign = Paint.Align.LEFT
+            val fmStat = statPaint.fontMetrics
+            val lineSpacing = scaleFactor * 2f
+
+            val stat1Y = topAreaCenterY - lineSpacing - fmStat.descent
+            val stat2Y = topAreaCenterY + lineSpacing - fmStat.ascent
+
+            canvas.drawText("• ${data.healthText}", statsStartX, stat1Y, statPaint)
+            canvas.drawText("• ${data.secondaryStatText}", statsStartX, stat2Y, statPaint)
+        }
+
+        // =========================================================================
+        // BRANCH 2: TALL / VERTICAL MODE (1x2, 2x4)
+        // =========================================================================
+    } else if (aspect < 0.72f) {
+        val padX = cardW * 0.10f
+        val padY = cardH * 0.07f
+        val availW = cardW - (padX * 2f)
+
+        // Top Row: Percentage + Charging Bolt
+        val pctSize = (cardW * 0.32f).coerceIn(scaleFactor * 26f, scaleFactor * 52f)
+        pctPaint.textSize = pctSize
+        pctPaint.textAlign = Paint.Align.LEFT
+        val fmPct = pctPaint.fontMetrics
+        val pctY = cardRect.top + padY - fmPct.ascent
+        canvas.drawText("${data.percentage}%", cardRect.left + padX, pctY, pctPaint)
+
+        if (data.isCharging) {
+            val iconSize = pctSize * 0.42f
+            val iconLeft = cardRect.right - padX - iconSize
+            val iconTop = pctY + fmPct.ascent + ((pctSize - iconSize) / 2f)
+            drawBoltIcon(context, canvas, iconLeft, iconTop, iconSize, accentColorInt)
+        }
+
+        // Middle: Stacked Metadata Lines
+        val statSize = (cardW * 0.088f).coerceIn(scaleFactor * 11f, scaleFactor * 14f)
+        statPaint.textSize = statSize
+        statPaint.textAlign = Paint.Align.LEFT
+        val fmStat = statPaint.fontMetrics
+        val statGap = scaleFactor * 5f
+
+        val stat1Y = pctY + fmPct.descent + (scaleFactor * 10f) - fmStat.ascent
+        val stat2Y = stat1Y + (fmStat.descent - fmStat.ascent) + statGap
+        canvas.drawText("• ${data.healthText}", cardRect.left + padX, stat1Y, statPaint)
+        canvas.drawText("• ${data.secondaryStatText}", cardRect.left + padX, stat2Y, statPaint)
+
+        // Bottom: Editorial Vertical Segmented Ladder
+        val ladderTopY = stat2Y + fmStat.descent + (cardH * 0.035f)
+        val ladderBottomY = cardRect.bottom - padY
+        val ladderH = (ladderBottomY - ladderTopY).coerceAtLeast(scaleFactor * 30f)
+
+        val numSegments = 16
+        val segGap = scaleFactor * 3.5f
+        val totalGaps = segGap * (numSegments - 1)
+        val segH = (ladderH - totalGaps) / numSegments
+        val activeCount = ((data.percentage.coerceIn(0, 100) / 100f) * numSegments).toInt()
+
+        for (i in 0 until numSegments) {
+            val fromBottom = (numSegments - 1) - i
+            val segTop = ladderTopY + i * (segH + segGap)
+            val segBottom = segTop + segH
+            val isActive = fromBottom < activeCount
+
+            val segPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (isActive) accentColorInt else trackColorInt
+                style = Paint.Style.FILL
+            }
+            val r = segH / 2f
+            canvas.drawRoundRect(RectF(cardRect.left + padX, segTop, cardRect.right - padX, segBottom), r, r, segPaint)
+        }
+
+        // =========================================================================
+        // BRANCH 3: STANDARD SQUARE / BALANCED MODE (2x2)
+        // =========================================================================
+    } else {
+        val pad = minOf(cardW, cardH) * 0.09f
+        val availW = cardW - (pad * 2f)
+
+        // 1. Header Percentage
+        val pctSize = (cardH * 0.30f).coerceIn(scaleFactor * 32f, scaleFactor * 62f)
+        pctPaint.textSize = pctSize
+        pctPaint.textAlign = Paint.Align.LEFT
+        val fmPct = pctPaint.fontMetrics
+        val pctY = cardRect.top + pad - fmPct.ascent
+        canvas.drawText("${data.percentage}%", cardRect.left + pad, pctY, pctPaint)
+
+        if (data.isCharging) {
+            val iconSize = cardH * 0.09f
+            val iconLeft = cardRect.right - pad - iconSize
+            val iconTop = cardRect.top + pad + (cardH * 0.02f)
+            drawBoltIcon(context, canvas, iconLeft, iconTop, iconSize, accentColorInt)
+        }
+
+        // 2. Middle Metadata Stats
+        val statSize = (cardH * 0.082f).coerceIn(scaleFactor * 11f, scaleFactor * 15f)
+        statPaint.textSize = statSize
+        statPaint.textAlign = Paint.Align.LEFT
+        val fmStat = statPaint.fontMetrics
+        val statLineHeight = (fmStat.descent - fmStat.ascent) + (scaleFactor * 4f)
+
+        val stat1Y = pctY + fmPct.descent + (cardH * 0.04f) - fmStat.ascent
+        val stat2Y = stat1Y + statLineHeight
+        canvas.drawText("• ${data.healthText}", cardRect.left + pad, stat1Y, statPaint)
+        canvas.drawText("• ${data.secondaryStatText}", cardRect.left + pad, stat2Y, statPaint)
+
+        // 3. Bottom Segmented Bar Spanning Full Width
+        val barH = (cardH * 0.10f).coerceIn(scaleFactor * 8f, scaleFactor * 15f).toInt()
+        val barW = availW.toInt()
+        val barBitmap = generateSegmentedBarBitmap(data.percentage, accentColorInt, trackColorInt, barW, barH)
+        canvas.drawBitmap(barBitmap, cardRect.left + pad, cardRect.bottom - pad - barH, null)
+    }
 
     return bitmap
 }
+
 
 // 7. MULTI-DEVICE STATS BENTO (4x2 / Adaptive)
 fun generateMultiDeviceBatteryBitmap(context: Context, data: DetailedBatteryData, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {

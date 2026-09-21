@@ -26,8 +26,8 @@ fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Dot Level Header", "2x2", "Battery", DotLevelHeaderBatteryReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Dot Level Pure", "2x2", "Battery", DotLevelPureBatteryReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Minimal Linear", "2x2", "Battery", MinimalLinearBatteryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Minimal Ring", "2x2", "Battery", MinimalRingBatteryReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Multi-Device", "4x2", "Battery", BatteryMultiDeviceStatsReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java, hasModeOption = true),
@@ -403,23 +403,44 @@ class MinimalLinearBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
 
 // 4. Minimal Ring Tile (2x2)
 class MinimalRingBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generateBatteryMinimalRingBitmap(context, data, config, isResponsive, wDp, hDp)
+        return generateBatteryMinimalRingBitmap(context, data, config, wDp, hDp)
     }
 }
 
 // 5. Arc Gauge Tile (2x2)
 class ArcGaugeBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generateArcGaugeTileBitmap(context, data, config, isResponsive, wDp, hDp)
+        return generateArcGaugeTileBitmap(context, data, config, wDp, hDp)
     }
 }
 
-// 6. Editorial Stats Tile (2x2)
+// 6. Editorial Stats Tile (2x2 / Responsive)
 class EditorialStatsBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
         return generateEditorialStatsBitmap(context, data, config, isResponsive, wDp, hDp)
     }
