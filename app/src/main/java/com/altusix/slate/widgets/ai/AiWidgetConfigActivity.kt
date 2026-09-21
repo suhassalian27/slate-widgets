@@ -197,39 +197,78 @@ class AiWidgetConfigActivity : ComponentActivity() {
                     previewHeight = 180.dp,
                     previewContent = {
                         val context = LocalContext.current
-                        val previewBitmap = remember(aiConfig, currentSlateConfig, isResponsive, widgetClassName) {
+
+                        // 1. Read exact homescreen dimensions from AppWidgetOptions
+                        val (screenWDp, screenHDp) = remember(widgetId, isResponsive) {
+                            val manager = AppWidgetManager.getInstance(context)
+                            val options = manager?.getAppWidgetOptions(widgetId)
+                            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+                            val fallbackW = when {
+                                widgetClassName.contains("DualFlagship") || widgetClassName.contains("Primary") || widgetClassName.contains("Capsule") || widgetClassName.contains("Dock") -> 240
+                                widgetClassName.contains("Mega") || widgetClassName.contains("Side") || widgetClassName.contains("BentoHero") -> 220
+                                else -> 150
+                            }
+                            val fallbackH = when {
+                                widgetClassName.contains("DualFlagship") || widgetClassName.contains("Primary") || widgetClassName.contains("Capsule") || widgetClassName.contains("Dock") -> 75
+                                widgetClassName.contains("Mega") || widgetClassName.contains("Side") || widgetClassName.contains("BentoHero") -> 120
+                                else -> 150
+                            }
+
+                            val rawW = if (isLandscape) {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackW) ?: fallbackW
+                            } else {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackW) ?: fallbackW
+                            }
+
+                            val rawH = if (isLandscape) {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackH) ?: fallbackH
+                            } else {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackH) ?: fallbackH
+                            }
+
+                            val finalW = if (rawW <= 0) fallbackW else rawW
+                            val finalH = if (rawH <= 0) fallbackH else rawH
+                            finalW to finalH
+                        }
+
+                        // 2. Render using the exact dimensions from homescreen
+                        val previewBitmap = remember(aiConfig, currentSlateConfig, isResponsive, widgetClassName, screenWDp, screenHDp) {
                             when {
-                                widgetClassName.contains("DualFlagship") -> generateAiBarDualFlagshipBitmap(context, currentSlateConfig, aiConfig, isResponsive, 220, 80, widgetId)
-                                widgetClassName.contains("Primary") -> generateAiBarHeroPrimaryBitmap(context, currentSlateConfig, aiConfig, isResponsive, 240, 75, widgetId)
-                                widgetClassName.contains("Dock5") -> generateAiBarDock5Bitmap(context, currentSlateConfig, aiConfig, isResponsive, 240, 75, widgetId)
-                                widgetClassName.contains("Capsule") -> generateAiBarCapsuleBitmap(context, currentSlateConfig, aiConfig, isResponsive, 220, 75, widgetId)
-                                widgetClassName.contains("BentoHero") || widgetClassName.contains("Folder6") -> generateAiFolder6BentoHeroBitmap(context, currentSlateConfig, aiConfig, isResponsive, 220, 120, widgetId)
-                                widgetClassName.contains("Side") || widgetClassName.contains("Folder8") -> generateAiFolder8BentoSideBitmap(context, currentSlateConfig, aiConfig, isResponsive, 220, 120, widgetId)
-                                widgetClassName.contains("Grid") || widgetClassName.contains("Folder9") -> generateAiFolder9GridBitmap(context, currentSlateConfig, aiConfig, isResponsive, 140, 140, widgetId)
-                                widgetClassName.contains("Mega") || widgetClassName.contains("Folder10") -> generateAiFolder10MegaBitmap(context, currentSlateConfig, aiConfig, isResponsive, 220, 120, widgetId)
-                                widgetClassName.contains("Asymmetric") || widgetClassName.contains("Folder7") -> generateAiFolder7AsymmetricBitmap(context, currentSlateConfig, aiConfig, isResponsive, 180, 120, widgetId)
-                                else -> generateAiFolder4ClassicBitmap(context, currentSlateConfig, aiConfig, isResponsive, 130, 130, widgetId)
+                                widgetClassName.contains("DualFlagship") -> generateAiBarDualFlagshipBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Primary") -> generateAiBarHeroPrimaryBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Dock5") -> generateAiBarDock5Bitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Capsule") -> generateAiBarCapsuleBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("BentoHero") || widgetClassName.contains("Folder6") -> generateAiFolder6BentoHeroBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Side") || widgetClassName.contains("Folder8") -> generateAiFolder8BentoSideBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Grid") || widgetClassName.contains("Folder9") -> generateAiFolder9GridBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Mega") || widgetClassName.contains("Folder10") -> generateAiFolder10MegaBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Asymmetric") || widgetClassName.contains("Folder7") -> generateAiFolder7AsymmetricBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                else -> generateAiFolder4ClassicBitmap(context, currentSlateConfig, aiConfig, isResponsive, screenWDp, screenHDp, widgetId)
                             }
                         }
 
-                        val previewModifier = remember(widgetClassName) {
-                            when {
-                                widgetClassName.contains("DualFlagship") || widgetClassName.contains("Primary") || widgetClassName.contains("Capsule") || widgetClassName.contains("Dock") ->
-                                    Modifier.size(width = 240.dp, height = 75.dp)
-                                widgetClassName.contains("Mega") || widgetClassName.contains("Side") || widgetClassName.contains("BentoHero") ->
-                                    Modifier.size(width = 220.dp, height = 120.dp)
-                                widgetClassName.contains("Asymmetric") ->
-                                    Modifier.size(width = 180.dp, height = 120.dp)
-                                else ->
-                                    Modifier.size(130.dp)
-                            }
+                        // 3. Scale proportionally inside preview box
+                        val aspect = (screenWDp.toFloat() / screenHDp.toFloat().coerceAtLeast(1f)).coerceIn(0.3f, 4.5f)
+                        val maxBoxW = 260f
+                        val maxBoxH = 145f
+
+                        val (dispW, dispH) = if (aspect > (maxBoxW / maxBoxH)) {
+                            maxBoxW.dp to (maxBoxW / aspect).dp
+                        } else {
+                            (maxBoxH * aspect).dp to maxBoxH.dp
                         }
 
-                        Image(
-                            bitmap = previewBitmap.asImageBitmap(),
-                            contentDescription = "AI Widget Preview",
-                            modifier = previewModifier
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = previewBitmap.asImageBitmap(),
+                                contentDescription = "AI Widget Preview",
+                                modifier = Modifier.size(dispW, dispH)
+                            )
+                        }
                     }
                 ) {
                     if (selectedTabKey == "MODELS") {
