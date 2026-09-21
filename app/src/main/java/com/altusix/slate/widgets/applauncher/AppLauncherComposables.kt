@@ -528,24 +528,25 @@ private fun renderLauncherContent(
     tintColor: Int,
     scaleFactor: Float
 ) {
-    val baseH = rect.height()
+    // 1. Anchor scaling to the minimum dimension so both 1x1 squares and 2x1 pills scale consistently
+    val minDim = minOf(rect.width(), rect.height())
 
     val (shapeScaleMultiplier, offsetYFactor) = when (config.shape) {
-        LauncherShape.TRIANGLE -> 0.85f to 0.10f
-        LauncherShape.STAR_5 -> 0.88f to 0.02f
-        LauncherShape.HEART -> 0.90f to -0.03f
-        LauncherShape.M3_PENTAGON -> 0.95f to 0.02f
+        LauncherShape.TRIANGLE -> 0.82f to 0.10f
+        LauncherShape.STAR_5 -> 0.85f to 0.02f
+        LauncherShape.HEART -> 0.88f to -0.03f
+        LauncherShape.M3_PENTAGON -> 0.92f to 0.02f
         else -> 1.0f to 0.0f
     }
 
     val cx = rect.centerX()
-    val cy = rect.centerY() + (baseH * offsetYFactor)
+    val cy = rect.centerY() + (minDim * offsetYFactor)
 
-    // Unified ~0.20f baseline scale across all icon and typography formats
-    val unifiedIconSize = (baseH * 0.22f * shapeScaleMultiplier).coerceAtLeast(scaleFactor * 8f)
+    // Increased vector icon size from 0.22f to 0.48f
+    val unifiedIconSize = (minDim * 0.48f * shapeScaleMultiplier).coerceAtLeast(scaleFactor * 14f)
 
     if (config.packageName.isEmpty() && config.iconType == LauncherIconType.APP_ICON) {
-        renderUnconfiguredPlaceholder(context, canvas, cx, cy, baseH, tintColor, scaleFactor)
+        renderUnconfiguredPlaceholder(context, canvas, cx, cy, minDim, tintColor, scaleFactor)
         return
     }
 
@@ -554,8 +555,8 @@ private fun renderLauncherContent(
             if (config.packageName.isNotEmpty()) {
                 try {
                     val iconDrawable = context.packageManager.getApplicationIcon(config.packageName)
-                    // 0.24f accounts for the internal whitespace padding built into standard Android app icons
-                    val iconPx = (baseH * 0.24f * shapeScaleMultiplier).toInt().coerceAtLeast((scaleFactor * 10f).toInt())
+                    // Scaled up to 0.52f to compensate for native Android adaptive icon margins
+                    val iconPx = (minDim * 0.52f * shapeScaleMultiplier).toInt().coerceAtLeast((scaleFactor * 16f).toInt())
                     iconDrawable.setBounds(
                         (cx - iconPx / 2f).toInt(),
                         (cy - iconPx / 2f).toInt(),
@@ -564,15 +565,16 @@ private fun renderLauncherContent(
                     )
                     iconDrawable.draw(canvas)
                 } catch (e: PackageManager.NameNotFoundException) {
-                    renderUnconfiguredPlaceholder(context, canvas, cx, cy, baseH, tintColor, scaleFactor)
+                    renderUnconfiguredPlaceholder(context, canvas, cx, cy, minDim, tintColor, scaleFactor)
                 }
             } else {
-                renderUnconfiguredPlaceholder(context, canvas, cx, cy, baseH, tintColor, scaleFactor)
+                renderUnconfiguredPlaceholder(context, canvas, cx, cy, minDim, tintColor, scaleFactor)
             }
         }
         LauncherIconType.EMOJI -> {
             val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = (baseH * 0.21f * shapeScaleMultiplier).coerceAtLeast(scaleFactor * 8f)
+                // Scaled up from 0.21f to 0.44f
+                textSize = (minDim * 0.44f * shapeScaleMultiplier).coerceAtLeast(scaleFactor * 16f)
                 textAlign = Paint.Align.CENTER
             }
             val fontMetrics = emojiPaint.fontMetrics
@@ -584,18 +586,18 @@ private fun renderLauncherContent(
             if (imageVector != null) {
                 renderImageVectorOnCanvas(canvas, imageVector, cx, cy, unifiedIconSize, tintColor)
             } else {
-                renderUnconfiguredPlaceholder(context, canvas, cx, cy, baseH, tintColor, scaleFactor)
+                renderUnconfiguredPlaceholder(context, canvas, cx, cy, minDim, tintColor, scaleFactor)
             }
         }
         LauncherIconType.CUSTOM_TEXT -> {
             val text = config.customText.ifEmpty { "APP" }.uppercase()
 
             val maxAllowedW = if (rect.width() > rect.height() * 1.3f) {
-                rect.width() * 0.82f
+                rect.width() * 0.85f
             } else {
-                rect.width() * 0.76f
+                rect.width() * 0.78f
             }
-            val maxAllowedH = baseH * 0.35f
+            val maxAllowedH = minDim * 0.45f
 
             val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = tintColor
@@ -603,7 +605,7 @@ private fun renderLauncherContent(
                 textAlign = Paint.Align.CENTER
             }
 
-            var targetTextSize = (baseH * 0.20f * shapeScaleMultiplier).coerceAtLeast(scaleFactor * 7f)
+            var targetTextSize = (minDim * 0.30f * shapeScaleMultiplier).coerceAtLeast(scaleFactor * 10f)
             textPaint.textSize = targetTextSize
 
             val measuredWidth = textPaint.measureText(text)
@@ -613,7 +615,7 @@ private fun renderLauncherContent(
             if (targetTextSize > maxAllowedH) {
                 targetTextSize = maxAllowedH
             }
-            textPaint.textSize = targetTextSize.coerceAtLeast(scaleFactor * 6f)
+            textPaint.textSize = targetTextSize.coerceAtLeast(scaleFactor * 8f)
 
             val fontMetrics = textPaint.fontMetrics
             val textY = cy - (fontMetrics.ascent + fontMetrics.descent) / 2f
@@ -627,13 +629,13 @@ private fun renderUnconfiguredPlaceholder(
     canvas: Canvas,
     cx: Float,
     cy: Float,
-    baseH: Float,
+    minDim: Float,
     tintColor: Int,
     scaleFactor: Float
 ) {
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = tintColor
-        textSize = (baseH * 0.20f).coerceAtLeast(scaleFactor * 7f)
+        textSize = (minDim * 0.28f).coerceAtLeast(scaleFactor * 10f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.CENTER
     }
