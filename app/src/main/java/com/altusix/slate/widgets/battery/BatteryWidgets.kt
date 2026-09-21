@@ -30,7 +30,7 @@ fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Arc Battery", "2x2", "Battery", ArcGaugeBatteryReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Editorial", "2x2", "Battery", EditorialStatsBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Multi-Device", "4x2", "Battery", BatteryMultiDeviceStatsReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Dot Level Meter Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java, hasModeOption = true),
@@ -461,39 +461,51 @@ class BatteryMultiDeviceStatsReceiver : BaseBatteryReceiver(targetAspect = 2.0f)
     }
 }
 
-// 8. Dot Matrix LED (4x2)
+// 8. Dot Matrix LED Receiver (4x2)
 class DotMatrixBatteryLEDReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val density = context.resources.displayMetrics.density
-        val scaleFactor = maxOf(density, 3.5f)
-        val wPx = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-        val hPx = (hDp * scaleFactor).toInt().coerceAtLeast(1)
         val isLight = config.themeMode == "LIGHT"
-        val activeColor = if (isLight) Color.BLACK else Color.WHITE
-        val dimColor = if (isLight) 0x1F000000 else 0x1AFFFFFF
+
+        // Use user-selected accent color for active lit-up LEDs
+        val activeColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
+        val dimColor = if (isLight) 0x14000000 else 0x1AFFFFFF
+
         val bgColor = getSafeBgColor(config)
         val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
         val bgArgb = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        return generateDotMatrixLEDBitmap(context, "${data.percentage}%", activeColor, dimColor, bgArgb, wPx, hPx, isResponsive)
+
+        return generateDotMatrixLEDBitmap(
+            context = context,
+            text = "${data.percentage}%",
+            activeColorInt = activeColor,
+            dimColorInt = dimColor,
+            bgColorInt = bgArgb,
+            wDp = wDp,
+            hDp = hDp
+        )
     }
 }
 
 // 9. Dot Level Meter Wide (4x2)
 class DotLevelMeterWideReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        val density = context.resources.displayMetrics.density
-        val scaleFactor = maxOf(density, 3.5f)
-        val wPx = (wDp * scaleFactor).toInt().coerceAtLeast(1)
-        val hPx = (hDp * scaleFactor).toInt().coerceAtLeast(1)
-        val isLight = config.themeMode == "LIGHT"
-        val activeColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
-        val dimColor = if (isLight) 0x1F000000 else 0x1AFFFFFF
-        val bgColor = getSafeBgColor(config)
-        val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
-        val bgArgb = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
-        return generateCenteredLevelBitmap(context, data.percentage, activeColor, dimColor, bgArgb, wPx, hPx, isResponsive)
+        return generateCenteredLevelBitmap(context, data.percentage, config, isResponsive, wDp, hDp)
     }
 }
 

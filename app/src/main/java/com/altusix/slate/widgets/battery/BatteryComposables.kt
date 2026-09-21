@@ -1216,57 +1216,62 @@ fun generateMultiDeviceBatteryBitmap(
 }
 
 
-// 8. Dot Matrix LED (4x2)
+// 8. Dot Matrix LED (Strict Uniform Fixed Card: 4x2)
 fun generateDotMatrixLEDBitmap(
     context: Context,
     text: String,
     activeColorInt: Int,
     dimColorInt: Int,
     bgColorInt: Int,
-    targetWidthPx: Int,
-    targetHeightPx: Int,
-    isResponsive: Boolean = false
+    wDp: Int,
+    hDp: Int
 ): Bitmap {
-    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
-    val bitmap = Bitmap.createBitmap(targetWidthPx.coerceAtLeast(1), targetHeightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
-    val w = targetWidthPx.toFloat()
-    val h = targetHeightPx.toFloat()
+    val margin = scaleFactor * 1.5f
+    val maxAvailW = w - (margin * 2f)
+    val maxAvailH = h - (margin * 2f)
 
-    val cardW = w
-    val maxCardH = cardW * 0.48f
-    val cardH = if (isResponsive) h else minOf(h, maxCardH)
+    val rows = 9
+    val columns = 23 // Accommodates "100%" (23 cols) without clipping, centers "87%" (17 cols) symmetrically
 
-    val leftX = 0f
+    // Exact padding ratio in units of cellSize between the card border and the outer dot grid
+    val padRatio = 0.70f
+    val totalColsUnits = columns + (padRatio * 2f)
+    val totalRowsUnits = rows + (padRatio * 2f)
+
+    // Cell size scaled so the card fits inside widget bounds while maintaining equal padding on all sides
+    val cellSize = minOf(maxAvailW / totalColsUnits, maxAvailH / totalRowsUnits)
+    val cardW = totalColsUnits * cellSize
+    val cardH = totalRowsUnits * cellSize
+    val pad = padRatio * cellSize
+
+    // Center card inside widget canvas
+    val leftX = (w - cardW) / 2f
     val topY = (h - cardH) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardW, topY + cardH)
 
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bgColorInt
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val rows = 9
-    val glyphWidth = 5
-    val glyphGap = 1
-    val textWidthCols = text.length * glyphWidth + (text.length - 1) * glyphGap
-
-    var cellSize = cardH / (rows + 2f)
-    var columns = ((cardW / cellSize) - 2f).toInt()
-
-    if (columns < textWidthCols) {
-        columns = textWidthCols
-        cellSize = cardW / (columns + 2f)
+    // Subtle edge border for dark surface elevation
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
     }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
-    val dotRadius = cellSize * 0.38f
-    val gridW = columns * cellSize
-    val gridH = rows * cellSize
-
-    val startX = leftX + (cardW - gridW) / 2f
-    val startY = topY + (cardH - gridH) / 2f
+    // Dot Grid Bounds: Exactly 'pad' distance from top, bottom, left, and right of cardRect
+    val dotRadius = cellSize * 0.36f
+    val startX = leftX + pad
+    val startY = topY + pad
 
     val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = dimColorInt
@@ -1278,6 +1283,7 @@ fun generateDotMatrixLEDBitmap(
         style = Paint.Style.FILL
     }
 
+    // 1. Draw Inactive Dim Dot Matrix
     for (r in 0 until rows) {
         for (c in 0 until columns) {
             val cx = startX + c * cellSize + cellSize / 2f
@@ -1286,6 +1292,7 @@ fun generateDotMatrixLEDBitmap(
         }
     }
 
+    // 2. Glyph Definitions (5x7)
     val fontMap = mapOf(
         '0' to arrayOf(0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110),
         '1' to arrayOf(0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110),
@@ -1300,10 +1307,17 @@ fun generateDotMatrixLEDBitmap(
         '%' to arrayOf(0b11001, 0b11010, 0b00010, 0b00100, 0b01000, 0b01011, 0b10011)
     )
 
+    val glyphWidth = 5
+    val glyphGap = 1
     val glyphHeight = 7
+    val textWidthCols = text.length * glyphWidth + (text.length - 1) * glyphGap
+
+    // Vertical center: 1 row of dim dots on top, 1 on bottom
     val startRow = (rows - glyphHeight) / 2
+    // Horizontal center: Equal dim dots on left and right
     var startCol = (columns - textWidthCols) / 2
 
+    // 3. Draw Active Characters
     text.forEach { char ->
         val glyph = fontMap[char]
         if (glyph != null && startCol + glyphWidth <= columns) {
@@ -1328,7 +1342,107 @@ fun generateDotMatrixLEDBitmap(
     return bitmap
 }
 
-// 9. Dot Level Wide (4x2)
+// 9. Dot Level Wide (Adaptive: 4x2 Bento, 4x1 Ribbon, 1x3 Tall Column)
+fun generateCenteredLevelBitmap(
+    context: Context,
+    percentage: Int,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean = false,
+    wDp: Int,
+    hDp: Int
+): Bitmap {
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val margin = scaleFactor * 1.5f
+    val cardRect = if (isResponsive) {
+        RectF(margin, margin, w - margin, h - margin)
+    } else {
+        val targetRatio = 2.0f
+        var cardH = h - (margin * 2f)
+        var cardW = cardH * targetRatio
+        if (cardW > w - (margin * 2f)) {
+            cardW = w - (margin * 2f)
+            cardH = cardW / targetRatio
+        }
+        val leftX = (w - cardW) / 2f
+        val topY = (h - cardH) / 2f
+        RectF(leftX, topY, leftX + cardW, topY + cardH)
+    }
+
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+
+    val isLight = config.themeMode == "LIGHT"
+    val bgColor = getSafeBgColor(config)
+    val activeColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val dimColor = if (isLight) 0x14000000 else 0x1AFFFFFF
+
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
+
+    // Tight, balanced edge padding
+    val pad = (minOf(cardW, cardH) * 0.065f).coerceIn(scaleFactor * 6f, scaleFactor * 14f)
+    val availW = cardW - (pad * 2f)
+    val availH = cardH - (pad * 2f)
+
+    // Dynamically calculate both columns and rows based on aspect ratio
+    val targetCellPx = scaleFactor * 16f
+    val cols = (availW / targetCellPx).toInt().coerceAtLeast(3)
+    val rows = (availH / targetCellPx).toInt().coerceAtLeast(3)
+
+    // Ensure cell size fits both dimensions and keeps dots square
+    val cellSize = minOf(availW / cols, availH / rows)
+    val dotRadius = cellSize * 0.34f
+    val gridW = cols * cellSize
+    val gridH = rows * cellSize
+
+    // Center the matrix inside the card
+    val startX = cardRect.left + (cardW - gridW) / 2f
+    val startY = cardRect.top + (cardH - gridH) / 2f
+
+    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeColor
+        style = Paint.Style.FILL
+    }
+
+    val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = dimColor
+        style = Paint.Style.FILL
+    }
+
+    val totalDots = cols * rows
+    val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
+
+    for (r in 0 until rows) {
+        val rowFromBottom = (rows - 1) - r
+        for (c in 0 until cols) {
+            val dotIndex = rowFromBottom * cols + c
+            val cx = startX + c * cellSize + cellSize / 2f
+            val cy = startY + r * cellSize + cellSize / 2f
+
+            val paint = if (dotIndex < activeDotsCount) activePaint else dimPaint
+            canvas.drawCircle(cx, cy, dotRadius, paint)
+        }
+    }
+
+    return bitmap
+}
+
+// Backward-compatible overload for legacy pixel-based calls
 fun generateCenteredLevelBitmap(
     context: Context,
     percentage: Int,
@@ -1340,64 +1454,15 @@ fun generateCenteredLevelBitmap(
     isResponsive: Boolean = false
 ): Bitmap {
     val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
-    val bitmap = Bitmap.createBitmap(targetWidthPx.coerceAtLeast(1), targetHeightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val w = targetWidthPx.toFloat()
-    val h = targetHeightPx.toFloat()
-
-    val cardW = w
-    val maxCardH = cardW * 0.48f
-    val cardH = if (isResponsive) h else minOf(h, maxCardH)
-
-    val leftX = 0f
-    val topY = (h - cardH) / 2f
-
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColorInt
-        style = Paint.Style.FILL
-    }
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
-
-    val rows = 5
-    val cellSize = cardH / (rows + 2f)
-    val columns = ((cardW / cellSize) - 2f).toInt().coerceAtLeast(5)
-
-    val dotRadius = cellSize * 0.38f
-    val gridW = columns * cellSize
-    val gridH = rows * cellSize
-
-    val startX = leftX + (cardW - gridW) / 2f
-    val startY = topY + (cardH - gridH) / 2f
-
-    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = activeColorInt
-        style = Paint.Style.FILL
-    }
-
-    val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = dimColorInt
-        style = Paint.Style.FILL
-    }
-
-    val totalDots = columns * rows
-    val activeDotsCount = (percentage.coerceIn(0, 100) * totalDots) / 100
-
-    for (r in 0 until rows) {
-        val rowFromBottom = (rows - 1) - r
-        for (c in 0 until columns) {
-            val dotIndex = rowFromBottom * columns + c
-            val cx = startX + c * cellSize + cellSize / 2f
-            val cy = startY + r * cellSize + cellSize / 2f
-
-            val paint = if (dotIndex < activeDotsCount) activePaint else dimPaint
-            canvas.drawCircle(cx, cy, dotRadius, paint)
-        }
-    }
-
-    return bitmap
+    val wDp = (targetWidthPx / scaleFactor).toInt().coerceAtLeast(1)
+    val hDp = (targetHeightPx / scaleFactor).toInt().coerceAtLeast(1)
+    val fakeConfig = SlateWidgetConfig(
+        accentColorHex = (activeColorInt.toLong() and 0xFFFFFFFFL),
+        backgroundColorHex = (bgColorInt.toLong() and 0xFFFFFFFFL)
+    )
+    return generateCenteredLevelBitmap(context, percentage, fakeConfig, isResponsive, wDp, hDp)
 }
+
 
 // 10. Sleek Minimal Battery Strip - Percentage Only (4x1)
 fun generateHorizontalStripBitmap(
