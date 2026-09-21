@@ -66,6 +66,19 @@ object BluetoothDataReader {
         }
     }
 
+    fun getPreviewDeviceStatus(): BluetoothDeviceData {
+        return BluetoothDeviceData(
+            isConnected = true,
+            deviceName = "Earbuds Pro",
+            batteryLevel = 85,
+            leftBattery = 85,
+            rightBattery = 80,
+            caseBattery = 90,
+            volumeLevel = 65,
+            needsPermission = false
+        )
+    }
+
     @SuppressLint("MissingPermission")
     fun readCurrentDeviceStatus(context: Context): BluetoothDeviceData {
         val currentVolume = getCurrentMediaVolume(context)
