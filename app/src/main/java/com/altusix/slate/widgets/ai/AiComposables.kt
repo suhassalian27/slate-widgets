@@ -301,8 +301,6 @@ fun generateSingleAiIconBitmap(
     )
 }
 
-
-
 private fun drawTextOnlyPillBitmap(
     context: Context,
     labelText: String,
@@ -357,7 +355,15 @@ private fun drawTextOnlyPillBitmap(
     return bitmap
 }
 
-private fun drawPillBaseBitmap(
+private fun getSmartAiHeroLabel(target: AiTarget): String {
+    return when (target) {
+        AiTarget.CHATGPT_TEXT -> "GPT"
+        AiTarget.CHATGPT_VOICE -> "GPT Voice"
+        else -> target.title
+    }
+}
+
+private fun drawDualFlagshipPill(
     context: Context,
     target: AiTarget,
     labelText: String,
@@ -365,86 +371,122 @@ private fun drawPillBaseBitmap(
     isLight: Boolean,
     widthPx: Int,
     heightPx: Int,
-    logoSizePercent: Float = 0.38f,
-    textSizePercent: Float = 0.30f,
-    isCenteredLayout: Boolean = false
+    scaleFactor: Float
 ): Bitmap {
-    val wPx = widthPx.coerceAtLeast(1)
-    val hPx = heightPx.coerceAtLeast(1)
-    val bitmap = Bitmap.createBitmap(wPx, hPx, Bitmap.Config.ARGB_8888)
+    val w = widthPx.coerceAtLeast(1)
+    val h = heightPx.coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    val w = wPx.toFloat()
-    val h = hPx.toFloat()
+    val pillRect = RectF(0f, 0f, w.toFloat(), h.toFloat())
+    val pillRadius = minOf(w.toFloat(), h.toFloat()) / 2f
 
-    val contentColor = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-    val pillBgColor = if (isLight) {
-        Color.parseColor("#0F000000")
-    } else {
-        Color.argb(30, Color.red(accentColorInt), Color.green(accentColorInt), Color.blue(accentColorInt))
-    }
-
-    val rect = RectF(0f, 0f, w, h)
-    val capsuleRadius = rect.height() / 2f
-
+    val tileBgColor = if (isLight) Color.parseColor("#0F000000") else Color.parseColor("#1C1C1E")
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = pillBgColor
+        color = tileBgColor
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(rect, capsuleRadius, capsuleRadius, bgPaint)
+    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, bgPaint)
 
-    var logoSize = h * logoSizePercent
-    var textSize = h * textSizePercent
-    var itemGap = h * 0.10f
+    val iconColor = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
+    val resId = context.resources.getIdentifier(target.drawableResName, "drawable", context.packageName)
+    val drawable = if (resId != 0) ContextCompat.getDrawable(context, resId)?.mutate() else null
+    drawable?.setTint(iconColor)
 
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = contentColor
-        this.textSize = textSize
+        color = iconColor
         typeface = getSlateFont(context, weight = 600)
+        textAlign = Paint.Align.CENTER
     }
 
-    var measuredTextWidth = textPaint.measureText(labelText)
-    var totalContentWidth = logoSize + itemGap + measuredTextWidth
+    val isVerticalStack = h > w * 0.85f
 
-    // Auto-scale content down if squeezed into a narrow container
-    val maxAvailW = w * 0.82f
-    if (totalContentWidth > maxAvailW && maxAvailW > 0f) {
-        val scale = maxAvailW / totalContentWidth
-        logoSize *= scale
-        textSize *= scale
-        itemGap *= scale
+    if (isVerticalStack) {
+        // --- 1. TALL / VERTICAL MODE (Icon on top, Label below) ---
+        var iconSize = (minOf(w, h) * 0.38f).coerceIn(scaleFactor * 22f, scaleFactor * 44f)
+        var textSize = (h * 0.16f).coerceIn(scaleFactor * 11f, scaleFactor * 17f)
         textPaint.textSize = textSize
-        measuredTextWidth = textPaint.measureText(labelText)
-        totalContentWidth = logoSize + itemGap + measuredTextWidth
-    }
 
-    val logoXStart = if (isCenteredLayout) (w - totalContentWidth) / 2f else capsuleRadius * 0.55f
-
-    val resId = context.resources.getIdentifier(target.drawableResName, "drawable", context.packageName)
-    if (resId != 0) {
-        val drawable = ContextCompat.getDrawable(context, resId)
-        if (drawable != null) {
-            val logoTop = ((h - logoSize) / 2f).toInt()
-            val logoLeft = logoXStart.toInt()
-            val logoRight = (logoLeft + logoSize).toInt()
-            val logoBottom = (logoTop + logoSize).toInt()
-
-            drawable.setBounds(logoLeft, logoTop, logoRight, logoBottom)
-            drawable.setTint(contentColor)
-            drawable.draw(canvas)
+        // Guard: shrink font size if text is wider than available pill width
+        val maxTextW = (w * 0.82f).coerceAtLeast(1f)
+        val measuredW = textPaint.measureText(labelText)
+        if (measuredW > maxTextW) {
+            textSize *= (maxTextW / measuredW)
+            textPaint.textSize = textSize
         }
-    }
 
-    val fontMetrics = textPaint.fontMetrics
-    val textX = logoXStart + logoSize + itemGap
-    val textY = (h / 2f) - (fontMetrics.ascent + fontMetrics.descent) / 2f
-    canvas.drawText(labelText, textX, textY, textPaint)
+        val textGap = scaleFactor * 5f
+        val totalH = iconSize + textGap + textSize
+        val topY = (h - totalH) / 2f
+
+        val iconCx = w / 2f
+        val iconCy = topY + (iconSize / 2f)
+
+        drawable?.let {
+            val l = (iconCx - iconSize / 2f).toInt()
+            val t = (iconCy - iconSize / 2f).toInt()
+            it.setBounds(l, t, (l + iconSize).toInt(), (t + iconSize).toInt())
+            it.draw(canvas)
+        }
+
+        val fm = textPaint.fontMetrics
+        val textBaseline = topY + iconSize + textGap - fm.ascent
+        canvas.drawText(labelText, w / 2f, textBaseline, textPaint)
+
+    } else {
+        // --- 2. HORIZONTAL MODE (Icon + Label side-by-side) ---
+        var iconSize = (h * 0.44f).coerceIn(scaleFactor * 16f, scaleFactor * 30f)
+        var textSize = (h * 0.36f).coerceIn(scaleFactor * 12f, scaleFactor * 19f)
+        var textGap = scaleFactor * 8f
+        textPaint.textSize = textSize
+
+        var textW = textPaint.measureText(labelText)
+        var totalContentW = iconSize + textGap + textW
+
+        // Available width inside rounded pill ends (protecting semicircular caps)
+        val maxContentW = (w - (h * 0.65f)).coerceAtLeast(1f)
+
+        // Smart Auto-Scale: If label is long (e.g. "GPT Voice", "Perplexity"), scale down together
+        if (totalContentW > maxContentW) {
+            val scale = (maxContentW / totalContentW).coerceIn(0.55f, 1f)
+            textSize *= scale
+            iconSize *= scale
+            textGap *= scale
+            textPaint.textSize = textSize
+            textW = textPaint.measureText(labelText)
+            totalContentW = iconSize + textGap + textW
+        }
+
+        // Guaranteed safe start X coordinate (never negative)
+        val contentStartX = ((w - totalContentW) / 2f).coerceAtLeast(h * 0.22f)
+        val iconLeft = contentStartX.toInt()
+        val iconTop = ((h - iconSize) / 2f).toInt()
+
+        drawable?.let {
+            it.setBounds(iconLeft, iconTop, (iconLeft + iconSize).toInt(), (iconTop + iconSize).toInt())
+            it.draw(canvas)
+        }
+
+        val textX = contentStartX + iconSize + textGap + (textW / 2f)
+        val fm = textPaint.fontMetrics
+        val textY = (h / 2f) - ((fm.ascent + fm.descent) / 2f)
+        canvas.drawText(labelText, textX, textY, textPaint)
+    }
 
     return bitmap
 }
 
+
 // 10. AI PRIMARY BAR (4x1)
-fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+fun generateAiBarHeroPrimaryBitmap(
+    context: Context,
+    config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -452,6 +494,11 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK)
+    val effectiveTargets = List(4) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
+    val heroTarget = effectiveTargets[0]
+    val heroLabel = getSmartAiHeroLabel(heroTarget)
 
     val margin = scaleFactor * 1.5f
     val cardRect = if (isResponsive) {
@@ -490,7 +537,6 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
         val baseInnerH = cardH - (pad * 2f)
         val availW = cardW - (pad * 2f)
 
-        // Mathematical width guard: Clamp innerH so total horizontal elements fit inside availW
         val maxInnerHFromWidth = availW / 5.1f
         val innerH = minOf(baseInnerH, maxInnerHFromWidth)
 
@@ -500,15 +546,13 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
         val rightTileW = innerH
 
         val totalGroupW = heroW + (divSpacing * 2f) + (rightTileW * 3f) + (gap * 2f)
-
-        // Center group both horizontally and vertically inside cardRect
         val startX = cardRect.left + (cardW - totalGroupW) / 2f
         val innerTopY = cardRect.top + (cardH - innerH) / 2f
 
-        // A. Gemini Hero Pill
+        // A. Dynamic Hero Pill
         val heroBitmap = drawTextOnlyPillBitmap(
             context = context,
-            labelText = "Gemini",
+            labelText = heroLabel,
             accentColorInt = accentColorInt,
             isLight = isLight,
             widthPx = heroW.toInt(),
@@ -516,7 +560,7 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
         )
         canvas.drawBitmap(heroBitmap, startX, innerTopY, null)
 
-        // B. Vertical Divider
+        // B. Divider
         val divX = startX + heroW + divSpacing
         val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (isLight) Color.parseColor("#26000000") else Color.parseColor("#26FFFFFF")
@@ -524,12 +568,12 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
         }
         canvas.drawLine(divX, cardRect.centerY() - (innerH * 0.28f), divX, cardRect.centerY() + (innerH * 0.28f), divPaint)
 
-        // C. Right Icon Tiles
+        // C. Dynamic Right Icon Tiles
         val rightStartX = divX + divSpacing
         val targets = listOf(
-            Triple(AiTarget.CHATGPT_TEXT, AiShapeStyle.SQUIRCLE, 0),
-            Triple(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE, 1),
-            Triple(AiTarget.GROK, AiShapeStyle.CAPSULE_RIGHT, 2)
+            Triple(effectiveTargets[1], AiShapeStyle.SQUIRCLE, 0),
+            Triple(effectiveTargets[2], AiShapeStyle.SQUIRCLE, 1),
+            Triple(effectiveTargets[3], AiShapeStyle.CAPSULE_RIGHT, 2)
         )
 
         for ((target, shape, index) in targets) {
@@ -564,7 +608,7 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
 
         val heroBitmap = drawTextOnlyPillBitmap(
             context = context,
-            labelText = "Gemini",
+            labelText = heroLabel,
             accentColorInt = accentColorInt,
             isLight = isLight,
             widthPx = availW.toInt(),
@@ -576,9 +620,9 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
         val botY = startY + topH + gap
 
         val bottomTargets = listOf(
-            Pair(AiTarget.CHATGPT_TEXT, AiShapeStyle.CORNER_BOTTOM_LEFT),
-            Pair(AiTarget.CLAUDE, AiShapeStyle.SQUIRCLE),
-            Pair(AiTarget.GROK, AiShapeStyle.CORNER_BOTTOM_RIGHT)
+            Pair(effectiveTargets[1], AiShapeStyle.CORNER_BOTTOM_LEFT),
+            Pair(effectiveTargets[2], AiShapeStyle.SQUIRCLE),
+            Pair(effectiveTargets[3], AiShapeStyle.CORNER_BOTTOM_RIGHT)
         )
 
         bottomTargets.forEachIndexed { i, (target, shape) ->
@@ -600,10 +644,17 @@ fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, 
     return bitmap
 }
 
-// 11. AI DOCK BAR (5 Apps: 5x1 / 1x5 Smart Pivot)
+fun generateAiBarHeroPrimaryBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK)
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 4, defaultTargets)
+    return generateAiBarHeroPrimaryBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 11. AI DOCK BAR (5 Apps)
 fun generateAiBarDock5Bitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
@@ -614,33 +665,29 @@ fun generateAiBarDock5Bitmap(
     val cols = if (isVertical) 1 else 5
     val rows = if (isVertical) 5 else 1
 
-    val targets = listOf(
-        AiTarget.GEMINI_TEXT,
-        AiTarget.CHATGPT_TEXT,
-        AiTarget.CLAUDE,
-        AiTarget.GROK,
-        AiTarget.PERPLEXITY
-    )
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK, AiTarget.PERPLEXITY)
+    val targets = List(5) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalFolderGrid(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        cols = cols,
-        rows = rows,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, cols = cols, rows = rows, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
-// 12. AI CAPSULE BAR (4 Apps: 4x1 / 1x4 Smart Pivot)
+fun generateAiBarDock5Bitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK, AiTarget.PERPLEXITY)
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 5, defaultTargets)
+    return generateAiBarDock5Bitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 12. AI CAPSULE BAR (4 Apps)
 fun generateAiBarCapsuleBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
@@ -651,122 +698,29 @@ fun generateAiBarCapsuleBitmap(
     val cols = if (isVertical) 1 else 4
     val rows = if (isVertical) 4 else 1
 
-    val targets = listOf(
-        AiTarget.CHATGPT_TEXT,
-        AiTarget.PERPLEXITY,
-        AiTarget.CLAUDE,
-        AiTarget.GEMINI_TEXT
-    )
+    val defaultTargets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE, AiTarget.GEMINI_TEXT)
+    val targets = List(4) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalFolderGrid(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        cols = cols,
-        rows = rows,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, cols = cols, rows = rows, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
-private fun drawDualFlagshipPill(
-    context: Context,
-    target: AiTarget,
-    labelText: String,
-    accentColorInt: Int,
-    isLight: Boolean,
-    widthPx: Int,
-    heightPx: Int,
-    scaleFactor: Float
-): Bitmap {
-    val w = widthPx.coerceAtLeast(1)
-    val h = heightPx.coerceAtLeast(1)
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val pillRect = RectF(0f, 0f, w.toFloat(), h.toFloat())
-
-    // Always a true pill (capsule) with semicircular ends
-    val pillRadius = minOf(w.toFloat(), h.toFloat()) / 2f
-
-    val tileBgColor = if (isLight) Color.parseColor("#0F000000") else Color.parseColor("#1C1C1E")
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = tileBgColor
-        style = Paint.Style.FILL
-    }
-    canvas.drawRoundRect(pillRect, pillRadius, pillRadius, bgPaint)
-
-    val iconColor = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-    val resId = context.resources.getIdentifier(target.drawableResName, "drawable", context.packageName)
-    val drawable = if (resId != 0) ContextCompat.getDrawable(context, resId)?.mutate() else null
-    drawable?.setTint(iconColor)
-
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = iconColor
-        typeface = getSlateFont(context, weight = 600)
-        textAlign = Paint.Align.CENTER
-    }
-
-    val isVerticalStack = h > w * 0.85f
-
-    if (isVerticalStack) {
-        // Tall mode: Icon on top, label centered below
-        val iconSize = (minOf(w, h) * 0.38f).coerceIn(scaleFactor * 22f, scaleFactor * 44f)
-        val textSize = (h * 0.16f).coerceIn(scaleFactor * 11f, scaleFactor * 17f)
-        textPaint.textSize = textSize
-
-        val textGap = scaleFactor * 6f
-        val totalH = iconSize + textGap + textSize
-        val topY = (h - totalH) / 2f
-
-        val iconCx = w / 2f
-        val iconCy = topY + (iconSize / 2f)
-
-        drawable?.let {
-            val l = (iconCx - iconSize / 2f).toInt()
-            val t = (iconCy - iconSize / 2f).toInt()
-            it.setBounds(l, t, (l + iconSize).toInt(), (t + iconSize).toInt())
-            it.draw(canvas)
-        }
-
-        val textBaseline = topY + iconSize + textGap + (textSize * 0.85f)
-        canvas.drawText(labelText, w / 2f, textBaseline, textPaint)
-    } else {
-        // Horizontal mode: Icon + Label side-by-side
-        val iconSize = (h * 0.44f).coerceIn(scaleFactor * 16f, scaleFactor * 30f)
-        val textSize = (h * 0.36f).coerceIn(scaleFactor * 12f, scaleFactor * 19f)
-        textPaint.textSize = textSize
-
-        val textW = textPaint.measureText(labelText)
-        val textGap = scaleFactor * 8f
-        val totalW = iconSize + textGap + textW
-
-        val startX = (w - totalW) / 2f
-        val iconLeft = startX.toInt()
-        val iconTop = ((h - iconSize) / 2f).toInt()
-
-        drawable?.let {
-            it.setBounds(iconLeft, iconTop, (iconLeft + iconSize).toInt(), (iconTop + iconSize).toInt())
-            it.draw(canvas)
-        }
-
-        val textX = startX + iconSize + textGap + (textW / 2f)
-        val fm = textPaint.fontMetrics
-        val textY = (h / 2f) - ((fm.ascent + fm.descent) / 2f)
-        canvas.drawText(labelText, textX, textY, textPaint)
-    }
-
-    return bitmap
+fun generateAiBarCapsuleBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE, AiTarget.GEMINI_TEXT)
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 4, defaultTargets)
+    return generateAiBarCapsuleBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
 }
 
-// 13. AI DUAL FLAGSHIP BAR (4x1 / 2x1 / 1x2 Pivot)
+// 13. AI DUAL FLAGSHIP BAR (2 Apps)
 fun generateAiBarDualFlagshipBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
@@ -779,6 +733,14 @@ fun generateAiBarDualFlagshipBitmap(
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
+
+    val defaultTargets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.GEMINI_TEXT)
+    val leftTarget = aiConfig.slots.getOrNull(0) ?: defaultTargets[0]
+    val rightTarget = aiConfig.slots.getOrNull(1) ?: defaultTargets[1]
+
+    // Uses smart labels (e.g. "GPT", "GPT Voice", "Claude")
+    val leftLabel = getSmartAiHeroLabel(leftTarget)
+    val rightLabel = getSmartAiHeroLabel(rightTarget)
 
     val margin = scaleFactor * 1.5f
     val cardRect = if (isResponsive) {
@@ -807,7 +769,6 @@ fun generateAiBarDualFlagshipBitmap(
     }
 
     if (aspectRatio >= 1.75f) {
-        // Mode 1: Wide Pill Bar (Side-by-Side Pills)
         val cornerRadius = cardH / 2f
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
@@ -818,21 +779,16 @@ fun generateAiBarDualFlagshipBitmap(
         val pillW = ((availW - gap) / 2f).toInt().coerceAtLeast(1)
 
         val leftPill = drawDualFlagshipPill(
-            context, AiTarget.CHATGPT_TEXT, "GPT", accentColorInt, isLight, pillW, innerH.toInt(), scaleFactor
+            context, leftTarget, leftLabel, accentColorInt, isLight, pillW, innerH.toInt(), scaleFactor
         )
         canvas.drawBitmap(leftPill, cardRect.left + pad, cardRect.top + pad, null)
 
         val rightPill = drawDualFlagshipPill(
-            context, AiTarget.GEMINI_TEXT, "Gemini", accentColorInt, isLight, pillW, innerH.toInt(), scaleFactor
+            context, rightTarget, rightLabel, accentColorInt, isLight, pillW, innerH.toInt(), scaleFactor
         )
         canvas.drawBitmap(rightPill, cardRect.left + pad + pillW + gap, cardRect.top + pad, null)
     } else {
-        // Mode 2 & 3: Vertical Pill (when tall) or Squircle (when square) with 2 Stacked Pills
-        val cornerRadius = if (aspectRatio < 0.85f) {
-            cardW / 2f // Pure vertical capsule in 1x2 mode
-        } else {
-            getStandardCornerRadius(scaleFactor) // Clean squircle in 2x2 mode
-        }
+        val cornerRadius = if (aspectRatio < 0.85f) cardW / 2f else getStandardCornerRadius(scaleFactor)
         canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, bgPaint)
 
         val pad = minOf(cardW, cardH) * 0.06f
@@ -847,12 +803,12 @@ fun generateAiBarDualFlagshipBitmap(
         val startY = cardRect.top + pad
 
         val topPill = drawDualFlagshipPill(
-            context, AiTarget.CHATGPT_TEXT, "GPT", accentColorInt, isLight, pillW, pillH, scaleFactor
+            context, leftTarget, leftLabel, accentColorInt, isLight, pillW, pillH, scaleFactor
         )
         canvas.drawBitmap(topPill, startX, startY, null)
 
         val botPill = drawDualFlagshipPill(
-            context, AiTarget.GEMINI_TEXT, "Gemini", accentColorInt, isLight, pillW, pillH, scaleFactor
+            context, rightTarget, rightLabel, accentColorInt, isLight, pillW, pillH, scaleFactor
         )
         canvas.drawBitmap(botPill, startX, startY + pillH + gap, null)
     }
@@ -860,126 +816,147 @@ fun generateAiBarDualFlagshipBitmap(
     return bitmap
 }
 
-// 14. AI QUAD FOLDER (2x2 Grid)
+fun generateAiBarDualFlagshipBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(AiTarget.CHATGPT_TEXT, AiTarget.GEMINI_TEXT)
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 2, defaultTargets)
+    return generateAiBarDualFlagshipBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 14. AI QUAD FOLDER (4 Apps)
 fun generateAiFolder4ClassicBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
     widgetId: Int
 ): Bitmap {
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val targets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE)
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE)
+    val targets = List(4) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalFolderGrid(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        cols = 2,
-        rows = 2,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, cols = 2, rows = 2, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
-// 15. AI BENTO FOLDER (6 Apps - 2 Hero Top + 4 Small Bottom)
+fun generateAiFolder4ClassicBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.PERPLEXITY, AiTarget.CLAUDE)
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 4, defaultTargets)
+    return generateAiFolder4ClassicBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 15. AI BENTO FOLDER (6 Apps)
 fun generateAiFolder6BentoHeroBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
     widgetId: Int
 ): Bitmap {
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val targets = listOf(
-        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT,
-        AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI
-    )
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
+    val targets = List(6) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalBentoHero6(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
-// 16. AI SIDE BENTO FOLDER (8 Apps - 2 Stacked Left + 6 Right)
+fun generateAiFolder6BentoHeroBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK, AiTarget.DEEPSEEK, AiTarget.META_AI)
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 6, defaultTargets)
+    return generateAiFolder6BentoHeroBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 16. AI SIDE BENTO FOLDER (8 Apps)
 fun generateAiFolder8BentoSideBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
     widgetId: Int
 ): Bitmap {
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val targets = listOf(
-        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT,
-        AiTarget.CLAUDE, AiTarget.GROK,
-        AiTarget.PERPLEXITY, AiTarget.COPILOT,
-        AiTarget.DEEPSEEK, AiTarget.META_AI
+    val defaultTargets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK,
+        AiTarget.PERPLEXITY, AiTarget.COPILOT, AiTarget.DEEPSEEK, AiTarget.META_AI
     )
+    val targets = List(8) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalBentoSide8(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
-// 17. AI 3x3 GRID FOLDER (3x3 Grid Hub)
+fun generateAiFolder8BentoSideBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.CLAUDE, AiTarget.GROK,
+        AiTarget.PERPLEXITY, AiTarget.COPILOT, AiTarget.DEEPSEEK, AiTarget.META_AI
+    )
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 8, defaultTargets)
+    return generateAiFolder8BentoSideBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 17. AI 3x3 GRID FOLDER (9 Apps)
 fun generateAiFolder9GridBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
     widgetId: Int
 ): Bitmap {
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val targets = listOf(
+    val defaultTargets = listOf(
         AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT,
         AiTarget.GROK, AiTarget.CLAUDE, AiTarget.DEEPSEEK,
         AiTarget.PERPLEXITY, AiTarget.META_AI, AiTarget.POE
     )
+    val targets = List(9) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalFolderGrid(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        cols = 3,
-        rows = 3,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, cols = 3, rows = 3, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
-// 18. AI MEGA FOLDER (10 Apps - 5x2 / 2x5 Smart Pivot)
+fun generateAiFolder9GridBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT,
+        AiTarget.GROK, AiTarget.CLAUDE, AiTarget.DEEPSEEK,
+        AiTarget.PERPLEXITY, AiTarget.META_AI, AiTarget.POE
+    )
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 9, defaultTargets)
+    return generateAiFolder9GridBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
+// 18. AI MEGA FOLDER (10 Apps)
 fun generateAiFolder10MegaBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
@@ -990,30 +967,35 @@ fun generateAiFolder10MegaBitmap(
     val cols = if (isVertical) 2 else 5
     val rows = if (isVertical) 5 else 2
 
-    val targets = listOf(
+    val defaultTargets = listOf(
         AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK,
         AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.MISTRAL
     )
+    val targets = List(10) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalFolderGrid(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        cols = cols,
-        rows = rows,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, cols = cols, rows = rows, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.GEMINI_TEXT }
         drawAiSlotVector(canvas, context, tileRect, target, accentColorInt, scaleFactor)
     }
 }
 
+fun generateAiFolder10MegaBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(
+        AiTarget.GEMINI_TEXT, AiTarget.CHATGPT_TEXT, AiTarget.COPILOT, AiTarget.CLAUDE, AiTarget.GROK,
+        AiTarget.PERPLEXITY, AiTarget.DEEPSEEK, AiTarget.META_AI, AiTarget.POE, AiTarget.MISTRAL
+    )
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 10, defaultTargets)
+    return generateAiFolder10MegaBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
+}
+
 // 19. AI ASYMMETRIC BENTO (7 Apps)
 fun generateAiFolder7AsymmetricBitmap(
     context: Context,
     config: SlateWidgetConfig,
+    aiConfig: AiWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
     hDp: Int,
@@ -1021,23 +1003,19 @@ fun generateAiFolder7AsymmetricBitmap(
 ): Bitmap {
     val isLight = config.themeMode == "LIGHT"
     val accentColorInt = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val targets = listOf(
+    val defaultTargets = listOf(
         AiTarget.CHATGPT_TEXT, AiTarget.GROK, AiTarget.COPILOT,
         AiTarget.GEMINI_TEXT, AiTarget.CLAUDE, AiTarget.PERPLEXITY, AiTarget.META_AI
     )
+    val targets = List(7) { i -> aiConfig.slots.getOrNull(i) ?: defaultTargets[i] }
 
     return renderUniversalBentoAsymmetric7(
-        context = context,
-        config = config,
-        isResponsive = isResponsive,
-        wDp = wDp,
-        hDp = hDp,
-        showTileBackground = true
+        context = context, config = config, isResponsive = isResponsive,
+        wDp = wDp, hDp = hDp, showTileBackground = true
     ) { canvas, tileRect, index, scaleFactor, _ ->
         val target = targets.getOrElse(index) { AiTarget.CHATGPT_TEXT }
         val isHero = index == 0
 
-        // Slot 0 (Hero) uses the prominent accent color fill
         if (isHero) {
             val heroFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = accentColorInt
@@ -1047,14 +1025,18 @@ fun generateAiFolder7AsymmetricBitmap(
         }
 
         drawAiSlotVector(
-            canvas = canvas,
-            context = context,
-            tileRect = tileRect,
-            target = target,
-            accentColorInt = accentColorInt,
-            scaleFactor = scaleFactor,
-            isPrimaryAccent = isHero,
-            isLight = isLight
+            canvas = canvas, context = context, tileRect = tileRect, target = target,
+            accentColorInt = accentColorInt, scaleFactor = scaleFactor,
+            isPrimaryAccent = isHero, isLight = isLight
         )
     }
+}
+
+fun generateAiFolder7AsymmetricBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int): Bitmap {
+    val defaultTargets = listOf(
+        AiTarget.CHATGPT_TEXT, AiTarget.GROK, AiTarget.COPILOT,
+        AiTarget.GEMINI_TEXT, AiTarget.CLAUDE, AiTarget.PERPLEXITY, AiTarget.META_AI
+    )
+    val aiConfig = AiWidgetConfig.load(context, widgetId, 7, defaultTargets)
+    return generateAiFolder7AsymmetricBitmap(context, config, aiConfig, isResponsive, wDp, hDp, widgetId)
 }

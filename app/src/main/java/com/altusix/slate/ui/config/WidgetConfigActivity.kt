@@ -89,7 +89,7 @@ import com.altusix.slate.widgets.social.updateAllSocialWidgets
 import com.altusix.slate.widgets.weather.WeatherConfigActivity
 import com.altusix.slate.widgets.weather.getWeatherWidgetsCatalog
 import com.altusix.slate.widgets.weather.updateAllWeatherWidgets
-
+import com.altusix.slate.widgets.ai.AiWidgetConfigActivity
 enum class ColorPickerTarget {
     BACKGROUND, ACCENT
 }
@@ -127,6 +127,18 @@ class WidgetConfigActivity : ComponentActivity() {
         val isAppFolder = getAppFolderWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         val isAppLauncher = getAppLauncherWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
         val isContacts = getContactsWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+        val isAiWidget = getAiWidgetsCatalog().any { it.receiverClass.name == widgetClassName }
+
+        if (isAiWidget) {
+            val forwardIntent = Intent(this, AiWidgetConfigActivity::class.java).apply {
+                intent?.extras?.let { putExtras(it) }
+                addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
+            }
+            startActivity(forwardIntent)
+            finish()
+            return
+        }
+
         if (isAppFolder) {
             val forwardIntent = Intent(this, AppFolderWidgetConfigActivity::class.java).apply {
                 intent?.extras?.let { putExtras(it) }

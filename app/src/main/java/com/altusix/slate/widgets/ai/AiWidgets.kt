@@ -209,10 +209,18 @@ abstract class BaseAiFolderReceiver(
     open val targets: List<AiTarget>
 ) : BaseAiReceiver(defaultLayoutResId) {
 
+    fun getEffectiveTargets(context: Context, widgetId: Int): List<AiTarget> {
+        val aiConfig = AiWidgetConfig.load(context, widgetId, slotCount, targets)
+        return List(slotCount) { i ->
+            aiConfig.slots.getOrNull(i) ?: targets.getOrElse(i) { AiTarget.GEMINI_TEXT }
+        }
+    }
+
     override fun setupTouchTargets(context: Context, views: RemoteViews, widgetId: Int) {
-        val totalSlots = minOf(slotCount, targets.size)
+        val effectiveTargets = getEffectiveTargets(context, widgetId)
+        val totalSlots = minOf(slotCount, effectiveTargets.size)
         views.bindFolderTouchSlots(context, widgetId, totalSlots) { i ->
-            AiLauncherUtils.getLaunchIntent(context, targets[i])
+            AiLauncherUtils.getLaunchIntent(context, effectiveTargets[i])
         }
     }
 }
