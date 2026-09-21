@@ -41,7 +41,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,9 +54,6 @@ import com.altusix.slate.ui.components.*
 import com.altusix.slate.widgets.appfolder.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextAlign
 
 class AppFolderWidgetConfigActivity : ComponentActivity() {
 
@@ -97,7 +97,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                 var installedApps by remember { mutableStateOf<List<InstalledAppItem>>(emptyList()) }
                 var selectedTabKey by remember { mutableStateOf("APPS") }
 
-                // Bottom Sheet State
                 var showAppPickerSheet by remember { mutableStateOf(false) }
                 var targetSlotIndex by remember { mutableIntStateOf(0) }
                 var sheetSearchQuery by remember { mutableStateOf("") }
@@ -127,7 +126,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                             pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
                         }
 
-                        // Fix 1: Deduplicate by packageName so multi-activity apps (e.g. Amazon) don't duplicate
                         val apps = resolved.map {
                             InstalledAppItem(
                                 label = it.loadLabel(pm).toString(),
@@ -156,6 +154,17 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                     AppFolderWidgetConfig.save(this@AppFolderWidgetConfigActivity, widgetId, folderConfig)
                     saveSlateWidgetConfig(this@AppFolderWidgetConfigActivity, widgetId, currentSlateConfig, isResponsive)
                     updateAllAppFolderWidgets(this@AppFolderWidgetConfigActivity)
+
+                    val manager = AppWidgetManager.getInstance(this@AppFolderWidgetConfigActivity)
+                    val info = manager.getAppWidgetInfo(widgetId)
+                    if (info?.provider != null) {
+                        val updateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                            component = info.provider
+                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(widgetId))
+                        }
+                        sendBroadcast(updateIntent)
+                    }
+
                     val resultIntent = Intent().apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                     }
@@ -176,28 +185,88 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                     previewHeight = 180.dp,
                     previewContent = {
                         val context = LocalContext.current
-                        val previewBitmap = remember(folderConfig, currentSlateConfig, isResponsive, widgetClassName) {
+
+                        // 1. Read real homescreen dimensions from AppWidgetOptions
+                        val (screenWDp, screenHDp) = remember(widgetId, isResponsive) {
+                            val manager = AppWidgetManager.getInstance(context)
+                            val options = manager?.getAppWidgetOptions(widgetId)
+                            val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+                            val fallbackW = when {
+                                widgetClassName.contains("Row5") -> 280
+                                widgetClassName.contains("Row4") -> 260
+                                widgetClassName.contains("Horizontal3") -> 220
+                                widgetClassName.contains("Vertical3") -> 75
+                                widgetClassName.contains("Bento10") || widgetClassName.contains("Folder8") -> 260
+                                else -> 150
+                            }
+                            val fallbackH = when {
+                                widgetClassName.contains("Row5") || widgetClassName.contains("Row4") || widgetClassName.contains("Horizontal3") -> 75
+                                widgetClassName.contains("Vertical3") -> 220
+                                widgetClassName.contains("Bento10") || widgetClassName.contains("Folder8") -> 130
+                                else -> 150
+                            }
+
+                            val rawW = if (isLandscape) {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0).takeIf { it != null && it > 0 }
+                                    ?: options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackW) ?: fallbackW
+                            } else {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).takeIf { it != null && it > 0 }
+                                    ?: options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackW) ?: fallbackW
+                            }
+
+                            val rawH = if (isLandscape) {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0).takeIf { it != null && it > 0 }
+                                    ?: options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackH) ?: fallbackH
+                            } else {
+                                options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0).takeIf { it != null && it > 0 }
+                                    ?: options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackH) ?: fallbackH
+                            }
+
+                            val finalW = if (rawW <= 0) fallbackW else rawW
+                            val finalH = if (rawH <= 0) fallbackH else rawH
+                            finalW to finalH
+                        }
+
+                        // 2. Generate preview using exact homescreen bounds and actual widgetId
+                        val previewBitmap = remember(folderConfig, currentSlateConfig, isResponsive, widgetClassName, screenWDp, screenHDp) {
                             when {
-                                widgetClassName.contains("Triangle4") -> generateAppFolderTriangle4Bitmap(context, currentSlateConfig, folderConfig, false, 140, 140, 0)
-                                widgetClassName.contains("Horizontal3") -> generateAppFolderHorizontal3Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 180, 80, 0)
-                                widgetClassName.contains("Vertical3") -> generateAppFolderVertical3Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 80, 180, 0)
-                                widgetClassName.contains("Row4") -> generateAppFolderRow4Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 220, 80, 0)
-                                widgetClassName.contains("Row5") -> generateAppFolderRow5Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 240, 80, 0)
-                                widgetClassName.contains("Circle6") -> generateAppFolderCircle6Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 140, 140, 0)
-                                widgetClassName.contains("Bento7") -> generateAppFolderBento7Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 140, 140, 0)
-                                widgetClassName.contains("Grid9") -> generateAppFolderGrid9Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 140, 140, 0)
-                                widgetClassName.contains("Bento10Left") -> generateAppFolderBento10LeftBitmap(context, currentSlateConfig, folderConfig, isResponsive, 220, 120, 0)
-                                widgetClassName.contains("Bento10Top") -> generateAppFolderBento10TopBitmap(context, currentSlateConfig, folderConfig, isResponsive, 220, 120, 0)
-                                widgetClassName.contains("Folder8") -> generateAppFolder8Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 220, 120, 0)
-                                else -> generateAppFolder4Bitmap(context, currentSlateConfig, folderConfig, isResponsive, 130, 130, 0)
+                                widgetClassName.contains("Triangle4") -> generateAppFolderTriangle4Bitmap(context, currentSlateConfig, folderConfig, false, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Horizontal3") -> generateAppFolderHorizontal3Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Vertical3") -> generateAppFolderVertical3Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Row4") -> generateAppFolderRow4Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Row5") -> generateAppFolderRow5Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Circle6") -> generateAppFolderCircle6Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Bento7") -> generateAppFolderBento7Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Grid9") -> generateAppFolderGrid9Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Bento10Left") -> generateAppFolderBento10LeftBitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Bento10Top") -> generateAppFolderBento10TopBitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                widgetClassName.contains("Folder8") -> generateAppFolder8Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
+                                else -> generateAppFolder4Bitmap(context, currentSlateConfig, folderConfig, isResponsive, screenWDp, screenHDp, widgetId)
                             }
                         }
 
-                        Image(
-                            bitmap = previewBitmap.asImageBitmap(),
-                            contentDescription = "Folder Preview",
-                            modifier = Modifier.size(if (slotCount >= 8) 180.dp else 130.dp)
-                        )
+                        // 3. Proportional, un-distorted scaling inside the preview container
+                        val aspect = (screenWDp.toFloat() / screenHDp.toFloat().coerceAtLeast(1f)).coerceIn(0.25f, 4.5f)
+                        val maxBoxW = 260f
+                        val maxBoxH = 145f
+
+                        val (dispW, dispH) = if (aspect > (maxBoxW / maxBoxH)) {
+                            maxBoxW.dp to (maxBoxW / aspect).dp
+                        } else {
+                            (maxBoxH * aspect).dp to maxBoxH.dp
+                        }
+
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = previewBitmap.asImageBitmap(),
+                                contentDescription = "Folder Preview",
+                                modifier = Modifier.size(dispW, dispH)
+                            )
+                        }
                     }
                 ) {
                     if (selectedTabKey == "APPS") {
@@ -326,7 +395,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // 1. Leading App Grid Icon in an Accent-Tinted Squircle
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
@@ -342,7 +410,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                 )
                             }
 
-                            // 2. Clean, Standard Title & Subtitle
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Select Apps",
@@ -357,7 +424,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                 )
                             }
 
-                            // 3. Universal Navigation Chevron
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                 contentDescription = null,
@@ -489,9 +555,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                     }
                 }
 
-                // =========================================================================
-                // MODAL APP PICKER SHEET (WITH EMBEDDED ASSIGNED DOCK)
-                // =========================================================================
+                // Modal Picker Sheet
                 if (showAppPickerSheet) {
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -513,7 +577,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                 .padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // Header
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -544,7 +607,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Fix 2: Assigned Apps Dock Pinned Inside the Modal Popup
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -569,7 +631,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Search Bar
                             OutlinedTextField(
                                 value = sheetSearchQuery,
                                 onValueChange = { sheetSearchQuery = it },
@@ -612,7 +673,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                 else installedApps.filter { it.label.contains(sheetSearchQuery, ignoreCase = true) }
                             }
 
-                            // Scrollable Apps Grid
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(4),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -638,18 +698,15 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                             .clickable {
                                                 val updatedSlots = folderConfig.slots.toMutableList()
                                                 if (isAssigned) {
-                                                    // Toggle off if already assigned
                                                     updatedSlots[assignedIdx] = AppSlotConfig()
                                                     targetSlotIndex = assignedIdx
                                                 } else {
-                                                    // Assign directly to current active target slot
                                                     val slotToFill = targetSlotIndex.coerceIn(0, slotCount - 1)
                                                     updatedSlots[slotToFill] = AppSlotConfig(
                                                         packageName = app.packageName,
                                                         appName = app.label,
                                                         isConfigured = true
                                                     )
-                                                    // Auto-advance target to next unconfigured slot
                                                     val nextEmpty = updatedSlots.indexOfFirst { !it.isConfigured }
                                                     if (nextEmpty != -1) {
                                                         targetSlotIndex = nextEmpty
@@ -658,7 +715,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                                 folderConfig = folderConfig.copy(slots = updatedSlots)
                                             }
                                     ) {
-                                        // 1. Center Content: App Icon + App Name
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -691,7 +747,6 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
                                             )
                                         }
 
-                                        // 2. Top-Right Corner Slot Badge with Centered Number
                                         if (isAssigned) {
                                             Box(
                                                 modifier = Modifier
@@ -775,7 +830,7 @@ class AppFolderWidgetConfigActivity : ComponentActivity() {
 }
 
 // =========================================================================
-// REUSABLE ASSIGNED SLOTS COMPONENTS (FIXES 2 & 3)
+// REUSABLE ASSIGNED SLOTS COMPONENTS
 // =========================================================================
 
 @Composable
@@ -837,13 +892,11 @@ private fun AssignedSlotItem(
     onClick: () -> Unit,
     onRemove: () -> Unit
 ) {
-    // Unclipped parent box with 5dp outer room for the top-right badge
     Box(
         modifier = Modifier
             .padding(top = 5.dp, end = 5.dp)
             .size(54.dp)
     ) {
-        // Main slot tile body
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -881,7 +934,6 @@ private fun AssignedSlotItem(
             }
         }
 
-        // Fix 3: Standard Cutout Remove Badge (Completely Unclipped)
         if (slot.isConfigured) {
             Box(
                 modifier = Modifier
