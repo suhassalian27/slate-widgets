@@ -33,8 +33,8 @@ fun getBatteryWidgetsCatalog(): List<SlateWidgetInfo> {
         SlateWidgetInfo("Dot Matrix LED", "4x2", "Battery", DotMatrixBatteryLEDReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Dot Level Meter Wide", "4x2", "Battery", DotLevelMeterWideReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Battery Strip", "4x1", "Battery", HorizontalBatteryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Pixel Heart", "2x2", "Battery", PixelHeartBatteryReceiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("5-Pill Gauge", "2x2", "Battery", SegmentedPillBatteryReceiver::class.java, hasModeOption = false),
+        SlateWidgetInfo("Pixel Heart", "2x2", "Battery", PixelHeartBatteryReceiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Lightning Bolt", "2x2", "Battery", LightningBoltBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Circular Dial", "2x2", "Battery", CircularRingBatteryReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Vertical Pill", "1x2", "Battery", VerticalBatteryPillReceiver::class.java, hasModeOption = true),
@@ -511,25 +511,46 @@ class DotLevelMeterWideReceiver : BaseBatteryReceiver(targetAspect = 2.0f) {
 
 // 10. Horizontal Strip (4x1)
 class HorizontalBatteryReceiver : BaseBatteryReceiver(targetAspect = 4.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
         return generateHorizontalStripBitmap(context, data, config, isResponsive, wDp, hDp)
     }
 }
 
-// 11. Segmented Pill Tile (2x2)
+// 11. Segmented Pill Tile Receiver (2x2)
 class SegmentedPillBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generateSegmentedPillTileBitmap(context, data, config, isResponsive, wDp, hDp)
+        return generateSegmentedPillTileBitmap(context, data, config, wDp, hDp)
     }
 }
 
-// 12. Pixel Heart Tile (2x2)
+// 12. Pixel Heart Tile Receiver (2x2)
 class PixelHeartBatteryReceiver : BaseBatteryReceiver(targetAspect = 1.0f) {
-    override fun renderWidgetBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap {
+    override fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
         val data = readDetailedBatteryStatus(context)
-        return generatePixelHeartBitmap(context, data, config, isResponsive, wDp, hDp)
+        return generatePixelHeartBitmap(context, data, config, wDp, hDp)
     }
 }
 

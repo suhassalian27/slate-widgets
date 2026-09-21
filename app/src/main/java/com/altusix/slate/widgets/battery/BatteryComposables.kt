@@ -1464,7 +1464,7 @@ fun generateCenteredLevelBitmap(
 }
 
 
-// 10. Sleek Minimal Battery Strip - Percentage Only (4x1)
+// 10. Precision Dash Battery Strip (Adaptive 20-Segment Meter)
 fun generateHorizontalStripBitmap(
     context: Context,
     data: DetailedBatteryData,
@@ -1478,85 +1478,301 @@ fun generateHorizontalStripBitmap(
     val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardW = w - (margin * 2f)
-    val maxCardH = cardW * 0.28f
-    val cardH = if (isResponsive) h - (margin * 2f) else minOf(h - (margin * 2f), maxCardH)
+    val cardRect = RectF(margin, margin, w - margin, h - margin)
 
-    val leftX = (w - cardW) / 2f
-    val topY = (h - cardH) / 2f
+    val cardW = cardRect.width()
+    val cardH = cardRect.height()
+    val aspect = cardW / cardH.coerceAtLeast(1f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
     val activeColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val trackColor = if (isLight) 0x1F000000 else 0x1AFFFFFF
+    val trackBgColor = if (isLight) 0x0A000000 else 0x12FFFFFF
+    val trackBorderColor = if (isLight) 0x10000000 else 0x1AFFFFFF
+    val inactiveSegmentColor = if (isLight) 0x16000000 else 0x1EFFFFFF
 
+    // 1. Main Card Surface & Border
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-    canvas.drawRoundRect(RectF(leftX, topY, leftX + cardW, topY + cardH), cardCornerRadius, cardCornerRadius, bgPaint)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val padX = cardW * 0.06f
-
-    val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryTextColor
-        textSize = cardH * 0.46f
-        typeface = getSlateFont(context, weight = 700)
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
     }
-    val pctText = "${data.percentage}%"
-    val pctTextWidth = pctPaint.measureText(pctText)
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
-    val fontMetricsPct = pctPaint.fontMetrics
-    val textY = topY + (cardH / 2f) - (fontMetricsPct.ascent + fontMetricsPct.descent) / 2f
+    // 20 Precision Segments (1 Segment = 5%)
+    val totalSegments = 20
+    val activeSegmentsCount = ((data.percentage.coerceIn(0, 100) / 100f) * totalSegments).toInt()
 
-    val textStartX = leftX + padX
-    canvas.drawText(pctText, textStartX, textY, pctPaint)
+    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = activeColor
+        style = Paint.Style.FILL
+    }
+    val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = inactiveSegmentColor
+        style = Paint.Style.FILL
+    }
+    val trackBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = trackBgColor
+        style = Paint.Style.FILL
+    }
+    val trackBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = trackBorderColor
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.75f
+    }
 
-    val barStartX = textStartX + pctTextWidth + (cardW * 0.06f)
-    val barEndX = leftX + cardW - padX
-    val barWidth = barEndX - barStartX
+    // =========================================================================
+    // BRANCH 1: INLINE STRIP (Reserved for true wide ribbons: 3x1, 4x1, 5x1 -> aspect >= 2.3)
+    // =========================================================================
+    if (aspect >= 2.3f) {
+        val padX = (cardW * 0.055f).coerceIn(scaleFactor * 12f, scaleFactor * 22f)
+        val padY = (cardH * 0.12f).coerceIn(scaleFactor * 6f, scaleFactor * 12f)
+        val availH = cardH - (padY * 2f)
+        val centerY = cardRect.top + (cardH / 2f)
 
-    if (barWidth > 0) {
-        val totalSegments = 10
-        val gap = barWidth * 0.04f
-        val segmentW = (barWidth - (gap * (totalSegments - 1))) / totalSegments
-        val barH = cardH * 0.28f
-        val barY = topY + (cardH - barH) / 2f
-        val segmentRadius = barH / 2f
-
-        val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = activeColor
-            style = Paint.Style.FILL
+        // A. Percentage Typography
+        var pctSize = (availH * 0.80f).coerceIn(scaleFactor * 18f, scaleFactor * 40f)
+        val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = pctSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
         }
-        val trackPaintObj = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = trackColor
-            style = Paint.Style.FILL
+
+        val pctText = "${data.percentage}%"
+        val maxPctW = cardW * 0.30f
+        while (pctPaint.measureText(pctText) > maxPctW && pctSize > scaleFactor * 14f) {
+            pctSize -= scaleFactor * 0.5f
+            pctPaint.textSize = pctSize
         }
 
-        val activeSegmentsCount = (data.percentage.coerceIn(0, 100) * totalSegments) / 100
+        val fmPct = pctPaint.fontMetrics
+        val textY = centerY - (fmPct.ascent + fmPct.descent) / 2f
+        canvas.drawText(pctText, cardRect.left + padX, textY, pctPaint)
+
+        var contentRight = cardRect.left + padX + pctPaint.measureText(pctText)
+
+        // Visual height of the numerals (baseline to cap height)
+        val pctCapHeight = Math.abs(fmPct.ascent)
+
+        // B. Charging Bolt Indicator
+        if (data.isCharging) {
+            val boltSize = (pctCapHeight * 0.80f).coerceAtLeast(scaleFactor * 11f)
+            val iconLeft = contentRight + (scaleFactor * 5f)
+            val iconTop = centerY - (boltSize / 2f)
+            drawBoltIcon(context, canvas, iconLeft, iconTop, boltSize, activeColor)
+            contentRight = iconLeft + boltSize
+        }
+
+        // C. Precision Dash Well with Pills at 90% of Percentage Height
+        val wellLeft = contentRight + (scaleFactor * 12f)
+        val wellRight = cardRect.right - padX
+        val wellW = wellRight - wellLeft
+
+        if (wellW > scaleFactor * 30f) {
+            // Target pill height: 90% of the percentage text's capital height
+            val segH = (pctCapHeight * 0.90f).coerceIn(scaleFactor * 10f, availH * 0.82f)
+            val wellPaddingY = (scaleFactor * 4f).coerceIn(scaleFactor * 3f, scaleFactor * 6f)
+            val wellH = segH + (wellPaddingY * 2f)
+            val wellY = centerY - (wellH / 2f)
+            val wellRadius = wellH / 2f
+            val wellRect = RectF(wellLeft, wellY, wellRight, wellY + wellH)
+
+            // Recessed track slot
+            canvas.drawRoundRect(wellRect, wellRadius, wellRadius, trackBgPaint)
+            canvas.drawRoundRect(wellRect, wellRadius, wellRadius, trackBorderPaint)
+
+            // Usable width and inner segment calculations
+            val insetX = wellH * 0.28f
+            val usableW = (wellW - (insetX * 2f)).coerceAtLeast(1f)
+            val segTop = wellY + wellPaddingY
+            val gap = (scaleFactor * 2.2f).coerceAtMost(usableW * 0.02f)
+            val segW = ((usableW - (gap * (totalSegments - 1))) / totalSegments).coerceAtLeast(1f)
+            val segRadius = minOf(segW / 2f, segH / 2f)
+
+            for (i in 0 until totalSegments) {
+                val sLeft = wellLeft + insetX + i * (segW + gap)
+                val sRight = sLeft + segW
+                val segRect = RectF(sLeft, segTop, sRight, segTop + segH)
+                val paint = if (i < activeSegmentsCount) activePaint else inactivePaint
+                canvas.drawRoundRect(segRect, segRadius, segRadius, paint)
+            }
+        }
+
+        // =========================================================================
+        // BRANCH 2: TALL COLUMN (1x2, 1x3, 1x4 -> aspect < 0.90)
+        // =========================================================================
+    } else if (aspect < 0.90f) {
+        val padX = cardW * 0.11f
+        val padY = cardH * 0.08f
+        val availW = cardW - (padX * 2f)
+
+        val statusText = if (data.isCharging) "CHARGING" else "BATTERY"
+        val statusColor = if (data.isCharging) activeColor else secondaryTextColor
+        val statusSize = (cardW * 0.095f).coerceIn(scaleFactor * 9.5f, scaleFactor * 13f)
+
+        val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = statusColor
+            textSize = statusSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+        }
+        val fmStatus = statusPaint.fontMetrics
+        val statusY = cardRect.top + padY - fmStatus.ascent
+
+        if (data.isCharging) {
+            val iconSize = statusSize * 1.05f
+            val iconTop = statusY + fmStatus.ascent + ((statusSize - iconSize) / 2f)
+            drawBoltIcon(context, canvas, cardRect.left + padX, iconTop, iconSize, activeColor)
+            canvas.drawText(statusText, cardRect.left + padX + iconSize + (scaleFactor * 4f), statusY, statusPaint)
+        } else {
+            canvas.drawText(statusText, cardRect.left + padX, statusY, statusPaint)
+        }
+
+        var pctSize = (cardW * 0.32f).coerceIn(scaleFactor * 24f, scaleFactor * 46f)
+        val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = pctSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+        }
+
+        val pctText = "${data.percentage}%"
+        while (pctPaint.measureText(pctText) > availW && pctSize > scaleFactor * 14f) {
+            pctSize -= scaleFactor * 0.5f
+            pctPaint.textSize = pctSize
+        }
+
+        val fmPct = pctPaint.fontMetrics
+        val pctY = statusY + fmStatus.descent + (scaleFactor * 6f) - fmPct.ascent
+        canvas.drawText(pctText, cardRect.left + padX, pctY, pctPaint)
+
+        // Vertical Precision Ladder
+        val wellTop = pctY + fmPct.descent + (cardH * 0.035f)
+        val wellBottom = cardRect.bottom - padY
+        val wellH = (wellBottom - wellTop).coerceAtLeast(scaleFactor * 30f)
+        val wellRadius = scaleFactor * 12f
+        val wellRect = RectF(cardRect.left + padX, wellTop, cardRect.right - padX, wellBottom)
+
+        canvas.drawRoundRect(wellRect, wellRadius, wellRadius, trackBgPaint)
+        canvas.drawRoundRect(wellRect, wellRadius, wellRadius, trackBorderPaint)
+
+        val insetX = scaleFactor * 8f
+        val insetY = scaleFactor * 8f
+        val usableH = (wellH - (insetY * 2f)).coerceAtLeast(1f)
+        val usableW = (availW - (insetX * 2f)).coerceAtLeast(1f)
+
+        val gap = (scaleFactor * 2.2f).coerceAtMost(usableH * 0.02f)
+        val segH = ((usableH - (gap * (totalSegments - 1))) / totalSegments).coerceAtLeast(1f)
+        val segRadius = segH / 2f
 
         for (i in 0 until totalSegments) {
-            val segLeft = barStartX + i * (segmentW + gap)
-            val segRight = segLeft + segmentW
-            val segRect = RectF(segLeft, barY, segRight, barY + barH)
-
-            val paint = if (i < activeSegmentsCount) activePaint else trackPaintObj
-            canvas.drawRoundRect(segRect, segmentRadius, segmentRadius, paint)
+            val fromBottom = (totalSegments - 1) - i
+            val sTop = wellTop + insetY + i * (segH + gap)
+            val sBottom = sTop + segH
+            val segRect = RectF(cardRect.left + padX + insetX, sTop, cardRect.left + padX + insetX + usableW, sBottom)
+            val paint = if (fromBottom < activeSegmentsCount) activePaint else inactivePaint
+            canvas.drawRoundRect(segRect, segRadius, segRadius, paint)
         }
+
+        // =========================================================================
+        // BRANCH 3: TOP-DOWN / BENTO MODE (Includes 2x1, 2x2, 3x2, 4x2 -> 0.90 <= aspect < 2.3)
+        // =========================================================================
+    } else {
+        val pad = (minOf(cardW, cardH) * 0.085f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        val availW = cardW - (pad * 2f)
+
+        val statusText = if (data.isCharging) "CHARGING" else "BATTERY"
+        val statusColor = if (data.isCharging) activeColor else secondaryTextColor
+        val statusSize = (cardH * 0.085f).coerceIn(scaleFactor * 10f, scaleFactor * 14f)
+
+        val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = statusColor
+            textSize = statusSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+        }
+        val fmStatus = statusPaint.fontMetrics
+        val statusY = cardRect.top + pad - fmStatus.ascent
+
+        if (data.isCharging) {
+            val iconSize = statusSize * 1.1f
+            val iconTop = statusY + fmStatus.ascent + ((statusSize - iconSize) / 2f)
+            drawBoltIcon(context, canvas, cardRect.left + pad, iconTop, iconSize, activeColor)
+            canvas.drawText(statusText, cardRect.left + pad + iconSize + (scaleFactor * 4f), statusY, statusPaint)
+        } else {
+            canvas.drawText(statusText, cardRect.left + pad, statusY, statusPaint)
+        }
+
+        // Substantial bottom well
+        val wellH = (cardH * 0.22f).coerceIn(scaleFactor * 20f, scaleFactor * 32f)
+        val wellY = cardRect.bottom - pad - wellH
+        val wellRadius = wellH / 2f
+        val wellRect = RectF(cardRect.left + pad, wellY, cardRect.right - pad, wellY + wellH)
+
+        canvas.drawRoundRect(wellRect, wellRadius, wellRadius, trackBgPaint)
+        canvas.drawRoundRect(wellRect, wellRadius, wellRadius, trackBorderPaint)
+
+        val insetX = wellH * 0.28f
+        val insetY = wellH * 0.18f
+        val usableW = (availW - (insetX * 2f)).coerceAtLeast(1f)
+        val segH = (wellH - (insetY * 2f)).coerceAtLeast(scaleFactor * 6f)
+        val segTop = wellY + insetY
+
+        val gap = (scaleFactor * 2.2f).coerceAtMost(usableW * 0.02f)
+        val segW = ((usableW - (gap * (totalSegments - 1))) / totalSegments).coerceAtLeast(1f)
+        val segRadius = minOf(segW / 2f, segH / 2f)
+
+        for (i in 0 until totalSegments) {
+            val sLeft = cardRect.left + pad + insetX + i * (segW + gap)
+            val sRight = sLeft + segW
+            val segRect = RectF(sLeft, segTop, sRight, segTop + segH)
+            val paint = if (i < activeSegmentsCount) activePaint else inactivePaint
+            canvas.drawRoundRect(segRect, segRadius, segRadius, paint)
+        }
+
+        // Center Hero Percentage
+        val centerTop = statusY + fmStatus.descent
+        val centerH = wellY - centerTop
+        var pctSize = (centerH * 0.72f).coerceIn(scaleFactor * 26f, scaleFactor * 52f)
+
+        val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryTextColor
+            textSize = pctSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+        }
+
+        val pctText = "${data.percentage}%"
+        while (pctPaint.measureText(pctText) > availW && pctSize > scaleFactor * 14f) {
+            pctSize -= scaleFactor * 0.5f
+            pctPaint.textSize = pctSize
+        }
+
+        val fmPct = pctPaint.fontMetrics
+        val pctY = centerTop + (centerH / 2f) - (fmPct.ascent + fmPct.descent) / 2f
+        canvas.drawText(pctText, cardRect.left + pad, pctY, pctPaint)
     }
 
     return bitmap
 }
 
-// 11. 5-Pill Gauge Tile (1:1 Square)
+
+// 11. 5-Pill Gauge Tile (Strict 1:1 Square)
 fun generateSegmentedPillTileBitmap(
     context: Context,
     data: DetailedBatteryData,
     config: SlateWidgetConfig,
-    isResponsive: Boolean = false,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -1565,19 +1781,11 @@ fun generateSegmentedPillTileBitmap(
     val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        val cardSize = minOf(w, h) - (margin * 2f)
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val cardSize = minOf(cardW, cardH)
-    val leftX = cardRect.left
-    val topY = cardRect.top
+    // Strictly locked to a centered 1:1 square
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1585,7 +1793,7 @@ fun generateSegmentedPillTileBitmap(
     val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
     val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
     val dimColor = if (isLight) 0x1F000000 else 0x26FFFFFF
-    val enclosureBgColor = if (isLight) 0x0F000000 else 0x1AFFFFFF
+    val enclosureBgColor = if (isLight) 0x0A000000 else 0x14FFFFFF
 
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1595,11 +1803,19 @@ fun generateSegmentedPillTileBitmap(
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
 
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
+
     val pad = cardSize * 0.10f
 
+    // Header Percentage Text
     val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (data.isCharging) accentColor else primaryTextColor
-        textSize = cardSize * 0.20f
+        textSize = cardSize * 0.22f
         textAlign = Paint.Align.CENTER
         typeface = getSlateFont(context, weight = 700)
     }
@@ -1607,10 +1823,11 @@ fun generateSegmentedPillTileBitmap(
     val textY = topY + pad + (cardSize * 0.08f) - (fontMetricsPct.ascent + fontMetricsPct.descent) / 2f
     canvas.drawText("${data.percentage}%", leftX + (cardSize / 2f), textY, pctPaint)
 
+    // Recessed Capsule Well
     val enclosureW = cardSize * 0.78f
-    val enclosureH = cardSize * 0.38f
+    val enclosureH = cardSize * 0.36f
     val enclosureLeft = leftX + (cardSize - enclosureW) / 2f
-    val enclosureTop = topY + (cardSize * 0.36f)
+    val enclosureTop = topY + (cardSize * 0.37f)
     val enclosureRect = RectF(enclosureLeft, enclosureTop, enclosureLeft + enclosureW, enclosureTop + enclosureH)
 
     val enclosurePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1620,6 +1837,14 @@ fun generateSegmentedPillTileBitmap(
     val enclosureCornerRadius = enclosureH * 0.30f
     canvas.drawRoundRect(enclosureRect, enclosureCornerRadius, enclosureCornerRadius, enclosurePaint)
 
+    val enclosureBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x10000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.75f
+    }
+    canvas.drawRoundRect(enclosureRect, enclosureCornerRadius, enclosureCornerRadius, enclosureBorderPaint)
+
+    // 5 Precision Vertical Pills
     val totalBars = 5
     val padX = enclosureW * 0.08f
     val padY = enclosureH * 0.14f
@@ -1660,6 +1885,7 @@ fun generateSegmentedPillTileBitmap(
         }
     }
 
+    // Status Footer
     val footerText = if (data.isCharging) "CHARGING" else "DISCHARGING"
     val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (data.isCharging) accentColor else secondaryTextColor
@@ -1674,12 +1900,11 @@ fun generateSegmentedPillTileBitmap(
     return bitmap
 }
 
-// 12. Pixel Heart Tile (1:1 Square)
+// 12. Pixel Heart Tile (Strict 1:1 Square)
 fun generatePixelHeartBitmap(
     context: Context,
     data: DetailedBatteryData,
     config: SlateWidgetConfig,
-    isResponsive: Boolean = false,
     wDp: Int,
     hDp: Int
 ): Bitmap {
@@ -1688,19 +1913,11 @@ fun generatePixelHeartBitmap(
     val h = canvas.height.toFloat()
 
     val margin = scaleFactor * 1.5f
-    val cardRect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        val cardSize = minOf(w, h) - (margin * 2f)
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
-    val cardW = cardRect.width()
-    val cardH = cardRect.height()
-    val cardSize = minOf(cardW, cardH)
-    val leftX = cardRect.left
-    val topY = cardRect.top
+    // Strictly locked to a centered 1:1 square
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
@@ -1714,6 +1931,13 @@ fun generatePixelHeartBitmap(
     }
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
     val heartGrid = arrayOf(
         intArrayOf(0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0),
