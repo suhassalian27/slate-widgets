@@ -2012,15 +2012,14 @@ fun generatePixelHeartBitmap(
     return bitmap
 }
 
-// 13. Lightning Bolt Tile (2x2 / 4x2)
+// 13. Lightning Bolt Tile (2x2 Square / 4x2 Wide)
 fun generateWavyLightningBoltBitmap(
     context: Context,
     data: DetailedBatteryData,
     config: SlateWidgetConfig,
     isResponsive: Boolean,
     wDp: Int,
-    hDp: Int,
-    isWide: Boolean = false
+    hDp: Int
 ): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
@@ -2031,14 +2030,13 @@ fun generateWavyLightningBoltBitmap(
     val primaryTextColor = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
     val secondaryTextColor = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
     val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
-    val dimColor = if (isLight) 0x1F000000 else 0x2BFFFFFF
+    val dimColor = if (isLight) 0x16000000 else 0x22FFFFFF
 
     val margin = scaleFactor * 1.5f
-    val targetRatio = if (isWide) 2.0f else 1.0f
-
     val cardRect = if (isResponsive) {
         RectF(margin, margin, w - margin, h - margin)
     } else {
+        val targetRatio = 2.0f
         var cardH = h - (margin * 2f)
         var cardW = cardH * targetRatio
         if (cardW > w - (margin * 2f)) {
@@ -2052,18 +2050,25 @@ fun generateWavyLightningBoltBitmap(
 
     val cardW = cardRect.width()
     val cardH = cardRect.height()
-    val leftX = cardRect.left
-    val topY = cardRect.top
+    val aspect = cardW / cardH.coerceAtLeast(1f)
+    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
 
-    val isWideLayout = isWide || (cardW / cardH >= 1.4f)
+    val isWideLayout = aspect >= 1.55f
 
+    // 1. Card Surface & Edge Border
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         style = Paint.Style.FILL
     }
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, bgPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
     canvas.save()
     val cardClipPath = Path().apply {
@@ -2071,16 +2076,30 @@ fun generateWavyLightningBoltBitmap(
     }
     canvas.clipPath(cardClipPath)
 
-    val scaleY = if (isWideLayout) {
-        (cardH * 0.85f) / 372f
-    } else {
-        minOf((cardW * 0.85f) / 290f, (cardH * 0.85f) / 372f)
-    }
-
-    val scaleX = scaleY * 1.15f
-
-    val centerX = if (isWideLayout) cardRect.right - (cardH / 2f) else cardRect.centerX()
+    // =========================================================================
+    // 2. LIGHTNING BOLT SIZING & RIGHT-SIDE ANCHORING
+    // =========================================================================
     val centerY = cardRect.centerY()
+    val boltScale: Float
+    val scaleX: Float
+    val scaleY: Float
+    val centerX: Float
+
+    if (isWideLayout) {
+        // Height drives the scale so the bolt stays large and proportional
+        scaleY = (cardH * 0.84f) / 372f
+        scaleX = scaleY * 1.08f
+
+        // Anchor the rightmost tip (+145f * scaleX) directly to the right padding
+        val rightPad = (cardH * 0.10f).coerceIn(scaleFactor * 12f, scaleFactor * 22f)
+        centerX = cardRect.right - rightPad - (145f * scaleX)
+    } else {
+        // Square layout: Bolt is centered inside the card
+        boltScale = minOf((cardW * 0.82f) / 290f, (cardH * 0.82f) / 372f)
+        scaleY = boltScale
+        scaleX = boltScale * 1.05f
+        centerX = cardRect.centerX()
+    }
 
     val boltPath = Path().apply {
         moveTo(centerX - (48f * scaleX), centerY - (186f * scaleY))
@@ -2097,14 +2116,9 @@ fun generateWavyLightningBoltBitmap(
         color = dimColor
         style = Paint.Style.FILL
     }
-
-    val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = accentColor
-        style = Paint.Style.FILL
-    }
-
     canvas.drawPath(boltPath, dimPaint)
 
+    // Wave Fill Rising from Bottom
     val fillProgress = data.percentage.coerceIn(0, 100) / 100f
     val minFillY = centerY + (186f * scaleY)
     val maxFillY = centerY - (186f * scaleY)
@@ -2112,8 +2126,8 @@ fun generateWavyLightningBoltBitmap(
 
     if (fillProgress > 0f) {
         val wavePath = Path().apply {
-            val waveAmplitude = 10f * scaleY
-            val waveLength = 250f * scaleX
+            val waveAmplitude = 8f * scaleY
+            val waveLength = 220f * scaleX
 
             moveTo(cardRect.left - (100f * scaleX), fillY)
 
@@ -2129,9 +2143,14 @@ fun generateWavyLightningBoltBitmap(
                 isUp = !isUp
             }
 
-            lineTo(cardRect.right + (100f * scaleX), cardRect.bottom + (100f * scaleY))
-            lineTo(cardRect.left - (100f * scaleX), cardRect.bottom + (100f * scaleY))
+            lineTo(cardRect.right + (150f * scaleX), cardRect.bottom + (150f * scaleY))
+            lineTo(cardRect.left - (150f * scaleX), cardRect.bottom + (150f * scaleY))
             close()
+        }
+
+        val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
         }
 
         canvas.save()
@@ -2140,37 +2159,66 @@ fun generateWavyLightningBoltBitmap(
         canvas.restore()
     }
 
+    // =========================================================================
+    // 3. LEFT-SIDE TYPOGRAPHY
+    // =========================================================================
     if (isWideLayout) {
-        val padX = leftX + (cardH * 0.12f)
-        val padY = topY + (cardH * 0.12f)
+        val padX = cardRect.left + (cardW * 0.07f).coerceIn(scaleFactor * 14f, scaleFactor * 24f)
+        val padY = cardRect.top + (cardH * 0.12f).coerceIn(scaleFactor * 8f, scaleFactor * 18f)
 
+        // Text width is mathematically bound to the left tip of the bolt
+        val boltLeftEdge = centerX - (145f * scaleX)
+        val maxTextW = (boltLeftEdge - padX - (scaleFactor * 12f)).coerceAtLeast(1f)
+
+        // Line 1: Percentage / Temperature
+        val line1Text = "${data.percentage}% / ${data.tempText}"
+        var pctSize = (cardH * 0.16f).coerceIn(scaleFactor * 14f, scaleFactor * 26f)
         val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryTextColor
-            textSize = cardH * 0.15f
+            textSize = pctSize
             typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
         }
-        val fontMetricsPct = pctPaint.fontMetrics
-        val pctY = padY + (cardH * 0.10f) - (fontMetricsPct.ascent + fontMetricsPct.descent) / 2f
-        canvas.drawText("${data.percentage}% / ${data.tempText}", padX, pctY, pctPaint)
+        while (pctPaint.measureText(line1Text) > maxTextW && pctSize > scaleFactor * 11f) {
+            pctSize -= scaleFactor * 0.5f
+            pctPaint.textSize = pctSize
+        }
+        val fmPct = pctPaint.fontMetrics
+        val pctY = padY + (cardH * 0.10f) - (fmPct.ascent + fmPct.descent) / 2f
+        canvas.drawText(line1Text, padX, pctY, pctPaint)
 
+        // Line 2: Charging/Discharging • Voltage
+        val subText = if (data.isCharging) "Charging • ${data.voltageText}" else "Discharging • ${data.voltageText}"
+        var subSize = (cardH * 0.088f).coerceIn(scaleFactor * 9f, scaleFactor * 14.5f)
         val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = secondaryTextColor
-            textSize = cardH * 0.08f
+            textSize = subSize
             typeface = getSlateFont(context, weight = 600)
+            textAlign = Paint.Align.LEFT
         }
-        val fontMetricsSub = subPaint.fontMetrics
-        val subY = padY + (cardH * 0.24f) - (fontMetricsSub.ascent + fontMetricsSub.descent) / 2f
-        val subText = if (data.isCharging) "Charging • ${data.voltageText}" else "Discharging • ${data.voltageText}"
+        while (subPaint.measureText(subText) > maxTextW && subSize > scaleFactor * 8f) {
+            subSize -= scaleFactor * 0.5f
+            subPaint.textSize = subSize
+        }
+        val fmSub = subPaint.fontMetrics
+        val subY = padY + (cardH * 0.27f) - (fmSub.ascent + fmSub.descent) / 2f
         canvas.drawText(subText, padX, subY, subPaint)
 
+        // Line 3: Charging Status at Bottom
+        val botText = if (data.isCharging) "Fast Charging Active" else "Battery Normal"
+        var botSize = (cardH * 0.088f).coerceIn(scaleFactor * 9f, scaleFactor * 14.5f)
         val botPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryTextColor
-            textSize = cardH * 0.08f
+            textSize = botSize
             typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
         }
-        val fontMetricsBot = botPaint.fontMetrics
-        val botY = topY + cardH - (cardH * 0.12f) - (fontMetricsBot.ascent + fontMetricsBot.descent) / 2f
-        val botText = if (data.isCharging) "Fast Charging Active" else "Battery Normal"
+        while (botPaint.measureText(botText) > maxTextW && botSize > scaleFactor * 8f) {
+            botSize -= scaleFactor * 0.5f
+            botPaint.textSize = botSize
+        }
+        val fmBot = botPaint.fontMetrics
+        val botY = cardRect.bottom - (cardH * 0.14f) - (fmBot.ascent + fmBot.descent) / 2f
         canvas.drawText(botText, padX, botY, botPaint)
     }
 
@@ -2178,20 +2226,21 @@ fun generateWavyLightningBoltBitmap(
     return bitmap
 }
 
-// 14. Circular Dial
+// 14. Circular Dial (Strict 1:1 Fixed Circle)
 fun generateCircularGaugeBitmap(
     context: Context,
     percentage: Int,
     isCharging: Boolean,
     config: SlateWidgetConfig,
-    widthPx: Int,
-    heightPx: Int,
-    isResponsive: Boolean = false
+    wDp: Int,
+    hDp: Int
 ): Bitmap {
-    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
-    val w = widthPx.toFloat()
-    val h = heightPx.toFloat()
-    val cardSize = minOf(w, h)
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
+
+    val margin = scaleFactor * 1.5f
+    val cardSize = minOf(w, h) - (margin * 2f)
     val cx = w / 2f
     val cy = h / 2f
 
@@ -2201,9 +2250,6 @@ fun generateCircularGaugeBitmap(
     val dimColor = if (isLight) 0x1F000000 else 0x2BFFFFFF
     val iconColor = if (isLight) Color.BLACK else Color.WHITE
 
-    val bitmap = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
     val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(alphaInt, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
@@ -2211,10 +2257,17 @@ fun generateCircularGaugeBitmap(
     }
     canvas.drawCircle(cx, cy, cardSize / 2f, bgPaint)
 
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawCircle(cx, cy, cardSize / 2f, borderPaint)
+
     val dynamicScale = (cardSize / 300f).coerceAtLeast(0.5f)
     val ringStrokeWidth = cardSize * 0.060f
-    val margin = cardSize * 0.05f
-    val arcRadius = (cardSize / 2f) - margin - (ringStrokeWidth / 2f)
+    val ringMargin = cardSize * 0.05f
+    val arcRadius = (cardSize / 2f) - ringMargin - (ringStrokeWidth / 2f)
 
     val arcRect = RectF(
         cx - arcRadius,
@@ -2358,22 +2411,18 @@ fun generateCircularGaugeBitmap(
     return bitmap
 }
 
-// 15. Vertical Pill
+// 15. Vertical Pill (Strict 1:2 Fixed Capsule)
 fun generateVerticalPillBitmap(
     context: Context,
     percentage: Int,
     isCharging: Boolean,
     config: SlateWidgetConfig,
-    widthPx: Int,
-    heightPx: Int,
-    isResponsive: Boolean = false
+    wDp: Int,
+    hDp: Int
 ): Bitmap {
-    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
-    val bitmap = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val w = widthPx.toFloat()
-    val h = heightPx.toFloat()
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val padding = minOf(w, h) * 0.05f
     val availW = w - (padding * 2f)
@@ -2390,7 +2439,7 @@ fun generateVerticalPillBitmap(
 
     val capH = bodyH * 0.045f
     val capW = bodyW * 0.40f
-    val strokeW = (bodyW * 0.045f).coerceIn(6f, 12f)
+    val strokeW = (bodyW * 0.045f).coerceIn(scaleFactor * 2f, scaleFactor * 4f)
 
     val totalH = bodyH + capH
     val startY = (h - totalH) / 2f
@@ -2411,7 +2460,7 @@ fun generateVerticalPillBitmap(
     )
 
     val bodyRadius = bodyW * 0.16f
-    val capRadius = 8f
+    val capRadius = scaleFactor * 3f
 
     val isLight = config.themeMode == "LIGHT"
     val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
@@ -2460,7 +2509,7 @@ fun generateVerticalPillBitmap(
         bodyRect.right - innerMargin,
         bodyRect.bottom - innerMargin
     )
-    val innerRadius = (bodyRadius - innerMargin).coerceAtLeast(8f)
+    val innerRadius = (bodyRadius - innerMargin).coerceAtLeast(scaleFactor * 3f)
 
     val innerClipPath = Path().apply {
         addRoundRect(innerRect, innerRadius, innerRadius, Path.Direction.CW)
@@ -2472,7 +2521,7 @@ fun generateVerticalPillBitmap(
     val totalSegments = 5
     val gap = innerRect.height() * 0.03f
     val segmentH = (innerRect.height() - (gap * (totalSegments - 1))) / totalSegments
-    val segmentRadius = (segmentH * 0.18f).coerceAtLeast(8f)
+    val segmentRadius = (segmentH * 0.18f).coerceAtLeast(scaleFactor * 3f)
 
     val activeSegmentsCount = (percentage.coerceIn(0, 100) / 100f * totalSegments).toInt()
 
@@ -2493,22 +2542,18 @@ fun generateVerticalPillBitmap(
     return bitmap
 }
 
-// 16. Horizontal Pill
+// 16. Horizontal Pill (Strict 2:1 Fixed Capsule)
 fun generateHorizontalPillBitmap(
     context: Context,
     percentage: Int,
     isCharging: Boolean,
     config: SlateWidgetConfig,
-    widthPx: Int,
-    heightPx: Int,
-    isResponsive: Boolean = false
+    wDp: Int,
+    hDp: Int
 ): Bitmap {
-    val scaleFactor = maxOf(context.resources.displayMetrics.density, 3.5f)
-    val bitmap = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val w = widthPx.toFloat()
-    val h = heightPx.toFloat()
+    val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
+    val w = canvas.width.toFloat()
+    val h = canvas.height.toFloat()
 
     val padding = minOf(w, h) * 0.05f
     val availW = w - (padding * 2f)
@@ -2525,7 +2570,7 @@ fun generateHorizontalPillBitmap(
 
     val capW = bodyW * 0.055f
     val capH = bodyH * 0.40f
-    val strokeW = (bodyH * 0.045f).coerceIn(6f, 12f)
+    val strokeW = (bodyH * 0.045f).coerceIn(scaleFactor * 2f, scaleFactor * 4f)
 
     val totalW = bodyW + capW
     val startX = (w - totalW) / 2f
@@ -2546,7 +2591,7 @@ fun generateHorizontalPillBitmap(
     )
 
     val bodyRadius = bodyH * 0.16f
-    val capRadius = 8f
+    val capRadius = scaleFactor * 3f
 
     val isLight = config.themeMode == "LIGHT"
     val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
@@ -2595,7 +2640,7 @@ fun generateHorizontalPillBitmap(
         bodyRect.right - innerMargin,
         bodyRect.bottom - innerMargin
     )
-    val innerRadius = (bodyRadius - innerMargin).coerceAtLeast(8f)
+    val innerRadius = (bodyRadius - innerMargin).coerceAtLeast(scaleFactor * 3f)
 
     val innerClipPath = Path().apply {
         addRoundRect(innerRect, innerRadius, innerRadius, Path.Direction.CW)
@@ -2607,7 +2652,7 @@ fun generateHorizontalPillBitmap(
     val totalSegments = 5
     val gap = innerRect.width() * 0.03f
     val segmentW = (innerRect.width() - (gap * (totalSegments - 1))) / totalSegments
-    val segmentRadius = (segmentW * 0.18f).coerceAtLeast(8f)
+    val segmentRadius = (segmentW * 0.18f).coerceAtLeast(scaleFactor * 3f)
 
     val activeSegmentsCount = (percentage.coerceIn(0, 100) * totalSegments) / 100
 
