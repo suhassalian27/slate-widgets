@@ -959,7 +959,7 @@ fun generateEarbudsVolumeControlBitmap(
 }
 
 /**
- * 5. Bluetooth Tri-Battery Studio Dock Widget (Strict 1:1 Fixed Square)
+ * 5. Bluetooth Tri-Battery Studio Dock Widget (Strict 1:1 Fixed Square - Fully Proportional)
  */
 fun generateBluetoothTriBatteryDockBitmap(
     context: Context,
@@ -981,14 +981,15 @@ fun generateBluetoothTriBatteryDockBitmap(
     val podBgColor = if (isLight) 0x0A000000 else 0x14FFFFFF
     val trackBarColor = if (isLight) 0x12000000 else 0x1AFFFFFF
 
-    val cardCornerRadius = getStandardCornerRadius(scaleFactor)
-
     // Standard outer boundary margin
     val margin = scaleFactor * 1.5f
     val cardSize = minOf(w, h) - (margin * 2f)
     val leftX = (w - cardSize) / 2f
     val topY = (h - cardSize) / 2f
     val cardRect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
+
+    // Proportional outer card corner radius
+    val cardCornerRadius = cardSize * 0.11f
 
     // 1. Card Surface & Edge Border
     val alphaInt = (slateConfig.opacity.coerceIn(0f, 1f) * 255).toInt()
@@ -1006,17 +1007,17 @@ fun generateBluetoothTriBatteryDockBitmap(
     val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x12000000 else 0x1AFFFFFF
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 0.8f
+        strokeWidth = (cardSize * 0.005f).coerceAtLeast(scaleFactor * 0.8f)
     }
     canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, borderPaint)
 
-    // 2. Compact Content Padding
-    val padH = cardSize * 0.05f
-    val padV = cardSize * 0.05f
+    // 2. Proportional Content Padding
+    val padH = cardSize * 0.055f
+    val padV = cardSize * 0.055f
     val contentRect = RectF(cardRect.left + padH, cardRect.top + padV, cardRect.right - padH, cardRect.bottom - padV)
 
-    // 3. Header Row: Device Name & Status Dot
-    val headerTextSize = (contentRect.width() * 0.052f).coerceIn(scaleFactor * 8.5f, scaleFactor * 12.5f)
+    // 3. Header Row: Device Name & Status Dot (Proportional to cardSize)
+    val headerTextSize = (contentRect.width() * 0.055f).coerceIn(scaleFactor * 8.5f, cardSize * 0.065f)
     val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
         textSize = headerTextSize
@@ -1046,7 +1047,7 @@ fun generateBluetoothTriBatteryDockBitmap(
     val topRowH = (podsArea.height() - podGap) * 0.58f
     val bottomRowH = (podsArea.height() - podGap) * 0.42f
     val podW = (podsArea.width() - podGap) / 2f
-    val podRadius = scaleFactor * 12f
+    val podRadius = cardSize * 0.045f // Proportional pod corner radius
 
     val podBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = podBgColor
@@ -1055,7 +1056,7 @@ fun generateBluetoothTriBatteryDockBitmap(
     val podBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = if (isLight) 0x10000000 else 0x16FFFFFF
         style = Paint.Style.STROKE
-        strokeWidth = scaleFactor * 0.75f
+        strokeWidth = (cardSize * 0.003f).coerceAtLeast(scaleFactor * 0.75f)
     }
 
     val trackBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1069,20 +1070,20 @@ fun generateBluetoothTriBatteryDockBitmap(
 
     val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
-        textSize = (topRowH * 0.15f).coerceIn(scaleFactor * 8.5f, scaleFactor * 12f)
+        textSize = (topRowH * 0.16f).coerceIn(scaleFactor * 8.5f, cardSize * 0.045f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.RIGHT
     }
 
     val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryTextColor
-        textSize = (topRowH * 0.22f).coerceIn(scaleFactor * 13f, scaleFactor * 20f)
+        textSize = (topRowH * 0.24f).coerceIn(scaleFactor * 12f, cardSize * 0.075f)
         typeface = getSlateFont(context, weight = 700)
         textAlign = Paint.Align.RIGHT
     }
 
-    val earbudScale = ((topRowH * 0.48f) / (46f * scaleFactor)).coerceIn(0.40f, 1.4f)
-    val miniBarH = (topRowH * 0.07f).coerceIn(scaleFactor * 4f, scaleFactor * 6.5f)
+    val earbudScale = ((topRowH * 0.48f) / (46f * scaleFactor)).coerceIn(0.40f, 3.5f)
+    val miniBarH = (topRowH * 0.075f).coerceIn(scaleFactor * 4f, cardSize * 0.022f)
 
     // POD 1: LEFT EARBUD
     val leftPod = RectF(podsArea.left, podsArea.top, podsArea.left + podW, podsArea.top + topRowH)
@@ -1162,12 +1163,12 @@ fun generateBluetoothTriBatteryDockBitmap(
         canvas.drawRoundRect(activeRect, miniBarH / 2f, miniBarH / 2f, activeBarPaint)
     }
 
-    // POD 3: CHARGING CASE (Tightly Clustered & Bounded Spacing)
+    // POD 3: CHARGING CASE
     val casePod = RectF(podsArea.left, podsArea.bottom - bottomRowH, podsArea.right, podsArea.bottom)
     canvas.drawRoundRect(casePod, podRadius, podRadius, podBgPaint)
     canvas.drawRoundRect(casePod, podRadius, podRadius, podBorderPaint)
 
-    val caseScale = ((bottomRowH * 0.45f) / (20f * scaleFactor)).coerceIn(0.40f, 1.3f)
+    val caseScale = ((bottomRowH * 0.48f) / (20f * scaleFactor)).coerceIn(0.40f, 3.5f)
     val caseCx = casePod.left + (casePod.width() * 0.13f)
     val caseCy = casePod.centerY()
 
@@ -1183,9 +1184,8 @@ fun generateBluetoothTriBatteryDockBitmap(
 
     val textStartX = casePod.left + (casePod.width() * 0.27f)
 
-    // Tightly bound title and percentage vertical stack inside the case pod
-    val caseTitleSize = (bottomRowH * 0.24f).coerceIn(scaleFactor * 8.5f, scaleFactor * 11.5f)
-    val casePctSize = (bottomRowH * 0.36f).coerceIn(scaleFactor * 12f, scaleFactor * 17.5f)
+    val caseTitleSize = (bottomRowH * 0.24f).coerceIn(scaleFactor * 8.5f, cardSize * 0.045f)
+    val casePctSize = (bottomRowH * 0.38f).coerceIn(scaleFactor * 11f, cardSize * 0.07f)
 
     val caseTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = secondaryTextColor
@@ -1204,11 +1204,11 @@ fun generateBluetoothTriBatteryDockBitmap(
     val fmCaseTitle = caseTitlePaint.fontMetrics
     val fmCasePct = casePctPaint.fontMetrics
 
-    val caseTextStackH = (fmCaseTitle.descent - fmCaseTitle.ascent) + (scaleFactor * 2f) + (fmCasePct.descent - fmCasePct.ascent)
+    val caseTextStackH = (fmCaseTitle.descent - fmCaseTitle.ascent) + (cardSize * 0.01f) + (fmCasePct.descent - fmCasePct.ascent)
     val caseStackTop = casePod.top + (casePod.height() - caseTextStackH) / 2f
 
     val caseTitleY = caseStackTop - fmCaseTitle.ascent
-    val casePctY = caseStackTop + (fmCaseTitle.descent - fmCaseTitle.ascent) + (scaleFactor * 2f) - fmCasePct.ascent
+    val casePctY = caseStackTop + (fmCaseTitle.descent - fmCaseTitle.ascent) + (cardSize * 0.01f) - fmCasePct.ascent
 
     canvas.drawText("CASE", textStartX, caseTitleY, caseTitlePaint)
     val casePctText = if (deviceData.isConnected) "${deviceData.caseBattery}%" else "--"
@@ -1216,7 +1216,7 @@ fun generateBluetoothTriBatteryDockBitmap(
 
     // Case Battery Bar on the Right
     val caseBarW = casePod.width() * 0.32f
-    val caseBarH = (bottomRowH * 0.15f).coerceIn(scaleFactor * 4.5f, scaleFactor * 7.5f)
+    val caseBarH = (bottomRowH * 0.15f).coerceIn(scaleFactor * 4.5f, cardSize * 0.03f)
     val caseBarRect = RectF(
         casePod.right - (casePod.width() * 0.08f) - caseBarW,
         casePod.centerY() - (caseBarH / 2f),
