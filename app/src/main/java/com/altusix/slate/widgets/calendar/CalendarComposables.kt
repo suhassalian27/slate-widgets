@@ -882,14 +882,23 @@ fun generateInlineHeaderDateBitmap(context: Context, state: CalendarDateState, c
 
 fun generateInlineHeaderDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateInlineHeaderDateBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
 
-// 7. FLIP CALENDAR (2x2 Square)
-fun generateSplitFlapCalendarBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
+// 7. FLIP CALENDAR (2x2 Square / Responsive)
+fun generateSplitFlapCalendarBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int = 0
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
+    val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
 
     val margin = scaleFactor * 1.5f
     val rect = if (isResponsive) {
@@ -908,19 +917,31 @@ fun generateSplitFlapCalendarBitmap(context: Context, state: CalendarDateState, 
     }
     canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
 
-    val cardSizeRef = minOf(rect.width(), rect.height())
-    val padH = rect.width() * 0.08f
-    val padV = rect.height() * 0.08f
-    val gapY = cardSizeRef * 0.04f
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, borderPaint)
 
-    val usableH = rect.height() - (padV * 2f)
+    // 1. Equal padding on all 4 sides
+    val pad = (minOf(rect.width(), rect.height()) * 0.08f).coerceIn(scaleFactor * 8f, scaleFactor * 18f)
+    val gapY = (minOf(rect.width(), rect.height()) * 0.04f).coerceIn(scaleFactor * 4f, scaleFactor * 10f)
+
+    val usableH = rect.height() - (pad * 2f)
     val tileH = (usableH - gapY) / 2f
-    val tileRadius = (cardRadius - padV).coerceAtLeast(scaleFactor * 6f)
+    val tileRadius = (cardRadius - pad).coerceAtLeast(scaleFactor * 6f)
 
     val tileBgColor = if (isLight) Color.parseColor("#E5E5EA") else Color.parseColor("#222226")
     val tileBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = tileBgColor
         style = Paint.Style.FILL
+    }
+
+    val tileBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x0E000000 else 0x14FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.75f
     }
 
     val splitLineColor = if (isLight) Color.parseColor("#C7C7CC") else Color.parseColor("#141416")
@@ -930,16 +951,17 @@ fun generateSplitFlapCalendarBitmap(context: Context, state: CalendarDateState, 
         strokeWidth = 1.5f * scaleFactor
     }
 
-    val pinColor = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#48484A")
+    // Mechanical hinge pins styled in accent color
     val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = pinColor
+        color = accentColor
         style = Paint.Style.FILL
     }
 
-    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val primaryText = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
 
     fun drawFlapTile(tileRect: RectF, text: String, textSizeRatio: Float, textColor: Int) {
         canvas.drawRoundRect(tileRect, tileRadius, tileRadius, tileBgPaint)
+        canvas.drawRoundRect(tileRect, tileRadius, tileRadius, tileBorderPaint)
 
         val midY = tileRect.centerY()
         canvas.drawLine(tileRect.left, midY, tileRect.right, midY, splitLinePaint)
@@ -973,28 +995,39 @@ fun generateSplitFlapCalendarBitmap(context: Context, state: CalendarDateState, 
         canvas.drawText(text, tileRect.centerX(), textY, textPaint)
     }
 
-    val topTileRect = RectF(rect.left + padH, rect.top + padV, rect.right - padH, rect.top + padV + tileH)
-    val bottomTileRect = RectF(rect.left + padH, topTileRect.bottom + gapY, rect.right - padH, rect.bottom - padV)
+    // Tiles have identical margin 'pad' to left, right, top, and bottom
+    val topTileRect = RectF(rect.left + pad, rect.top + pad, rect.right - pad, rect.top + pad + tileH)
+    val bottomTileRect = RectF(rect.left + pad, topTileRect.bottom + gapY, rect.right - pad, rect.bottom - pad)
 
     val weekdayText = state.dayOfWeekShort.uppercase()
     val dayNumText = state.dayOfMonth.padStart(2, '0')
 
-    drawFlapTile(topTileRect, weekdayText, 0.48f, primaryText)
+    // Top weekday uses accentColor, bottom date uses primaryText
+    drawFlapTile(topTileRect, weekdayText, 0.48f, accentColor)
     drawFlapTile(bottomTileRect, dayNumText, 0.58f, primaryText)
 
     return bitmap
 }
 
-fun generateSplitFlapCalendarBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateSplitFlapCalendarBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
-
-// 8. STACKED HEADER DATE (2x2 Square)
-fun generateStackedHeaderDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
+// 8. STACKED HEADER DATE (2x2 Square / Adaptive Responsive)
+fun generateStackedHeaderDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int = 0
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
 
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
+    val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryText = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
 
     val margin = scaleFactor * 1.5f
     val rect = if (isResponsive) {
@@ -1007,19 +1040,30 @@ fun generateStackedHeaderDateBitmap(context: Context, state: CalendarDateState, 
     }
 
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+
+    // 1. Surface Background & Elevation Border
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val primaryText = if (isLight) Color.parseColor("#1C1C1E") else Color.WHITE
-    val secondaryText = Color.parseColor("#8E8E93")
-    val redAccent = if (isLight) Color.parseColor("#FF3B30") else Color.parseColor("#FF453A")
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, borderPaint)
 
-    val cardSizeRef = minOf(rect.width(), rect.height())
-    val padX = rect.width() * 0.12f
-    val maxAvailableWidth = rect.width() - (padX * 2f)
+    val cardW = rect.width()
+    val cardH = rect.height()
+    val aspect = cardW / cardH.coerceAtLeast(1f)
 
     val fullMonthName = when (state.monthShort.uppercase()) {
         "JAN" -> "JANUARY"
@@ -1050,82 +1094,244 @@ fun generateStackedHeaderDateBitmap(context: Context, state: CalendarDateState, 
 
     val dateText = state.dayOfMonth
 
-    var monthSize = cardSizeRef * 0.10f
-    var weekdaySize = cardSizeRef * 0.15f
-    var dateSize = cardSizeRef * 0.42f
+    // =========================================================================
+    // BRANCH 1: WIDE RESPONSIVE (aspect >= 1.35)
+    // Left: Stacked Month & Weekday | Right: Hero Date Numeral
+    // =========================================================================
+    if (aspect >= 1.35f) {
+        val padX = (cardW * 0.08f).coerceIn(scaleFactor * 14f, scaleFactor * 28f)
 
-    val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = monthSize
-        typeface = getSlateFont(context, weight = 500)
-        textAlign = Paint.Align.LEFT
-        letterSpacing = 0.05f
+        // 1. Right Date Column
+        var dateSize = (cardH * 0.65f).coerceAtLeast(scaleFactor * 28f)
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = dateSize
+            typeface = getSlateFont(context, weight = 300)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val maxDateW = cardW * 0.42f
+        if (datePaint.measureText(dateText) > maxDateW) {
+            dateSize *= (maxDateW / datePaint.measureText(dateText))
+            datePaint.textSize = dateSize
+        }
+
+        val dateBounds = Rect()
+        datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+        val dateY = rect.centerY() + (dateBounds.height() / 2f) - dateBounds.bottom
+        canvas.drawText(dateText, rect.right - padX, dateY, datePaint)
+
+        // 2. Left Header Column
+        val dateOccupiedW = datePaint.measureText(dateText)
+        val maxLeftW = (rect.right - padX - dateOccupiedW - (scaleFactor * 16f)) - (rect.left + padX)
+
+        var monthSize = (cardH * 0.15f).coerceIn(scaleFactor * 10f, scaleFactor * 18f)
+        var weekdaySize = (cardH * 0.23f).coerceIn(scaleFactor * 13f, scaleFactor * 26f)
+
+        val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = monthSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+            letterSpacing = 0.07f
+        }
+
+        val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            textSize = weekdaySize
+            typeface = getSlateFont(context, weight = 600)
+            textAlign = Paint.Align.LEFT
+        }
+
+        if (monthPaint.measureText(fullMonthName) > maxLeftW) {
+            monthSize *= (maxLeftW / monthPaint.measureText(fullMonthName))
+            monthPaint.textSize = monthSize
+        }
+        if (weekdayPaint.measureText(weekdayTitle) > maxLeftW) {
+            weekdaySize *= (maxLeftW / weekdayPaint.measureText(weekdayTitle))
+            weekdayPaint.textSize = weekdaySize
+        }
+
+        val monthBounds = Rect()
+        monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
+        val monthH = monthBounds.height().toFloat()
+
+        val weekdayBounds = Rect()
+        weekdayPaint.getTextBounds(weekdayTitle, 0, weekdayTitle.length, weekdayBounds)
+        val weekdayH = weekdayBounds.height().toFloat()
+
+        // Increased gap between month and weekday
+        val gap = (cardH * 0.065f).coerceAtLeast(scaleFactor * 7f)
+        val totalLeftH = monthH + gap + weekdayH
+        val leftTop = rect.centerY() - (totalLeftH / 2f)
+
+        val monthY = leftTop - monthBounds.top
+        val weekdayY = monthY + monthBounds.bottom + gap - weekdayBounds.top
+
+        canvas.drawText(fullMonthName, rect.left + padX, monthY, monthPaint)
+        canvas.drawText(weekdayTitle, rect.left + padX, weekdayY, weekdayPaint)
+
+        // =========================================================================
+        // BRANCH 2: TALL RESPONSIVE (aspect < 0.78)
+        // Month & Weekday anchored at top, Date anchored at bottom
+        // =========================================================================
+    } else if (aspect < 0.78f) {
+        val padX = cardW * 0.11f
+        val padY = (cardH * 0.09f).coerceIn(scaleFactor * 12f, scaleFactor * 24f)
+        val maxAvailableWidth = cardW - (padX * 2f)
+
+        val refDim = minOf(cardW * 1.25f, cardH * 0.60f)
+
+        var monthSize = (refDim * 0.082f).coerceAtLeast(scaleFactor * 10f)
+        var weekdaySize = (refDim * 0.125f).coerceAtLeast(scaleFactor * 12f)
+        var dateSize = (refDim * 0.44f).coerceAtLeast(scaleFactor * 34f)
+
+        val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = monthSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+            letterSpacing = 0.05f
+        }
+
+        val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            textSize = weekdaySize
+            typeface = getSlateFont(context, weight = 600)
+            textAlign = Paint.Align.LEFT
+        }
+
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = dateSize
+            typeface = getSlateFont(context, weight = 300)
+            textAlign = Paint.Align.LEFT
+        }
+
+        if (monthPaint.measureText(fullMonthName) > maxAvailableWidth) {
+            monthSize *= (maxAvailableWidth / monthPaint.measureText(fullMonthName))
+            monthPaint.textSize = monthSize
+        }
+        if (weekdayPaint.measureText(weekdayTitle) > maxAvailableWidth) {
+            weekdaySize *= (maxAvailableWidth / weekdayPaint.measureText(weekdayTitle))
+            weekdayPaint.textSize = weekdaySize
+        }
+        if (datePaint.measureText(dateText) > maxAvailableWidth) {
+            dateSize *= (maxAvailableWidth / datePaint.measureText(dateText))
+            datePaint.textSize = dateSize
+        }
+
+        val monthBounds = Rect()
+        monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
+
+        val weekdayBounds = Rect()
+        weekdayPaint.getTextBounds(weekdayTitle, 0, weekdayTitle.length, weekdayBounds)
+
+        val dateBounds = Rect()
+        datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+        // Increased gap between month and weekday
+        val gap1 = (refDim * 0.065f).coerceAtLeast(scaleFactor * 7f)
+        val leftX = rect.left + padX
+
+        // Month and Weekday at top edge
+        val monthY = rect.top + padY - monthBounds.top
+        val weekdayY = monthY + monthBounds.bottom + gap1 - weekdayBounds.top
+
+        // Day number pinned to bottom edge
+        val dateY = rect.bottom - padY - dateBounds.bottom
+
+        canvas.drawText(fullMonthName, leftX, monthY, monthPaint)
+        canvas.drawText(weekdayTitle, leftX, weekdayY, weekdayPaint)
+        canvas.drawText(dateText, leftX, dateY, datePaint)
+
+        // =========================================================================
+        // BRANCH 3: SQUARE / FIXED MODE (0.78 <= aspect < 1.35)
+        // Month & Weekday at top with distinct gap, Day numeral at bottom
+        // =========================================================================
+    } else {
+        val cardSizeRef = minOf(cardW, cardH)
+        val padX = cardW * 0.11f
+        val padY = cardH * 0.11f
+        val maxAvailableWidth = cardW - (padX * 2f)
+
+        var monthSize = (cardSizeRef * 0.082f).coerceAtLeast(scaleFactor * 9.5f)
+        var weekdaySize = (cardSizeRef * 0.125f).coerceAtLeast(scaleFactor * 12f)
+        var dateSize = (cardSizeRef * 0.44f).coerceAtLeast(scaleFactor * 34f)
+
+        val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = secondaryText
+            textSize = monthSize
+            typeface = getSlateFont(context, weight = 700)
+            textAlign = Paint.Align.LEFT
+            letterSpacing = 0.05f
+        }
+
+        val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            textSize = weekdaySize
+            typeface = getSlateFont(context, weight = 600)
+            textAlign = Paint.Align.LEFT
+        }
+
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryText
+            textSize = dateSize
+            typeface = getSlateFont(context, weight = 300)
+            textAlign = Paint.Align.LEFT
+        }
+
+        if (monthPaint.measureText(fullMonthName) > maxAvailableWidth) {
+            monthSize *= (maxAvailableWidth / monthPaint.measureText(fullMonthName))
+            monthPaint.textSize = monthSize
+        }
+        if (weekdayPaint.measureText(weekdayTitle) > maxAvailableWidth) {
+            weekdaySize *= (maxAvailableWidth / weekdayPaint.measureText(weekdayTitle))
+            weekdayPaint.textSize = weekdaySize
+        }
+        if (datePaint.measureText(dateText) > maxAvailableWidth) {
+            dateSize *= (maxAvailableWidth / datePaint.measureText(dateText))
+            datePaint.textSize = dateSize
+        }
+
+        val monthBounds = Rect()
+        monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
+
+        val weekdayBounds = Rect()
+        weekdayPaint.getTextBounds(weekdayTitle, 0, weekdayTitle.length, weekdayBounds)
+
+        val dateBounds = Rect()
+        datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+
+        // Expanded spacing between month and weekday
+        val gap1 = (cardSizeRef * 0.048f).coerceAtLeast(scaleFactor * 5f)
+        val leftX = rect.left + padX
+
+        // Month and Weekday at top edge
+        val monthY = rect.top + padY - monthBounds.top
+        val weekdayY = monthY + monthBounds.bottom + gap1 - weekdayBounds.top
+
+        // Day numeral anchored at bottom edge
+        val dateY = rect.bottom - padY - dateBounds.bottom
+
+        canvas.drawText(fullMonthName, leftX, monthY, monthPaint)
+        canvas.drawText(weekdayTitle, leftX, weekdayY, weekdayPaint)
+        canvas.drawText(dateText, leftX, dateY, datePaint)
     }
-
-    val weekdayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = redAccent
-        textSize = weekdaySize
-        typeface = getSlateFont(context, weight = 500)
-        textAlign = Paint.Align.LEFT
-    }
-
-    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = dateSize
-        typeface = getSlateFont(context, weight = 300)
-        textAlign = Paint.Align.LEFT
-    }
-
-    if (monthPaint.measureText(fullMonthName) > maxAvailableWidth) {
-        monthSize *= (maxAvailableWidth / monthPaint.measureText(fullMonthName))
-        monthPaint.textSize = monthSize
-    }
-
-    if (weekdayPaint.measureText(weekdayTitle) > maxAvailableWidth) {
-        weekdaySize *= (maxAvailableWidth / weekdayPaint.measureText(weekdayTitle))
-        weekdayPaint.textSize = weekdaySize
-    }
-
-    if (datePaint.measureText(dateText) > maxAvailableWidth) {
-        dateSize *= (maxAvailableWidth / datePaint.measureText(dateText))
-        datePaint.textSize = dateSize
-    }
-
-    val monthBounds = Rect()
-    monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
-
-    val weekdayBounds = Rect()
-    weekdayPaint.getTextBounds(weekdayTitle, 0, weekdayTitle.length, weekdayBounds)
-
-    val dateBounds = Rect()
-    datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
-
-    val gap1 = cardSizeRef * 0.035f
-    val gap2 = cardSizeRef * 0.055f
-
-    val monthH = monthBounds.height().toFloat()
-    val weekdayH = weekdayBounds.height().toFloat()
-    val dateH = dateBounds.height().toFloat()
-
-    val totalBlockHeight = monthH + gap1 + weekdayH + gap2 + dateH
-    val blockTop = rect.centerY() - (totalBlockHeight / 2f)
-    val leftX = rect.left + padX
-
-    val monthY = blockTop + monthH - monthBounds.bottom
-    val weekdayY = blockTop + monthH + gap1 + weekdayH - weekdayBounds.bottom
-    val dateY = blockTop + monthH + gap1 + weekdayH + gap2 + dateH - dateBounds.bottom
-
-    canvas.drawText(fullMonthName, leftX, monthY, monthPaint)
-    canvas.drawText(weekdayTitle, leftX, weekdayY, weekdayPaint)
-    canvas.drawText(dateText, leftX, dateY, datePaint)
 
     return bitmap
 }
 
-fun generateStackedHeaderDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateStackedHeaderDateBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
-
-// 9. SIDEBAR MONTH DATE (2x2 Square)
-fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
+// 9. SIDEBAR MONTH DATE (2x2 Square / Adaptive Responsive)
+fun generateSideBarDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    isResponsive: Boolean,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int = 0
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -1146,13 +1352,22 @@ fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config
 
     val cardRadius = getStandardCornerRadius(scaleFactor)
 
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+    // 1. Base Card Surface
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
-    canvas.drawRoundRect(rect, cardRadius, cardRadius, bodyPaint)
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, bgPaint)
 
-    val stripW = rect.width() * 0.30f
+    // 2. Left Sidebar Strip (Bounded so wide widgets don't get huge sidebars)
+    val aspect = rect.width() / rect.height().coerceAtLeast(1f)
+    val stripW = (rect.width() * 0.28f).coerceIn(scaleFactor * 28f, rect.height() * 0.70f)
     val stripRect = RectF(rect.left, rect.top, rect.left + stripW, rect.bottom)
 
     val stripPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1166,6 +1381,15 @@ fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config
     canvas.drawRect(stripRect, stripPaint)
     canvas.restore()
 
+    // 3. Card Elevation Border
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
+    }
+    canvas.drawRoundRect(rect, cardRadius, cardRadius, borderPaint)
+
+    // 4. Sidebar Text Setup
     val fullMonthName = when (state.monthShort.uppercase()) {
         "JAN" -> "JANUARY"
         "FEB" -> "FEBRUARY"
@@ -1182,13 +1406,20 @@ fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config
         else -> state.monthShort.uppercase()
     }
 
+    // Use short month name if vertical strip space is tight in wide banners
+    val monthDisplayText = if (stripRect.height() < scaleFactor * 85f && aspect >= 1.6f) {
+        state.monthShort.uppercase()
+    } else {
+        fullMonthName
+    }
+
     val r = ((accentColorInt shr 16) and 0xFF) / 255f
     val g = ((accentColorInt shr 8) and 0xFF) / 255f
     val b = (accentColorInt and 0xFF) / 255f
     val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
-    val stripTextColor = if (luminance > 0.5f) Color.parseColor("#121214") else Color.WHITE
+    val stripTextColor = if (luminance > 0.5f) 0xFF121214.toInt() else android.graphics.Color.WHITE
 
-    var baseMonthTextSize = stripW * 0.42f
+    var baseMonthTextSize = (stripW * 0.38f).coerceIn(scaleFactor * 8.5f, scaleFactor * 18f)
     val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = stripTextColor
         textSize = baseMonthTextSize
@@ -1197,9 +1428,9 @@ fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config
         letterSpacing = 0.08f
     }
 
-    val maxMonthHeight = stripRect.height() * 0.82f
-    if (monthPaint.measureText(fullMonthName) > maxMonthHeight) {
-        baseMonthTextSize *= (maxMonthHeight / monthPaint.measureText(fullMonthName))
+    val maxMonthHeight = stripRect.height() * 0.80f
+    if (monthPaint.measureText(monthDisplayText) > maxMonthHeight) {
+        baseMonthTextSize *= (maxMonthHeight / monthPaint.measureText(monthDisplayText))
         monthPaint.textSize = baseMonthTextSize
     }
 
@@ -1209,41 +1440,61 @@ fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config
     canvas.rotate(-90f, stripCx, stripCy)
 
     val monthBounds = Rect()
-    monthPaint.getTextBounds(fullMonthName, 0, fullMonthName.length, monthBounds)
+    monthPaint.getTextBounds(monthDisplayText, 0, monthDisplayText.length, monthBounds)
     val monthTextY = stripCy + (monthBounds.height() / 2f) - monthBounds.bottom
 
-    canvas.drawText(fullMonthName, stripCx, monthTextY, monthPaint)
+    canvas.drawText(monthDisplayText, stripCx, monthTextY, monthPaint)
     canvas.restore()
 
+    // 5. Right Area: Date Numeral (Constrained to BOTH width and height)
     val rightAreaRect = RectF(stripRect.right, rect.top, rect.right, rect.bottom)
-    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
+    val primaryText = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
 
     val dateText = state.dayOfMonth
-    var baseDateSize = rightAreaRect.width() * 0.55f
+
+    // Height & Width bounds to prevent overflow
+    val maxDateH = rightAreaRect.height() * 0.70f
+    val maxDateW = rightAreaRect.width() * 0.80f
+
+    var dateSize = minOf(rightAreaRect.height() * 0.68f, rightAreaRect.width() * 0.58f).coerceAtLeast(scaleFactor * 18f)
 
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = baseDateSize
-        typeface = getSlateFont(context, weight = 500)
+        textSize = dateSize
+        typeface = getSlateFont(context, weight = 400)
         textAlign = Paint.Align.CENTER
     }
 
-    val maxDateW = rightAreaRect.width() * 0.85f
-    if (datePaint.measureText(dateText) > maxDateW) {
-        baseDateSize *= (maxDateW / datePaint.measureText(dateText))
-        datePaint.textSize = baseDateSize
-    }
-
+    // Optical text bounds check
     val dateBounds = Rect()
     datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
-    val dateY = rightAreaRect.centerY() + (dateBounds.height() / 2f) - dateBounds.bottom
 
+    if (dateBounds.height() > maxDateH && dateBounds.height() > 0) {
+        dateSize *= (maxDateH / dateBounds.height())
+        datePaint.textSize = dateSize
+        datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+    }
+
+    val measuredW = datePaint.measureText(dateText)
+    if (measuredW > maxDateW && measuredW > 0f) {
+        dateSize *= (maxDateW / measuredW)
+        datePaint.textSize = dateSize
+        datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
+    }
+
+    val dateY = rightAreaRect.centerY() + (dateBounds.height() / 2f) - dateBounds.bottom
     canvas.drawText(dateText, rightAreaRect.centerX(), dateY, datePaint)
 
     return bitmap
 }
 
-fun generateSideBarDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateSideBarDateBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
+fun generateSideBarDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int
+): Bitmap = generateSideBarDateBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
 
 // 10. QUADRANT GRID DATE (2x2 Square)
 fun generateGridQuadrantCalendarBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {

@@ -307,20 +307,38 @@ class CalendarInlineHeaderReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
 
 // 7. FLIP CALENDAR (2x2)
 class CalendarSplitFlapReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
-        generateSplitFlapCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+    override fun renderBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateSplitFlapCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
 // 8. STACKED HEADER DATE (2x2)
 class CalendarStackedHeaderReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
-        generateStackedHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+    override fun renderBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateStackedHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
 // 9. SIDEBAR MONTH DATE (2x2)
 class CalendarSideBarReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
-        generateSideBarDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+    override fun renderBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateSideBarDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
 // 10. QUADRANT GRID DATE (2x2)
