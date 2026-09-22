@@ -7,13 +7,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Bundle
 import android.provider.CalendarContract
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
 import com.altusix.slate.core.service.SlateClockTickerService
-import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.data.local.loadSlateWidgetConfig
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -38,8 +39,8 @@ fun getCurrentCalendarDateState(): CalendarDateState {
 fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
         SlateWidgetInfo("Capsule Calendar", "2x1", "Calendar", CalendarPill2x1Receiver::class.java, hasModeOption = true),
+        SlateWidgetInfo("Big Date", "2x2", "Calendar", CalendarDate2x2Receiver::class.java, hasModeOption = false),
         SlateWidgetInfo("Basic Calendar", "4x2", "Calendar", CalendarBasicReceiver::class.java, hasModeOption = true),
-        SlateWidgetInfo("Big Date", "2x2", "Calendar", CalendarDate2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Overlay Calendar", "4x2", "Calendar", CalendarWatermarkReceiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Calendar Page", "2x2", "Calendar", CalendarPage2x2Receiver::class.java, hasModeOption = true),
         SlateWidgetInfo("Inline Header Date", "2x2", "Calendar", CalendarInlineHeaderReceiver::class.java, hasModeOption = true),
@@ -70,45 +71,7 @@ fun getCalendarWidgetsCatalog(): List<SlateWidgetInfo> {
     )
 }
 
-private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
-    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-    val bgKey = "widget_${widgetId}_bg_color"
-
-    // Snapshot and permanently lock the current global theme on initial placement
-    if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
-        val globalSettings = ThemePreferences(context).getThemeSettings()
-        val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
-                ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
-                ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
-
-        widgetPrefs.edit()
-            .putString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
-            .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-            .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
-            .putFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-            .apply()
-    }
-
-    val globalSettings = ThemePreferences(context).getThemeSettings()
-    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
-
-    val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
-            ((bgColor shr 8 and 0xFFL) * 0.7152f) +
-            ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
-    val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
-        ?: if (isLight) "LIGHT" else "DARK"
-
-    return SlateWidgetConfig(
-        themeMode = mode,
-        backgroundColorHex = bgColor,
-        opacity = opacity,
-        accentColorHex = accentColor
-    )
-}
-
-private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
     val modeKey = "widget_${widgetId}_mode"
     val isResponsiveKey = "widget_${widgetId}_is_responsive"
@@ -127,7 +90,7 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
 }
 
 fun updateAllCalendarWidgets(context: Context) {
-    val manager = AppWidgetManager.getInstance(context)
+    val manager = AppWidgetManager.getInstance(context) ?: return
     val receivers = listOf(
         CalendarPill2x1Receiver::class.java,
         CalendarBasicReceiver::class.java,
@@ -161,21 +124,47 @@ fun updateAllCalendarWidgets(context: Context) {
         CalendarRadialArcReceiver::class.java
     )
 
-    for (receiver in receivers) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, receiver))
+    for (receiverClass in receivers) {
+        val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass))
         if (ids != null && ids.isNotEmpty()) {
-            val intent = Intent(context, receiver).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            val receiver = receiverClass.getDeclaredConstructor().newInstance()
+            for (id in ids) {
+                receiver.updateSingleWidget(context, manager, id)
             }
-            context.sendBroadcast(intent)
         }
     }
 }
 
-abstract class BaseCalendarReceiver : AppWidgetProvider() {
+abstract class BaseCalendarReceiver(
+    open val targetAspect: Float = 1.0f
+) : AppWidgetProvider() {
 
-    abstract fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap
+    abstract fun renderBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap
+
+    fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = renderBitmap(context, appWidgetId, config, isResponsive, wDp, hDp)
+
+    fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = renderBitmap(context, widgetId, config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
@@ -184,7 +173,7 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        val manager = AppWidgetManager.getInstance(context)
+        val manager = AppWidgetManager.getInstance(context) ?: return
         val ids = manager.getAppWidgetIds(ComponentName(context, this::class.java))
         if (ids != null && ids.isNotEmpty()) {
             onUpdate(context, manager, ids)
@@ -197,28 +186,65 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
         }
     }
 
-    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle?) {
-        updateSingleWidget(context, appWidgetManager, appWidgetId)
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateSingleWidget(context, appWidgetManager, appWidgetId)
     }
 
-    private fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
+    fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
         try {
             val config = loadSlateWidgetConfig(context, id)
-            val isResponsive = parseAndLockIsResponsive(context, id)
+            val isResponsive = if (id == -1) true else parseAndLockIsResponsive(context, id)
 
             val options = manager.getAppWidgetOptions(id)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 140) ?: 140 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 140) ?: 140
-            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 60) ?: 60 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 60) ?: 60
+            val fallbackSize = if (targetAspect >= 1.8f) (if (targetAspect >= 2.5f) 280 to 70 else 280 to 140) else 150 to 150
 
-            val wDp = if (wDpRaw <= 0) 140 else wDpRaw
-            val hDp = if (hDpRaw <= 0) 60 else hDpRaw
+            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackSize.first) ?: fallbackSize.first
+            else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackSize.first) ?: fallbackSize.first
+            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackSize.second) ?: fallbackSize.second
+            else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackSize.second) ?: fallbackSize.second
 
-            val bitmap = renderBitmap(context, config, isResponsive, wDp, hDp)
-            val views = RemoteViews(context.packageName, R.layout.widget_canvas_container)
+            val wDp = if (wDpRaw <= 0) fallbackSize.first else wDpRaw
+            val hDp = if (hDpRaw <= 0) fallbackSize.second else hDpRaw
+            val density = context.resources.displayMetrics.density
 
-            views.setImageViewBitmap(R.id.widget_canvas_image, bitmap)
+            val padH: Int
+            val padV: Int
+            val effWDp: Int
+            val effHDp: Int
+
+            if (!isResponsive && targetAspect > 0f) {
+                val currentAspect = wDp.toFloat() / hDp.toFloat()
+                if (currentAspect > targetAspect) {
+                    val contentW = hDp * targetAspect
+                    padH = (((wDp - contentW) / 2f) * density).toInt()
+                    padV = 0
+                    effWDp = maxOf(1, contentW.toInt())
+                    effHDp = hDp
+                } else {
+                    val contentH = wDp / targetAspect
+                    padH = 0
+                    padV = (((hDp - contentH) / 2f) * density).toInt()
+                    effWDp = wDp
+                    effHDp = maxOf(1, contentH.toInt())
+                }
+            } else {
+                padH = 0
+                padV = 0
+                effWDp = wDp
+                effHDp = hDp
+            }
+
+            val bitmap = renderBitmap(context, id, config, isResponsive, effWDp, effHDp)
+            val views = RemoteViews(context.packageName, R.layout.widget_base_single)
+            views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
+            views.setImageViewBitmap(R.id.widget_image_view, bitmap)
 
             val calendarIntent = Intent(Intent.ACTION_VIEW).apply {
                 data = CalendarContract.CONTENT_URI
@@ -228,7 +254,7 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
                 context, id, calendarIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnClickPendingIntent(R.id.widget_canvas_image, pendingIntent)
+            views.setOnClickPendingIntent(R.id.touch_slot_0, pendingIntent)
 
             manager.updateAppWidget(id, views)
         } catch (e: Exception) {
@@ -238,194 +264,229 @@ abstract class BaseCalendarReceiver : AppWidgetProvider() {
 }
 
 // 1. CAPSULE PILL (2x1)
-class CalendarPill2x1Receiver : BaseCalendarReceiver() { override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generatePillCalendarBitmap(context, getCurrentCalendarPillState(), config, isResponsive, wDp, hDp) }
+class CalendarPill2x1Receiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generatePillCalendarBitmap(context, getCurrentCalendarPillState(), config, isResponsive, wDp, hDp)
+}
 
 // 2. BASIC CALENDAR (4x2)
-class CalendarBasicReceiver : BaseCalendarReceiver() { override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateBasicCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
+class CalendarBasicReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateBasicCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp)
+}
 
-class CalendarDate2x2Receiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
-        generateBigDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
+// 3. BIG DATE (2x2 Fixed Receiver)
+class CalendarDate2x2Receiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap = generateBigDateBitmap(context, CalendarEngine.getDateState(), config, wDp, hDp)
 }
 
 // 4. MONTH OVERLAY CALENDAR (4x2)
-class CalendarWatermarkReceiver : BaseCalendarReceiver() { override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateWatermarkCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
+class CalendarWatermarkReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateWatermarkCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp)
+}
 
-class CalendarPage2x2Receiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 5. CALENDAR PAGE (2x2)
+class CalendarPage2x2Receiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateCalendarPageBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 6. INLINE HEADER DATE (2x2 Square / Responsive Single Card)
-class CalendarInlineHeaderReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 6. INLINE HEADER DATE (2x2)
+class CalendarInlineHeaderReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateInlineHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 7. FLIP CALENDAR (2x2 Square / Responsive Single Card)
-class CalendarSplitFlapReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 7. FLIP CALENDAR (2x2)
+class CalendarSplitFlapReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateSplitFlapCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 8. STACKED HEADER DATE (2x2 Square / Responsive Single Card)
-class CalendarStackedHeaderReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 8. STACKED HEADER DATE (2x2)
+class CalendarStackedHeaderReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateStackedHeaderDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 9. SIDEBAR MONTH DATE (2x2 Square / Responsive Single Card)
-class CalendarSideBarReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 9. SIDEBAR MONTH DATE (2x2)
+class CalendarSideBarReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateSideBarDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 10. QUADRANT GRID DATE (2x2 Square / Responsive Single Card)
-class CalendarGridQuadrantReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 10. QUADRANT GRID DATE (2x2)
+class CalendarGridQuadrantReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateGridQuadrantCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 11. DIAGONAL SPLIT DATE (2x2 Square / Responsive Single Card)
-class CalendarDiagonalSplitReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 11. DIAGONAL SPLIT DATE (2x2)
+class CalendarDiagonalSplitReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateDiagonalSplitDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
 // 12. SPLIT DASHBOARD CALENDAR (4x2)
-class CalendarDashboardReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateSplitDashboardCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
+class CalendarDashboardReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateSplitDashboardCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp)
+}
 
 // 13. FOCUS TIMELINE CALENDAR (4x2)
-class CalendarFocusTimelineReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateFocusTimelineCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
+class CalendarFocusTimelineReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateFocusTimelineCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp)
+}
 
 // 14. ANALOG TIMELINE HYBRID (4x2)
-class CalendarAnalogTimelineReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateAnalogTimelineCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
+class CalendarAnalogTimelineReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateAnalogTimelineCalendarBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp)
+}
 
-// 15. WEEK PROGRESS CALENDAR (4x2 / Capsule Progress Tracker)
-class CalendarWeekProgressReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 15. WEEK PROGRESS CALENDAR (4x2)
+class CalendarWeekProgressReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateWeekProgressCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 16. MODULAR MATRIX CALENDAR (4x2 / Bento Day Grid)
-class CalendarModularMatrixReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 16. MODULAR MATRIX CALENDAR (4x2)
+class CalendarModularMatrixReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateModularMatrixCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 17. ELEGANT OVERVIEW CALENDAR (4x2 / Giant Date & Month Grid)
-class CalendarOverviewReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 17. ELEGANT OVERVIEW CALENDAR (4x2)
+class CalendarOverviewReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateOverviewCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 18. MINIMAL WEEK STRIP CALENDAR (4x2 / Date & Underlined Day Strip)
-class CalendarMinimalWeekStripReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 18. MINIMAL WEEK STRIP CALENDAR (4x2)
+class CalendarMinimalWeekStripReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateMinimalWeekStripCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 19. VERTICAL TIME PILL WIDGET (4x2 / Rotated Clock & Dual Capsule Stack)
-class CalendarVerticalTimePillReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 19. VERTICAL TIME PILL WIDGET (4x2)
+class CalendarVerticalTimePillReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateVerticalTimePillCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 20. TIMELINE PROGRESS CALENDAR (4x2 / Minimal Horizontal Axis)
-class CalendarTimelineProgressReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 20. TIMELINE PROGRESS CALENDAR (4x2)
+class CalendarTimelineProgressReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateTimelineProgressCalendarBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 21. CORNER BADGE DATE (2x2 Square / Responsive Single Card)
-class CalendarPageFlipReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 21. CORNER BADGE DATE (2x2)
+class CalendarPageFlipReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generatePageFlipDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 22. VERTICAL DATE WHEEL (2x2 Square / Responsive Single Card)
-class CalendarVerticalWheelReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 22. VERTICAL DATE WHEEL (2x2)
+class CalendarVerticalWheelReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateVerticalDateWheelBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 23. MONTH PROGRESS CAPSULE (2x2 Square / Responsive Single Card)
-class CalendarMonthProgressCapsuleReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 23. MONTH PROGRESS CAPSULE (2x2)
+class CalendarMonthProgressCapsuleReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateMonthProgressCapsuleBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 24. TIMELINE PILLARS DATE (2x2 Square / Responsive Single Card)
-class CalendarTimelinePillarsReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 24. TIMELINE PILLARS DATE (2x2)
+class CalendarTimelinePillarsReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateTimelinePillarsBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 25. TILTED BADGE FLIP DATE (2x2 Square / Responsive Single Card)
-class CalendarTiltedBadgeFlipReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 25. TILTED BADGE FLIP DATE (2x2)
+class CalendarTiltedBadgeFlipReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateTiltedBadgeFlipDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 26. SOLAR LANDSCAPE DATE (2x2 Square / Responsive Single Card)
-class CalendarSolarLandscapeReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 26. SOLAR LANDSCAPE DATE (2x2)
+class CalendarSolarLandscapeReceiver : BaseCalendarReceiver(targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateSolarLandscapeDateBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 27. YEAR MATRIX PROGRESS (4x2 / Year Dot Matrix & Status Header)
-class CalendarYearMatrixReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 27. YEAR MATRIX PROGRESS (4x2)
+class CalendarYearMatrixReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateYearMatrixProgressBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 }
 
-// 28. ANALOG MONTH DASHBOARD (4x2 / Precision Clock & Calendar Grid)
-class CalendarAnalogCalendarHybridReceiver : BaseCalendarReceiver() {
-
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 28. ANALOG MONTH DASHBOARD (4x2)
+class CalendarAnalogCalendarHybridReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateAnalogCalendarHybridBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        try {
+            context.startService(Intent(context, SlateClockTickerService::class.java))
+        } catch (_: Exception) {}
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        try {
+            context.stopService(Intent(context, SlateClockTickerService::class.java))
+        } catch (_: Exception) {}
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        try {
+            context.startService(Intent(context, SlateClockTickerService::class.java))
+        } catch (_: Exception) {}
     }
 }
 
 // 29. ARCHITECTURAL ANALOG DASHBOARD (4x2)
-class CalendarArchitecturalAnalogReceiver : BaseCalendarReceiver() {
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap = generateArchitecturalAnalogReceiverBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp) }
+class CalendarArchitecturalAnalogReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateArchitecturalAnalogReceiverBitmap(context, getCurrentCalendarDateState(), config, isResponsive, wDp, hDp)
+}
 
-// 30. RADIAL ARC ORBITAL DASHBOARD (4x2 / Concentric Time Arcs & Life Progress)
-class CalendarRadialArcReceiver : BaseCalendarReceiver() {
-
-    override fun renderBitmap(context: Context, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int) =
+// 30. RADIAL ARC ORBITAL DASHBOARD (4x2)
+class CalendarRadialArcReceiver : BaseCalendarReceiver(targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateRadialArcDashboardBitmap(context, CalendarEngine.getDateState(), config, isResponsive, wDp, hDp)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        try {
+            context.startService(Intent(context, SlateClockTickerService::class.java))
+        } catch (_: Exception) {}
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        context.stopService(Intent(context, SlateClockTickerService::class.java))
+        try {
+            context.stopService(Intent(context, SlateClockTickerService::class.java))
+        } catch (_: Exception) {}
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        context.startService(Intent(context, SlateClockTickerService::class.java))
+        try {
+            context.startService(Intent(context, SlateClockTickerService::class.java))
+        } catch (_: Exception) {}
     }
 }

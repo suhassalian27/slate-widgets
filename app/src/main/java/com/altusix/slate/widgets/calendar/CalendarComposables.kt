@@ -13,6 +13,8 @@ import com.altusix.slate.utils.createSupersampledCanvas
 import com.altusix.slate.utils.getSafeBgColor
 import com.altusix.slate.utils.getSlateFont
 import com.altusix.slate.utils.getStandardCornerRadius
+import androidx.compose.ui.graphics.toArgb
+import com.altusix.slate.core.theme.SlateColors
 
 // 1. CAPSULE PILL (2x1)
 fun generatePillCalendarBitmap(context: Context, state: CalendarPillState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
@@ -361,8 +363,15 @@ fun generateBasicCalendarBitmap(context: Context, state: CalendarDateState, conf
 
 fun generateBasicCalendarBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateBasicCalendarBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
 
-// 3. BIG DATE (2x2 Square)
-fun generateBigDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
+// 3. BIG DATE (Strict 1:1 Fixed Square - Fully Proportional)
+fun generateBigDateBitmap(
+    context: Context,
+    state: CalendarDateState,
+    config: SlateWidgetConfig,
+    wDp: Int,
+    hDp: Int,
+    widgetId: Int = 0
+): Bitmap {
     val (bitmap, canvas, scaleFactor) = createSupersampledCanvas(wDp, hDp, context)
     val w = canvas.width.toFloat()
     val h = canvas.height.toFloat()
@@ -370,65 +379,103 @@ fun generateBigDateBitmap(context: Context, state: CalendarDateState, config: Sl
     val isLight = config.themeMode == "LIGHT"
     val bgColor = getSafeBgColor(config)
     val cardCornerRadius = getStandardCornerRadius(scaleFactor)
+    val accentColor = config.accentColorHex.toInt() or 0xFF000000.toInt()
+    val primaryText = if (isLight) SlateColors.TextLightPrimary.toArgb() else SlateColors.TextDarkPrimary.toArgb()
+    val secondaryText = if (isLight) SlateColors.TextLightSecondary.toArgb() else SlateColors.TextDarkSecondary.toArgb()
 
+    // Strict 1:1 square centered in widget bounds
     val margin = scaleFactor * 1.5f
-    val rect = if (isResponsive) {
-        RectF(margin, margin, w - margin, h - margin)
-    } else {
-        val cardSize = minOf(w - (margin * 2f), h - (margin * 2f))
-        val leftX = (w - cardSize) / 2f
-        val topY = (h - cardSize) / 2f
-        RectF(leftX, topY, leftX + cardSize, topY + cardSize)
-    }
+    val cardSize = minOf(w, h) - (margin * 2f)
+    val leftX = (w - cardSize) / 2f
+    val topY = (h - cardSize) / 2f
+    val rect = RectF(leftX, topY, leftX + cardSize, topY + cardSize)
 
+    val alphaInt = (config.opacity.coerceIn(0f, 1f) * 255).toInt()
     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bgColor
+        color = android.graphics.Color.argb(
+            alphaInt,
+            android.graphics.Color.red(bgColor),
+            android.graphics.Color.green(bgColor),
+            android.graphics.Color.blue(bgColor)
+        )
         style = Paint.Style.FILL
     }
     canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, bgPaint)
 
-    val primaryText = if (isLight) Color.parseColor("#161618") else Color.WHITE
-    val secondaryText = if (isLight) Color.parseColor("#8E8E93") else Color.parseColor("#B3FFFFFF")
-
-    val cardSizeRef = minOf(rect.width(), rect.height())
-    val pad = cardSizeRef * 0.12f
-
-    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = primaryText
-        textSize = cardSizeRef * 0.10f
-        typeface = getSlateFont(context, weight = 700)
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) 0x12000000 else 0x1AFFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = scaleFactor * 0.8f
     }
-    val headerY = rect.top + pad + headerPaint.textSize
-    canvas.drawText("${state.monthShort.uppercase()} ${state.year}", rect.left + pad, headerY, headerPaint)
+    canvas.drawRoundRect(rect, cardCornerRadius, cardCornerRadius, borderPaint)
 
+    val pad = cardSize * 0.11f
+    val maxAvailableWidth = cardSize - (pad * 2f)
+
+    // 1. Header: Month & Year (Fully proportional to cardSize)
+    val headerText = "${state.monthShort.uppercase()} ${state.year}"
+    var headerTextSize = (cardSize * 0.095f).coerceAtLeast(scaleFactor * 10f)
+    val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = secondaryText
+        textSize = headerTextSize
+        typeface = getSlateFont(context, weight = 700)
+        letterSpacing = 0.04f
+    }
+    while (headerPaint.measureText(headerText) > maxAvailableWidth && headerTextSize > scaleFactor * 8f) {
+        headerTextSize -= scaleFactor * 0.5f
+        headerPaint.textSize = headerTextSize
+    }
+    val fmHeader = headerPaint.fontMetrics
+    val headerY = rect.top + pad - fmHeader.ascent
+    canvas.drawText(headerText, rect.left + pad, headerY, headerPaint)
+
+    // 2. Date Number & Weekday Tag (Fully proportional to cardSize)
     val dateText = state.dayOfMonth
+    val dayText = state.dayOfWeekShort.uppercase()
+
+    var dateTextSize = (cardSize * 0.44f).coerceAtLeast(scaleFactor * 32f)
+    var dayTextSize = (cardSize * 0.125f).coerceAtLeast(scaleFactor * 10f)
+    var dayGap = cardSize * 0.045f
+
     val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryText
-        textSize = cardSizeRef * 0.42f
+        textSize = dateTextSize
         typeface = getSlateFont(context, weight = 700)
+    }
+
+    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        textSize = dayTextSize
+        typeface = getSlateFont(context, weight = 700)
+        letterSpacing = 0.05f
+    }
+
+    // Proportional auto-scaling if two digits + weekday exceed available width
+    val totalContentW = datePaint.measureText(dateText) + dayGap + dayPaint.measureText(dayText)
+    if (totalContentW > maxAvailableWidth) {
+        val scale = maxAvailableWidth / totalContentW
+        dateTextSize *= scale
+        dayTextSize *= scale
+        dayGap *= scale
+        datePaint.textSize = dateTextSize
+        dayPaint.textSize = dayTextSize
     }
 
     val dateBounds = Rect()
     datePaint.getTextBounds(dateText, 0, dateText.length, dateBounds)
 
-    val remainingHeight = rect.bottom - headerY
-    val dateY = headerY + (remainingHeight / 2f) + (dateBounds.height() / 2f) - (4f * scaleFactor)
+    val remainingHeight = rect.bottom - (headerY + fmHeader.descent) - pad
+    val dateY = (headerY + fmHeader.descent) + (remainingHeight / 2f) + (dateBounds.height() / 2f) - (cardSize * 0.015f)
     canvas.drawText(dateText, rect.left + pad, dateY, datePaint)
 
+    // Weekday alignment
     val dateWidth = datePaint.measureText(dateText)
-    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = secondaryText
-        textSize = cardSizeRef * 0.12f
-        typeface = getSlateFont(context, weight = 700)
-    }
-
-    val dayX = rect.left + pad + dateWidth + (cardSizeRef * 0.05f)
-    canvas.drawText(state.dayOfWeekShort.uppercase(), dayX, dateY - (dateBounds.height() * 0.10f), dayPaint)
+    val dayX = rect.left + pad + dateWidth + dayGap
+    val dayY = dateY - (dateBounds.height() * 0.08f)
+    canvas.drawText(dayText, dayX, dayY, dayPaint)
 
     return bitmap
 }
-
-fun generateBigDateBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap = generateBigDateBitmap(context, state, config, isResponsive = true, wDp = wDp, hDp = hDp)
 
 // 4. MONTH OVERLAY CALENDAR (4x2)
 fun generateWatermarkCalendarBitmap(context: Context, state: CalendarDateState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int, widgetId: Int = 0): Bitmap {
