@@ -12,8 +12,8 @@ import android.os.Bundle
 import android.widget.RemoteViews
 import com.altusix.slate.R
 import com.altusix.slate.core.model.SlateWidgetInfo
-import com.altusix.slate.core.theme.ThemePreferences
 import com.altusix.slate.data.local.SlateWidgetConfig
+import com.altusix.slate.data.local.loadSlateWidgetConfig
 
 fun getCalculatorWidgetsCatalog(): List<SlateWidgetInfo> {
     return listOf(
@@ -24,45 +24,7 @@ fun getCalculatorWidgetsCatalog(): List<SlateWidgetInfo> {
     )
 }
 
-private fun loadSlateWidgetConfig(context: Context, widgetId: Int): SlateWidgetConfig {
-    val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
-    val bgKey = "widget_${widgetId}_bg_color"
-
-    // Snapshot and permanently lock current global theme on placement
-    if (!widgetPrefs.contains(bgKey) && widgetId != -1) {
-        val globalSettings = ThemePreferences(context).getThemeSettings()
-        val isLight = (((globalSettings.bgHex shr 16 and 0xFFL) * 0.2126f) +
-                ((globalSettings.bgHex shr 8 and 0xFFL) * 0.7152f) +
-                ((globalSettings.bgHex and 0xFFL) * 0.0722f)) / 255f > 0.5f
-
-        widgetPrefs.edit()
-            .putString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
-            .putLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-            .putLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
-            .putFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-            .apply()
-    }
-
-    val globalSettings = ThemePreferences(context).getThemeSettings()
-    val bgColor = widgetPrefs.getLong("widget_${widgetId}_bg_color", globalSettings.bgHex)
-    val opacity = widgetPrefs.getFloat("widget_${widgetId}_opacity", globalSettings.opacity)
-    val accentColor = widgetPrefs.getLong("widget_${widgetId}_accent_color", globalSettings.accentHex)
-
-    val isLight = (((bgColor shr 16 and 0xFFL) * 0.2126f) +
-            ((bgColor shr 8 and 0xFFL) * 0.7152f) +
-            ((bgColor and 0xFFL) * 0.0722f)) / 255f > 0.5f
-    val mode = widgetPrefs.getString("widget_${widgetId}_theme_mode", if (isLight) "LIGHT" else "DARK")
-        ?: if (isLight) "LIGHT" else "DARK"
-
-    return SlateWidgetConfig(
-        themeMode = mode,
-        backgroundColorHex = bgColor,
-        opacity = opacity,
-        accentColorHex = accentColor
-    )
-}
-
-private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
+fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
     val widgetPrefs = context.getSharedPreferences("slate_widget_prefs", Context.MODE_PRIVATE)
     val modeKey = "widget_${widgetId}_mode"
     val isResponsiveKey = "widget_${widgetId}_is_responsive"
@@ -81,7 +43,7 @@ private fun parseAndLockIsResponsive(context: Context, widgetId: Int): Boolean {
 }
 
 fun updateAllCalculatorWidgets(context: Context) {
-    val manager = AppWidgetManager.getInstance(context)
+    val manager = AppWidgetManager.getInstance(context) ?: return
     val receivers = listOf(
         StandardCalc2x2Receiver::class.java,
         SplitCalc2x2Receiver::class.java,
@@ -91,24 +53,60 @@ fun updateAllCalculatorWidgets(context: Context) {
     for (receiverClass in receivers) {
         val ids = manager.getAppWidgetIds(ComponentName(context, receiverClass)) ?: intArrayOf()
         if (ids.isNotEmpty()) {
-            val intent = Intent(context, receiverClass).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            val receiver = receiverClass.getDeclaredConstructor().newInstance()
+            for (id in ids) {
+                receiver.updateSingleWidget(context, manager, id)
             }
-            context.sendBroadcast(intent)
         }
     }
 }
 
-abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvider() {
+abstract class BaseCalcReceiver(
+    private val layoutResId: Int,
+    open val targetAspect: Float = 1.0f
+) : AppWidgetProvider() {
 
     companion object {
         const val ACTION_CALC_KEY = "com.altusix.slate.ACTION_CALC_KEY"
         const val EXTRA_KEY = "extra_calc_key"
     }
 
-    abstract fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap
+    abstract fun renderBitmap(
+        context: Context,
+        appWidgetId: Int,
+        state: CalculatorState,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap
+
     abstract fun getKeyMap(): Map<Int, String>
+
+    fun renderWidgetBitmap(
+        context: Context,
+        appWidgetId: Int,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int
+    ): Bitmap {
+        val state = if (appWidgetId == -1) {
+            CalculatorState(expression = "128 × 4", resultText = "512", isEvaluated = true)
+        } else {
+            CalculatorEngine.getWidgetState(context, appWidgetId)
+        }
+        return renderBitmap(context, appWidgetId, state, config, isResponsive, wDp, hDp)
+    }
+
+    fun renderBitmapForWidget(
+        context: Context,
+        config: SlateWidgetConfig,
+        isResponsive: Boolean,
+        wDp: Int,
+        hDp: Int,
+        widgetId: Int
+    ): Bitmap = renderWidgetBitmap(context, widgetId, config, isResponsive, wDp, hDp)
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_CALC_KEY) {
@@ -131,24 +129,55 @@ abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvide
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle?) {
-        updateSingleWidget(context, appWidgetManager, appWidgetId)
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateSingleWidget(context, appWidgetManager, appWidgetId)
     }
 
-    private fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
+    fun updateSingleWidget(context: Context, manager: AppWidgetManager, id: Int) {
         try {
             val config = loadSlateWidgetConfig(context, id)
             val state = CalculatorEngine.getWidgetState(context, id)
+            val isResponsive = if (id == -1) true else parseAndLockIsResponsive(context, id)
 
             val options = manager.getAppWidgetOptions(id)
             val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160) ?: 160
-            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) ?: 160 else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 160) ?: 160
-            val wDp = if (wDpRaw <= 0) 160 else wDpRaw
-            val hDp = if (hDpRaw <= 0) 160 else hDpRaw
+            val fallbackSize = if (targetAspect >= 1.8f) 300 to 150 else 160 to 160
+            val wDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, fallbackSize.first) ?: fallbackSize.first else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, fallbackSize.first) ?: fallbackSize.first
+            val hDpRaw = if (isLandscape) options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackSize.second) ?: fallbackSize.second else options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackSize.second) ?: fallbackSize.second
+            val wDp = if (wDpRaw <= 0) fallbackSize.first else wDpRaw
+            val hDp = if (hDpRaw <= 0) fallbackSize.second else hDpRaw
+            val density = context.resources.displayMetrics.density
 
-            val bitmap = renderBitmap(context, id, state, config, wDp, hDp)
+            val padH: Int
+            val padV: Int
+            val effWDp: Int
+            val effHDp: Int
+
+            if (!isResponsive && targetAspect > 0f) {
+                val currentAspect = wDp.toFloat() / hDp.toFloat()
+                if (currentAspect > targetAspect) {
+                    val contentW = hDp * targetAspect
+                    padH = (((wDp - contentW) / 2f) * density).toInt()
+                    padV = 0
+                    effWDp = maxOf(1, contentW.toInt())
+                    effHDp = hDp
+                } else {
+                    val contentH = wDp / targetAspect
+                    padH = 0
+                    padV = (((hDp - contentH) / 2f) * density).toInt()
+                    effWDp = wDp
+                    effHDp = maxOf(1, contentH.toInt())
+                }
+            } else {
+                padH = 0
+                padV = 0
+                effWDp = wDp
+                effHDp = hDp
+            }
+
+            val bitmap = renderBitmap(context, id, state, config, isResponsive, effWDp, effHDp)
             val views = RemoteViews(context.packageName, layoutResId)
+            views.setViewPadding(R.id.layout_grid_root, padH, padV, padH, padV)
             views.setImageViewBitmap(R.id.widget_canvas_surface, bitmap)
 
             for ((viewId, keyVal) in getKeyMap()) {
@@ -156,7 +185,6 @@ abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvide
                     action = ACTION_CALC_KEY
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                     putExtra(EXTRA_KEY, keyVal)
-                    // Unique data URI prevents PendingIntent overwriting
                     data = Uri.parse("slate_calc://$id/$viewId/$keyVal")
                 }
                 val pendingIntent = PendingIntent.getBroadcast(
@@ -175,9 +203,9 @@ abstract class BaseCalcReceiver(private val layoutResId: Int) : AppWidgetProvide
     }
 }
 
-class StandardCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calculator_2x2_layout) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-        generateCalculator2x2Bitmap(context, state, config, parseAndLockIsResponsive(context, appWidgetId), wDp, hDp, appWidgetId)
+class StandardCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calculator_2x2_layout, targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateCalculator2x2Bitmap(context, state, config, isResponsive, wDp, hDp, appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL", R.id.btn_calc_percent to "%", R.id.btn_calc_div to "÷",
@@ -188,9 +216,9 @@ class StandardCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calculator_2x2_
     )
 }
 
-class SplitCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_split_layout) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-        generateSplitCalculatorBitmap(context, state, config, parseAndLockIsResponsive(context, appWidgetId), wDp, hDp, appWidgetId)
+class SplitCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_split_layout, targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateSplitCalculatorBitmap(context, state, config, isResponsive, wDp, hDp, appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_ac to "AC", R.id.btn_calc_del to "DEL", R.id.btn_calc_percent to "%",
@@ -202,9 +230,9 @@ class SplitCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_split_layout)
     )
 }
 
-class StudioCalc4x2Receiver : BaseCalcReceiver(R.layout.widget_calc_4x2_layout) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
-        generateStudioCalculator4x2Bitmap(context, state, config, parseAndLockIsResponsive(context, appWidgetId), wDp, hDp, appWidgetId)
+class StudioCalc4x2Receiver : BaseCalcReceiver(R.layout.widget_calc_4x2_layout, targetAspect = 2.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
+        generateStudioCalculator4x2Bitmap(context, state, config, isResponsive, wDp, hDp, appWidgetId)
 
     override fun getKeyMap() = mapOf(
         R.id.btn_calc_7 to "7", R.id.btn_calc_8 to "8", R.id.btn_calc_9 to "9", R.id.btn_calc_div to "÷",
@@ -215,8 +243,8 @@ class StudioCalc4x2Receiver : BaseCalcReceiver(R.layout.widget_calc_4x2_layout) 
     )
 }
 
-class CircleCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_circle_layout) {
-    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, wDp: Int, hDp: Int): Bitmap =
+class CircleCalc2x2Receiver : BaseCalcReceiver(R.layout.widget_calc_circle_layout, targetAspect = 1.0f) {
+    override fun renderBitmap(context: Context, appWidgetId: Int, state: CalculatorState, config: SlateWidgetConfig, isResponsive: Boolean, wDp: Int, hDp: Int): Bitmap =
         generateCircleCalculatorBitmap(context, state, config, isResponsive = false, wDp = wDp, hDp = hDp, widgetId = appWidgetId)
 
     override fun getKeyMap() = mapOf(
